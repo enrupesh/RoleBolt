@@ -330,6 +330,8 @@ Rules for the rubric:
 
   const raw = await callNvidiaChatCompletions({
     apiKey: MESHAPI_API_KEY,
+    retries: 2,
+    fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
     messages: [{ role: "user", content: prompt }],
     temperature: 0.6,
     max_tokens: 2000,
@@ -469,6 +471,8 @@ For "tier": classify each criterion as 1 (must-have skill), 2 (experience depth)
 
   const raw = await callNvidiaChatCompletions({
     apiKey: MESHAPI_API_KEY,
+    retries: 2,
+    fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
     messages: [{ role: "user", content: prompt }],
     temperature: 0.4,
     max_tokens: 2000,
@@ -595,6 +599,8 @@ Write in plain text, no JSON, no markdown headers.`;
 
   const brief = await callNvidiaChatCompletions({
     apiKey: MESHAPI_API_KEY,
+    retries: 2,
+    fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
     messages: [{ role: "user", content: prompt }],
     temperature: 0.5,
     max_tokens: 600,
@@ -633,6 +639,8 @@ Respond with ONLY this exact JSON structure, no markdown, no extra text:
 
   const raw = await callNvidiaChatCompletions({
     apiKey: MESHAPI_API_KEY,
+    retries: 2,
+    fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
     messages: [{ role: "user", content: prompt }],
     temperature: 0.5,
     max_tokens: 1200,
@@ -720,6 +728,8 @@ Rules:
 
   const raw = await callNvidiaChatCompletions({
     apiKey: MESHAPI_API_KEY,
+    retries: 2,
+    fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
     messages: [{ role: "user", content: prompt }],
     temperature: 0.25,
     max_tokens: 700,
@@ -791,6 +801,8 @@ TONE RULES:
 
   const email = await callNvidiaChatCompletions({
     apiKey: MESHAPI_API_KEY,
+    retries: 2,
+    fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
     messages: [{ role: "user", content: prompt }],
     temperature: 0.75,
     max_tokens: 350,
@@ -1607,6 +1619,8 @@ FORMAT RULES:
 
   return await callNvidiaChatCompletions({
     apiKey: MESHAPI_API_KEY,
+    retries: 2,
+    fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
     messages: [{ role: "user", content: prompt }],
     temperature: 0.5,
     max_tokens: 900,
@@ -2044,6 +2058,8 @@ Rules:
 
   const raw = await callNvidiaChatCompletions({
     apiKey: MESHAPI_API_KEY,
+    retries: 2,
+    fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
     messages: [{ role: "user", content: prompt }],
     temperature: 0.35,
     max_tokens: 800,
