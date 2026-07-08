@@ -1,0 +1,82 @@
+Request URL
+https://raina-1.onrender.com/recruit/jobs/6a4dfed578b88abf6bba91ab/candidates/6a4e10a578b88abf6bba91b7/retry-score
+Request Method
+POST
+Status Code
+200 OK
+Remote Address
+[64:ff9b::d818:3908]:443
+Referrer Policy
+no-referrer-when-downgrade
+access-control-allow-credentials
+true
+access-control-allow-origin
+https://forjob.onrender.com
+alt-svc
+h3=":443"; ma=86400
+cf-cache-status
+DYNAMIC
+cf-ray
+a17de1d32a08ff64-BOM
+content-encoding
+br
+content-length
+2170
+content-type
+application/json; charset=utf-8
+date
+Wed, 08 Jul 2026 08:57:47 GMT
+etag
+W/"1004-ATqOjfu1lLGNDRi7qiDB1VrYQk4"
+rndr-id
+c365db5f-78e0-4c51
+server
+cloudflare
+vary
+Origin
+vary
+Accept-Encoding
+x-powered-by
+Express
+x-render-origin-server
+Render
+:authority
+raina-1.onrender.com
+:method
+POST
+:path
+/recruit/jobs/6a4dfed578b88abf6bba91ab/candidates/6a4e10a578b88abf6bba91b7/retry-score
+:scheme
+https
+accept
+*/*
+accept-encoding
+gzip, deflate, br, zstd
+accept-language
+en-US,en;q=0.8
+authorization
+Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6IjE2ZDM5Y2FiYTg2MWY1YzYwMmI3YjY0ODk5YjdhYTdhMWYxZmM4NmUiLCJ0eXAiOiJKV1QifQ.eyJuYW1lIjoiUGx5bmRyb3ggQWkiLCJwaWN0dXJlIjoiaHR0cHM6Ly9saDMuZ29vZ2xldXNlcmNvbnRlbnQuY29tL2EvQUNnOG9jSTlaR2NEZzFIZHh4Nk5pUS1RTW03dmhyYjh4M3pOU0ZIdWpWVXZpZzVlLXIyakZtND1zOTYtYyIsImlzcyI6Imh0dHBzOi8vc2VjdXJldG9rZW4uZ29vZ2xlLmNvbS9ldmFyYS05YTY5MyIsImF1ZCI6ImV2YXJhLTlhNjkzIiwiYXV0aF90aW1lIjoxNzgzNDg4ODE4LCJ1c2VyX2lkIjoiM3VMc1Q3Mm5rclo4NFJ2VzNqbnpid2RtVVR0MSIsInN1YiI6IjN1THNUNzJua3JaODRSdlczam56YndkbVVUdDEiLCJpYXQiOjE3ODM0OTk3NTAsImV4cCI6MTc4MzUwMzM1MCwiZW1haWwiOiJwbHluZHJveGFpQGdtYWlsLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJmaXJlYmFzZSI6eyJpZGVudGl0aWVzIjp7Imdvb2dsZS5jb20iOlsiMTAzMDUxNzI4NDYzMTY1OTc1NzAyIl0sImVtYWlsIjpbInBseW5kcm94YWlAZ21haWwuY29tIl19LCJzaWduX2luX3Byb3ZpZGVyIjoiZ29vZ2xlLmNvbSJ9fQ.n0OoW0XtmSrC6OYGM-h1O9d-2v1JP1tWmxSgu3rHUBqjVyxlxrDU2b_PSn3FC2B55T0SOaDGwlCZ8dLxNFTfLvI1a5_rhR0bT4JxOiyB8oXmfc8Zvt6wZaqpEvV78wcYJb8k4gguWlrQDr-rVisKyJqS-_l9SuCJG-8-fRJofKzmyiPRvjkQKGc1n57lsV-1Ynt1_X4CW0aNcFSkSriGNgoZdbDokgjfykLSBP6IK8H00iNpMbS_FKgdNWDEec2mM2SrlIBvuUbH12uC2UHSe5DpF7md70L9VNTji2DygFRm0t2EQnFCMWX_Sr_Ce4VMs0Nq1FICpjRLoLSA-jrTOg
+content-length
+0
+origin
+https://forjob.onrender.com
+priority
+u=1, i
+referer
+https://forjob.onrender.com/
+sec-ch-ua
+"Not;A=Brand";v="8", "Chromium";v="150", "Brave";v="150"
+sec-ch-ua-mobile
+?0
+sec-ch-ua-platform
+"Windows"
+sec-fetch-dest
+empty
+sec-fetch-mode
+cors
+sec-fetch-site
+cross-site
+sec-gpc
+1
+user-agent
+Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36
