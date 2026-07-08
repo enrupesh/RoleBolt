@@ -573,6 +573,27 @@ For "tier": classify each criterion as 1 (must-have skill), 2 (experience depth)
     tier: resolveTier(b.criterion, b.tier),
   })).filter((b: any) => b.criterion.length > 0);
 
+  // Parsed JSON but with no usable criteria (missing/empty scoreBreakdown, or
+  // every entry lacked a criterion name) is structurally invalid — treat it
+  // the same as an unparseable response instead of silently persisting a
+  // fabricated 0/100 score as if it were a real evaluation.
+  if (breakdown.length === 0) {
+    const rubricMaxScore = args.rubric.reduce((sum, r) => sum + r.weight, 0) || 100;
+    const extractedName = extractNameFromResume(args.resumeText);
+    console.error("[recruit] scoreCandidate: AI returned parseable but structurally invalid response (no score breakdown). Raw output (first 500 chars):", raw?.slice(0, 500));
+    return {
+      name: extractedName,
+      email: "",
+      totalScore: 0,
+      maxScore: rubricMaxScore,
+      scoreBreakdown: [],
+      aiSummary: "",
+      redFlags: [],
+      strengths: [],
+      scoringFailed: true,
+    };
+  }
+
   const totalScore = breakdown.reduce((sum: number, b: any) => sum + b.score, 0);
   const maxScore = breakdown.reduce((sum: number, b: any) => sum + b.maxScore, 0) || 100;
 
