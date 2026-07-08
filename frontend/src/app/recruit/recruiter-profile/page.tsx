@@ -242,24 +242,23 @@ function RecruiterProfileContent() {
     }
   }
 
-  async function requestVerification() {
-    if (!authToken) return;
-    setRequestingVerification(true);
-    setVerificationMessage("");
-    try {
-      const res = await fetch(apiUrl("/recruit/company/request-verification"), {
-        method: "POST",
-        headers: { Authorization: `Bearer ${authToken}` },
-      });
-      const data = await readApiJson(res);
-      if (!res.ok) throw new Error(data.error || "Failed to request verification.");
-      setVerificationStatus(data.status);
-      setVerificationMessage(data.message);
-    } catch (e: any) {
-      setVerificationMessage(e.message);
-    } finally {
-      setRequestingVerification(false);
+  function requestVerification() {
+    // Check profile completeness before redirecting
+    if (!profile.companyName.trim()) {
+      setVerificationMessage("Please fill in your name before requesting verification.");
+      return;
     }
+    if (!profile.description.trim()) {
+      setVerificationMessage("Please add a description to your profile before requesting verification.");
+      return;
+    }
+    const hasLink = profile.website.trim() || profile.linkedinUrl.trim()
+      || profile.personalLinkedinUrl.trim() || profile.socialLinks.portfolio.trim();
+    if (!hasLink) {
+      setVerificationMessage("Please add at least one link (website, LinkedIn, or portfolio) before requesting verification.");
+      return;
+    }
+    router.push("/recruit/verification");
   }
 
   function set<K extends keyof Profile>(key: K, value: Profile[K]) {
