@@ -76,8 +76,8 @@ const howTo = howToJsonLd({
       url: "/signup",
     },
     {
-      name: "Create your company profile",
-      text: "Set up your company name, logo, description, and website. This appears on your public job board and individual job listings.",
+      name: "Create your recruiter profile",
+      text: "Set up your name, logo, description, and website — whether you're a company, educational institute, or individual recruiter. This appears on your public job board and individual job listings.",
       url: "/recruit",
     },
     {

@@ -381,7 +381,7 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
           <div className="rounded-2xl border border-[#0a66c2]/20 bg-blue-50/50 p-4 flex items-center justify-between gap-4">
             <div>
               <p className="text-sm font-semibold text-slate-800">Want to know more about who's hiring?</p>
-              <p className="text-xs text-slate-500 mt-0.5">View the recruiter's full company profile and their other open roles.</p>
+              <p className="text-xs text-slate-500 mt-0.5">View the recruiter's full profile and their other open roles.</p>
             </div>
             <Link
               href={`/recruit/recruiter/${id}`}

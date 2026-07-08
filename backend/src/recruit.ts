@@ -2088,10 +2088,19 @@ recruitRouter.put("/company/profile", async (req, res) => {
     const uid = getUid(req);
     if (!uid) return res.status(401).json({ error: "Unauthorized" });
 
-    const fields = ["companyName", "companyType", "industry", "companySize", "website", "location", "description", "mission", "benefits", "linkedinUrl", "logoUrl", "photoUrl", "bio"];
+    const fields = [
+      "profileType", "companyName", "tagline", "companyType", "industry", "companySize", "foundedYear",
+      "website", "location", "description", "mission", "benefits",
+      "instituteType", "coursesOffered", "affiliationNumber",
+      "niche", "registrationNumber",
+      "linkedinUrl", "logoUrl", "photoUrl", "bio", "personalLinkedinUrl",
+    ];
     const update: Record<string, any> = {};
     for (const f of fields) {
       if (req.body[f] !== undefined) update[f] = String(req.body[f]).trim();
+    }
+    if (update.profileType && !["company", "educational_institute", "individual", "content_creator", "ngo_government"].includes(update.profileType)) {
+      delete update.profileType;
     }
     if (req.body.socialLinks && typeof req.body.socialLinks === "object") {
       const sl = req.body.socialLinks;
