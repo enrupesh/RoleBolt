@@ -1,3 +1,9 @@
+// Thin OpenAI-compatible chat-completions client. Originally written against
+// NVIDIA NIM; now pointed at Mesh API (https://developers.meshapi.ai), which
+// exposes the same OpenAI-style `/v1/chat/completions` contract in front of
+// 1000+ models (use provider-prefixed model IDs, e.g. "openai/gpt-4o-mini").
+// The function/param names below still say "nvidia" for historical reasons
+// but the logic is provider-agnostic — only `baseUrl`/`apiKey`/`model` change.
 export type ChatRole = "system" | "user" | "assistant";
 
 export type ChatMessage = {
@@ -67,8 +73,8 @@ export async function callNvidiaChatCompletions(args: {
 }) {
   const {
     apiKey,
-    baseUrl = "https://integrate.api.nvidia.com/v1",
-    model = "openai/gpt-oss-20b",
+    baseUrl = "https://api.meshapi.ai/v1",
+    model = "openai/gpt-4o-mini",
     messages,
     temperature = 0.7,
     top_p = 0.9,

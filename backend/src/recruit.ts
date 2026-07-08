@@ -17,7 +17,7 @@ function trackEvent(event: string, uid?: string, data?: Record<string, unknown>)
 export const recruitRouter = express.Router();
 export const recruitPublicRouter = express.Router();
 
-const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY ?? "";
+const MESHAPI_API_KEY = process.env.MESHAPI_API_KEY ?? "";
 const FRONTEND_URL = process.env.FRONTEND_URL ?? "https://www.plyndrox.app";
 
 function getUid(req: express.Request): string {
@@ -329,7 +329,7 @@ Rules for the rubric:
 - Descriptions should guide a non-expert reviewer`;
 
   const raw = await callNvidiaChatCompletions({
-    apiKey: NVIDIA_API_KEY,
+    apiKey: MESHAPI_API_KEY,
     messages: [{ role: "user", content: prompt }],
     temperature: 0.6,
     max_tokens: 2000,
@@ -468,7 +468,7 @@ Respond with ONLY this JSON (no markdown, no extra text):
 For "tier": classify each criterion as 1 (must-have skill), 2 (experience depth), or 3 (nice-to-have), matching the THREE-TIER SCORING WEIGHTS defined above.`;
 
   const raw = await callNvidiaChatCompletions({
-    apiKey: NVIDIA_API_KEY,
+    apiKey: MESHAPI_API_KEY,
     messages: [{ role: "user", content: prompt }],
     temperature: 0.4,
     max_tokens: 2000,
@@ -594,7 +594,7 @@ Write a practical interview brief (250-350 words) covering:
 Write in plain text, no JSON, no markdown headers.`;
 
   const brief = await callNvidiaChatCompletions({
-    apiKey: NVIDIA_API_KEY,
+    apiKey: MESHAPI_API_KEY,
     messages: [{ role: "user", content: prompt }],
     temperature: 0.5,
     max_tokens: 600,
@@ -632,7 +632,7 @@ Respond with ONLY this exact JSON structure, no markdown, no extra text:
 {"questions":[{"id":"q1","text":"..."},{"id":"q2","text":"..."},{"id":"q3","text":"..."},{"id":"q4","text":"..."},{"id":"q5","text":"..."}]}`;
 
   const raw = await callNvidiaChatCompletions({
-    apiKey: NVIDIA_API_KEY,
+    apiKey: MESHAPI_API_KEY,
     messages: [{ role: "user", content: prompt }],
     temperature: 0.5,
     max_tokens: 1200,
@@ -719,7 +719,7 @@ Rules:
 - reasoning: specific explanation of what the assessment revealed that the resume did not show`;
 
   const raw = await callNvidiaChatCompletions({
-    apiKey: NVIDIA_API_KEY,
+    apiKey: MESHAPI_API_KEY,
     messages: [{ role: "user", content: prompt }],
     temperature: 0.25,
     max_tokens: 700,
@@ -790,7 +790,7 @@ TONE RULES:
 - Do not use bullet points or formal headers`;
 
   const email = await callNvidiaChatCompletions({
-    apiKey: NVIDIA_API_KEY,
+    apiKey: MESHAPI_API_KEY,
     messages: [{ role: "user", content: prompt }],
     temperature: 0.75,
     max_tokens: 350,
@@ -1606,7 +1606,7 @@ FORMAT RULES:
 - End with a signature block for the hiring manager`;
 
   return await callNvidiaChatCompletions({
-    apiKey: NVIDIA_API_KEY,
+    apiKey: MESHAPI_API_KEY,
     messages: [{ role: "user", content: prompt }],
     temperature: 0.5,
     max_tokens: 900,
@@ -2043,7 +2043,7 @@ Rules:
 - If no resume text, focus on preference and skills matching only`;
 
   const raw = await callNvidiaChatCompletions({
-    apiKey: NVIDIA_API_KEY,
+    apiKey: MESHAPI_API_KEY,
     messages: [{ role: "user", content: prompt }],
     temperature: 0.35,
     max_tokens: 800,
