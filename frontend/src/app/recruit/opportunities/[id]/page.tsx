@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import ApplyForm from "./ApplyForm";
 import RecruitHeader from "@/components/RecruitHeader";
 import ShareJobButton from "./ShareJobButton";
 import CopyJobButton from "./CopyJobButton";
 import ReportJobButton from "./ReportJobButton";
 import CompanySection from "./CompanySection";
 import QualityBreakdown from "./QualityBreakdown";
+import StickyActions from "./StickyActions";
 import { computeJobQuality } from "@/lib/jobQuality";
 import PageTracker from "@/components/PageTracker";
 import { apiUrl, readApiJson } from "@/lib/api";
@@ -81,27 +81,23 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       noIndex: true,
     });
   }
-  const title = `${job.title}${job.companyName ? ` at ${job.companyName}` : ""} | Plyndrox Recruit AI`;
   const location = job.location || "India";
   const mode = job.workMode ? ` · ${job.workMode.charAt(0).toUpperCase() + job.workMode.slice(1)}` : "";
-  const description = `${job.title} role${job.companyName ? ` at ${job.companyName}` : ""} in ${location}${mode}. ${job.mustHaveSkills ? `Skills: ${job.mustHaveSkills.split(",").slice(0, 4).join(", ")}.` : ""} Apply free on Plyndrox Recruit AI — India's niche job platform.`;
+  const description = `${job.title} role${job.companyName ? ` at ${job.companyName}` : ""} in ${location}${mode}. ${job.mustHaveSkills ? `Skills: ${job.mustHaveSkills.split(",").slice(0, 4).join(", ")}.` : ""} Apply free on Plyndrox Recruit AI.`;
   const skills = job.mustHaveSkills
     ? job.mustHaveSkills.split(",").slice(0, 6).map((s: string) => s.trim()).filter(Boolean)
     : [];
   return buildMetadata({
-    title,
+    title: `${job.title}${job.companyName ? ` at ${job.companyName}` : ""} | Plyndrox Recruit AI`,
     description,
     path: `/recruit/opportunities/${id}`,
     keywords: [
       job.title,
       ...(job.companyName ? [`${job.title} at ${job.companyName}`] : []),
       `${job.title} jobs India`,
-      `${job.title} hiring`,
       ...(location !== "India" ? [`${job.title} jobs ${location}`] : []),
       ...skills.map((s: string) => `${s} jobs India`),
       "Plyndrox Recruit AI",
-      "niche jobs India",
-      "apply free India",
     ],
   });
 }
@@ -112,7 +108,7 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
 
   if (!job) {
     return (
-      <div className="min-h-screen bg-white">
+      <div className="min-h-screen bg-[#f8fafc]">
         <RecruitHeader />
         <div className="flex flex-col items-center justify-center py-32 text-center px-4">
           <div className="text-4xl mb-4">🔍</div>
@@ -148,21 +144,15 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
     job.verifiedCompany ? "Verified company: Yes" : "",
     job.openings && job.openings > 1 ? `Openings: ${job.openings}` : "",
     deadlineLabel ? `Apply by: ${deadlineLabel}` : "",
-    job.languageRequirement ? `Language: ${job.languageRequirement}` : "",
-    job.workMode === "remote" && job.timezoneOverlap ? `Timezone: ${job.timezoneOverlap}` : "",
-    job.perks?.trim() ? `Perks: ${job.perks.trim()}` : "",
     "",
     "── Role overview ──",
     roleOverview || "The recruiter has not published a full job description yet.",
     "",
     mustHave.length ? `── Must-have skills ──\n${mustHave.map(s => `• ${s}`).join("\n")}` : "",
-    "",
     niceToHave.length ? `── Good-to-have skills ──\n${niceToHave.map(s => `• ${s}`).join("\n")}` : "",
     "",
     `View job: https://www.plyndrox.app/recruit/opportunities/${id}`,
-  ]
-    .filter(Boolean)
-    .join("\n");
+  ].filter(Boolean).join("\n");
 
   const tags = [
     { label: salary(job), color: "bg-slate-100 text-slate-700" },
@@ -177,206 +167,261 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
   ];
 
   return (
-    <div className="min-h-screen bg-white text-slate-900">
+    <div className="min-h-screen bg-[#f8fafc] text-slate-900">
       <PageTracker event="opportunity_viewed" data={{ jobId: id }} />
       <RecruitHeader />
-      <div className="mx-auto max-w-6xl px-4 py-2 sm:px-6 lg:px-8">
-        <Link href="/recruit/opportunities" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-[#0a66c2] transition py-2">
-          <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M19 12H5" /><path d="m12 5-7 7 7 7" /></svg>
+
+      {/* Sticky bottom CTA bar */}
+      <StickyActions jobId={id} jobTitle={job.title} companyName={job.companyName} />
+
+      {/* Back nav */}
+      <div className="mx-auto max-w-3xl px-4 pt-4 sm:px-6">
+        <Link
+          href="/recruit/opportunities"
+          className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-[#0a66c2] transition"
+        >
+          <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+            <path d="M19 12H5" /><path d="m12 5-7 7 7 7" />
+          </svg>
           Back to jobs
         </Link>
       </div>
 
-      <main className="mx-auto max-w-6xl px-4 pb-10 sm:px-6 lg:px-8 lg:grid lg:grid-cols-[1fr_360px] lg:gap-6 lg:items-start">
-        <section className="space-y-4 mt-0">
-          <div className="rounded-3xl border border-slate-200 bg-gradient-to-br from-white to-blue-50/40 p-5 shadow-sm sm:p-6">
-            <div className="flex items-start gap-4">
-              <div className="flex h-14 w-14 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100 text-xl font-black text-[#0a66c2]">
-                {(job.companyName || job.title).slice(0, 1).toUpperCase()}
+      {/* Single-column content — extra bottom padding for sticky bar */}
+      <main className="mx-auto max-w-3xl px-4 py-4 pb-28 sm:px-6 space-y-4">
+
+        {/* ── 1. Job header ── */}
+        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <div className="flex items-start gap-4">
+            {/* Logo avatar */}
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100 text-xl font-black text-[#0a66c2]">
+              {(job.companyName || job.title).slice(0, 1).toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+                {job.verifiedCompany && (
+                  <span className="rounded-full border border-green-200 bg-green-50 px-2.5 py-0.5 text-[11px] font-bold text-green-700">✓ Verified company</span>
+                )}
+                {job.freshersAllowed && (
+                  <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[11px] font-bold text-amber-700">Freshers welcome</span>
+                )}
+                <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${quality.color} ${quality.bg} ${quality.border}`}>
+                  {quality.tier === "high" ? "★ " : quality.tier === "standard" ? "◆ " : "· "}{quality.label}
+                </span>
               </div>
-              <div className="min-w-0 flex-1">
-                <div className="mb-2 flex flex-wrap items-center gap-2">
-                  {job.verifiedCompany && <span className="rounded-full border border-green-200 bg-green-50 px-2.5 py-1 text-[11px] font-bold text-green-700">✓ Verified company</span>}
-                  {job.freshersAllowed && <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-700">Freshers welcome</span>}
-                  <span className={`rounded-full border px-2.5 py-1 text-[11px] font-bold ${quality.color} ${quality.bg} ${quality.border}`}>
-                    {quality.tier === "high" ? "★ " : quality.tier === "standard" ? "◆ " : "· "}{quality.label}
-                  </span>
-                </div>
-                <h1 className="text-xl sm:text-2xl font-bold tracking-tight leading-tight">{job.title}</h1>
-                <p className="mt-1 text-sm text-slate-500">
-                  <span className="font-medium text-slate-700">{job.companyName || "Company"}</span>
-                  {job.companyType ? ` · ${job.companyType}` : ""}
-                  {` · ${job.location || "India"}`}
-                </p>
+              <h1 className="text-xl font-bold tracking-tight leading-tight sm:text-2xl">{job.title}</h1>
+              <p className="mt-1 text-sm text-slate-500">
+                <span className="font-medium text-slate-700">{job.companyName || "Company"}</span>
+                {job.companyType ? ` · ${job.companyType}` : ""}
+                {` · ${job.location || "India"}`}
+              </p>
+              {(job.niche || job.department) && (
                 <p className="mt-0.5 text-xs text-slate-400">{job.niche || job.department}</p>
-              </div>
-              <div className="relative z-10 flex shrink-0 items-center gap-2">
-                <ShareJobButton title={job.title} companyName={job.companyName} />
-                <CopyJobButton text={copyText} />
-              </div>
-            </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {tags.map((t, i) => (
-                <span key={i} className={`rounded-full px-3 py-1 text-xs font-semibold ${t.color}`}>{t.label}</span>
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm">
-            <h2 className="text-base font-bold text-slate-900 mb-3">Role overview</h2>
-            <div className="prose prose-sm max-w-none text-slate-700 leading-relaxed whitespace-pre-wrap">
-              {roleOverview || "The recruiter has not published a full job description yet."}
-            </div>
-          </div>
-
-          {(mustHave.length > 0 || niceToHave.length > 0) && (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <h2 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#0a66c2] text-white text-[10px]">✓</span>
-                  Must-have skills
-                </h2>
-                <ul className="space-y-2">
-                  {(mustHave.length ? mustHave : ["Relevant experience for this role"]).map(item => (
-                    <li key={item} className="flex items-start gap-2 text-sm text-slate-700">
-                      <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-[#0a66c2] shrink-0" />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <h2 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-100 text-amber-700 text-[10px]">+</span>
-                  Good-to-have
-                </h2>
-                <ul className="space-y-2">
-                  {(niceToHave.length ? niceToHave : ["Strong communication and ownership"]).map(item => (
-                    <li key={item} className="flex items-start gap-2 text-sm text-slate-700">
-                      <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-amber-400 shrink-0" />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          )}
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="text-sm font-bold text-slate-900 mb-4">Job details</h2>
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 text-sm">
-              {[
-                { label: "Niche", value: job.niche || job.department || "General" },
-                { label: "Company type", value: job.companyType || "Not specified" },
-                { label: "Education", value: job.educationRequirement || "Flexible" },
-                { label: "Notice period", value: job.noticePeriod || "Flexible" },
-                { label: "Openings", value: job.openings && job.openings > 1 ? `${job.openings} positions` : "1 position" },
-                { label: "Apply by", value: deadlineLabel || "Open until filled" },
-                ...(job.languageRequirement ? [{ label: "Language", value: job.languageRequirement }] : []),
-                ...(job.workMode === "remote" && job.timezoneOverlap ? [{ label: "Timezone", value: job.timezoneOverlap }] : []),
-              ].map(item => (
-                <div key={item.label}>
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">{item.label}</p>
-                  <p className="font-medium text-slate-800">{item.value}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {job.perks?.trim() && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <h2 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-violet-100 text-violet-700 text-[10px]">★</span>
-                Perks &amp; Benefits
-              </h2>
-              <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{job.perks}</p>
-            </div>
-          )}
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100">
-                <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-              </div>
-              <h2 className="text-sm font-bold text-slate-900">Trust &amp; safety</h2>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="flex items-start gap-3 rounded-2xl bg-emerald-50 border border-emerald-100 p-3">
-                <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 text-xs font-black">✓</div>
-                <div>
-                  <p className="text-xs font-bold text-slate-900">Free to apply</p>
-                  <p className="mt-0.5 text-[11px] text-slate-500">No fees charged to candidates. Ever.</p>
-                </div>
-              </div>
-              {job.salaryMin || job.salaryMax ? (
-                <div className="flex items-start gap-3 rounded-2xl bg-emerald-50 border border-emerald-100 p-3">
-                  <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 text-xs font-black">₹</div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-900">Salary disclosed</p>
-                    <p className="mt-0.5 text-[11px] text-slate-500">Recruiter shared the salary range upfront.</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-start gap-3 rounded-2xl bg-slate-50 border border-slate-100 p-3">
-                  <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-400 text-xs font-black">₹</div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-500">Salary not disclosed</p>
-                    <p className="mt-0.5 text-[11px] text-slate-400">Ask during application process.</p>
-                  </div>
-                </div>
-              )}
-              {job.verifiedCompany ? (
-                <div className="flex items-start gap-3 rounded-2xl bg-emerald-50 border border-emerald-100 p-3">
-                  <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 text-xs font-black">✓</div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-900">Verified company</p>
-                    <p className="mt-0.5 text-[11px] text-slate-500">Company identity reviewed by Plyndrox team.</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-start gap-3 rounded-2xl bg-slate-50 border border-slate-100 p-3">
-                  <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-400 text-[11px] font-black">?</div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-500">Not verified</p>
-                    <p className="mt-0.5 text-[11px] text-slate-400">Review company details before applying.</p>
-                  </div>
-                </div>
               )}
             </div>
+            {/* Share / Copy */}
+            <div className="flex shrink-0 items-center gap-2">
+              <ShareJobButton title={job.title} companyName={job.companyName} />
+              <CopyJobButton text={copyText} />
+            </div>
           </div>
 
-          <QualityBreakdown job={job} />
+          {/* Tag pills */}
+          <div className="mt-4 flex flex-wrap gap-2">
+            {tags.map((t, i) => (
+              <span key={i} className={`rounded-full px-3 py-1 text-xs font-semibold ${t.color}`}>{t.label}</span>
+            ))}
+          </div>
 
-          <CompanySection
-            jobId={id}
-            companyName={job.companyName}
-            companyType={job.companyType}
-            location={job.location}
-          />
-
-          <div className="rounded-2xl border border-[#0a66c2]/20 bg-blue-50/50 p-4 flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-semibold text-slate-800">Want to know more about who's hiring?</p>
-              <p className="text-xs text-slate-500 mt-0.5">View the recruiter's full profile and their other open roles.</p>
-            </div>
+          {/* Inline CTAs — visible on desktop, supplementary to sticky bar */}
+          <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+            <Link
+              href={`/recruit/opportunities/${id}/apply`}
+              className="flex-1 rounded-full bg-[#0a66c2] py-3 text-center text-sm font-bold text-white shadow-md shadow-blue-500/20 transition hover:bg-[#004182] active:scale-95"
+            >
+              Apply Now →
+            </Link>
             <Link
               href={`/recruit/recruiter/${id}`}
-              className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-[#0a66c2]/30 bg-white px-4 py-2 text-xs font-bold text-[#0a66c2] hover:bg-[#0a66c2] hover:text-white transition"
+              className="flex-1 rounded-full border-2 border-[#0a66c2] py-3 text-center text-sm font-bold text-[#0a66c2] transition hover:bg-blue-50"
             >
-              <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
               View Recruiter Profile
             </Link>
           </div>
-
-          <div className="flex justify-end pt-1">
-            <ReportJobButton jobId={id} />
-          </div>
-
-        </section>
-
-        <div className="mt-4 lg:mt-0 lg:sticky lg:top-24">
-          <ApplyForm jobId={id} jobTitle={job.title} companyName={job.companyName} />
         </div>
+
+        {/* ── 2. Role overview ── */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <div className="mb-3 flex items-center gap-2">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-50 text-xs text-[#0a66c2]">📄</span>
+            <h2 className="text-base font-bold text-slate-900">Role overview</h2>
+          </div>
+          <div className="prose prose-sm max-w-none text-slate-700 leading-relaxed whitespace-pre-wrap">
+            {roleOverview || "The recruiter has not published a full job description yet."}
+          </div>
+        </div>
+
+        {/* ── 3. Skills ── */}
+        {(mustHave.length > 0 || niceToHave.length > 0) && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <h2 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#0a66c2] text-white text-[10px]">✓</span>
+                Must-have skills
+              </h2>
+              <ul className="space-y-2">
+                {(mustHave.length ? mustHave : ["Relevant experience for this role"]).map(item => (
+                  <li key={item} className="flex items-start gap-2 text-sm text-slate-700">
+                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[#0a66c2]" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <h2 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-100 text-amber-700 text-[10px]">+</span>
+                Good-to-have
+              </h2>
+              <ul className="space-y-2">
+                {(niceToHave.length ? niceToHave : ["Strong communication and ownership"]).map(item => (
+                  <li key={item} className="flex items-start gap-2 text-sm text-slate-700">
+                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
+
+        {/* ── 4. Job details grid ── */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="mb-4 flex items-center gap-2">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-slate-500 text-xs">🗂</span>
+            <h2 className="text-sm font-bold text-slate-900">Job details</h2>
+          </div>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 text-sm">
+            {[
+              { label: "Niche", value: job.niche || job.department || "General" },
+              { label: "Company type", value: job.companyType || "Not specified" },
+              { label: "Education", value: job.educationRequirement || "Flexible" },
+              { label: "Notice period", value: job.noticePeriod || "Flexible" },
+              { label: "Openings", value: job.openings && job.openings > 1 ? `${job.openings} positions` : "1 position" },
+              { label: "Apply by", value: deadlineLabel || "Open until filled" },
+              ...(job.languageRequirement ? [{ label: "Language", value: job.languageRequirement }] : []),
+              ...(job.workMode === "remote" && job.timezoneOverlap ? [{ label: "Timezone", value: job.timezoneOverlap }] : []),
+            ].map(item => (
+              <div key={item.label}>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1">{item.label}</p>
+                <p className="font-medium text-slate-800">{item.value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── 5. Perks ── */}
+        {job.perks?.trim() && (
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-violet-100 text-violet-700 text-[10px]">★</span>
+              Perks &amp; Benefits
+            </h2>
+            <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{job.perks}</p>
+          </div>
+        )}
+
+        {/* ── 6. Trust & safety ── */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100">
+              <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              </svg>
+            </div>
+            <h2 className="text-sm font-bold text-slate-900">Trust &amp; safety</h2>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="flex items-start gap-3 rounded-2xl bg-emerald-50 border border-emerald-100 p-3">
+              <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 text-xs font-black">✓</div>
+              <div>
+                <p className="text-xs font-bold text-slate-900">Free to apply</p>
+                <p className="mt-0.5 text-[11px] text-slate-500">No fees charged. Ever.</p>
+              </div>
+            </div>
+            {job.salaryMin || job.salaryMax ? (
+              <div className="flex items-start gap-3 rounded-2xl bg-emerald-50 border border-emerald-100 p-3">
+                <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 text-xs font-black">₹</div>
+                <div>
+                  <p className="text-xs font-bold text-slate-900">Salary disclosed</p>
+                  <p className="mt-0.5 text-[11px] text-slate-500">Range shared upfront.</p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-start gap-3 rounded-2xl bg-slate-50 border border-slate-100 p-3">
+                <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-400 text-xs font-black">₹</div>
+                <div>
+                  <p className="text-xs font-bold text-slate-500">Salary not disclosed</p>
+                  <p className="mt-0.5 text-[11px] text-slate-400">Ask during the process.</p>
+                </div>
+              </div>
+            )}
+            {job.verifiedCompany ? (
+              <div className="flex items-start gap-3 rounded-2xl bg-emerald-50 border border-emerald-100 p-3">
+                <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 text-xs font-black">✓</div>
+                <div>
+                  <p className="text-xs font-bold text-slate-900">Verified company</p>
+                  <p className="mt-0.5 text-[11px] text-slate-500">Identity reviewed by Plyndrox.</p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-start gap-3 rounded-2xl bg-slate-50 border border-slate-100 p-3">
+                <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-400 text-[11px] font-black">?</div>
+                <div>
+                  <p className="text-xs font-bold text-slate-500">Not verified</p>
+                  <p className="mt-0.5 text-[11px] text-slate-400">Review details before applying.</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── 7. Quality breakdown ── */}
+        <QualityBreakdown job={job} />
+
+        {/* ── 8. Company section ── */}
+        <CompanySection
+          jobId={id}
+          companyName={job.companyName}
+          companyType={job.companyType}
+          location={job.location}
+        />
+
+        {/* ── 9. Bottom CTA block ── */}
+        <div className="rounded-3xl border border-[#0a66c2]/20 bg-gradient-to-br from-blue-50 to-white p-6 shadow-sm text-center">
+          <p className="text-base font-bold text-slate-900">Ready to apply?</p>
+          <p className="mt-1 text-sm text-slate-500">Takes less than 2 minutes. Free to apply — no account needed.</p>
+          <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:justify-center">
+            <Link
+              href={`/recruit/opportunities/${id}/apply`}
+              className="rounded-full bg-[#0a66c2] px-8 py-3.5 text-sm font-bold text-white shadow-lg shadow-blue-500/25 transition hover:bg-[#004182] active:scale-95"
+            >
+              Apply Now →
+            </Link>
+            <Link
+              href={`/recruit/recruiter/${id}`}
+              className="rounded-full border-2 border-[#0a66c2] px-8 py-3.5 text-sm font-bold text-[#0a66c2] transition hover:bg-blue-50"
+            >
+              View Recruiter Profile
+            </Link>
+          </div>
+        </div>
+
+        {/* Report */}
+        <div className="flex justify-end">
+          <ReportJobButton jobId={id} />
+        </div>
+
       </main>
     </div>
   );
