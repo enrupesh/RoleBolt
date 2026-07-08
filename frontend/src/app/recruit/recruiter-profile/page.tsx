@@ -793,7 +793,7 @@ function RecruiterProfileContent() {
               <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-green-100 text-green-700 text-lg font-black">✓</div>
               <div>
                 <p className="text-sm font-bold text-green-800">Verified</p>
-                <p className="text-xs text-green-700 mt-0.5">Your {copy.verifyNoun} has been verified by the Plyndrox team. A "Verified" badge appears on all your job listings.</p>
+                <p className="text-xs text-green-700 mt-0.5">Your {copy.verifyNoun} has been verified by the Rolebolt team. A "Verified" badge appears on all your job listings.</p>
               </div>
             </div>
           ) : verificationStatus === "requested" ? (

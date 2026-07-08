@@ -4,16 +4,16 @@ import { buildMetadata, breadcrumbJsonLd, productAppJsonLd, faqJsonLd, howToJson
 import { JsonLd } from "@/components/JsonLd";
 
 export const metadata: Metadata = buildMetadata({
-  title: "Recruit AI — Free AI Hiring & ATS for Modern Teams | Plyndrox",
+  title: "Recruit AI — Free AI Hiring & ATS for Modern Teams | Rolebolt",
   description:
-    "Plyndrox Recruit AI is a free AI-powered ATS that sources candidates, screens resumes, scores fit, and runs your full hiring pipeline end-to-end — for startups, agencies, and enterprise teams.",
+    "Rolebolt is a free AI-powered ATS that sources candidates, screens resumes, scores fit, and runs your full hiring pipeline end-to-end — for startups, agencies, and enterprise teams.",
   path: "/recruit",
   keywords: [...productKeywords.recruit],
 });
 
 const recruitFaqs = [
   {
-    question: "What is Plyndrox Recruit AI?",
+    question: "What is Rolebolt?",
     answer:
       "Recruit AI is a free AI-powered applicant tracking system (ATS) that sources candidates, parses and scores resumes, schedules interviews, runs async assessments, and manages the full hiring pipeline for startups, SMBs, and enterprise teams.",
   },
@@ -50,7 +50,7 @@ const recruitFaqs = [
   {
     question: "How is Recruit AI different from Naukri or LinkedIn Recruiter?",
     answer:
-      "Unlike Naukri and LinkedIn Recruiter (both paid), Plyndrox Recruit AI is completely free, built for niche hiring categories (tech, finance, healthcare, sales, creative, blue-collar), and uses AI to score and match candidates — not just keyword search.",
+      "Unlike Naukri and LinkedIn Recruiter (both paid), Rolebolt is completely free, built for niche hiring categories (tech, finance, healthcare, sales, creative, blue-collar), and uses AI to score and match candidates — not just keyword search.",
   },
   {
     question: "Does Recruit AI work for non-technical hiring?",
@@ -65,14 +65,14 @@ const recruitFaqs = [
 ];
 
 const howTo = howToJsonLd({
-  name: "How to Post a Job and Hire with Plyndrox Recruit AI",
+  name: "How to Post a Job and Hire with Rolebolt",
   description:
-    "Step-by-step guide to posting your first job listing, setting up your hiring pipeline, and screening candidates using Plyndrox Recruit AI — completely free.",
+    "Step-by-step guide to posting your first job listing, setting up your hiring pipeline, and screening candidates using Rolebolt — completely free.",
   totalTime: "PT10M",
   steps: [
     {
-      name: "Sign up for a free Plyndrox account",
-      text: "Go to plyndrox.app and create your account. Navigate to the Recruit AI section and select the Recruiter role.",
+      name: "Sign up for a free Rolebolt account",
+      text: "Go to rolebolt.app and create your account. Navigate to the Recruit AI section and select the Recruiter role.",
       url: "/signup",
     },
     {
@@ -114,7 +114,7 @@ export default function RecruitLayout({ children }: { children: React.ReactNode 
         id="ld-app-recruit"
         data={productAppJsonLd({
           id: "recruit",
-          name: "Plyndrox Recruit AI",
+          name: "Rolebolt",
           url: "/recruit",
           description:
             "Free AI applicant tracking system: AI sourcing, resume parsing and scoring, niche job board, async assessments, talent pool, and full hiring pipeline management.",

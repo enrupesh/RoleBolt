@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 const DEFAULT_BACKEND_URL = "https://raina-1.onrender.com";
 const TIMEOUT_MS = 65_000;
-const FRONTEND_HOSTS = new Set(["plyndrox.app", "www.plyndrox.app"]);
+const FRONTEND_HOSTS = new Set(["rolebolt.app", "www.rolebolt.app"]);
 
 function normalizeBackendUrl(value: string) {
   const raw = value.trim().replace(/\/$/, "");

@@ -39,9 +39,9 @@ export async function generateMetadata({
   const job = await loadJob(id);
   return buildMetadata({
     title: job
-      ? `Apply — ${job.title}${job.companyName ? ` at ${job.companyName}` : ""} | Plyndrox Recruit AI`
-      : "Apply | Plyndrox Recruit AI",
-    description: "Submit your application on Plyndrox Recruit AI.",
+      ? `Apply — ${job.title}${job.companyName ? ` at ${job.companyName}` : ""} | Rolebolt`
+      : "Apply | Rolebolt",
+    description: "Submit your application on Rolebolt.",
     path: `/recruit/opportunities/${id}/apply`,
     noIndex: true,
   });
