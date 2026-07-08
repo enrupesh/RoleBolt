@@ -23,7 +23,7 @@ const CREATOR_NAV: NavLink[] = [
   { href: "/recruit/dashboard", label: "Dashboard" },
   { href: "/recruit/analytics", label: "Analytics" },
   { href: "/recruit/talent-pool", label: "Talent Pool" },
-  { href: "/recruit/company-profile", label: "Company Profile" },
+  { href: "/recruit/recruiter-profile", label: "Recruiter Profile" },
 ];
 
 function MenuIcon() {

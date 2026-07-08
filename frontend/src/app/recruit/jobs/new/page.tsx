@@ -662,7 +662,7 @@ function NewJobContent() {
               </div>
               <p className="text-[11px] text-gray-400">
                 ✓ <span className="text-gray-400">Verified company badge</span> — automatically added when your company is verified.{" "}
-                <a href="/recruit/company-profile" className="text-indigo-400 hover:underline">Request verification →</a>
+                <a href="/recruit/recruiter-profile" className="text-indigo-400 hover:underline">Request verification →</a>
               </p>
             </div>
           )}

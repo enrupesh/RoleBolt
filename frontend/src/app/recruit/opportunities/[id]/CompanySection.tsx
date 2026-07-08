@@ -8,15 +8,29 @@ type CompanyData = {
   companyType?: string;
   location?: string;
   profile: {
+    profileType?: string;
+    tagline?: string;
     description?: string;
     mission?: string;
     benefits?: string;
     industry?: string;
     companySize?: string;
+    foundedYear?: string;
+    instituteType?: string;
+    coursesOffered?: string;
+    niche?: string;
     website?: string;
     linkedinUrl?: string;
     logoUrl?: string;
   } | null;
+};
+
+const SECTION_TITLE: Record<string, string> = {
+  company: "About the company",
+  educational_institute: "About the institute",
+  individual: "About the recruiter",
+  content_creator: "About the creator",
+  ngo_government: "About the organisation",
 };
 
 export default function CompanySection({ jobId, companyName, companyType, location }: {
@@ -43,8 +57,10 @@ export default function CompanySection({ jobId, companyName, companyType, locati
 
   const hasRichInfo = Boolean(
     profile?.description || profile?.mission || profile?.benefits ||
-    profile?.website || profile?.linkedinUrl || profile?.companySize || profile?.industry
+    profile?.website || profile?.linkedinUrl || profile?.companySize || profile?.industry ||
+    profile?.tagline || profile?.instituteType || profile?.coursesOffered || profile?.niche
   );
+  const sectionTitle = SECTION_TITLE[profile?.profileType || ""] || "About the company";
 
   if (loading) {
     return (
@@ -58,7 +74,7 @@ export default function CompanySection({ jobId, companyName, companyType, locati
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h2 className="text-sm font-bold text-slate-900 mb-4">About the company</h2>
+      <h2 className="text-sm font-bold text-slate-900 mb-4">{sectionTitle}</h2>
 
       <div className="flex items-start gap-3 mb-4">
         {profile?.logoUrl ? (
@@ -75,11 +91,14 @@ export default function CompanySection({ jobId, companyName, companyType, locati
         )}
         <div className="min-w-0">
           <p className="font-bold text-slate-900">{name}</p>
+          {profile?.tagline && <p className="text-xs text-slate-600 mt-0.5">{profile.tagline}</p>}
           <p className="text-xs text-slate-500 mt-0.5">
-            {[type, loc, profile?.industry].filter(Boolean).join(" · ")}
+            {[type || profile?.instituteType, loc, profile?.industry || profile?.niche].filter(Boolean).join(" · ")}
           </p>
-          {profile?.companySize && (
-            <p className="text-xs text-slate-400 mt-0.5">{profile.companySize} employees</p>
+          {(profile?.companySize || profile?.foundedYear) && (
+            <p className="text-xs text-slate-400 mt-0.5">
+              {[profile?.companySize && `${profile.companySize} employees`, profile?.foundedYear && `Founded ${profile.foundedYear}`].filter(Boolean).join(" · ")}
+            </p>
           )}
         </div>
       </div>
@@ -90,6 +109,12 @@ export default function CompanySection({ jobId, companyName, companyType, locati
             <div>
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">About</p>
               <p className="text-sm text-slate-700 leading-relaxed">{profile.description}</p>
+            </div>
+          )}
+          {profile?.coursesOffered && (
+            <div>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Courses Offered</p>
+              <p className="text-sm text-slate-700 leading-relaxed">{profile.coursesOffered}</p>
             </div>
           )}
           {profile?.mission && (
@@ -132,7 +157,7 @@ export default function CompanySection({ jobId, companyName, companyType, locati
       ) : (
         <div className="rounded-xl bg-slate-50 border border-slate-100 p-3">
           <p className="text-xs text-slate-500">
-            The recruiter hasn't added a company description yet.{" "}
+            The recruiter hasn't added a description yet.{" "}
             <span className="font-medium">Company info visible: {[type, loc].filter(Boolean).join(", ") || "minimal details provided."}</span>
           </p>
         </div>

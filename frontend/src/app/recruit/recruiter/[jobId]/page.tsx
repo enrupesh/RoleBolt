@@ -21,10 +21,16 @@ type OtherJob = {
 };
 
 type CompanyProfile = {
+  profileType?: string;
   companyName?: string;
+  tagline?: string;
   companyType?: string;
   industry?: string;
   companySize?: string;
+  foundedYear?: string;
+  instituteType?: string;
+  coursesOffered?: string;
+  niche?: string;
   website?: string;
   linkedinUrl?: string;
   logoUrl?: string;
@@ -33,7 +39,16 @@ type CompanyProfile = {
   benefits?: string;
   bio?: string;
   photoUrl?: string;
+  personalLinkedinUrl?: string;
   socialLinks?: { instagram?: string; twitter?: string; github?: string; portfolio?: string };
+};
+
+const RECRUITER_SECTION_TITLE: Record<string, string> = {
+  company: "About the Company",
+  educational_institute: "About the Institute",
+  individual: "About the Recruiter",
+  content_creator: "About the Creator",
+  ngo_government: "About the Organisation",
 };
 
 type RecruiterData = {
@@ -101,11 +116,12 @@ export default function RecruiterProfilePage({ params }: { params: Promise<{ job
 
   const cp = data.companyProfile;
   const name = cp?.companyName || data.companyName || "Company";
-  const type = cp?.companyType || data.companyType;
+  const type = cp?.companyType || cp?.instituteType || data.companyType;
   const loc = (cp as any)?.location || data.location;
-  const hasRichInfo = Boolean(cp?.description || cp?.mission || cp?.benefits || cp?.website || cp?.linkedinUrl);
+  const aboutTitle = RECRUITER_SECTION_TITLE[cp?.profileType || ""] || "About the Company";
+  const hasRichInfo = Boolean(cp?.description || cp?.mission || cp?.benefits || cp?.website || cp?.linkedinUrl || cp?.coursesOffered);
   const hasRecruiterInfo = Boolean(cp?.bio || cp?.photoUrl);
-  const hasSocialLinks = Boolean(cp?.linkedinUrl || cp?.socialLinks?.instagram || cp?.socialLinks?.twitter || cp?.socialLinks?.github || cp?.socialLinks?.portfolio);
+  const hasSocialLinks = Boolean(cp?.personalLinkedinUrl || cp?.socialLinks?.instagram || cp?.socialLinks?.twitter || cp?.socialLinks?.github || cp?.socialLinks?.portfolio);
 
   return (
     <div className="min-h-screen bg-white text-slate-900">
@@ -135,11 +151,14 @@ export default function RecruiterProfilePage({ params }: { params: Promise<{ job
             )}
             <div className="min-w-0 flex-1">
               <h1 className="text-2xl font-bold tracking-tight text-slate-900">{name}</h1>
+              {cp?.tagline && <p className="text-sm text-slate-600 mt-0.5">{cp.tagline}</p>}
               <p className="mt-1 text-sm text-slate-500">
-                {[type, loc, cp?.industry].filter(Boolean).join(" · ")}
+                {[type, loc, cp?.industry || cp?.niche].filter(Boolean).join(" · ")}
               </p>
-              {cp?.companySize && (
-                <p className="text-xs text-slate-400 mt-0.5">{cp.companySize} employees</p>
+              {(cp?.companySize || cp?.foundedYear) && (
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {[cp?.companySize && `${cp.companySize} employees`, cp?.foundedYear && `Founded ${cp.foundedYear}`].filter(Boolean).join(" · ")}
+                </p>
               )}
               <div className="mt-3 flex flex-wrap gap-2">
                 {cp?.website && (
@@ -164,6 +183,7 @@ export default function RecruiterProfilePage({ params }: { params: Promise<{ job
         {hasRecruiterInfo && (
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <h2 className="text-sm font-bold text-slate-900 mb-4">About the Recruiter</h2>
+            {/* Note: this card is always about the individual recruiter/hiring manager (photo/bio), distinct from the org card above. */}
             <div className="flex items-start gap-4">
               {cp?.photoUrl ? (
                 <img src={cp.photoUrl} alt="Recruiter" className="h-14 w-14 rounded-full object-cover border-2 border-slate-100 shrink-0" />
@@ -176,8 +196,8 @@ export default function RecruiterProfilePage({ params }: { params: Promise<{ job
                 {cp?.bio && <p className="text-sm text-slate-700 leading-relaxed">{cp.bio}</p>}
                 {hasSocialLinks && (
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {cp?.linkedinUrl && (
-                      <a href={cp.linkedinUrl.startsWith("http") ? cp.linkedinUrl : `https://${cp.linkedinUrl}`} target="_blank" rel="noopener noreferrer"
+                    {cp?.personalLinkedinUrl && (
+                      <a href={cp.personalLinkedinUrl.startsWith("http") ? cp.personalLinkedinUrl : `https://${cp.personalLinkedinUrl}`} target="_blank" rel="noopener noreferrer"
                         className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-[#0a66c2] hover:bg-blue-100 transition">
                         <svg width="11" height="11" fill="currentColor" viewBox="0 0 24 24"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6zM2 9h4v12H2z"/><circle cx="4" cy="4" r="2"/></svg>
                         LinkedIn
@@ -213,10 +233,17 @@ export default function RecruiterProfilePage({ params }: { params: Promise<{ job
 
         {hasRichInfo && (
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+            <h2 className="text-sm font-bold text-slate-900">{aboutTitle}</h2>
             {cp?.description && (
               <div>
                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">About</p>
                 <p className="text-sm text-slate-700 leading-relaxed">{cp.description}</p>
+              </div>
+            )}
+            {cp?.coursesOffered && (
+              <div>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Courses Offered</p>
+                <p className="text-sm text-slate-700 leading-relaxed">{cp.coursesOffered}</p>
               </div>
             )}
             {cp?.mission && (
@@ -236,7 +263,7 @@ export default function RecruiterProfilePage({ params }: { params: Promise<{ job
 
         {!hasRichInfo && (
           <div className="rounded-2xl border border-slate-100 bg-slate-50 p-5">
-            <p className="text-sm text-slate-500">This recruiter hasn't added a company description yet.</p>
+            <p className="text-sm text-slate-500">This recruiter hasn't added a description yet.</p>
           </div>
         )}
 
