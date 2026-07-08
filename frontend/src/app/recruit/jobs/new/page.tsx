@@ -35,14 +35,60 @@ function CheckIcon() {
 
 const STEPS = ["Role Basics", "Skills & Scope", "Compensation", "Review & Generate"];
 const SENIORITY_OPTIONS = ["Intern", "Junior", "Mid-level", "Senior", "Lead", "Manager", "Director", "VP"];
-const NICHES = [
-  "AI, Data, Software & Product Tech",
-  "Sales, Business Development & Revenue Roles",
-  "Finance, Accounting, Banking & Fintech",
-  "Healthcare, Pharma & Allied Medical Workforce",
-  "Skilled Blue-Collar, Logistics & Industrial Workforce",
-  "Creative, Marketing, Media & Design",
+
+type NicheExtraField = { key: string; label: string; placeholder: string };
+type NicheOption = { label: string; locationOptional?: boolean; extraFields?: NicheExtraField[] };
+
+const NICHE_OPTIONS: NicheOption[] = [
+  { label: "AI, Data, Software & Product Tech" },
+  { label: "Sales, Business Development & Revenue Roles" },
+  { label: "Finance, Accounting, Banking & Fintech" },
+  {
+    label: "Healthcare, Pharma & Allied Medical Workforce",
+    extraFields: [{ key: "licenseRequired", label: "License / Certification Required", placeholder: "e.g. Registered Nurse license, MBBS, Pharmacy license" }],
+  },
+  {
+    label: "Skilled Blue-Collar, Logistics & Industrial Workforce",
+    extraFields: [{ key: "shiftTiming", label: "Shift Timing", placeholder: "e.g. Day shift, Night shift, Rotational" }],
+  },
+  { label: "Creative, Marketing, Media & Design" },
+  {
+    label: "Content & Creator Economy",
+    locationOptional: true,
+    extraFields: [
+      { key: "portfolioLink", label: "Portfolio / Sample Work Link", placeholder: "e.g. YouTube channel, Drive folder, Behance link" },
+      { key: "platform", label: "Primary Platform", placeholder: "e.g. YouTube, Instagram, Podcast, Blog" },
+    ],
+  },
+  {
+    label: "Education & EdTech",
+    locationOptional: true,
+    extraFields: [{ key: "subjectExpertise", label: "Subject / Grade Level Expertise", placeholder: "e.g. Class 10-12 Maths, IELTS, Python for beginners" }],
+  },
+  {
+    label: "HR & Recruitment",
+    extraFields: [{ key: "hrFocusArea", label: "Focus Area", placeholder: "e.g. Talent Acquisition, Payroll, HRBP, L&D" }],
+  },
+  {
+    label: "Real Estate & Construction",
+    extraFields: [{ key: "projectType", label: "Project Type", placeholder: "e.g. Residential, Commercial, Site Supervision" }],
+  },
+  {
+    label: "Social Media & Community Management",
+    locationOptional: true,
+    extraFields: [{ key: "platform", label: "Primary Platform(s)", placeholder: "e.g. Instagram, Discord, LinkedIn" }],
+  },
 ];
+const OTHER_NICHE_VALUE = "__other__";
+
+function getNicheOption(niche: string): NicheOption | undefined {
+  return NICHE_OPTIONS.find(n => n.label === niche);
+}
+
+function isKnownNiche(niche: string): boolean {
+  return NICHE_OPTIONS.some(n => n.label === niche);
+}
+
 const JOB_TYPES = ["Full-time", "Part-time", "Internship", "Contract", "Freelance"];
 const COMPANY_TYPES = ["Startup", "MNC", "Agency", "Hospital", "Fintech", "Manufacturing", "Recruitment Firm", "Other"];
 const WORK_MODES = [
@@ -65,6 +111,8 @@ type FormData = {
   responsibilities: string;
   mustHaveSkills: string;
   niceToHaveSkills: string;
+  nicheDetails: Record<string, string>;
+  companyTypeOther: string;
   salaryMin: string;
   salaryMax: string;
   salaryCurrency: string;
@@ -78,13 +126,48 @@ type FormData = {
 };
 
 const DEFAULT: FormData = {
-  title: "", niche: NICHES[0], companyName: "", companyType: "Startup", jobType: "Full-time",
+  title: "", niche: NICHE_OPTIONS[0].label, companyName: "", companyType: "Startup", jobType: "Full-time",
   department: "", seniority: "Mid-level", location: "",
   workMode: "remote", responsibilities: "", mustHaveSkills: "",
-  niceToHaveSkills: "", salaryMin: "", salaryMax: "", salaryCurrency: "INR",
+  niceToHaveSkills: "", nicheDetails: {}, companyTypeOther: "",
+  salaryMin: "", salaryMax: "", salaryCurrency: "INR",
   experienceMin: "", experienceMax: "", educationRequirement: "", noticePeriod: "",
   freshersAllowed: false, verifiedCompany: false, publicVisibility: true,
 };
+
+// Heuristic check to catch obviously fake/junk input (e.g. "asdasdasd",
+// "aaaaaaa") without needing a server round-trip for every keystroke.
+function hasRepeatingPattern(letters: string): boolean {
+  const n = letters.length;
+  for (let period = 2; period <= 5; period++) {
+    if (n < period * 3) continue;
+    let matches = 0;
+    for (let i = period; i < n; i++) {
+      if (letters[i] === letters[i - period]) matches++;
+    }
+    if (matches / (n - period) > 0.55) return true;
+  }
+  return false;
+}
+
+function isMeaningfulText(text: string, minWords = 1, minLength = 3): boolean {
+  const trimmed = text.trim();
+  if (trimmed.length < minLength) return false;
+  const letters = trimmed.toLowerCase().replace(/[^a-z]/g, "");
+  if (letters.length >= 4) {
+    const uniqueChars = new Set(letters).size;
+    if (uniqueChars < 3) return false;
+    const counts: Record<string, number> = {};
+    for (const c of letters) counts[c] = (counts[c] || 0) + 1;
+    const maxCount = Math.max(...Object.values(counts));
+    if (maxCount / letters.length > 0.5) return false;
+  }
+  if (letters.length >= 6 && hasRepeatingPattern(letters)) return false;
+  // Count words loosely — accept short acronyms/tech tokens (React, AWS, CI/CD, 5+)
+  // as long as they contain at least one letter, so real skills text isn't penalized.
+  const words = trimmed.split(/\s+/).filter(w => /[a-zA-Z]/.test(w));
+  return words.length >= minWords;
+}
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return <span className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.15em] text-gray-400">{children}</span>;
@@ -118,6 +201,69 @@ function Textarea({ value, onChange, placeholder, rows = 4 }: {
   );
 }
 
+function NicheSelect({ value, onChange, customValue, onCustomChange }: {
+  value: string;
+  onChange: (v: string) => void;
+  customValue: boolean;
+  onCustomChange: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const isOther = customValue;
+  const filtered = NICHE_OPTIONS.filter(n => n.label.toLowerCase().includes(query.toLowerCase()));
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between rounded-2xl border border-white/[0.08] bg-white px-4 py-3 text-sm text-white outline-none transition focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/30"
+      >
+        <span className={isOther ? "text-gray-400" : ""}>{isOther ? "Other (type below)" : value}</span>
+        <span className="text-gray-400 text-xs">▾</span>
+      </button>
+      {open && (
+        <div className="absolute z-20 mt-1.5 w-full rounded-2xl border border-white/[0.1] bg-gray-50 shadow-xl overflow-hidden">
+          <input
+            autoFocus
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Search niches..."
+            className="w-full border-b border-white/[0.08] bg-transparent px-4 py-3 text-sm text-white outline-none placeholder-zinc-600"
+          />
+          <div className="max-h-56 overflow-y-auto">
+            {filtered.map(n => (
+              <button
+                type="button"
+                key={n.label}
+                onClick={() => { onChange(n.label); setOpen(false); setQuery(""); }}
+                className={`block w-full text-left px-4 py-2.5 text-sm hover:bg-indigo-500/10 transition ${n.label === value && !isOther ? "text-indigo-400 font-semibold" : "text-white"}`}
+              >
+                {n.label}
+              </button>
+            ))}
+            {filtered.length === 0 && (
+              <p className="px-4 py-3 text-xs text-gray-400">No match — try "Other" below.</p>
+            )}
+            <button
+              type="button"
+              onClick={() => { onChange(OTHER_NICHE_VALUE); setOpen(false); setQuery(""); }}
+              className={`block w-full text-left px-4 py-2.5 text-sm border-t border-white/[0.06] hover:bg-indigo-500/10 transition ${isOther ? "text-indigo-400 font-semibold" : "text-gray-400"}`}
+            >
+              + Other (my role doesn't fit these)
+            </button>
+          </div>
+        </div>
+      )}
+      {isOther && (
+        <div className="mt-3">
+          <Input value={value === OTHER_NICHE_VALUE ? "" : value} onChange={onCustomChange} placeholder="e.g. Hospitality & Travel, Voice Acting, Photography..." />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function NewJobContent() {
   const router = useRouter();
   const [step, setStep] = useState(0);
@@ -141,9 +287,31 @@ function NewJobContent() {
     return (val: string) => setForm(prev => ({ ...prev, [key]: val }));
   }
 
+  function updateNicheDetail(key: string) {
+    return (val: string) => setForm(prev => ({ ...prev, nicheDetails: { ...prev.nicheDetails, [key]: val } }));
+  }
+
+  // Switching niches clears extra fields from the previous niche so stale
+  // metadata (e.g. a "Portfolio Link" left over from Content & Creator)
+  // doesn't get submitted/stored/prompted for an unrelated niche.
+  function setNiche(newNiche: string) {
+    setForm(prev => ({ ...prev, niche: newNiche, nicheDetails: {} }));
+  }
+
+  const activeNicheOption = getNicheOption(form.niche);
+  const locationRequired = form.workMode !== "remote" && !activeNicheOption?.locationOptional;
+
   function canProceed() {
-    if (step === 0) return form.title.trim().length > 0 && form.location.trim().length > 0;
-    if (step === 1) return form.responsibilities.trim().length > 10 && form.mustHaveSkills.trim().length > 5;
+    if (step === 0) {
+      if (form.niche === OTHER_NICHE_VALUE || !isMeaningfulText(form.niche, 1, 2)) return false;
+      if (!isMeaningfulText(form.title, 1, 3)) return false;
+      if (form.companyType === "Other" && !isMeaningfulText(form.companyTypeOther, 1, 2)) return false;
+      if (locationRequired && !isMeaningfulText(form.location, 1, 2)) return false;
+      return true;
+    }
+    if (step === 1) {
+      return isMeaningfulText(form.responsibilities, 4, 15) && isMeaningfulText(form.mustHaveSkills, 2, 6);
+    }
     return true;
   }
 
@@ -152,11 +320,13 @@ function NewJobContent() {
     setLoading(true);
     setError("");
     try {
+      const resolvedCompanyType = form.companyType === "Other" ? form.companyTypeOther.trim() : form.companyType;
       const res = await fetch(apiUrl("/recruit/jobs"), {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           ...form,
+          companyType: resolvedCompanyType,
           salaryMin: form.salaryMin ? Number(form.salaryMin) : undefined,
           salaryMax: form.salaryMax ? Number(form.salaryMax) : undefined,
         }),
@@ -297,14 +467,23 @@ function NewJobContent() {
               </div>
               <div>
                 <FieldLabel>Niche *</FieldLabel>
-                <select
+                <NicheSelect
                   value={form.niche}
-                  onChange={e => update("niche")(e.target.value)}
-                  className="w-full rounded-2xl border border-white/[0.08] bg-white px-4 py-3 text-sm text-white outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/30"
-                >
-                  {NICHES.map(n => <option key={n} value={n} className="bg-gray-50">{n}</option>)}
-                </select>
+                  onChange={setNiche}
+                  customValue={form.niche === OTHER_NICHE_VALUE || !isKnownNiche(form.niche)}
+                  onCustomChange={update("niche")}
+                />
               </div>
+              {activeNicheOption?.extraFields?.map(f => (
+                <div key={f.key}>
+                  <FieldLabel>{f.label}</FieldLabel>
+                  <Input
+                    value={form.nicheDetails[f.key] || ""}
+                    onChange={updateNicheDetail(f.key)}
+                    placeholder={f.placeholder}
+                  />
+                </div>
+              ))}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <FieldLabel>Company Name</FieldLabel>
@@ -319,6 +498,11 @@ function NewJobContent() {
                   >
                     {COMPANY_TYPES.map(t => <option key={t} value={t} className="bg-gray-50">{t}</option>)}
                   </select>
+                  {form.companyType === "Other" && (
+                    <div className="mt-2">
+                      <Input value={form.companyTypeOther} onChange={update("companyTypeOther")} placeholder="e.g. Non-profit, Cooperative" />
+                    </div>
+                  )}
                 </div>
               </div>
               <div>
@@ -368,8 +552,12 @@ function NewJobContent() {
                 </div>
               </div>
               <div>
-                <FieldLabel>Location *</FieldLabel>
-                <Input value={form.location} onChange={update("location")} placeholder="e.g. Bangalore, India or Anywhere" />
+                <FieldLabel>
+                  {locationRequired ? "Location *" : (
+                    <>Location <span className="text-gray-400 normal-case font-normal">(optional for this niche/work mode)</span></>
+                  )}
+                </FieldLabel>
+                <Input value={form.location} onChange={update("location")} placeholder={locationRequired ? "e.g. Bangalore, India" : "e.g. Anywhere / Remote-friendly (optional)"} />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
