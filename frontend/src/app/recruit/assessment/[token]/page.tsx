@@ -169,7 +169,7 @@ export default function AssessmentPage({ params }: { params: Promise<{ token: st
           </p>
           <div className="mt-8 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-5 py-4">
             <p className="text-[10px] text-zinc-700 uppercase tracking-widest">Powered by</p>
-            <p className="text-sm font-bold text-indigo-400 mt-1">Plyndrox Recruit AI</p>
+            <p className="text-sm font-bold text-indigo-400 mt-1">Rolebolt</p>
           </div>
         </div>
       </div>
@@ -210,7 +210,7 @@ export default function AssessmentPage({ params }: { params: Promise<{ token: st
                   </svg>
                 </div>
                 <div>
-                  <p className="text-[11px] font-bold text-white tracking-wide leading-none">Plyndrox Recruit AI</p>
+                  <p className="text-[11px] font-bold text-white tracking-wide leading-none">Rolebolt</p>
                   {data.jobTitle && <p className="text-[10px] text-gray-400 mt-0.5 leading-none truncate max-w-[160px] sm:max-w-xs">{data.jobTitle}</p>}
                 </div>
               </div>
@@ -370,7 +370,7 @@ export default function AssessmentPage({ params }: { params: Promise<{ token: st
         <footer className="border-t border-white/[0.04] px-4 sm:px-6 py-3">
           <div className="mx-auto max-w-2xl flex items-center justify-between">
             <p className="text-[10px] text-zinc-800">Your responses are securely processed by AI</p>
-            <p className="text-[10px] text-zinc-800">Plyndrox Recruit AI</p>
+            <p className="text-[10px] text-zinc-800">Rolebolt</p>
           </div>
         </footer>
       </div>

@@ -75,20 +75,20 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const job = await loadJob(id);
   if (!job) {
     return buildMetadata({
-      title: "Job not found | Plyndrox Recruit AI",
-      description: "This job opportunity could not be found on Plyndrox Recruit AI.",
+      title: "Job not found | Rolebolt",
+      description: "This job opportunity could not be found on Rolebolt.",
       path: `/recruit/opportunities/${id}`,
       noIndex: true,
     });
   }
   const location = job.location || "India";
   const mode = job.workMode ? ` · ${job.workMode.charAt(0).toUpperCase() + job.workMode.slice(1)}` : "";
-  const description = `${job.title} role${job.companyName ? ` at ${job.companyName}` : ""} in ${location}${mode}. ${job.mustHaveSkills ? `Skills: ${job.mustHaveSkills.split(",").slice(0, 4).join(", ")}.` : ""} Apply free on Plyndrox Recruit AI.`;
+  const description = `${job.title} role${job.companyName ? ` at ${job.companyName}` : ""} in ${location}${mode}. ${job.mustHaveSkills ? `Skills: ${job.mustHaveSkills.split(",").slice(0, 4).join(", ")}.` : ""} Apply free on Rolebolt.`;
   const skills = job.mustHaveSkills
     ? job.mustHaveSkills.split(",").slice(0, 6).map((s: string) => s.trim()).filter(Boolean)
     : [];
   return buildMetadata({
-    title: `${job.title}${job.companyName ? ` at ${job.companyName}` : ""} | Plyndrox Recruit AI`,
+    title: `${job.title}${job.companyName ? ` at ${job.companyName}` : ""} | Rolebolt`,
     description,
     path: `/recruit/opportunities/${id}`,
     keywords: [
@@ -97,7 +97,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       `${job.title} jobs India`,
       ...(location !== "India" ? [`${job.title} jobs ${location}`] : []),
       ...skills.map((s: string) => `${s} jobs India`),
-      "Plyndrox Recruit AI",
+      "Rolebolt",
     ],
   });
 }
@@ -151,7 +151,7 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
     mustHave.length ? `── Must-have skills ──\n${mustHave.map(s => `• ${s}`).join("\n")}` : "",
     niceToHave.length ? `── Good-to-have skills ──\n${niceToHave.map(s => `• ${s}`).join("\n")}` : "",
     "",
-    `View job: https://www.plyndrox.app/recruit/opportunities/${id}`,
+    `View job: https://www.rolebolt.app/recruit/opportunities/${id}`,
   ].filter(Boolean).join("\n");
 
   const tags = [
@@ -371,7 +371,7 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
                 <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 text-xs font-black">✓</div>
                 <div>
                   <p className="text-xs font-bold text-slate-900">Verified company</p>
-                  <p className="mt-0.5 text-[11px] text-slate-500">Identity reviewed by Plyndrox.</p>
+                  <p className="mt-0.5 text-[11px] text-slate-500">Identity reviewed by Rolebolt.</p>
                 </div>
               </div>
             ) : (

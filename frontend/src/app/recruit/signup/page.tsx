@@ -98,11 +98,11 @@ function RecruitSignupForm() {
           <Link href="/recruit" className="flex items-center gap-2.5">
             <span className="flex h-5 w-5 items-center justify-center rounded-xl bg-[#0a66c2] text-sm font-black text-white">R</span>
             <span>
-              <span className="block text-base font-bold leading-tight text-slate-900">Plyndrox Recruit AI</span>
-              <span className="block text-[11px] text-slate-500 leading-tight">Plyndrox Jobs Network</span>
+              <span className="block text-base font-bold leading-tight text-slate-900">Rolebolt</span>
+              <span className="block text-[11px] text-slate-500 leading-tight">Rolebolt Jobs Network</span>
             </span>
           </Link>
-          <p className="mt-2 text-center text-sm text-slate-500">Create your Plyndrox Recruit AI account</p>
+          <p className="mt-2 text-center text-sm text-slate-500">Create your Rolebolt account</p>
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -197,7 +197,7 @@ function RecruitSignupForm() {
           </Link>
         </p>
         <p className="mt-2 text-center text-xs text-slate-400">
-          <Link href="/recruit" className="hover:underline">← Back to Plyndrox Recruit AI</Link>
+          <Link href="/recruit" className="hover:underline">← Back to Rolebolt</Link>
         </p>
       </div>
     </div>

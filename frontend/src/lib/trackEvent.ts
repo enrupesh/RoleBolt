@@ -19,10 +19,10 @@ export function trackEvent(
 function getSessionId(): string {
   if (typeof window === "undefined") return "";
   try {
-    let id = sessionStorage.getItem("plyndrox_sid");
+    let id = sessionStorage.getItem("rolebolt_sid");
     if (!id) {
       id = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-      sessionStorage.setItem("plyndrox_sid", id);
+      sessionStorage.setItem("rolebolt_sid", id);
     }
     return id;
   } catch {
