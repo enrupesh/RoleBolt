@@ -4,11 +4,11 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { onAuthStateChanged } from "firebase/auth";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { getFirebaseAuth, getFirebaseStorage } from "@/lib/firebaseClient";
+import { getFirebaseAuth } from "@/lib/firebaseClient";
 import RecruitHeader from "@/components/RecruitHeader";
 import { RecruitGuard } from "@/components/RecruitGuard";
 import { apiUrl, readApiJson } from "@/lib/api";
+import { uploadImage } from "@/lib/uploadImage";
 
 const NICHES = [
   "AI, Data, Software & Product Tech",
@@ -195,17 +195,14 @@ function RecruitProfileContent() {
   }
 
   async function handlePhotoUpload(file: File) {
-    if (!uid) return;
+    if (!uid || !token) return;
     setUploadingPhoto(true);
     setUploadError("");
     try {
-      const storage = getFirebaseStorage();
-      const storageRef = ref(storage, `recruit/seekerPhotos/${uid}`);
-      await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(storageRef);
+      const url = await uploadImage(file, token);
       set("photoUrl", url);
     } catch (e: any) {
-      setUploadError("Photo upload failed. Please try again or paste a photo URL.");
+      setUploadError(e.message || "Photo upload failed. Please try again or paste a photo URL.");
     } finally {
       setUploadingPhoto(false);
     }
