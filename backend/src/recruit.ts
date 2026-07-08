@@ -281,15 +281,23 @@ async function generateJobDescription(args: {
   salaryMin?: number;
   salaryMax?: number;
   salaryCurrency: string;
+  niche?: string;
+  nicheDetails?: Record<string, string>;
 }): Promise<{ jd: string; rubric: { name: string; weight: number; description: string }[] }> {
   const salary =
     args.salaryMin && args.salaryMax
       ? `${args.salaryCurrency} ${args.salaryMin.toLocaleString()} – ${args.salaryMax.toLocaleString()} per year`
       : "Competitive (not disclosed)";
 
+  const nicheDetailsLines = Object.entries(args.nicheDetails || {})
+    .filter(([, v]) => v && String(v).trim())
+    .map(([k, v]) => `- ${k}: ${v}`)
+    .join("\n");
+
   const prompt = `You are a senior recruiter and job-description copywriter for an India-first job marketplace. Generate polished, candidate-friendly hiring content.
 
 INPUT:
+- Job Niche/Category: ${args.niche || "General"}
 - Role Title: ${args.title}
 - Department: ${args.department || "Not specified"}
 - Seniority: ${args.seniority}
@@ -298,7 +306,9 @@ INPUT:
 - Key Responsibilities: ${args.responsibilities}
 - Must-Have Skills: ${args.mustHaveSkills}
 - Nice-to-Have Skills: ${args.niceToHaveSkills}
-- Compensation: ${salary}
+- Compensation: ${salary}${nicheDetailsLines ? `\n- Niche-specific details:\n${nicheDetailsLines}` : ""}
+
+Tailor the tone, expectations, and rubric to fit this specific niche (e.g. a Content Creator role should value portfolios/samples over years of experience; a Blue-Collar role should value shift flexibility and reliability; a Healthcare role should value licenses/certifications).
 
 OUTPUT FORMAT (respond with valid JSON only, no markdown):
 {
@@ -886,14 +896,24 @@ recruitRouter.post("/jobs", async (req, res) => {
     const uid = getUid(req);
     const {
       title, niche, companyName, companyType, jobType, department, seniority, location, workMode,
-      responsibilities, mustHaveSkills, niceToHaveSkills,
+      responsibilities, mustHaveSkills, niceToHaveSkills, nicheDetails,
       salaryMin, salaryMax, salaryCurrency, experienceMin, experienceMax,
       educationRequirement, noticePeriod, freshersAllowed, verifiedCompany, publicVisibility,
     } = req.body;
 
+    // Some niches (content/creator, education, social media, etc.) are
+    // inherently location-agnostic — same rule the frontend uses so a
+    // remote/niche-appropriate job doesn't get blocked on a fake location.
+    const LOCATION_OPTIONAL_NICHES = new Set([
+      "Content & Creator Economy",
+      "Education & EdTech",
+      "Social Media & Community Management",
+    ]);
+    const locationRequired = workMode !== "remote" && !LOCATION_OPTIONAL_NICHES.has(niche);
+
     if (!title?.trim() || title.trim().length < 3) return res.status(400).json({ error: "Job title must be at least 3 characters." });
     if (!companyName?.trim()) return res.status(400).json({ error: "Company name is required." });
-    if (!location?.trim()) return res.status(400).json({ error: "Location is required." });
+    if (locationRequired && !location?.trim()) return res.status(400).json({ error: "Location is required for this role." });
     if (!responsibilities?.trim() && !mustHaveSkills?.trim()) {
       return res.status(400).json({ error: "Please provide either key responsibilities or must-have skills." });
     }
@@ -908,6 +928,15 @@ recruitRouter.post("/jobs", async (req, res) => {
     const companyProfileForVerif = await RecruitCompanyProfile.findOne({ uid }).lean();
     const isVerifiedCompany = (companyProfileForVerif as any)?.verificationStatus === "verified";
 
+    const safeNicheDetails: Record<string, string> =
+      nicheDetails && typeof nicheDetails === "object" && !Array.isArray(nicheDetails)
+        ? Object.fromEntries(
+            Object.entries(nicheDetails)
+              .filter(([, v]) => typeof v === "string" && v.trim())
+              .map(([k, v]) => [String(k).slice(0, 60), String(v).trim().slice(0, 500)])
+          )
+        : {};
+
     const { jd, rubric } = await generateJobDescription({
       title, department: department || "", seniority: seniority || "Mid-level",
       location: location || "Remote", workMode: workMode || "remote",
@@ -916,6 +945,8 @@ recruitRouter.post("/jobs", async (req, res) => {
       salaryMin: salaryMin ? Number(salaryMin) : undefined,
       salaryMax: salaryMax ? Number(salaryMax) : undefined,
       salaryCurrency: salaryCurrency || "INR",
+      niche: niche || "AI, Data, Software & Product Tech",
+      nicheDetails: safeNicheDetails,
     });
 
     const job = await RecruitJob.create({
@@ -928,6 +959,7 @@ recruitRouter.post("/jobs", async (req, res) => {
       location: location || "Remote", workMode: workMode || "remote",
       responsibilities: responsibilities || "", mustHaveSkills: mustHaveSkills || "",
       niceToHaveSkills: niceToHaveSkills || "",
+      nicheDetails: safeNicheDetails,
       salaryMin: salaryMin ? Number(salaryMin) : undefined,
       salaryMax: salaryMax ? Number(salaryMax) : undefined,
       salaryCurrency: salaryCurrency || "INR",
