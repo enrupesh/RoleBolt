@@ -12,7 +12,7 @@ import { formatJobDescription } from "@/lib/jobDescription";
 
 function getFrontendUrl(): string {
   if (typeof window !== "undefined" && window.location?.origin) return window.location.origin;
-  return process.env.NEXT_PUBLIC_SITE_URL || "https://www.plyndrox.app";
+  return process.env.NEXT_PUBLIC_SITE_URL || "https://www.rolebolt.app";
 }
 
 type Confidence = "high" | "medium" | "low";
@@ -695,7 +695,7 @@ function SeekerProfileModal({ candidateId, jobId, token, onClose }: {
 
               {noProfile || !seekerProfile ? (
                 <div className="flex flex-col items-center justify-center py-6 text-center rounded-2xl border border-dashed border-zinc-800">
-                  <p className="text-sm font-semibold text-gray-500">No Plyndrox profile found</p>
+                  <p className="text-sm font-semibold text-gray-500">No Rolebolt profile found</p>
                   <p className="text-xs text-gray-400 mt-1 max-w-xs">
                     This candidate hasn't set up a full profile. Their resume and application details are shown above.
                   </p>
@@ -1611,7 +1611,7 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
 function PostToBoardsTab({ job }: { job: Job }) {
   const [copiedBoard, setCopiedBoard] = useState<string | null>(null);
   const [linkCopiedPost, setLinkCopiedPost] = useState(false);
-  const plyndroxUrl = `${getFrontendUrl()}/recruit/opportunities/${job._id}`;
+  const roleboltUrl = `${getFrontendUrl()}/recruit/opportunities/${job._id}`;
   const jobDescription = formatJobDescription(job.generatedJD);
 
   const linkedinPost = `🚀 We're Hiring: ${job.title}
@@ -1700,12 +1700,12 @@ ${jobDescription}`;
       <div className="rounded-2xl border border-indigo-500/20 bg-indigo-500/[0.05] px-5 py-4">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <p className="text-sm font-semibold text-indigo-600 mb-1">Share your Plyndrox listing</p>
-            <p className="text-xs text-[var(--text-muted)] leading-relaxed break-all">{plyndroxUrl}</p>
+            <p className="text-sm font-semibold text-indigo-600 mb-1">Share your Rolebolt listing</p>
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed break-all">{roleboltUrl}</p>
           </div>
           <button
             onClick={() => {
-              navigator.clipboard.writeText(plyndroxUrl).then(() => {
+              navigator.clipboard.writeText(roleboltUrl).then(() => {
                 setLinkCopiedPost(true);
                 setTimeout(() => setLinkCopiedPost(false), 2000);
               });

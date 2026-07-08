@@ -4,7 +4,7 @@ import { createContext, useContext, useLayoutEffect, useState } from "react";
 
 export type Theme = "white" | "light" | "dark" | "green" | "reading" | "ocean" | "rose" | "auto";
 
-export const THEME_STORAGE_KEY = "plyndrox_theme";
+export const THEME_STORAGE_KEY = "rolebolt_theme";
 const LEGACY_STORAGE_KEY = "evara_theme";
 
 interface ThemeContextValue {

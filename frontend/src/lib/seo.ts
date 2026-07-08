@@ -1,23 +1,23 @@
 import type { Metadata } from "next";
 
-export const SITE_URL = "https://www.plyndrox.app";
+export const SITE_URL = "https://www.rolebolt.app";
 
 export const siteConfig = {
-  name: "Plyndrox AI",
-  shortName: "Plyndrox",
+  name: "Rolebolt",
+  shortName: "Rolebolt",
   url: SITE_URL,
   locale: "en_US",
-  defaultTitle: "Plyndrox AI — Every AI Tool You Need. Free for Everyone.",
-  titleTemplate: "%s | Plyndrox AI",
+  defaultTitle: "Rolebolt — Every AI Tool You Need. Free for Everyone.",
+  titleTemplate: "%s | Rolebolt",
   defaultDescription:
-    "Plyndrox AI is the free all-in-one AI platform: personal AI companion, WhatsApp AI, Inbox AI, invoice automation, AI hiring, Smart Ledger, Link Pulse, Sales Analytics, and more — built for individuals and businesses worldwide.",
+    "Rolebolt is the free all-in-one AI platform: personal AI companion, WhatsApp AI, Inbox AI, invoice automation, AI hiring, Smart Ledger, Link Pulse, Sales Analytics, and more — built for individuals and businesses worldwide.",
   slogan: "Every AI tool you need. Free for everyone.",
   defaultKeywords: [
-    "Plyndrox",
-    "Plyndrox AI",
-    "Plyndrox app",
-    "Plyndrox.app",
-    "plyndrox ai platform",
+    "Rolebolt",
+    "Rolebolt",
+    "Rolebolt app",
+    "Rolebolt.app",
+    "rolebolt ai platform",
     "free AI platform",
     "free AI tools",
     "free AI suite",
@@ -116,21 +116,21 @@ export const siteConfig = {
     "AI outreach automation",
     "personalized cold email AI",
   ],
-  twitterHandle: "@plyndroxai",
+  twitterHandle: "@roleboltai",
   organization: {
-    legalName: "Plyndrox AI",
+    legalName: "Rolebolt",
     foundingDate: "2024",
     foundingLocation: "India",
-    email: "support@plyndrox.app",
-    contactEmail: "support@plyndrox.app",
-    pressEmail: "press@plyndrox.app",
-    salesEmail: "sales@plyndrox.app",
+    email: "support@rolebolt.app",
+    contactEmail: "support@rolebolt.app",
+    pressEmail: "press@rolebolt.app",
+    salesEmail: "sales@rolebolt.app",
     sameAs: [
-      "https://www.plyndrox.app",
-      "https://twitter.com/plyndroxai",
-      "https://x.com/plyndroxai",
-      "https://www.linkedin.com/company/plyndrox-ai",
-      "https://github.com/plyndrox",
+      "https://www.rolebolt.app",
+      "https://twitter.com/roleboltai",
+      "https://x.com/roleboltai",
+      "https://www.linkedin.com/company/rolebolt-ai",
+      "https://github.com/rolebolt",
     ],
     knowsAbout: [
       "Artificial Intelligence",
@@ -543,7 +543,7 @@ export const productKeywords = {
     "Ibara widget",
     "Ibara chat widget",
     "Ibara chatbot",
-    "Plyndrox Ibara",
+    "Rolebolt Ibara",
     "embeddable AI chatbot",
     "embeddable AI widget",
     "embeddable chatbot",
@@ -729,7 +729,7 @@ export const productKeywords = {
 
   ledger: [
     "Smart Ledger",
-    "Plyndrox Smart Ledger",
+    "Rolebolt Smart Ledger",
     "AI satti",
     "satti AI",
     "satti software",
@@ -1095,9 +1095,9 @@ export const productKeywords = {
   ],
 
   features: [
-    "Plyndrox features",
-    "Plyndrox AI features",
-    "Plyndrox capabilities",
+    "Rolebolt features",
+    "Rolebolt features",
+    "Rolebolt capabilities",
     "AI suite features",
     "all in one AI features",
     "free AI features",
@@ -1108,35 +1108,35 @@ export const productKeywords = {
     "AI features for personal use",
     "AI features comparison",
     "AI features list",
-    "what does Plyndrox do",
-    "what is Plyndrox AI",
-    "Plyndrox vs ChatGPT",
-    "Plyndrox vs Gemini",
-    "Plyndrox vs Claude",
-    "Plyndrox vs Copilot",
-    "Plyndrox vs Perplexity",
-    "Plyndrox review",
-    "Plyndrox AI review",
-    "Plyndrox demo",
-    "Plyndrox use cases",
+    "what does Rolebolt do",
+    "what is Rolebolt",
+    "Rolebolt vs ChatGPT",
+    "Rolebolt vs Gemini",
+    "Rolebolt vs Claude",
+    "Rolebolt vs Copilot",
+    "Rolebolt vs Perplexity",
+    "Rolebolt review",
+    "Rolebolt review",
+    "Rolebolt demo",
+    "Rolebolt use cases",
     "free AI feature comparison",
   ],
 
   pricing: [
-    "Plyndrox pricing",
-    "Plyndrox AI pricing",
-    "Plyndrox cost",
-    "Plyndrox AI cost",
-    "Plyndrox free plan",
-    "Plyndrox subscription",
-    "Plyndrox business plan",
-    "Plyndrox enterprise plan",
+    "Rolebolt pricing",
+    "Rolebolt pricing",
+    "Rolebolt cost",
+    "Rolebolt cost",
+    "Rolebolt free plan",
+    "Rolebolt subscription",
+    "Rolebolt business plan",
+    "Rolebolt enterprise plan",
     "free AI pricing",
-    "is Plyndrox free",
-    "is Plyndrox AI really free",
-    "Plyndrox free forever",
-    "Plyndrox free for business",
-    "Plyndrox free for personal use",
+    "is Rolebolt free",
+    "is Rolebolt really free",
+    "Rolebolt free forever",
+    "Rolebolt free for business",
+    "Rolebolt free for personal use",
     "free AI tools pricing",
     "free AI subscription",
     "free AI no credit card",
@@ -1152,7 +1152,7 @@ export const productKeywords = {
   ],
 
   solutions: [
-    "Plyndrox solutions",
+    "Rolebolt solutions",
     "AI solutions",
     "AI solutions by industry",
     "AI for restaurants",
@@ -1253,14 +1253,14 @@ export const productKeywords = {
     "AI tools for startups free",
     "AI platform free forever",
     "free AI tools for small business India",
-    "Plyndrox AI for India",
+    "Rolebolt for India",
     "13 AI tools free",
     "all-in-one AI platform free",
   ],
 
   budget: [
     "Budget Tracker AI",
-    "Plyndrox Budget Tracker AI",
+    "Rolebolt Budget Tracker AI",
     "AI budget tracker",
     "AI budget planner",
     "AI budget manager",
@@ -1349,7 +1349,7 @@ export const productKeywords = {
 
   salesAi: [
     "Sales AI",
-    "Plyndrox Sales AI",
+    "Rolebolt Sales AI",
     "AI sales assistant",
     "AI sales tool",
     "AI sales platform",
@@ -1437,7 +1437,7 @@ export const productKeywords = {
   ],
   linkPulse: [
     "Link Pulse",
-    "Plyndrox Link Pulse",
+    "Rolebolt Link Pulse",
     "free URL shortener",
     "URL shortener free",
     "link shortener",
@@ -1492,7 +1492,7 @@ export const productKeywords = {
   salesDashboard: [
     "Sales Analytics Dashboard",
     "sales dashboard",
-    "Plyndrox Sales Dashboard",
+    "Rolebolt Sales Dashboard",
     "free sales dashboard",
     "retail sales analytics",
     "sales analytics tool",
@@ -1561,7 +1561,7 @@ export function buildMetadata({
   noIndex,
   alternateLanguages,
 }: BuildMetadataInput): Metadata {
-  const fullTitle = title.includes("Plyndrox") ? title : `${title} | Plyndrox AI`;
+  const fullTitle = title.includes("Rolebolt") ? title : `${title} | Rolebolt`;
   const url = path.startsWith("http") ? path : `${SITE_URL}${path}`;
   const seen = new Set<string>();
   const dedupedKeywords: string[] = [];
@@ -1586,7 +1586,7 @@ export function buildMetadata({
         ...(alternateLanguages ?? {}),
       },
       types: {
-        "application/rss+xml": [{ url: `${SITE_URL}/feed.xml`, title: "Plyndrox AI Blog RSS" }],
+        "application/rss+xml": [{ url: `${SITE_URL}/feed.xml`, title: "Rolebolt Blog RSS" }],
       },
     },
     robots: noIndex
@@ -1638,11 +1638,11 @@ export function organizationJsonLd() {
     "@type": "Organization",
     "@id": `${SITE_URL}#organization`,
     name: siteConfig.organization.legalName,
-    alternateName: [siteConfig.shortName, "Plyndrox", "Plyndrox AI Platform"],
+    alternateName: [siteConfig.shortName, "Rolebolt", "Rolebolt Platform"],
     url: SITE_URL,
     logo: {
       "@type": "ImageObject",
-      url: `${SITE_URL}/icons/plyndrox-512.png`,
+      url: `${SITE_URL}/icons/rolebolt-512.png`,
       width: 512,
       height: 512,
     },
@@ -1722,7 +1722,7 @@ export function softwareApplicationJsonLd() {
     applicationSubCategory: "Artificial Intelligence Platform",
     description: siteConfig.defaultDescription,
     url: SITE_URL,
-    image: `${SITE_URL}/icons/plyndrox-512.png`,
+    image: `${SITE_URL}/icons/rolebolt-512.png`,
     softwareVersion: "1.0",
     inLanguage: ["en", "hi"],
     featureList: [
@@ -1835,7 +1835,7 @@ export function articleJsonLd(opts: {
 
 /**
  * Per-product SoftwareApplication schema. Use inside each product's layout.tsx
- * so search engines can present each Plyndrox product as its own entity with
+ * so search engines can present each Rolebolt product as its own entity with
  * its own rating, price, and feature list.
  */
 export function productAppJsonLd(opts: {

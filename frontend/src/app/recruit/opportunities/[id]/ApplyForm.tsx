@@ -239,7 +239,7 @@ export default function ApplyForm({
       const res = await fetch(apiUrl(`/recruit-public/jobs/${jobId}/apply`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, source: "Plyndrox Jobs" }),
+        body: JSON.stringify({ ...form, source: "Rolebolt Jobs" }),
       });
       const data = await readApiJson(res);
       if (!res.ok) throw new Error(data.error || "Application failed. Please try again.");

@@ -774,7 +774,7 @@ function NewJobContent() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <FieldLabel>Company Name</FieldLabel>
-                  <Input value={form.companyName} onChange={update("companyName")} placeholder="e.g. Plyndrox" />
+                  <Input value={form.companyName} onChange={update("companyName")} placeholder="e.g. Rolebolt" />
                 </div>
                 <div>
                   <FieldLabel>Company Type</FieldLabel>
@@ -1053,7 +1053,7 @@ function NewJobContent() {
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] font-bold text-gray-400">✦</span>
-                        <span className="text-[11px] text-gray-400">Verified company — by Plyndrox</span>
+                        <span className="text-[11px] text-gray-400">Verified company — by Rolebolt</span>
                       </div>
                     </div>
                     {q.tier !== "high" && (

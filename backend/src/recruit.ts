@@ -19,7 +19,7 @@ export const recruitRouter = express.Router();
 export const recruitPublicRouter = express.Router();
 
 const MESHAPI_API_KEY = process.env.MESHAPI_API_KEY ?? "";
-const FRONTEND_URL = process.env.FRONTEND_URL ?? "https://www.plyndrox.app";
+const FRONTEND_URL = process.env.FRONTEND_URL ?? "https://www.rolebolt.app";
 
 function getUid(req: express.Request): string {
   return (req as any).user?.uid ?? "";
@@ -1200,7 +1200,7 @@ recruitPublicRouter.post("/jobs/:jobId/apply", async (req, res) => {
       assessmentStatus: "not_sent",
       previousResumeScore: scored.totalScore,
       scoringFailed: scored.scoringFailed,
-      source: source || "Plyndrox Jobs",
+      source: source || "Rolebolt Jobs",
       location: location || "",
       currentStatus: currentStatus || "",
       educationLevel: educationLevel || "",
