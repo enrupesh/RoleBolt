@@ -1,7 +1,6 @@
 import Link from "next/link";
 import RecruitHeader from "@/components/RecruitHeader";
 import FilterDropdown from "./FilterDropdown";
-import { computeJobQuality } from "@/lib/jobQuality";
 import PageTracker from "@/components/PageTracker";
 import { apiUrl, readApiJson } from "@/lib/api";
 
@@ -84,6 +83,22 @@ function quickFilterLink(params: PageSearchParams, updates: Record<string, strin
   });
   const qs = query.toString();
   return `/recruit/opportunities${qs ? `?${qs}` : ""}`;
+}
+
+// Avatar color based on company name — deterministic, 6 palettes
+const AVATAR_PALETTES = [
+  "from-blue-50 to-blue-100 text-blue-700",
+  "from-violet-50 to-violet-100 text-violet-700",
+  "from-emerald-50 to-emerald-100 text-emerald-700",
+  "from-amber-50 to-amber-100 text-amber-700",
+  "from-rose-50 to-rose-100 text-rose-700",
+  "from-indigo-50 to-indigo-100 text-indigo-700",
+];
+function avatarPalette(name?: string) {
+  if (!name) return AVATAR_PALETTES[0];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+  return AVATAR_PALETTES[hash % AVATAR_PALETTES.length];
 }
 
 function timeAgo(dateStr?: string) {
@@ -211,16 +226,16 @@ export default async function RecruitOpportunitiesPage({ searchParams }: { searc
             </div>
           ) : (
             jobs.map(job => {
-              const quality = computeJobQuality(job);
               const hasSalary = !!(job.salaryMin || job.salaryMax);
               const deadline = formatDeadline(job.applicationDeadline);
+              const palette = avatarPalette(job.companyName || job.title);
               return (
                 <div key={job._id} className="group relative rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:border-[#0a66c2]/40 hover:shadow-md">
                   <Link href={`/recruit/opportunities/${job._id}`} className="absolute inset-0 rounded-2xl z-0" aria-label={`View ${job.title}`} />
 
                   <div className="flex gap-3">
-                    {/* Avatar */}
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 text-sm font-black text-[#0a66c2]">
+                    {/* Avatar — color varies by company */}
+                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-sm font-black ${palette}`}>
                       {(job.companyName || job.title).slice(0, 1).toUpperCase()}
                     </div>
 
@@ -231,16 +246,23 @@ export default async function RecruitOpportunitiesPage({ searchParams }: { searc
                           <h2 className="font-bold text-slate-900 group-hover:text-[#0a66c2] transition leading-snug">
                             {job.title}
                           </h2>
-                          {job.verifiedCompany && (
-                            <span className="rounded-full bg-green-50 border border-green-200 px-1.5 py-0.5 text-[10px] font-bold text-green-700">✓</span>
+
+                          {/* Verified = golden tick | Not verified = grey tag */}
+                          {job.verifiedCompany ? (
+                            <span className="inline-flex items-center gap-0.5 rounded-full border border-yellow-300 bg-yellow-50 px-1.5 py-0.5 text-[10px] font-bold text-yellow-700">
+                              ✦ Verified
+                            </span>
+                          ) : (
+                            <span className="rounded-full border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-400">
+                              Unverified
+                            </span>
                           )}
+
                           {job.freshersAllowed && (
                             <span className="rounded-full bg-amber-50 border border-amber-200 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">Freshers</span>
                           )}
-                          {quality.tier === "high" && (
-                            <span className={`rounded-full border px-1.5 py-0.5 text-[10px] font-bold ${quality.color} ${quality.bg} ${quality.border}`}>★</span>
-                          )}
                         </div>
+
                         <div className="flex shrink-0 items-center gap-1.5 text-[11px] text-slate-400">
                           {job.createdAt && <span>{timeAgo(job.createdAt)}</span>}
                           <svg className="opacity-0 group-hover:opacity-100 transition text-[#0a66c2]" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
@@ -260,11 +282,11 @@ export default async function RecruitOpportunitiesPage({ searchParams }: { searc
                         {job.niche ? ` · ${job.niche.split(",")[0].trim()}` : ""}
                       </p>
 
-                      {/* Skills */}
+                      {/* Skills — max 4, properly truncated */}
                       {job.mustHaveSkills && (
                         <div className="mt-2 flex flex-wrap gap-1">
                           {job.mustHaveSkills.split(",").slice(0, 4).map(s => s.trim()).filter(Boolean).map(s => (
-                            <span key={s} className="rounded-full bg-slate-50 border border-slate-200 px-2 py-0.5 text-[11px] text-slate-500">{s}</span>
+                            <span key={s} className="max-w-[140px] truncate rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] text-slate-500">{s}</span>
                           ))}
                         </div>
                       )}
@@ -280,7 +302,7 @@ export default async function RecruitOpportunitiesPage({ searchParams }: { searc
                         {job.seniority && <span className="text-slate-400">{job.seniority}</span>}
                         {job.openings && job.openings > 1 && <span className="text-slate-400">{job.openings} openings</span>}
                         {deadline && (
-                          <span className="ml-auto rounded-full bg-rose-50 border border-rose-100 px-2 py-0.5 font-semibold text-rose-600">
+                          <span className="ml-auto rounded-full border border-rose-100 bg-rose-50 px-2 py-0.5 font-semibold text-rose-600">
                             By {deadline}
                           </span>
                         )}
