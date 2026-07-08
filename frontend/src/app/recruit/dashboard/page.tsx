@@ -200,9 +200,9 @@ function RecruitDashboardContent() {
               className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition">
               <BarChartIcon /> Analytics
             </Link>
-            <Link href="/recruit/company-profile"
+            <Link href="/recruit/recruiter-profile"
               className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition">
-              Company Profile
+              Recruiter Profile
             </Link>
           </nav>
 
@@ -355,9 +355,9 @@ function RecruitDashboardContent() {
             className="flex items-center gap-1.5 rounded-xl bg-white border border-slate-200 px-4 py-2.5 text-xs font-medium text-slate-700 shadow-sm">
             <BarChartIcon /> Analytics
           </Link>
-          <Link href="/recruit/company-profile"
+          <Link href="/recruit/recruiter-profile"
             className="flex items-center gap-1.5 rounded-xl bg-white border border-slate-200 px-4 py-2.5 text-xs font-medium text-slate-700 shadow-sm">
-            Company Profile
+            Recruiter Profile
           </Link>
         </div>
       </main>
