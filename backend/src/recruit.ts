@@ -283,6 +283,11 @@ async function generateJobDescription(args: {
   salaryCurrency: string;
   niche?: string;
   nicheDetails?: Record<string, string>;
+  openings?: number;
+  perks?: string;
+  languageRequirement?: string;
+  timezoneOverlap?: string;
+  applicationDeadline?: Date;
 }): Promise<{ jd: string; rubric: { name: string; weight: number; description: string }[] }> {
   const salary =
     args.salaryMin && args.salaryMax
@@ -293,6 +298,14 @@ async function generateJobDescription(args: {
     .filter(([, v]) => v && String(v).trim())
     .map(([k, v]) => `- ${k}: ${v}`)
     .join("\n");
+
+  const extraLines = [
+    args.openings && args.openings > 1 ? `- Number of Openings: ${args.openings}` : "",
+    args.perks?.trim() ? `- Perks & Benefits: ${args.perks.trim()}` : "",
+    args.languageRequirement?.trim() ? `- Language Requirement: ${args.languageRequirement.trim()}` : "",
+    args.timezoneOverlap?.trim() ? `- Timezone / Working Hours Overlap: ${args.timezoneOverlap.trim()}` : "",
+    args.applicationDeadline ? `- Application Deadline: ${args.applicationDeadline.toDateString()}` : "",
+  ].filter(Boolean).join("\n");
 
   const prompt = `You are a senior recruiter and job-description copywriter for an India-first job marketplace. Generate polished, candidate-friendly hiring content.
 
@@ -306,7 +319,7 @@ INPUT:
 - Key Responsibilities: ${args.responsibilities}
 - Must-Have Skills: ${args.mustHaveSkills}
 - Nice-to-Have Skills: ${args.niceToHaveSkills}
-- Compensation: ${salary}${nicheDetailsLines ? `\n- Niche-specific details:\n${nicheDetailsLines}` : ""}
+- Compensation: ${salary}${nicheDetailsLines ? `\n- Niche-specific details:\n${nicheDetailsLines}` : ""}${extraLines ? `\n${extraLines}` : ""}
 
 Tailor the tone, expectations, and rubric to fit this specific niche (e.g. a Content Creator role should value portfolios/samples over years of experience; a Blue-Collar role should value shift flexibility and reliability; a Healthcare role should value licenses/certifications).
 
@@ -919,6 +932,7 @@ recruitRouter.post("/jobs", async (req, res) => {
       responsibilities, mustHaveSkills, niceToHaveSkills, nicheDetails,
       salaryMin, salaryMax, salaryCurrency, experienceMin, experienceMax,
       educationRequirement, noticePeriod, freshersAllowed, verifiedCompany, publicVisibility,
+      openings, applicationDeadline, perks, languageRequirement, timezoneOverlap,
     } = req.body;
 
     // Some niches (content/creator, education, social media, etc.) are
@@ -957,6 +971,12 @@ recruitRouter.post("/jobs", async (req, res) => {
           )
         : {};
 
+    const safeOpenings = openings !== undefined && openings !== "" && Number(openings) > 0 ? Math.floor(Number(openings)) : 1;
+    const safeDeadline = applicationDeadline && !isNaN(new Date(applicationDeadline).getTime()) ? new Date(applicationDeadline) : undefined;
+    const safePerks = typeof perks === "string" ? perks.trim().slice(0, 1000) : "";
+    const safeLanguageRequirement = typeof languageRequirement === "string" ? languageRequirement.trim().slice(0, 200) : "";
+    const safeTimezoneOverlap = typeof timezoneOverlap === "string" ? timezoneOverlap.trim().slice(0, 200) : "";
+
     const { jd, rubric } = await generateJobDescription({
       title, department: department || "", seniority: seniority || "Mid-level",
       location: location || "Remote", workMode: workMode || "remote",
@@ -967,6 +987,11 @@ recruitRouter.post("/jobs", async (req, res) => {
       salaryCurrency: salaryCurrency || "INR",
       niche: niche || "AI, Data, Software & Product Tech",
       nicheDetails: safeNicheDetails,
+      openings: safeOpenings,
+      perks: safePerks,
+      languageRequirement: safeLanguageRequirement,
+      timezoneOverlap: safeTimezoneOverlap,
+      applicationDeadline: safeDeadline,
     });
 
     const job = await RecruitJob.create({
@@ -990,6 +1015,11 @@ recruitRouter.post("/jobs", async (req, res) => {
       freshersAllowed: Boolean(freshersAllowed),
       verifiedCompany: isVerifiedCompany,
       publicVisibility: publicVisibility !== false,
+      openings: safeOpenings,
+      applicationDeadline: safeDeadline,
+      perks: safePerks,
+      languageRequirement: safeLanguageRequirement,
+      timezoneOverlap: safeTimezoneOverlap,
       generatedJD: jd, rubric, status: "active", candidateCount: 0,
     });
 
@@ -1033,10 +1063,28 @@ recruitRouter.patch("/jobs/:jobId", async (req, res) => {
       "department", "location", "workMode", "salaryMin", "salaryMax",
       "experienceMin", "experienceMax", "educationRequirement", "noticePeriod",
       "freshersAllowed", "publicVisibility",
+      "openings", "applicationDeadline", "perks", "languageRequirement", "timezoneOverlap",
     ];
     const update: any = {};
     for (const key of allowed) {
       if (req.body[key] !== undefined) update[key] = req.body[key];
+    }
+    if (update.openings !== undefined) {
+      const n = Number(update.openings);
+      update.openings = n > 0 ? Math.floor(n) : 1;
+    }
+    if (update.applicationDeadline !== undefined) {
+      const d = new Date(update.applicationDeadline);
+      update.applicationDeadline = isNaN(d.getTime()) ? undefined : d;
+    }
+    if (update.perks !== undefined) {
+      update.perks = typeof update.perks === "string" ? update.perks.trim().slice(0, 1000) : "";
+    }
+    if (update.languageRequirement !== undefined) {
+      update.languageRequirement = typeof update.languageRequirement === "string" ? update.languageRequirement.trim().slice(0, 200) : "";
+    }
+    if (update.timezoneOverlap !== undefined) {
+      update.timezoneOverlap = typeof update.timezoneOverlap === "string" ? update.timezoneOverlap.trim().slice(0, 200) : "";
     }
     const companyProfileForPatch = await RecruitCompanyProfile.findOne({ uid }).lean();
     update.verifiedCompany = (companyProfileForPatch as any)?.verificationStatus === "verified";
@@ -1053,7 +1101,7 @@ recruitPublicRouter.get("/jobs", async (req, res) => {
     await connectMongo();
     const filter = buildPublicJobQuery(req.query);
     const jobs = await RecruitJob.find(filter)
-      .select("title niche companyName companyType jobType department seniority location workMode salaryMin salaryMax salaryCurrency experienceMin experienceMax educationRequirement noticePeriod freshersAllowed verifiedCompany candidateCount createdAt mustHaveSkills generatedJD")
+      .select("title niche companyName companyType jobType department seniority location workMode salaryMin salaryMax salaryCurrency experienceMin experienceMax educationRequirement noticePeriod freshersAllowed verifiedCompany candidateCount createdAt mustHaveSkills generatedJD openings applicationDeadline")
       .sort({ verifiedCompany: -1, createdAt: -1 })
       .limit(80)
       .lean();
