@@ -52,6 +52,24 @@ export default function FilterDropdown({ hasFilters, defaults }: Props) {
   const [verifiedCompany, setVerifiedCompany] = useState(defaults.verifiedCompany);
   const ref = useRef<HTMLDivElement>(null);
 
+  // Sync local state when URL-driven defaults change (quick chips, back/forward)
+  useEffect(() => {
+    setQ(defaults.q);
+    setNiche(defaults.niche);
+    setWorkMode(defaults.workMode);
+    setJobType(defaults.jobType);
+    setSeniority(defaults.seniority);
+    setCompanyType(defaults.companyType);
+    setMinSalary(defaults.minSalary);
+    setNoticePeriod(defaults.noticePeriod);
+    setEducationRequirement(defaults.educationRequirement);
+    setPostedAfterDays(defaults.postedAfterDays);
+    setFreshersAllowed(defaults.freshersAllowed);
+    setVerifiedCompany(defaults.verifiedCompany);
+  }, [defaults.q, defaults.niche, defaults.workMode, defaults.jobType, defaults.seniority,
+      defaults.companyType, defaults.minSalary, defaults.noticePeriod, defaults.educationRequirement,
+      defaults.postedAfterDays, defaults.freshersAllowed, defaults.verifiedCompany]);
+
   // Count active filters for badge
   const activeCount = [
     q, niche !== "all" ? niche : "", workMode !== "all" ? workMode : "",
