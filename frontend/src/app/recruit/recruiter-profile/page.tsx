@@ -4,11 +4,11 @@ import { useState, useEffect, useRef } from "react";
 import { RecruitGuard } from "@/components/RecruitGuard";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { getFirebaseAuth, getFirebaseStorage } from "@/lib/firebaseClient";
+import { getFirebaseAuth } from "@/lib/firebaseClient";
 import Link from "next/link";
 import RecruitHeader from "@/components/RecruitHeader";
 import { apiUrl, readApiJson } from "@/lib/api";
+import { uploadImage } from "@/lib/uploadImage";
 
 type ProfileType = "company" | "educational_institute" | "individual" | "content_creator" | "ngo_government";
 
@@ -214,34 +214,29 @@ function RecruiterProfileContent() {
     return () => unsub();
   }, [router]);
 
-  async function uploadImage(file: File, path: string): Promise<string> {
-    const storage = getFirebaseStorage();
-    const storageRef = ref(storage, path);
-    await uploadBytes(storageRef, file);
-    return getDownloadURL(storageRef);
-  }
-
   async function handleLogoUpload(file: File) {
+    if (!authToken) { setLogoUploadError("Please wait for sign-in to finish and try again."); return; }
     setUploadingLogo(true);
     setLogoUploadError("");
     try {
-      const url = await uploadImage(file, `recruit/companyLogos/${uid}`);
+      const url = await uploadImage(file, authToken);
       setProfile(prev => ({ ...prev, logoUrl: url }));
-    } catch {
-      setLogoUploadError("Upload failed. Please try again or paste a URL.");
+    } catch (e: any) {
+      setLogoUploadError(e.message || "Upload failed. Please try again or paste a URL.");
     } finally {
       setUploadingLogo(false);
     }
   }
 
   async function handlePhotoUpload(file: File) {
+    if (!authToken) { setPhotoUploadError("Please wait for sign-in to finish and try again."); return; }
     setUploadingPhoto(true);
     setPhotoUploadError("");
     try {
-      const url = await uploadImage(file, `recruit/recruiterPhotos/${uid}`);
+      const url = await uploadImage(file, authToken);
       setProfile(prev => ({ ...prev, photoUrl: url }));
-    } catch {
-      setPhotoUploadError("Photo upload failed. Please try again or paste a URL.");
+    } catch (e: any) {
+      setPhotoUploadError(e.message || "Photo upload failed. Please try again or paste a URL.");
     } finally {
       setUploadingPhoto(false);
     }
