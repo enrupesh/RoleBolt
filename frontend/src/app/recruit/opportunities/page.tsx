@@ -143,79 +143,56 @@ export default async function RecruitOpportunitiesPage({ searchParams }: { searc
 
       <main className="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:px-8">
 
-        {/* ── Hero card ── */}
-        <div className="mb-6 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
-
-          {/* Title row */}
-          <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+        {/* ── Hero bar ── */}
+        <div className="mb-5 rounded-2xl border border-slate-200 bg-white px-4 py-3.5 shadow-sm sm:px-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            {/* Title */}
             <div>
-              <h1 className="text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
-                Find roles that fit your skills faster
-              </h1>
-              <p className="mt-1.5 text-sm text-slate-500">
-                Browse fresh jobs across India — filtered, verified, and free to apply.
-              </p>
+              <h1 className="text-lg font-bold tracking-tight text-slate-950">Find Jobs</h1>
+              <p className="text-xs text-slate-400 mt-0.5">Browse roles across India — verified &amp; free to apply</p>
+            </div>
+            {/* Result count + clear */}
+            <div className="flex items-center gap-2 text-xs text-slate-500">
+              <span className="font-semibold text-slate-700">{jobs.length} role{jobs.length === 1 ? "" : "s"}</span>
+              {hasFilters && (
+                <Link href="/recruit/opportunities" className="text-slate-400 hover:text-red-500 transition font-semibold">
+                  · Clear filters
+                </Link>
+              )}
             </div>
           </div>
 
-          {/* Filter button + quick filters */}
-          <div className="mt-4 flex flex-wrap items-center gap-2">
+          {/* Filter row */}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
             <FilterDropdown
               hasFilters={hasFilters}
               defaults={{ q, niche, workMode, jobType, seniority, companyType, minSalary, noticePeriod, educationRequirement, postedAfterDays, freshersAllowed, verifiedCompany }}
             />
+            <div className="h-5 w-px bg-slate-200" />
             <Link
-              href={quickFilterLink(params, { postedAfterDays: "7" })}
-              className={`rounded-full border px-3.5 py-2 text-xs font-semibold transition ${postedAfterDays === "7" ? "border-[#0a66c2] bg-blue-50 text-[#0a66c2]" : "border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300 hover:bg-white"}`}
+              href={quickFilterLink(params, { postedAfterDays: postedAfterDays === "7" ? "" : "7" })}
+              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${postedAfterDays === "7" ? "border-[#0a66c2] bg-blue-50 text-[#0a66c2]" : "border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50"}`}
             >
-              Fresh jobs this week
+              This week
             </Link>
             <Link
               href={quickFilterLink(params, { freshersAllowed: freshersAllowed ? "" : "true" })}
-              className={`rounded-full border px-3.5 py-2 text-xs font-semibold transition ${freshersAllowed ? "border-amber-400 bg-amber-50 text-amber-700" : "border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300 hover:bg-white"}`}
+              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${freshersAllowed ? "border-amber-400 bg-amber-50 text-amber-700" : "border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50"}`}
             >
-              Freshers-friendly roles
+              Freshers ok
             </Link>
             <Link
               href={quickFilterLink(params, { workMode: workMode === "remote" ? "" : "remote" })}
-              className={`rounded-full border px-3.5 py-2 text-xs font-semibold transition ${workMode === "remote" ? "border-[#0a66c2] bg-blue-50 text-[#0a66c2]" : "border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300 hover:bg-white"}`}
+              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${workMode === "remote" ? "border-[#0a66c2] bg-blue-50 text-[#0a66c2]" : "border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50"}`}
             >
-              Remote opportunities
+              Remote
             </Link>
-          </div>
-
-          {/* Info strips */}
-          <div className="mt-4 grid gap-2 border-t border-slate-100 pt-4 sm:grid-cols-3">
-            {[
-              { title: "Free to apply", desc: "No payment or subscription needed." },
-              { title: "AI-scored listings", desc: "Every job has a quality score based on transparency." },
-              { title: "Trust-first filters", desc: "Find freshers-friendly and verified-company roles." },
-            ].map(({ title, desc }) => (
-              <div key={title} className="rounded-2xl bg-slate-50 px-4 py-3 ring-1 ring-slate-100">
-                <span className="text-xs font-bold text-slate-900">{title}</span>
-                <p className="mt-0.5 text-[11px] text-slate-500">{desc}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Active filter chips + result count */}
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-[#0a66c2]/10 px-3 py-1 text-xs font-bold text-[#0a66c2]">
-              {jobs.length} role{jobs.length === 1 ? "" : "s"} found
-            </span>
+            {/* Active chips */}
             {activeChips.map(chip => (
-              <span key={chip} className="inline-flex items-center gap-1 rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-[#0a66c2]">
+              <span key={chip} className="rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-[#0a66c2]">
                 {chip}
               </span>
             ))}
-            {hasFilters && (
-              <Link
-                href="/recruit/opportunities"
-                className="rounded-full px-2.5 py-1 text-[11px] font-bold text-slate-400 hover:text-red-500 transition"
-              >
-                ✕ Clear filters
-              </Link>
-            )}
           </div>
         </div>
 
@@ -235,32 +212,38 @@ export default async function RecruitOpportunitiesPage({ searchParams }: { searc
           ) : (
             jobs.map(job => {
               const quality = computeJobQuality(job);
+              const hasSalary = !!(job.salaryMin || job.salaryMax);
+              const deadline = formatDeadline(job.applicationDeadline);
               return (
-                <div key={job._id} className="group relative rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm transition-all hover:border-[#0a66c2]/30 hover:shadow-md">
+                <div key={job._id} className="group relative rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:border-[#0a66c2]/40 hover:shadow-md">
                   <Link href={`/recruit/opportunities/${job._id}`} className="absolute inset-0 rounded-2xl z-0" aria-label={`View ${job.title}`} />
 
-                  <div className="flex gap-3 sm:gap-4">
+                  <div className="flex gap-3">
                     {/* Avatar */}
-                    <div className="flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 text-base font-black text-[#0a66c2]">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 text-sm font-black text-[#0a66c2]">
                       {(job.companyName || job.title).slice(0, 1).toUpperCase()}
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      {/* Title + badges */}
-                      <div className="flex flex-wrap items-start gap-x-2 gap-y-1">
-                        <h2 className="font-bold text-slate-900 group-hover:text-[#0a66c2] transition leading-snug">
-                          {job.title}
-                        </h2>
-                        <div className="flex flex-wrap gap-1">
+                      {/* Title row + time + arrow */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1">
+                          <h2 className="font-bold text-slate-900 group-hover:text-[#0a66c2] transition leading-snug">
+                            {job.title}
+                          </h2>
                           {job.verifiedCompany && (
-                            <span className="inline-flex items-center gap-0.5 rounded-full bg-green-50 border border-green-200 px-2 py-0.5 text-[10px] font-bold text-green-700">✓ Verified</span>
+                            <span className="rounded-full bg-green-50 border border-green-200 px-1.5 py-0.5 text-[10px] font-bold text-green-700">✓</span>
                           )}
                           {job.freshersAllowed && (
-                            <span className="rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-bold text-amber-700">Freshers ok</span>
+                            <span className="rounded-full bg-amber-50 border border-amber-200 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">Freshers</span>
                           )}
                           {quality.tier === "high" && (
-                            <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${quality.color} ${quality.bg} ${quality.border}`}>★ High quality</span>
+                            <span className={`rounded-full border px-1.5 py-0.5 text-[10px] font-bold ${quality.color} ${quality.bg} ${quality.border}`}>★</span>
                           )}
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1.5 text-[11px] text-slate-400">
+                          {job.createdAt && <span>{timeAgo(job.createdAt)}</span>}
+                          <svg className="opacity-0 group-hover:opacity-100 transition text-[#0a66c2]" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
                         </div>
                       </div>
 
@@ -271,7 +254,7 @@ export default async function RecruitOpportunitiesPage({ searchParams }: { searc
                         {" · "}{job.location || "India"}
                       </p>
 
-                      {/* Meta */}
+                      {/* Work mode · Job type · Niche */}
                       <p className="mt-0.5 text-xs text-slate-400 capitalize">
                         {job.workMode || "Flexible"} · {job.jobType || "Full-time"}
                         {job.niche ? ` · ${job.niche.split(",")[0].trim()}` : ""}
@@ -280,31 +263,25 @@ export default async function RecruitOpportunitiesPage({ searchParams }: { searc
                       {/* Skills */}
                       {job.mustHaveSkills && (
                         <div className="mt-2 flex flex-wrap gap-1">
-                          {job.mustHaveSkills.split(",").slice(0, 5).map(s => s.trim()).filter(Boolean).map(s => (
-                            <span key={s} className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-medium text-slate-600 border border-slate-200">{s}</span>
+                          {job.mustHaveSkills.split(",").slice(0, 4).map(s => s.trim()).filter(Boolean).map(s => (
+                            <span key={s} className="rounded-full bg-slate-50 border border-slate-200 px-2 py-0.5 text-[11px] text-slate-500">{s}</span>
                           ))}
                         </div>
                       )}
 
-                      {/* Salary + experience row */}
-                      <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
-                        <span className="font-semibold text-slate-700">{formatSalary(job)}</span>
-                        <span>{job.experienceMin ?? 0}{job.experienceMax ? `–${job.experienceMax}` : "+"} yrs</span>
-                        {job.seniority && <span>{job.seniority}</span>}
-                        {job.noticePeriod && <span>{job.noticePeriod} notice</span>}
-                        {job.openings && job.openings > 1 && <span>{job.openings} openings</span>}
-                        {job.createdAt && <span className="ml-auto text-slate-400">{timeAgo(job.createdAt)}</span>}
-                      </div>
-
-                      {/* Tags row */}
-                      <div className="mt-3 flex flex-wrap gap-1.5">
-                        <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-[#0a66c2]">Apply free</span>
-                        {(job.salaryMin || job.salaryMax) && (
-                          <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-[11px] font-bold text-emerald-700">₹ Salary visible</span>
+                      {/* Bottom row: salary + meta + deadline */}
+                      <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                        {hasSalary ? (
+                          <span className="font-semibold text-emerald-700">{formatSalary(job)}</span>
+                        ) : (
+                          <span className="text-slate-400">Salary not disclosed</span>
                         )}
-                        {formatDeadline(job.applicationDeadline) && (
-                          <span className="rounded-full bg-rose-50 border border-rose-200 px-2.5 py-1 text-[11px] font-bold text-rose-700">
-                            Apply by {formatDeadline(job.applicationDeadline)}
+                        <span className="text-slate-400">{job.experienceMin ?? 0}{job.experienceMax ? `–${job.experienceMax}` : "+"} yrs</span>
+                        {job.seniority && <span className="text-slate-400">{job.seniority}</span>}
+                        {job.openings && job.openings > 1 && <span className="text-slate-400">{job.openings} openings</span>}
+                        {deadline && (
+                          <span className="ml-auto rounded-full bg-rose-50 border border-rose-100 px-2 py-0.5 font-semibold text-rose-600">
+                            By {deadline}
                           </span>
                         )}
                       </div>
