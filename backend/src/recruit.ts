@@ -626,16 +626,19 @@ Write a practical interview brief (250-350 words) covering:
 
 Write in plain text, no JSON, no markdown headers.`;
 
-  const brief = await callNvidiaChatCompletions({
-    apiKey: MESHAPI_API_KEY,
-    retries: 2,
-    fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
-    messages: [{ role: "user", content: prompt }],
-    temperature: 0.5,
-    max_tokens: 600,
-  });
-
-  return brief;
+  try {
+    return await callNvidiaChatCompletions({
+      apiKey: MESHAPI_API_KEY,
+      retries: 2,
+      fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.5,
+      max_tokens: 600,
+    });
+  } catch (err) {
+    console.error("[recruit] generateInterviewBrief: AI call failed:", err);
+    return `Interview brief unavailable — the AI service could not be reached. Candidate: ${args.candidateName} for ${args.jobTitle}. Please review their resume and score breakdown manually before the interview.`;
+  }
 }
 
 async function generateAssessmentQuestions(args: {
@@ -666,14 +669,28 @@ STRICT REQUIREMENTS:
 Respond with ONLY this exact JSON structure, no markdown, no extra text:
 {"questions":[{"id":"q1","text":"..."},{"id":"q2","text":"..."},{"id":"q3","text":"..."},{"id":"q4","text":"..."},{"id":"q5","text":"..."}]}`;
 
-  const raw = await callNvidiaChatCompletions({
-    apiKey: MESHAPI_API_KEY,
-    retries: 2,
-    fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
-    messages: [{ role: "user", content: prompt }],
-    temperature: 0.5,
-    max_tokens: 1200,
-  });
+  const defaultQuestions = [
+    { id: "q1", text: `Describe a challenging technical problem you solved in a previous ${args.jobTitle} role. What was the situation, what actions did you take, and what was the measurable outcome?` },
+    { id: "q2", text: `Walk us through a project where you had to work across teams or stakeholders with competing priorities. How did you navigate it and what did you learn?` },
+    { id: "q3", text: `Tell us about a time you had to rapidly learn a new skill or technology under a tight deadline. How did you approach it and what was the result?` },
+    { id: "q4", text: `Describe a situation where your initial approach to a problem was wrong. How did you identify it, course-correct, and what did you do differently afterward?` },
+    { id: "q5", text: `As a ${args.jobTitle}, how would you approach your first 90 days — what would you prioritize, how would you measure early success, and what concerns would you flag to your manager?` },
+  ];
+
+  let raw: string;
+  try {
+    raw = await callNvidiaChatCompletions({
+      apiKey: MESHAPI_API_KEY,
+      retries: 2,
+      fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.5,
+      max_tokens: 1200,
+    });
+  } catch (err) {
+    console.error("[recruit] generateAssessmentQuestions: AI call failed, using default questions:", err);
+    return defaultQuestions;
+  }
 
   const parsed = safeJson(raw);
   if (parsed && Array.isArray(parsed.questions) && parsed.questions.length >= 3) {
@@ -683,13 +700,7 @@ Respond with ONLY this exact JSON structure, no markdown, no extra text:
     })).filter((q: { id: string; text: string }) => q.text.length > 10);
   }
 
-  return [
-    { id: "q1", text: `Describe a challenging technical problem you solved in a previous ${args.jobTitle} role. What was the situation, what actions did you take, and what was the measurable outcome?` },
-    { id: "q2", text: `Walk us through a project where you had to work across teams or stakeholders with competing priorities. How did you navigate it and what did you learn?` },
-    { id: "q3", text: `Tell us about a time you had to rapidly learn a new skill or technology under a tight deadline. How did you approach it and what was the result?` },
-    { id: "q4", text: `Describe a situation where your initial approach to a problem was wrong. How did you identify it, course-correct, and what did you do differently afterward?` },
-    { id: "q5", text: `As a ${args.jobTitle}, how would you approach your first 90 days — what would you prioritize, how would you measure early success, and what concerns would you flag to your manager?` },
-  ];
+  return defaultQuestions;
 }
 
 async function analyzeAssessmentAnswers(args: {
@@ -755,16 +766,21 @@ Rules:
 - weaknesses: 0-3 genuine concerns (if none, use empty array)
 - reasoning: specific explanation of what the assessment revealed that the resume did not show`;
 
-  const raw = await callNvidiaChatCompletions({
-    apiKey: MESHAPI_API_KEY,
-    retries: 2,
-    fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
-    messages: [{ role: "user", content: prompt }],
-    temperature: 0.25,
-    max_tokens: 700,
-  });
+  let raw: string | null = null;
+  try {
+    raw = await callNvidiaChatCompletions({
+      apiKey: MESHAPI_API_KEY,
+      retries: 2,
+      fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.25,
+      max_tokens: 700,
+    });
+  } catch (err) {
+    console.error("[recruit] analyzeAssessmentAnswers: AI call failed, keeping resume score:", err);
+  }
 
-  const parsed = safeJson(raw);
+  const parsed = raw ? safeJson(raw) : null;
 
   const combinedPct = typeof parsed?.combinedScorePercent === "number"
     ? Math.max(0, Math.min(100, parsed.combinedScorePercent))
@@ -828,16 +844,19 @@ TONE RULES:
 - Keep it under 200 words
 - Do not use bullet points or formal headers`;
 
-  const email = await callNvidiaChatCompletions({
-    apiKey: MESHAPI_API_KEY,
-    retries: 2,
-    fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
-    messages: [{ role: "user", content: prompt }],
-    temperature: 0.75,
-    max_tokens: 350,
-  });
-
-  return email;
+  try {
+    return await callNvidiaChatCompletions({
+      apiKey: MESHAPI_API_KEY,
+      retries: 2,
+      fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.75,
+      max_tokens: 350,
+    });
+  } catch (err) {
+    console.error("[recruit] generateRejectionEmail: AI call failed, using template:", err);
+    return `Hi ${args.candidateName.split(" ")[0]},\n\nThank you for your interest in the ${args.jobTitle} role and for the time you invested ${context}. After careful consideration, we've decided to move forward with other candidates whose experience more closely matches what we need right now.\n\nThis isn't a reflection of your abilities, and we'd genuinely encourage you to apply for future openings that fit your background. We wish you the very best in your search.\n\nWarm regards`;
+  }
 }
 
 recruitRouter.post("/jobs", async (req, res) => {
@@ -1646,14 +1665,19 @@ FORMAT RULES:
 - If company name is not provided, use "the Company" as a placeholder
 - End with a signature block for the hiring manager`;
 
-  return await callNvidiaChatCompletions({
-    apiKey: MESHAPI_API_KEY,
-    retries: 2,
-    fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
-    messages: [{ role: "user", content: prompt }],
-    temperature: 0.5,
-    max_tokens: 900,
-  });
+  try {
+    return await callNvidiaChatCompletions({
+      apiKey: MESHAPI_API_KEY,
+      retries: 2,
+      fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.5,
+      max_tokens: 900,
+    });
+  } catch (err) {
+    console.error("[recruit] generateOfferLetter: AI call failed, using template:", err);
+    return `Dear ${args.candidateName},\n\nCongratulations! We are pleased to offer you the position of ${args.jobTitle}${args.department ? ` in ${args.department}` : ""} at ${args.companyName || "the Company"}.\n\nRole details:\n- Location: ${args.location}\n- Work Mode: ${args.workMode}\n- Seniority: ${args.seniority}\n- Start Date: ${args.startDate}\n- Compensation: ${args.salaryCurrency} ${args.salary} per year${args.signingBonus ? `\n- Signing Bonus: ${args.signingBonus}` : ""}${args.benefits ? `\n- Benefits: ${args.benefits}` : ""}\n\nThis offer is subject to standard terms of employment, which will be detailed in your employment agreement.\n\nPlease confirm your acceptance by replying to this email.\n\nWe're excited to have you join the team!\n\nBest regards,\n${args.hiringManagerName || "Hiring Team"}`;
+  }
 }
 
 recruitRouter.post("/jobs/:jobId/candidates/:candidateId/offer-letter", async (req, res) => {
@@ -2085,14 +2109,20 @@ Rules:
 - profileSuggestions: 2–4 concrete, actionable suggestions to improve their profile or chances for this specific role
 - If no resume text, focus on preference and skills matching only`;
 
-  const raw = await callNvidiaChatCompletions({
-    apiKey: MESHAPI_API_KEY,
-    retries: 2,
-    fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
-    messages: [{ role: "user", content: prompt }],
-    temperature: 0.35,
-    max_tokens: 800,
-  });
+  let raw: string;
+  try {
+    raw = await callNvidiaChatCompletions({
+      apiKey: MESHAPI_API_KEY,
+      retries: 2,
+      fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.35,
+      max_tokens: 800,
+    });
+  } catch (err) {
+    console.error("[recruit] generateJobMatch: AI call failed:", err);
+    return { matchScore: 0, matchReasons: [], missingSkills: [], profileSuggestions: ["Match analysis is temporarily unavailable — please try again shortly."] };
+  }
 
   const parsed = safeJson(raw);
   if (!parsed) {
