@@ -226,6 +226,31 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
             </div>
           </div>
 
+          {/* ── Verification status banner ── */}
+          {job.verifiedCompany ? (
+            <div className="mt-4 flex items-center gap-3 rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-green-50 px-4 py-3.5">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500 shadow-md shadow-emerald-200 text-white text-lg font-black">✓</div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-extrabold text-emerald-800 leading-tight">Verified Company</p>
+                <p className="text-xs text-emerald-600 mt-0.5">This company's identity has been reviewed and confirmed by Rolebolt.</p>
+              </div>
+              <span className="shrink-0 rounded-full bg-emerald-500 px-3 py-1 text-[11px] font-black text-white tracking-wide uppercase shadow-sm">
+                Verified ✓
+              </span>
+            </div>
+          ) : (
+            <div className="mt-4 flex items-center gap-3 rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-50 to-slate-100 px-4 py-3.5">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-300 text-white text-lg font-black">?</div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-extrabold text-slate-600 leading-tight">Unverified Company</p>
+                <p className="text-xs text-slate-400 mt-0.5">This company has not been verified by Rolebolt. Please review carefully before applying.</p>
+              </div>
+              <span className="shrink-0 rounded-full bg-slate-400 px-3 py-1 text-[11px] font-black text-white tracking-wide uppercase shadow-sm">
+                Unverified
+              </span>
+            </div>
+          )}
+
           {/* Tag pills */}
           <div className="mt-4 flex flex-wrap gap-2">
             {tags.map((t, i) => (
