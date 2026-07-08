@@ -288,10 +288,8 @@ function buildPublicJobQuery(query: any) {
   const seniority = String(query.seniority ?? "").trim();
   if (seniority && seniority !== "all") filter.seniority = seniority;
   const postedAfterDays = Number(query.postedAfterDays);
-  if (!Number.isNaN(postedAfterDays) && postedAfterDays > 0) {
-    const cutoff = new Date(Date.now() - postedAfterDays * 24 * 60 * 60 * 1000);
-    filter.createdAt = { $gte: cutoff };
-  }
+  const cutoffDays = (!Number.isNaN(postedAfterDays) && postedAfterDays > 0) ? postedAfterDays : 2;
+  filter.createdAt = { $gte: new Date(Date.now() - cutoffDays * 24 * 60 * 60 * 1000) };
   return filter;
 }
 
