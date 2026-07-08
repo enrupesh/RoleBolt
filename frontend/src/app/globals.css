@@ -1,0 +1,928 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #09090b;
+  --surface: #ffffff;
+  --surface-elevated: #ffffff;
+  --surface-muted: #f8fafc;
+  --border: #e4e4e7;
+  --text-secondary: #52525b;
+  --text-muted: #71717a;
+  --accent: #4f46e5;
+  --accent-hover: #4338ca;
+}
+
+html[data-theme="white"],
+html[data-theme="light"] {
+  --background: #ffffff;
+  --foreground: #09090b;
+  --surface: #ffffff;
+  --surface-elevated: #ffffff;
+  --surface-muted: #f8fafc;
+  --border: #e4e4e7;
+  --text-secondary: #52525b;
+  --text-muted: #71717a;
+  --accent: #4f46e5;
+  --accent-hover: #4338ca;
+}
+
+html[data-theme="dark"] {
+  --background: #09090b;
+  --foreground: #fafafa;
+  --surface: #18181b;
+  --surface-elevated: #111827;
+  --surface-muted: #27272a;
+  --border: #3f3f46;
+  --text-secondary: #d4d4d8;
+  --text-muted: #a1a1aa;
+  --accent: #818cf8;
+  --accent-hover: #a5b4fc;
+}
+
+html[data-theme="green"] {
+  --background: #f0fdf4;
+  --foreground: #10251a;
+  --surface: #f7fee7;
+  --surface-elevated: #ffffff;
+  --surface-muted: #dcfce7;
+  --border: #bbf7d0;
+  --text-secondary: #3f6b4f;
+  --text-muted: #4d7c5b;
+  --accent: #16a34a;
+  --accent-hover: #15803d;
+}
+
+html[data-theme="reading"] {
+  --background: #fff8ed;
+  --foreground: #2d2216;
+  --surface: #fffaf2;
+  --surface-elevated: #ffffff;
+  --surface-muted: #f8ecd7;
+  --border: #ead7bd;
+  --text-secondary: #725b3d;
+  --text-muted: #8a6a43;
+  --accent: #b7791f;
+  --accent-hover: #92400e;
+}
+
+html[data-theme="ocean"] {
+  --background: #eff6ff;
+  --foreground: #132238;
+  --surface: #f8fbff;
+  --surface-elevated: #ffffff;
+  --surface-muted: #dbeafe;
+  --border: #bfdbfe;
+  --text-secondary: #395b85;
+  --text-muted: #4d6f9b;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+}
+
+html[data-theme="rose"] {
+  --background: #fff1f2;
+  --foreground: #31151c;
+  --surface: #fff7f8;
+  --surface-elevated: #ffffff;
+  --surface-muted: #ffe4e6;
+  --border: #fecdd3;
+  --text-secondary: #7f3d4b;
+  --text-muted: #9f5260;
+  --accent: #e11d48;
+  --accent-hover: #be123c;
+}
+
+/* Base tailwind theme overrides */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+}
+
+/* Crisp text on every theme — never let a translucent layer or filter blur the type */
+button, a, input, textarea, select, label, p, span, h1, h2, h3, h4, h5, h6, li, td, th {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Gradient text: keep edges crisp */
+.text-transparent.bg-clip-text,
+[class*="bg-clip-text"] {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-clip: text;
+  -webkit-background-clip: text;
+}
+
+body.app-theme {
+  background: var(--background) !important;
+  color: var(--foreground) !important;
+}
+
+body.app-theme .bg-white,
+body.app-theme .bg-zinc-50,
+body.app-theme .bg-gray-50,
+body.app-theme .bg-slate-50,
+body.app-theme .bg-neutral-50,
+body.app-theme .bg-white\/95,
+body.app-theme .bg-white\/90,
+body.app-theme .bg-white\/80,
+body.app-theme .bg-white\/70,
+body.app-theme .bg-white\/60,
+body.app-theme .bg-zinc-50\/80,
+body.app-theme .bg-gray-50\/80 {
+  background-color: var(--surface) !important;
+}
+
+body.app-theme .bg-zinc-100,
+body.app-theme .bg-gray-100,
+body.app-theme .bg-slate-100,
+body.app-theme .bg-neutral-100 {
+  background-color: var(--surface-muted) !important;
+}
+
+body.app-theme .bg-\[\#f7f8fc\],
+body.app-theme .bg-\[\#f8f9fa\],
+body.app-theme .bg-\[\#f9fafb\],
+body.app-theme .bg-\[\#fafafa\],
+body.app-theme .bg-\[\#fff\],
+body.app-theme .bg-\[\#ffffff\] {
+  background-color: var(--surface) !important;
+}
+
+body.app-theme .text-zinc-950,
+body.app-theme .text-zinc-900,
+body.app-theme .text-zinc-800,
+body.app-theme .text-gray-950,
+body.app-theme .text-gray-900,
+body.app-theme .text-gray-800,
+body.app-theme .text-slate-950,
+body.app-theme .text-slate-900,
+body.app-theme .text-slate-800,
+body.app-theme .text-neutral-950,
+body.app-theme .text-neutral-900,
+body.app-theme .text-neutral-800,
+body.app-theme .text-stone-950,
+body.app-theme .text-stone-900,
+body.app-theme .text-black,
+body.app-theme .text-\[\#1d2226\],
+body.app-theme .text-\[\#09090b\],
+body.app-theme .text-\[\#111827\],
+body.app-theme .text-\[\#18181b\],
+body.app-theme .text-\[\#0a66c2\] {
+  color: var(--foreground) !important;
+}
+
+body.app-theme .text-zinc-700,
+body.app-theme .text-zinc-600,
+body.app-theme .text-gray-700,
+body.app-theme .text-gray-600,
+body.app-theme .text-slate-700,
+body.app-theme .text-slate-600,
+body.app-theme .text-neutral-700,
+body.app-theme .text-neutral-600,
+body.app-theme .text-stone-700,
+body.app-theme .text-stone-600 {
+  color: var(--text-secondary) !important;
+}
+
+body.app-theme .text-zinc-500,
+body.app-theme .text-zinc-400,
+body.app-theme .text-zinc-300,
+body.app-theme .text-gray-500,
+body.app-theme .text-gray-400,
+body.app-theme .text-gray-300,
+body.app-theme .text-slate-500,
+body.app-theme .text-slate-400,
+body.app-theme .text-slate-300,
+body.app-theme .text-neutral-500,
+body.app-theme .text-neutral-400,
+body.app-theme .text-stone-500,
+body.app-theme .text-stone-400 {
+  color: var(--text-muted) !important;
+}
+
+body.app-theme .border-zinc-50,
+body.app-theme .border-zinc-100,
+body.app-theme .border-zinc-200,
+body.app-theme .border-zinc-300,
+body.app-theme .border-gray-100,
+body.app-theme .border-gray-200,
+body.app-theme .border-gray-300,
+body.app-theme .border-slate-100,
+body.app-theme .border-slate-200,
+body.app-theme .border-slate-300,
+body.app-theme .border-neutral-100,
+body.app-theme .border-neutral-200,
+body.app-theme .border-stone-100,
+body.app-theme .border-stone-200,
+body.app-theme .border-\[\#e9eaf0\] {
+  border-color: var(--border) !important;
+}
+
+/* In dark/non-white themes, light tinted backgrounds (blue-50, indigo-50, etc.) become invisible "wash" surfaces.
+   Re-map them to the surface-muted variable so cards stay visible and text stays readable. */
+body.app-theme[data-theme="dark"] .bg-blue-50,
+body.app-theme[data-theme="dark"] .bg-blue-50\/40,
+body.app-theme[data-theme="dark"] .bg-blue-50\/50,
+body.app-theme[data-theme="dark"] .bg-blue-50\/60,
+body.app-theme[data-theme="dark"] .bg-indigo-50,
+body.app-theme[data-theme="dark"] .bg-indigo-50\/60,
+body.app-theme[data-theme="dark"] .bg-indigo-50\/90,
+body.app-theme[data-theme="dark"] .bg-violet-50,
+body.app-theme[data-theme="dark"] .bg-purple-50,
+body.app-theme[data-theme="dark"] .bg-emerald-50,
+body.app-theme[data-theme="dark"] .bg-emerald-50\/60,
+body.app-theme[data-theme="dark"] .bg-emerald-50\/90,
+body.app-theme[data-theme="dark"] .bg-sky-50,
+body.app-theme[data-theme="dark"] .bg-sky-50\/60,
+body.app-theme[data-theme="dark"] .bg-sky-50\/90,
+body.app-theme[data-theme="dark"] .bg-amber-50,
+body.app-theme[data-theme="dark"] .bg-amber-50\/60,
+body.app-theme[data-theme="dark"] .bg-amber-50\/90,
+body.app-theme[data-theme="dark"] .bg-rose-50,
+body.app-theme[data-theme="dark"] .bg-rose-50\/60,
+body.app-theme[data-theme="dark"] .bg-rose-50\/90,
+body.app-theme[data-theme="dark"] .bg-pink-50,
+body.app-theme[data-theme="dark"] .bg-green-50,
+body.app-theme[data-theme="dark"] .bg-yellow-50,
+body.app-theme[data-theme="dark"] .bg-orange-50,
+body.app-theme[data-theme="dark"] .bg-teal-50,
+body.app-theme[data-theme="dark"] .bg-cyan-50,
+body.app-theme[data-theme="dark"] .bg-fuchsia-50 {
+  background-color: var(--surface-muted) !important;
+}
+
+/* Dark theme: bright-saturated text (-700/-800/-900 on tinted palettes) becomes hard to read on dark.
+   Lift them to a pastel variant for legibility while preserving brand color identity. */
+body.app-theme[data-theme="dark"] .text-blue-900,
+body.app-theme[data-theme="dark"] .text-blue-800,
+body.app-theme[data-theme="dark"] .text-blue-700,
+body.app-theme[data-theme="dark"] .text-blue-600 { color: #93c5fd !important; }
+
+body.app-theme[data-theme="dark"] .text-indigo-900,
+body.app-theme[data-theme="dark"] .text-indigo-800,
+body.app-theme[data-theme="dark"] .text-indigo-700,
+body.app-theme[data-theme="dark"] .text-indigo-600 { color: #a5b4fc !important; }
+
+body.app-theme[data-theme="dark"] .text-violet-900,
+body.app-theme[data-theme="dark"] .text-violet-800,
+body.app-theme[data-theme="dark"] .text-violet-700,
+body.app-theme[data-theme="dark"] .text-violet-600,
+body.app-theme[data-theme="dark"] .text-purple-900,
+body.app-theme[data-theme="dark"] .text-purple-800,
+body.app-theme[data-theme="dark"] .text-purple-700,
+body.app-theme[data-theme="dark"] .text-purple-600 { color: #c4b5fd !important; }
+
+body.app-theme[data-theme="dark"] .text-emerald-900,
+body.app-theme[data-theme="dark"] .text-emerald-800,
+body.app-theme[data-theme="dark"] .text-emerald-700,
+body.app-theme[data-theme="dark"] .text-emerald-600,
+body.app-theme[data-theme="dark"] .text-green-900,
+body.app-theme[data-theme="dark"] .text-green-800,
+body.app-theme[data-theme="dark"] .text-green-700,
+body.app-theme[data-theme="dark"] .text-green-600 { color: #6ee7b7 !important; }
+
+body.app-theme[data-theme="dark"] .text-amber-900,
+body.app-theme[data-theme="dark"] .text-amber-800,
+body.app-theme[data-theme="dark"] .text-amber-700,
+body.app-theme[data-theme="dark"] .text-amber-600,
+body.app-theme[data-theme="dark"] .text-yellow-900,
+body.app-theme[data-theme="dark"] .text-yellow-800,
+body.app-theme[data-theme="dark"] .text-yellow-700 { color: #fcd34d !important; }
+
+body.app-theme[data-theme="dark"] .text-rose-900,
+body.app-theme[data-theme="dark"] .text-rose-800,
+body.app-theme[data-theme="dark"] .text-rose-700,
+body.app-theme[data-theme="dark"] .text-rose-600,
+body.app-theme[data-theme="dark"] .text-pink-900,
+body.app-theme[data-theme="dark"] .text-pink-800,
+body.app-theme[data-theme="dark"] .text-pink-700,
+body.app-theme[data-theme="dark"] .text-red-700,
+body.app-theme[data-theme="dark"] .text-red-600 { color: #fda4af !important; }
+
+body.app-theme[data-theme="dark"] .text-sky-900,
+body.app-theme[data-theme="dark"] .text-sky-800,
+body.app-theme[data-theme="dark"] .text-sky-700,
+body.app-theme[data-theme="dark"] .text-sky-600,
+body.app-theme[data-theme="dark"] .text-cyan-700,
+body.app-theme[data-theme="dark"] .text-cyan-600,
+body.app-theme[data-theme="dark"] .text-teal-700,
+body.app-theme[data-theme="dark"] .text-teal-600 { color: #7dd3fc !important; }
+
+/* Tinted borders need to be visible on dark surfaces too */
+body.app-theme[data-theme="dark"] .border-blue-100,
+body.app-theme[data-theme="dark"] .border-indigo-100,
+body.app-theme[data-theme="dark"] .border-violet-100,
+body.app-theme[data-theme="dark"] .border-purple-100,
+body.app-theme[data-theme="dark"] .border-emerald-100,
+body.app-theme[data-theme="dark"] .border-sky-100,
+body.app-theme[data-theme="dark"] .border-amber-100,
+body.app-theme[data-theme="dark"] .border-rose-100,
+body.app-theme[data-theme="dark"] .border-pink-100,
+body.app-theme[data-theme="dark"] .border-green-100,
+body.app-theme[data-theme="dark"] .border-blue-200,
+body.app-theme[data-theme="dark"] .border-indigo-200,
+body.app-theme[data-theme="dark"] .border-violet-200,
+body.app-theme[data-theme="dark"] .border-purple-200,
+body.app-theme[data-theme="dark"] .border-emerald-200,
+body.app-theme[data-theme="dark"] .border-sky-200,
+body.app-theme[data-theme="dark"] .border-amber-200,
+body.app-theme[data-theme="dark"] .border-rose-200,
+body.app-theme[data-theme="dark"] .border-pink-200,
+body.app-theme[data-theme="dark"] .border-green-200 {
+  border-color: var(--border) !important;
+}
+
+/* Form inputs / placeholders on themed surfaces */
+body.app-theme input,
+body.app-theme textarea,
+body.app-theme select {
+  background-color: var(--surface) !important;
+  color: var(--foreground) !important;
+  border-color: var(--border) !important;
+}
+body.app-theme input::placeholder,
+body.app-theme textarea::placeholder {
+  color: var(--text-muted) !important;
+  opacity: 1;
+}
+
+body.app-theme .glass-nav,
+body.app-theme .glass-card,
+body.app-theme .bento-item,
+body.app-theme .bihar-sidebar,
+body.app-theme .bihar-chat-bg {
+  background-color: var(--surface) !important;
+  border-color: var(--border) !important;
+  color: var(--foreground) !important;
+}
+
+body.app-theme .shadow-black\/5,
+body.app-theme .shadow-black\/10,
+body.app-theme .shadow-black\/15 {
+  --tw-shadow-color: color-mix(in srgb, var(--foreground) 16%, transparent) !important;
+}
+
+/* High end grid background */
+.hero-grid {
+  background-size: 40px 40px;
+  background-image: linear-gradient(to right, rgba(0, 0, 0, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.05) 1px, transparent 1px);
+  mask-image: linear-gradient(to bottom, black 40%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 40%, transparent 100%);
+}
+
+.hero-glow {
+  position: absolute;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(79, 70, 229, 0.15) 0%, rgba(255,255,255,0) 70%);
+  top: -100px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* Animations */
+@keyframes providerFadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes confetti-pop {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) rotate(0deg) scale(0.8);
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(0, 240px, 0) rotate(520deg) scale(1.1);
+  }
+}
+
+@keyframes fade-in-up {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-fade-in {
+  animation: fade-in 1s ease-out forwards;
+}
+
+.delay-100 { animation-delay: 100ms; }
+.delay-200 { animation-delay: 200ms; }
+.delay-300 { animation-delay: 300ms; }
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #d4d4d8;
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #a1a1aa;
+}
+
+/* Glassmorphism utilities — opaque enough to render text crisply, blur only on the background not the text */
+.glass-nav {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: saturate(180%) blur(16px);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.04);
+}
+
+html[data-theme="dark"] .glass-nav {
+  background: rgba(15, 15, 18, 0.92);
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+html[data-theme="dark"] .glass-card {
+  background: rgba(24, 24, 27, 0.95);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Bento Box Grid */
+.bento-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 1.5rem;
+}
+
+.bento-item {
+  border-radius: 1.5rem;
+  background-color: #ffffff;
+  border: 1px solid var(--border);
+  padding: 2rem;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.01);
+}
+
+.bento-item:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.02);
+  border-color: rgba(79, 70, 229, 0.3);
+}
+
+.bento-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: transparent;
+  transition: background 0.3s ease;
+}
+
+.bento-item:hover::before {
+  background: linear-gradient(to right, var(--accent), #8b5cf6);
+}
+
+@media (min-width: 1024px) {
+  .col-span-8 { grid-column: span 8; }
+  .col-span-4 { grid-column: span 4; }
+  .col-span-6 { grid-column: span 6; }
+  .col-span-12 { grid-column: span 12; }
+}
+
+@media (max-width: 1023px) {
+  .bento-item { grid-column: span 12; }
+}
+
+/* Button variants */
+.btn-primary {
+  background-color: #09090b;
+  color: white;
+  border-radius: 9999px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
+}
+
+.btn-primary:hover {
+  background-color: #27272a;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+.btn-secondary {
+  background-color: #ffffff;
+  color: #09090b;
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+  border-color: #d4d4d8;
+  background-color: #f4f4f5;
+  transform: translateY(-1px);
+}
+
+.plyndrox-logo-img {
+  display: block;
+  flex-shrink: 0;
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+/* Gradient Text */
+.text-gradient {
+  background: linear-gradient(135deg, #09090b 0%, #52525b 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-gradient-accent {
+  background: linear-gradient(135deg, #4f46e5 0%, #9333ea 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Stats */
+.stat-card {
+  position: relative;
+}
+.stat-card::after {
+  content: "";
+  position: absolute;
+  top: 15%;
+  right: 0;
+  height: 70%;
+  width: 1px;
+  background: var(--border);
+}
+.stat-card:last-child::after {
+  display: none;
+}
+@media (max-width: 640px) {
+  .stat-card::after { display: none; }
+}
+
+.theme-panel > div {
+  background-color: var(--surface) !important;
+}
+
+.theme-panel-trigger {
+  background-color: var(--surface) !important;
+}
+
+.theme-panel-option {
+  background-color: var(--background) !important;
+}
+
+.theme-panel-option-active {
+  background-color: color-mix(in srgb, var(--accent) 12%, var(--surface)) !important;
+  border-color: var(--accent) !important;
+}
+
+.theme-panel-active-badge {
+  background-color: var(--accent) !important;
+  color: #ffffff !important;
+}
+
+.theme-panel-swatch {
+  background-color: var(--swatch) !important;
+}
+
+.chat-markdown { line-height: 1.65; }
+.chat-markdown p { margin: 0.4rem 0; }
+.chat-markdown p:first-child { margin-top: 0; }
+.chat-markdown p:last-child { margin-bottom: 0; }
+.chat-markdown h1, .chat-markdown h2, .chat-markdown h3 {
+  margin: 0.6rem 0 0.3rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.chat-markdown h1 { font-size: 1.15em; }
+.chat-markdown h2 { font-size: 1.05em; }
+.chat-markdown h3 { font-size: 0.97em; }
+.chat-markdown ul, .chat-markdown ol { margin: 0.4rem 0; padding-left: 1.35rem; }
+.chat-markdown li { margin: 0.25rem 0; }
+.chat-markdown strong { font-weight: 650; }
+.chat-markdown em { font-style: italic; color: #666666; }
+.chat-markdown code {
+  font-family: var(--font-geist-mono), monospace;
+  background: rgba(0,0,0,0.06);
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 4px;
+  padding: 0.1em 0.35em;
+  font-size: 0.85em;
+}
+.chat-markdown pre {
+  background: #f8f9fa;
+  border: 1px solid #e8e8e8;
+  border-radius: 10px;
+  padding: 1rem;
+  overflow-x: auto;
+  margin: 0.6rem 0;
+}
+.chat-markdown pre code {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: 0.82em;
+}
+.chat-markdown blockquote {
+  border-left: 3px solid var(--accent);
+  padding-left: 0.85rem;
+  color: #666666;
+  margin: 0.4rem 0;
+}
+.chat-markdown a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+.chat-markdown hr { border: none; border-top: 1px solid #e8e8e8; margin: 0.6rem 0; }
+.chat-markdown table { width: 100%; border-collapse: collapse; font-size: 0.88em; margin: 0.5rem 0; }
+.chat-markdown th, .chat-markdown td {
+  border: 1px solid #e8e8e8;
+  padding: 0.4rem 0.75rem;
+  text-align: left;
+}
+.chat-markdown th { background: #f3f4f6; font-weight: 600; }
+
+.sidebar-overlay {
+  position: fixed; inset: 0; z-index: 30;
+  background: rgba(0,0,0,0.35);
+  backdrop-filter: blur(2px);
+}
+
+.bihar-sidebar {
+  background: #ffffff;
+  border-right: 1px solid #e8e8e8;
+}
+.bihar-chat-bg {
+  background: rgb(255, 255, 255);
+}
+
+/* ─── INBOX READING PANE ────────────────────────────────────────────────── */
+.inbox-reading-pane {
+  background: var(--background);
+}
+
+/* ─── ARBITRARY VALUE BG CLASSES (Tailwind JIT) ─────────────────────────── */
+body.app-theme .bg-\[\#f8f7ff\],
+body.app-theme .bg-\[\#f8f9fa\],
+body.app-theme .bg-\[\#f9f9f9\],
+body.app-theme .bg-\[\#eeebff\] {
+  background-color: var(--surface) !important;
+}
+
+body.app-theme .bg-\[\#eeebff\] {
+  background-color: color-mix(in srgb, var(--accent) 14%, var(--surface)) !important;
+}
+
+/* ─── HOVER STATE OVERRIDES ─────────────────────────────────────────────── */
+body.app-theme .hover\:bg-white:hover,
+body.app-theme .hover\:bg-gray-50:hover,
+body.app-theme .hover\:bg-gray-100:hover,
+body.app-theme .hover\:bg-zinc-50:hover,
+body.app-theme .hover\:bg-slate-50:hover {
+  background-color: var(--surface-muted) !important;
+}
+
+body.app-theme .hover\:bg-\[\#f8f7ff\]:hover {
+  background-color: color-mix(in srgb, var(--accent) 8%, var(--surface)) !important;
+}
+
+body.app-theme .hover\:text-\[\#1d2226\]:hover {
+  color: var(--foreground) !important;
+}
+
+/* ─── FOCUS-WITHIN STATE OVERRIDES ─────────────────────────────────────── */
+body.app-theme .focus-within\:bg-white:focus-within {
+  background-color: var(--surface-elevated) !important;
+}
+
+/* ─── GRADIENT BG CLASSES ───────────────────────────────────────────────── */
+body.app-theme .from-violet-50,
+body.app-theme .from-indigo-50,
+body.app-theme .from-blue-50,
+body.app-theme .from-emerald-50,
+body.app-theme .from-amber-50,
+body.app-theme .from-rose-50,
+body.app-theme .from-purple-50,
+body.app-theme .from-sky-50 {
+  --tw-gradient-from: var(--surface-muted) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, transparent) !important;
+}
+
+body.app-theme .to-violet-50,
+body.app-theme .to-indigo-50,
+body.app-theme .to-blue-50,
+body.app-theme .to-emerald-50,
+body.app-theme .to-amber-50,
+body.app-theme .to-rose-50,
+body.app-theme .to-purple-50,
+body.app-theme .to-sky-50 {
+  --tw-gradient-to: var(--surface-muted) !important;
+}
+
+body.app-theme .via-violet-50,
+body.app-theme .via-indigo-50,
+body.app-theme .via-blue-50 {
+  --tw-gradient-stops: var(--tw-gradient-from), var(--surface-muted), var(--tw-gradient-to, transparent) !important;
+}
+
+/* ─── ADDITIONAL BG VARIANTS MISSING FROM OVERRIDES ───────────────────── */
+body.app-theme .bg-white\/50,
+body.app-theme .bg-white\/40,
+body.app-theme .bg-white\/30 {
+  background-color: color-mix(in srgb, var(--surface) 55%, transparent) !important;
+}
+
+body.app-theme .bg-gray-50\/80,
+body.app-theme .bg-gray-50\/60,
+body.app-theme .bg-gray-50\/40 {
+  background-color: var(--surface) !important;
+}
+
+/* ─── ADDITIONAL TEXT CLASSES ───────────────────────────────────────────── */
+body.app-theme .text-\[\#1d2226\] {
+  color: var(--foreground) !important;
+}
+
+/* ─── ADDITIONAL BORDER CLASSES ─────────────────────────────────────────── */
+body.app-theme .border-\[\#e8e8e8\],
+body.app-theme .border-\[\#e9eaf0\],
+body.app-theme .border-\[\#f0f0f0\] {
+  border-color: var(--border) !important;
+}
+
+/* ─── DARK THEME SPECIFIC: tinted light backgrounds → surface-muted ─────── */
+/* Applied for all non-white themes to keep cards readable */
+body.app-theme:not([data-theme="white"]):not([data-theme="light"]) .bg-violet-50,
+body.app-theme:not([data-theme="white"]):not([data-theme="light"]) .bg-violet-50\/80,
+body.app-theme:not([data-theme="white"]):not([data-theme="light"]) .bg-indigo-50,
+body.app-theme:not([data-theme="white"]):not([data-theme="light"]) .bg-indigo-50\/80,
+body.app-theme:not([data-theme="white"]):not([data-theme="light"]) .bg-blue-50,
+body.app-theme:not([data-theme="white"]):not([data-theme="light"]) .bg-blue-50\/80,
+body.app-theme:not([data-theme="white"]):not([data-theme="light"]) .bg-sky-50,
+body.app-theme:not([data-theme="white"]):not([data-theme="light"]) .bg-purple-50,
+body.app-theme:not([data-theme="white"]):not([data-theme="light"]) .bg-\[\#f8f7ff\],
+body.app-theme:not([data-theme="white"]):not([data-theme="light"]) .bg-\[\#eeebff\] {
+  background-color: var(--surface-muted) !important;
+}
+
+/* Dark theme: restore the selected-email highlight with proper contrast */
+body.app-theme[data-theme="dark"] .bg-\[\#eeebff\] {
+  background-color: color-mix(in srgb, var(--accent) 22%, var(--surface)) !important;
+}
+
+/* Dark theme: tinted gradient replacements (only specific light color stops) */
+body.app-theme[data-theme="dark"] .from-violet-50,
+body.app-theme[data-theme="dark"] .from-indigo-50,
+body.app-theme[data-theme="dark"] .from-blue-50,
+body.app-theme[data-theme="dark"] .from-purple-50,
+body.app-theme[data-theme="dark"] .from-emerald-50,
+body.app-theme[data-theme="dark"] .from-rose-50,
+body.app-theme[data-theme="dark"] .from-amber-50,
+body.app-theme[data-theme="dark"] .from-sky-50 {
+  --tw-gradient-from: var(--surface-muted) !important;
+}
+body.app-theme[data-theme="dark"] .to-violet-50,
+body.app-theme[data-theme="dark"] .to-indigo-50,
+body.app-theme[data-theme="dark"] .to-blue-50,
+body.app-theme[data-theme="dark"] .to-purple-50,
+body.app-theme[data-theme="dark"] .to-emerald-50,
+body.app-theme[data-theme="dark"] .to-rose-50,
+body.app-theme[data-theme="dark"] .to-amber-50,
+body.app-theme[data-theme="dark"] .to-sky-50 {
+  --tw-gradient-to: var(--surface-muted) !important;
+}
+
+/* ─── DARK MODE SIDEBAR CHAT BG & CUSTOM COMPONENTS ────────────────────── */
+body.app-theme[data-theme="dark"] .bihar-sidebar {
+  background: var(--surface);
+  border-right-color: var(--border);
+}
+body.app-theme[data-theme="dark"] .bihar-chat-bg {
+  background: var(--background);
+}
+
+/* ─── DARK MODE: scrollbar ─────────────────────────────────────────────── */
+body.app-theme[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+}
+body.app-theme[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: #52525b;
+}
+
+/* ─── SHADOW RING ON DARK MODE ─────────────────────────────────────────── */
+body.app-theme[data-theme="dark"] .ring-white {
+  --tw-ring-color: rgba(255,255,255,0.12) !important;
+}
+body.app-theme[data-theme="dark"] .shadow-sm,
+body.app-theme[data-theme="dark"] .shadow {
+  --tw-shadow: 0 1px 3px 0 rgba(0,0,0,0.4), 0 1px 2px -1px rgba(0,0,0,0.4) !important;
+  box-shadow: var(--tw-shadow) !important;
+}
+
+/* ─── ALL THEMES: inbox list item backgrounds ───────────────────────────── */
+body.app-theme .inbox-email-row-unread {
+  background-color: var(--surface);
+}
+body.app-theme .inbox-email-row-unread:hover {
+  background-color: color-mix(in srgb, var(--accent) 6%, var(--surface));
+}
+body.app-theme .inbox-email-row-read {
+  background-color: var(--background);
+}
+body.app-theme .inbox-email-row-read:hover {
+  background-color: var(--surface-muted);
+}
+body.app-theme .inbox-email-row-selected {
+  background-color: color-mix(in srgb, var(--accent) 14%, var(--surface)) !important;
+}
+
+/* ─── Google Translate toolbar suppression ──────────────────────────────── */
+.goog-te-banner-frame.skiptranslate,
+iframe.skiptranslate,
+.goog-te-gadget,
+.goog-te-gadget-simple,
+.goog-te-gadget-icon,
+.goog-logo-link,
+#google_translate_element,
+.goog-te-menu-frame {
+  display: none !important;
+}
+
+/* Prevent Google Translate from pushing the body down */
+body {
+  top: 0 !important;
+  position: static !important;
+}
+
+/* Hide "Translated by Google" banner that appears at the top */
+.VIpgJd-ZVi9od-ORHb-OEVmcd,
+.VIpgJd-ZVi9od-aZ2wEe-wOHMyf,
+.VIpgJd-ZVi9od-SmfZ-OEVmcd {
+  display: none !important;
+}
