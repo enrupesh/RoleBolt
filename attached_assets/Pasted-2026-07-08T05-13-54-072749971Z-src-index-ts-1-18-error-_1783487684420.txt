@@ -1,0 +1,100 @@
+2026-07-08T05:13:54.072749971Z src/index.ts(1,18): error TS7016: Could not find a declaration file for module 'cors'. '/opt/render/project/src/backend/node_modules/cors/lib/index.js' implicitly has an 'any' type.
+2026-07-08T05:13:54.072778001Z   Try `npm i --save-dev @types/cors` if it exists or add a new declaration (.d.ts) file containing `declare module 'cors';`
+2026-07-08T05:13:54.072892045Z src/index.ts(3,21): error TS7016: Could not find a declaration file for module 'express'. '/opt/render/project/src/backend/node_modules/express/index.js' implicitly has an 'any' type.
+2026-07-08T05:13:54.072906896Z   Try `npm i --save-dev @types/express` if it exists or add a new declaration (.d.ts) file containing `declare module 'express';`
+2026-07-08T05:13:54.072918276Z src/index.ts(5,26): error TS7016: Could not find a declaration file for module 'cookie-parser'. '/opt/render/project/src/backend/node_modules/cookie-parser/index.js' implicitly has an 'any' type.
+2026-07-08T05:13:54.072922446Z   Try `npm i --save-dev @types/cookie-parser` if it exists or add a new declaration (.d.ts) file containing `declare module 'cookie-parser';`
+2026-07-08T05:13:54.072930097Z src/index.ts(138,21): error TS7006: Parameter '_req' implicitly has an 'any' type.
+2026-07-08T05:13:54.072973328Z src/index.ts(138,27): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.072997529Z src/recruit.ts(1,21): error TS7016: Could not find a declaration file for module 'express'. '/opt/render/project/src/backend/node_modules/express/index.js' implicitly has an 'any' type.
+2026-07-08T05:13:54.07302326Z   Try `npm i --save-dev @types/express` if it exists or add a new declaration (.d.ts) file containing `declare module 'express';`
+2026-07-08T05:13:54.07303318Z src/recruit.ts(27,44): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.073083442Z src/recruit.ts(27,49): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.073095012Z src/recruit.ts(49,43): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.073169174Z src/recruit.ts(49,48): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.073186225Z src/recruit.ts(802,36): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.073190105Z src/recruit.ts(802,41): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.073205906Z src/recruit.ts(871,35): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.073217516Z src/recruit.ts(871,40): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.073221176Z src/recruit.ts(882,42): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.073227866Z src/recruit.ts(882,47): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.073270298Z src/recruit.ts(894,44): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.073275588Z src/recruit.ts(894,49): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.073279158Z src/recruit.ts(918,41): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.073292169Z src/recruit.ts(918,46): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.073298609Z src/recruit.ts(933,48): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.073301889Z src/recruit.ts(933,53): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.073310719Z src/recruit.ts(948,55): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.073316229Z src/recruit.ts(948,60): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.073319489Z src/recruit.ts(1006,45): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.0733278Z src/recruit.ts(1006,50): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.07333144Z src/recruit.ts(1018,54): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.07333499Z src/recruit.ts(1018,59): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.073343Z src/recruit.ts(1097,53): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.073357801Z src/recruit.ts(1097,58): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.073365701Z src/recruit.ts(1110,68): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.073371421Z src/recruit.ts(1110,73): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.073373951Z src/recruit.ts(1137,79): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.073384921Z src/recruit.ts(1137,84): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.073396852Z src/recruit.ts(1174,73): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.073405012Z src/recruit.ts(1174,78): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.073463814Z src/recruit.ts(1206,69): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.073469864Z src/recruit.ts(1206,74): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.073483475Z src/recruit.ts(1219,83): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.073486695Z src/recruit.ts(1219,88): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.073506196Z src/recruit.ts(1262,80): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.073514456Z src/recruit.ts(1262,85): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.073518556Z src/recruit.ts(1285,76): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.073531806Z src/recruit.ts(1285,81): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.073540737Z src/recruit.ts(1306,54): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.073602659Z src/recruit.ts(1306,59): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.073610529Z src/recruit.ts(1335,62): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.073614169Z src/recruit.ts(1335,67): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.073627429Z src/recruit.ts(1384,40): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.073715583Z src/recruit.ts(1384,45): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.073726443Z src/recruit.ts(1512,42): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.073729993Z src/recruit.ts(1512,47): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.073739013Z src/recruit.ts(1539,57): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.073742543Z src/recruit.ts(1539,62): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.073746133Z src/recruit.ts(1616,80): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.073749624Z src/recruit.ts(1616,85): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.073753184Z src/recruit.ts(1667,81): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.073760454Z src/recruit.ts(1667,86): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.073764304Z src/recruit.ts(1704,58): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.073768134Z src/recruit.ts(1704,63): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.073839536Z src/recruit.ts(1738,49): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.073844487Z src/recruit.ts(1738,54): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.073848227Z src/recruit.ts(1815,45): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.073851877Z src/recruit.ts(1815,50): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.073855847Z src/recruit.ts(1828,45): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.073859577Z src/recruit.ts(1828,50): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.073862977Z src/recruit.ts(1880,46): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.073886048Z src/recruit.ts(1880,51): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.073889978Z src/recruit.ts(1893,46): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.073893678Z src/recruit.ts(1893,51): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.073897209Z src/recruit.ts(1927,60): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.073909499Z src/recruit.ts(1927,65): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.073918759Z src/recruit.ts(1958,56): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.073922789Z src/recruit.ts(1958,61): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.07392591Z src/recruit.ts(2065,55): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.073928619Z src/recruit.ts(2065,60): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.0739314Z src/recruit.ts(2102,56): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.07393455Z src/recruit.ts(2102,61): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.07394292Z src/recruit.ts(2122,52): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.07394944Z src/recruit.ts(2122,57): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.07395752Z src/recruit.ts(2156,48): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.073965621Z src/recruit.ts(2156,53): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.073997802Z src/recruit.ts(2187,47): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.074002072Z src/recruit.ts(2187,52): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.074005562Z src/recruit.ts(2216,61): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.074032893Z src/recruit.ts(2216,66): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.074036863Z src/recruit.ts(2247,59): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.074042603Z src/recruit.ts(2247,64): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.074083885Z src/recruit.ts(2262,53): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.074087545Z src/recruit.ts(2262,58): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.074089595Z src/recruit.ts(2297,63): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.074126596Z src/recruit.ts(2297,68): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.074129706Z src/recruit.ts(2314,47): error TS7006: Parameter 'req' implicitly has an 'any' type.
+2026-07-08T05:13:54.074131716Z src/recruit.ts(2314,52): error TS7006: Parameter 'res' implicitly has an 'any' type.
+2026-07-08T05:13:54.157357473Z ==> Build failed 😞
+2026-07-08T05:13:54.157375463Z ==> Common ways to troubleshoot your deploy: https://render.com/docs/troubleshooting-deploys
