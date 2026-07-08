@@ -1,0 +1,43 @@
+2026-07-08T09:29:59.537984831Z ==> Downloading cache...
+2026-07-08T09:29:59.575433152Z ==> Cloning from https://github.com/rupeshsahu408/ratheeji
+2026-07-08T09:30:00.547493008Z ==> Checking out commit 751952a9685d8c5caabcdb7a155582e75e0359a7 in branch main
+2026-07-08T09:30:09.797404374Z ==> Downloaded 403MB in 3s. Extraction took 7s.
+2026-07-08T09:30:21.944474928Z ==> Using Node.js version 24.14.1 (default)
+2026-07-08T09:30:21.944483818Z ==> Docs on specifying a Node.js version: https://render.com/docs/node-version
+2026-07-08T09:30:21.99294406Z ==> Running build command 'npm install && npm run build'...
+2026-07-08T09:31:34.872325843Z 
+2026-07-08T09:31:34.872350293Z up to date, audited 454 packages in 1m
+2026-07-08T09:31:34.872364523Z 
+2026-07-08T09:31:34.872508136Z 148 packages are looking for funding
+2026-07-08T09:31:34.872564498Z   run `npm fund` for details
+2026-07-08T09:31:35.023184569Z 
+2026-07-08T09:31:35.023208109Z 2 vulnerabilities (1 moderate, 1 high)
+2026-07-08T09:31:35.023213209Z 
+2026-07-08T09:31:35.02321863Z To address all issues, run:
+2026-07-08T09:31:35.02322327Z   npm audit fix --force
+2026-07-08T09:31:35.02322769Z 
+2026-07-08T09:31:35.02323303Z Run `npm audit` for details.
+2026-07-08T09:31:35.2294867Z 
+2026-07-08T09:31:35.229511711Z > recruit-frontend@0.1.0 build
+2026-07-08T09:31:35.229516511Z > next build
+2026-07-08T09:31:35.229520321Z 
+2026-07-08T09:31:35.644121048Z ▲ Next.js 16.2.3 (Turbopack)
+2026-07-08T09:31:35.644539587Z 
+2026-07-08T09:31:35.670946235Z   Creating an optimized production build ...
+2026-07-08T09:31:41.297253125Z ✓ Compiled successfully in 5.4s
+2026-07-08T09:31:41.298734358Z   Running TypeScript ...
+2026-07-08T09:31:46.737715101Z Failed to type check.
+2026-07-08T09:31:46.737749092Z 
+2026-07-08T09:31:46.738003638Z ./src/app/recruit/jobs/[id]/page.tsx:1411:32
+2026-07-08T09:31:46.738021398Z Type error: Cannot find name 'FRONTEND_URL'. Did you mean 'getFrontendUrl'?
+2026-07-08T09:31:46.738025488Z 
+2026-07-08T09:31:46.738028868Z   1409 |             <button
+2026-07-08T09:31:46.738032179Z   1410 |               onClick={() => {
+2026-07-08T09:31:46.738035988Z > 1411 |                 const url = `${FRONTEND_URL}/recruit/opportunities/${id}`;
+2026-07-08T09:31:46.738040029Z        |                                ^
+2026-07-08T09:31:46.738043759Z   1412 |                 navigator.clipboard.writeText(url).then(() => {
+2026-07-08T09:31:46.738046879Z   1413 |                   setLinkCopied(true);
+2026-07-08T09:31:46.738050509Z   1414 |                   setTimeout(() => setLinkCopied(false), 2000);
+2026-07-08T09:31:46.815762732Z Next.js build worker exited with code: 1 and signal: null
+2026-07-08T09:31:46.88911385Z ==> Build failed 😞
+2026-07-08T09:31:46.88913579Z ==> Common ways to troubleshoot your deploy: https://render.com/docs/troubleshooting-deploys
