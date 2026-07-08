@@ -158,10 +158,7 @@ export default function ApplyForm({ jobId, jobTitle, companyName }: { jobId: str
           The recruiter will review your profile and AI match score shortly.
         </p>
         <div className="mt-5 flex flex-col sm:flex-row gap-2 justify-center">
-          <Link href="/recruit/my-applications" className="rounded-full bg-[#0a66c2] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#004182] transition text-center">
-            Track applications
-          </Link>
-          <Link href="/recruit/opportunities" className="rounded-full border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition text-center">
+          <Link href="/recruit/opportunities" className="rounded-full bg-[#0a66c2] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#004182] transition text-center">
             Browse more jobs
           </Link>
         </div>
@@ -294,7 +291,6 @@ export default function ApplyForm({ jobId, jobTitle, companyName }: { jobId: str
         <div>
           <div className="mb-1.5 flex items-center justify-between">
             <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Resume / Work history *</label>
-            <Link href="/recruit/profile" className="text-[11px] text-[#0a66c2] hover:underline">Set up profile →</Link>
           </div>
           <textarea value={form.resumeText} onChange={e => update("resumeText", e.target.value)}
             placeholder="Paste your resume text, LinkedIn summary, or work history. Include skills, experience, education and achievements for the best AI match score…"
@@ -321,10 +317,6 @@ export default function ApplyForm({ jobId, jobTitle, companyName }: { jobId: str
           ) : "Submit application"}
         </button>
 
-        <p className="text-center text-xs text-slate-400">
-          Applied before?{" "}
-          <Link href="/recruit/my-applications" className="text-[#0a66c2] hover:underline">Track your applications</Link>
-        </p>
         <p className="text-center text-[11px] text-slate-400">
           Free to apply. Your details are sent only to the recruiter for this role.
         </p>

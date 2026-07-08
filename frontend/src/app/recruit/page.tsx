@@ -16,23 +16,10 @@ const NICHES = [
   { label: "Creative, Marketing, Media & Design", emoji: "🎨", slug: "creative-marketing" },
 ];
 
-const SEEKER_FEATURES = [
-  "Deep niche filters", "AI match score", "Salary transparency",
-  "Remote / Hybrid / Onsite", "Skills match", "Notice period filter",
-  "Freshers allowed", "Verified companies", "Save & track jobs",
-];
-
 const RECRUITER_FEATURES = [
   "AI job description writer", "Applicant pipeline", "Candidate scoring",
   "Async assessments", "Hiring decision engine", "Rejection email generator",
   "Talent pool", "Company profile", "Interview briefs",
-];
-
-const SEEKER_SHORTCUTS = [
-  { href: "/recruit/opportunities", label: "🔍 Find Jobs" },
-  { href: "/recruit/saved-jobs", label: "🔖 Saved Jobs" },
-  { href: "/recruit/my-applications", label: "📋 My Applications" },
-  { href: "/recruit/profile", label: "👤 My Profile" },
 ];
 
 const CREATOR_SHORTCUTS = [
@@ -73,7 +60,7 @@ export default function RecruitLandingPage() {
 
   const role = recruitProfile?.role ?? null;
   const isLoggedIn = !!firebaseUser && !!recruitProfile;
-  const shortcuts = role === "seeker" ? SEEKER_SHORTCUTS : role === "creator" ? CREATOR_SHORTCUTS : null;
+  const shortcuts = role === "creator" ? CREATOR_SHORTCUTS : null;
 
   async function handleSignOut() {
     const auth = getFirebaseAuth();
@@ -97,20 +84,17 @@ export default function RecruitLandingPage() {
           <nav className="hidden md:flex items-center gap-1">
             <Link href="/recruit/opportunities" className="rounded-full px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition">Find Jobs</Link>
             {!isLoggedIn && (
-              <>
-                <Link href="/recruit/signup" className="rounded-full px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition">For Job Seekers</Link>
-                <Link href="/recruit/signup" className="rounded-full px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition">For Recruiters</Link>
-              </>
+              <Link href="/recruit/signup" className="rounded-full px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition">For Recruiters</Link>
             )}
           </nav>
           <div className="flex items-center gap-2">
             {isLoggedIn ? (
               <>
                 <Link
-                  href={role === "creator" ? "/recruit/dashboard" : "/recruit/opportunities"}
+                  href="/recruit/dashboard"
                   className="hidden sm:inline-flex rounded-full border border-[#0a66c2] px-4 py-2 text-xs font-semibold text-[#0a66c2] hover:bg-blue-50 transition"
                 >
-                  {role === "creator" ? "Go to Dashboard" : "Browse Jobs"}
+                  Go to Dashboard
                 </Link>
                 <button
                   onClick={handleSignOut}
@@ -144,7 +128,6 @@ export default function RecruitLandingPage() {
                 { href: "/recruit/opportunities", label: "Find Jobs" },
                 ...(!isLoggedIn ? [{ href: "/recruit/login", label: "Sign in" }, { href: "/recruit/signup", label: "Create account" }] : []),
                 ...(role === "creator" ? [{ href: "/recruit/dashboard", label: "Dashboard" }] : []),
-                ...(role === "seeker" ? [{ href: "/recruit/profile", label: "My Profile" }] : []),
               ].map(link => (
                 <Link
                   key={link.href}
@@ -182,7 +165,7 @@ export default function RecruitLandingPage() {
               LinkedIn meets serious<br />job search for India.
             </h1>
             <p className="mt-5 text-base sm:text-lg leading-8 text-slate-600 max-w-xl">
-              Deep job filters, AI-powered candidate scoring, verified companies, and a complete hiring workflow — built for Indian job seekers and recruiters.
+              AI-powered candidate scoring, verified companies, and a complete hiring workflow — built for Indian recruiters and hiring teams.
             </p>
 
             {isLoggedIn ? (
@@ -224,9 +207,6 @@ export default function RecruitLandingPage() {
                   <span className="text-xs font-semibold text-slate-500 self-center">Quick access:</span>
                   <Link href="/recruit/opportunities" className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-600 hover:border-[#0a66c2]/30 hover:text-[#0a66c2] transition">
                     🔍 Browse jobs
-                  </Link>
-                  <Link href="/recruit/signup" className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-600 hover:border-[#0a66c2]/30 hover:text-[#0a66c2] transition">
-                    🎯 Seeker signup
                   </Link>
                   <Link href="/recruit/signup" className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-600 hover:border-[#0a66c2]/30 hover:text-[#0a66c2] transition">
                     🏢 Recruiter signup
@@ -271,84 +251,47 @@ export default function RecruitLandingPage() {
         </div>
       </section>
 
-      {/* Seeker / Recruiter split */}
+      {/* Recruiter features */}
       <section className="border-t border-slate-100 bg-[#f3f6f8] py-14">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mb-10 text-center">
-            <p className="text-xs font-bold uppercase tracking-widest text-[#0a66c2] mb-2">Who it's for</p>
-            <h2 className="text-2xl font-bold sm:text-3xl">Built for both sides of hiring</h2>
+            <p className="text-xs font-bold uppercase tracking-widest text-[#0a66c2] mb-2">Built for hiring teams</p>
+            <h2 className="text-2xl font-bold sm:text-3xl">Everything a recruiter needs</h2>
           </div>
-          <div className="grid gap-5 md:grid-cols-2">
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-7 shadow-sm">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-xl">🎯</div>
-                <div>
-                  <h3 className="font-bold text-slate-900">For Job Seekers</h3>
-                  <p className="text-xs text-slate-500">Search, apply, track</p>
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-2 mb-5">
-                {SEEKER_FEATURES.map(f => (
-                  <span key={f} className="rounded-full bg-slate-100 border border-slate-200 px-3 py-1 text-xs font-medium text-slate-700">{f}</span>
-                ))}
-              </div>
-              <div className="flex flex-col sm:flex-row gap-2">
-                <Link href="/recruit/opportunities" className="flex-1 rounded-full bg-[#0a66c2] px-5 py-2.5 text-center text-xs font-bold text-white hover:bg-[#004182] transition">
-                  Browse jobs
-                </Link>
-                {!isLoggedIn && (
-                  <Link href="/recruit/signup" className="flex-1 rounded-full border border-slate-300 px-5 py-2.5 text-center text-xs font-semibold text-slate-700 hover:bg-slate-50 transition">
-                    Sign up as Seeker
-                  </Link>
-                )}
-                {role === "seeker" && (
-                  <Link href="/recruit/profile" className="flex-1 rounded-full border border-slate-300 px-5 py-2.5 text-center text-xs font-semibold text-slate-700 hover:bg-slate-50 transition">
-                    My Profile
-                  </Link>
-                )}
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm max-w-3xl mx-auto">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-xl">🏢</div>
+              <div>
+                <h3 className="font-bold text-slate-900">For Recruiters &amp; Hiring Teams</h3>
+                <p className="text-xs text-slate-500">Post jobs, evaluate candidates, hire faster</p>
               </div>
             </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-7 shadow-sm">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-xl">🏢</div>
-                <div>
-                  <h3 className="font-bold text-slate-900">For Recruiters</h3>
-                  <p className="text-xs text-slate-500">Post, evaluate, hire</p>
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-2 mb-5">
-                {RECRUITER_FEATURES.map(f => (
-                  <span key={f} className="rounded-full bg-slate-100 border border-slate-200 px-3 py-1 text-xs font-medium text-slate-700">{f}</span>
-                ))}
-              </div>
-              <div className="flex flex-col sm:flex-row gap-2">
-                {!isLoggedIn && (
-                  <>
-                    <Link href="/recruit/signup" className="flex-1 rounded-full bg-[#0a66c2] px-5 py-2.5 text-center text-xs font-bold text-white hover:bg-[#004182] transition">
-                      Sign up as Creator
-                    </Link>
-                    <Link href="/recruit/login" className="flex-1 rounded-full border border-slate-300 px-5 py-2.5 text-center text-xs font-semibold text-slate-700 hover:bg-slate-50 transition">
-                      Sign in
-                    </Link>
-                  </>
-                )}
-                {role === "creator" && (
-                  <>
-                    <Link href="/recruit/jobs/new" className="flex-1 rounded-full bg-[#0a66c2] px-5 py-2.5 text-center text-xs font-bold text-white hover:bg-[#004182] transition">
-                      Post a job
-                    </Link>
-                    <Link href="/recruit/dashboard" className="flex-1 rounded-full border border-slate-300 px-5 py-2.5 text-center text-xs font-semibold text-slate-700 hover:bg-slate-50 transition">
-                      Dashboard
-                    </Link>
-                  </>
-                )}
-                {role === "seeker" && (
-                  <Link href="/recruit/opportunities" className="flex-1 rounded-full border border-slate-300 px-5 py-2.5 text-center text-xs font-semibold text-slate-700 hover:bg-slate-50 transition">
-                    Browse recruiter-posted jobs →
+            <div className="flex flex-wrap gap-2 mb-6">
+              {RECRUITER_FEATURES.map(f => (
+                <span key={f} className="rounded-full bg-slate-100 border border-slate-200 px-3 py-1 text-xs font-medium text-slate-700">{f}</span>
+              ))}
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              {!isLoggedIn && (
+                <>
+                  <Link href="/recruit/signup" className="flex-1 rounded-full bg-[#0a66c2] px-5 py-2.5 text-center text-xs font-bold text-white hover:bg-[#004182] transition">
+                    Get started free
                   </Link>
-                )}
-              </div>
+                  <Link href="/recruit/login" className="flex-1 rounded-full border border-slate-300 px-5 py-2.5 text-center text-xs font-semibold text-slate-700 hover:bg-slate-50 transition">
+                    Sign in
+                  </Link>
+                </>
+              )}
+              {role === "creator" && (
+                <>
+                  <Link href="/recruit/jobs/new" className="flex-1 rounded-full bg-[#0a66c2] px-5 py-2.5 text-center text-xs font-bold text-white hover:bg-[#004182] transition">
+                    Post a job
+                  </Link>
+                  <Link href="/recruit/dashboard" className="flex-1 rounded-full border border-slate-300 px-5 py-2.5 text-center text-xs font-semibold text-slate-700 hover:bg-slate-50 transition">
+                    Dashboard
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -370,12 +313,12 @@ export default function RecruitLandingPage() {
             {NICHES.map(({ label, emoji, slug }) => (
               <Link
                 key={label}
-                href={`/recruit/niche/${slug}`}
+                href={`/recruit/opportunities?niche=${encodeURIComponent(label)}`}
                 className="group rounded-2xl border border-slate-200 bg-[#f8fafc] p-5 hover:border-[#0a66c2]/30 hover:bg-blue-50/30 transition"
               >
                 <span className="text-2xl">{emoji}</span>
                 <p className="mt-2 font-bold text-slate-900 group-hover:text-[#0a66c2] transition text-sm leading-snug">{label}</p>
-                <p className="mt-1 text-xs text-slate-500">Explore jobs, skills & roles →</p>
+                <p className="mt-1 text-xs text-slate-500">Browse jobs in this niche →</p>
               </Link>
             ))}
           </div>
@@ -390,25 +333,27 @@ export default function RecruitLandingPage() {
       {/* Footer CTA */}
       <section className="border-t border-slate-200 bg-[#0a66c2] py-14 text-white">
         <div className="mx-auto max-w-3xl px-4 text-center sm:px-6">
-          <h2 className="text-2xl font-bold sm:text-3xl">Ready to find your next role?</h2>
+          <h2 className="text-2xl font-bold sm:text-3xl">Ready to start hiring smarter?</h2>
           <p className="mt-3 text-blue-100 text-sm sm:text-base">
-            Join thousands of Indian professionals finding better jobs through Plyndrox Recruit AI.
+            AI-powered hiring for Indian recruiters — completely free.
           </p>
           <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:justify-center">
-            <Link href="/recruit/opportunities" className="rounded-full bg-white px-8 py-3.5 text-sm font-bold text-[#0a66c2] hover:bg-blue-50 transition shadow">
-              Browse open roles
-            </Link>
             {isLoggedIn ? (
               <Link
-                href={role === "seeker" ? "/recruit/profile" : "/recruit/dashboard"}
-                className="rounded-full border border-white/30 bg-white/10 px-8 py-3.5 text-sm font-bold text-white hover:bg-white/20 transition"
+                href="/recruit/dashboard"
+                className="rounded-full bg-white px-8 py-3.5 text-sm font-bold text-[#0a66c2] hover:bg-blue-50 transition shadow"
               >
-                {role === "seeker" ? "My Profile" : "Recruiter Dashboard"}
+                Go to Dashboard
               </Link>
             ) : (
-              <Link href="/recruit/signup" className="rounded-full border border-white/30 bg-white/10 px-8 py-3.5 text-sm font-bold text-white hover:bg-white/20 transition">
-                Create free account
-              </Link>
+              <>
+                <Link href="/recruit/signup" className="rounded-full bg-white px-8 py-3.5 text-sm font-bold text-[#0a66c2] hover:bg-blue-50 transition shadow">
+                  Get started free
+                </Link>
+                <Link href="/recruit/opportunities" className="rounded-full border border-white/30 bg-white/10 px-8 py-3.5 text-sm font-bold text-white hover:bg-white/20 transition">
+                  Browse open roles
+                </Link>
+              </>
             )}
           </div>
         </div>

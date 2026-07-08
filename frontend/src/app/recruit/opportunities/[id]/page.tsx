@@ -2,12 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import ApplyForm from "./ApplyForm";
 import RecruitHeader from "@/components/RecruitHeader";
-import ClientSaveButton from "../SaveButton";
 import ShareJobButton from "./ShareJobButton";
 import CopyJobButton from "./CopyJobButton";
-import RecentlyViewedTracker from "./RecentlyViewedTracker";
-import ReportJobButton from "./ReportJobButton";
-import JobMatchPanel from "./JobMatchPanel";
 import CompanySection from "./CompanySection";
 import QualityBreakdown from "./QualityBreakdown";
 import { computeJobQuality } from "@/lib/jobQuality";
@@ -183,18 +179,6 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
     <div className="min-h-screen bg-white text-slate-900">
       <PageTracker event="opportunity_viewed" data={{ jobId: id }} />
       <RecruitHeader />
-      <RecentlyViewedTracker
-        job={{
-          jobId: id,
-          title: job.title,
-          companyName: job.companyName,
-          location: job.location,
-          workMode: job.workMode,
-          jobType: job.jobType,
-          niche: job.niche,
-        }}
-      />
-
       <div className="mx-auto max-w-6xl px-4 py-2 sm:px-6 lg:px-8">
         <Link href="/recruit/opportunities" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-[#0a66c2] transition py-2">
           <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M19 12H5" /><path d="m12 5-7 7 7 7" /></svg>
@@ -226,15 +210,6 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
                 <p className="mt-0.5 text-xs text-slate-400">{job.niche || job.department}</p>
               </div>
               <div className="relative z-10 flex shrink-0 items-center gap-2">
-                <ClientSaveButton
-                  jobId={id}
-                  title={job.title}
-                  companyName={job.companyName}
-                  location={job.location}
-                  workMode={job.workMode}
-                  jobType={job.jobType}
-                  niche={job.niche}
-                />
                 <ShareJobButton title={job.title} companyName={job.companyName} />
                 <CopyJobButton text={copyText} />
               </div>
@@ -392,21 +367,6 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
             </Link>
           </div>
 
-          <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-5 shadow-sm">
-            <h2 className="text-sm font-bold text-slate-900">Apply faster with your saved profile</h2>
-            <p className="mt-2 text-sm leading-relaxed text-slate-600">
-              Save your profile once and Plyndrox can reuse your name, contact details, and resume text when you apply to similar jobs.
-            </p>
-            <Link href="/recruit/profile" className="mt-3 inline-flex rounded-full bg-white px-4 py-2 text-xs font-bold text-[#0a66c2] shadow-sm ring-1 ring-blue-100 transition hover:bg-blue-50">
-              Update seeker profile
-            </Link>
-          </div>
-
-          <JobMatchPanel jobId={id} />
-
-          <div className="flex justify-end pt-1">
-            <ReportJobButton jobId={id} />
-          </div>
         </section>
 
         <div className="mt-4 lg:mt-0 lg:sticky lg:top-24">
