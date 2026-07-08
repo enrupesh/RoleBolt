@@ -1203,24 +1203,57 @@ recruitPublicRouter.post(
       let text = "";
 
       if (mimetype === "application/pdf") {
+        // Use lib path directly — bypasses pdf-parse's test runner code which
+        // tries to read a local test file and throws in production environments.
         // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const pdfParse = require("pdf-parse");
-        const data = await pdfParse(buffer);
+        const pdfParse = require("pdf-parse/lib/pdf-parse");
+        let data: any;
+        try {
+          data = await pdfParse(buffer);
+        } catch (pdfErr: any) {
+          // Scanned / image-only PDFs produce no text layer — give a helpful message
+          const msg = pdfErr?.message ?? "";
+          if (msg.includes("No password") || msg.includes("password")) {
+            return res.status(422).json({ error: "This PDF is password-protected. Please remove the password and try again." });
+          }
+          throw pdfErr; // unexpected — rethrow to outer catch
+        }
         text = data.text ?? "";
+        if (!text.trim()) {
+          return res.status(422).json({
+            error: "Your PDF appears to be a scanned image — it has no readable text layer. Please export as a text-based PDF, or paste your resume manually.",
+          });
+        }
       } else if (mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
         // eslint-disable-next-line @typescript-eslint/no-var-requires
         const mammoth = require("mammoth");
         const result = await mammoth.extractRawText({ buffer });
         text = result.value ?? "";
+        if (!text.trim()) {
+          return res.status(422).json({ error: "Could not extract text from this DOCX. Please try saving it again and re-uploading." });
+        }
       } else if (mimetype === "text/plain") {
         text = buffer.toString("utf-8");
       } else {
-        return res.status(400).json({ error: "Unsupported file type. Upload PDF, DOCX, or TXT." });
+        return res.status(400).json({ error: "Unsupported file type. Please upload a PDF, DOCX, or TXT file." });
       }
 
-      text = text.replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+      // ── Clean & normalise extracted text ──────────────────────────────────
+      text = text
+        // Normalise all line endings
+        .replace(/\r\n/g, "\n").replace(/\r/g, "\n")
+        // Strip null bytes and non-printable control chars (keep tab + newline)
+        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
+        // Collapse runs of spaces/tabs on a single line to one space
+        .replace(/[^\S\n]+/g, " ")
+        // Remove blank lines that contain only whitespace
+        .replace(/^ +$/gm, "")
+        // Collapse 3+ consecutive blank lines to two (preserve section breaks)
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+
       if (text.length < 40) {
-        return res.status(422).json({ error: "Could not extract enough text from this file. Try pasting your resume manually." });
+        return res.status(422).json({ error: "Could not extract enough text from this file. Please try pasting your resume manually." });
       }
 
       return res.json({ ok: true, text });
