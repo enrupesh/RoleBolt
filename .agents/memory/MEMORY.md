@@ -1,0 +1,1 @@
+- [Mesh API AI call reliability](meshapi-ai-reliability.md) — AI call sites need retries/fallbackModels + local try/catch, or transient failures 500 the route even with a healthy key.
