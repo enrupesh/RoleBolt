@@ -628,6 +628,15 @@ For "tier": classify each criterion as 1 (must-have skill), 2 (experience depth)
   };
 }
 
+function formatNicheContext(niche?: string, nicheDetails?: Record<string, string>): string {
+  if (!niche || !niche.trim()) return "";
+  const detailLines = Object.entries(nicheDetails || {})
+    .filter(([, v]) => v && String(v).trim())
+    .map(([k, v]) => `  - ${k}: ${v}`)
+    .join("\n");
+  return `\nJob Niche/Category: ${niche}${detailLines ? `\nNiche-specific details:\n${detailLines}` : ""}`;
+}
+
 async function generateInterviewBrief(args: {
   candidateName: string;
   jobTitle: string;
@@ -635,19 +644,25 @@ async function generateInterviewBrief(args: {
   aiSummary: string;
   redFlags: string[];
   scoreBreakdown: { criterion: string; score: number; maxScore: number; reasoning: string }[];
+  niche?: string;
+  nicheDetails?: Record<string, string>;
 }): Promise<string> {
   const lowScores = args.scoreBreakdown
     .filter((b) => b.score / b.maxScore < 0.6)
     .map((b) => `${b.criterion}: ${b.reasoning}`)
     .join("; ");
 
+  const nicheContext = formatNicheContext(args.niche, args.nicheDetails);
+
   const prompt = `You are a senior talent acquisition specialist. Write a concise interview preparation brief for the interviewer.
 
 Candidate: ${args.candidateName}
-Role: ${args.jobTitle}
+Role: ${args.jobTitle}${nicheContext}
 AI Summary: ${args.aiSummary}
 Red Flags: ${args.redFlags.join(", ") || "None identified"}
 Weak Areas: ${lowScores || "None"}
+
+Tailor the probing questions and verification points to fit this specific niche (e.g. a Content Creator role should probe portfolio quality/audience growth, not coding ability; a Healthcare role should verify licenses/certifications; a Blue-Collar role should probe shift reliability). Do not default to technical/coding questions unless the niche is actually tech-related.
 
 Write a practical interview brief (250-350 words) covering:
 1. Quick candidate summary (2 sentences)
@@ -676,12 +691,17 @@ async function generateAssessmentQuestions(args: {
   jobTitle: string;
   rubric: { name: string; weight: number; description: string }[];
   jd: string;
+  niche?: string;
+  nicheDetails?: Record<string, string>;
 }): Promise<{ id: string; text: string }[]> {
   const rubricText = args.rubric
     .map((r, i) => `${i + 1}. ${r.name} (${r.weight} pts): ${r.description}`)
     .join("\n");
 
+  const nicheContext = formatNicheContext(args.niche, args.nicheDetails);
+
   const prompt = `You are a senior hiring manager at a fast-growing company. Generate exactly 5 written assessment questions for a candidate applying to be a ${args.jobTitle}.
+${nicheContext}
 
 SCORING RUBRIC (your questions must each probe a different criterion):
 ${rubricText}
@@ -690,7 +710,7 @@ JOB DESCRIPTION EXCERPT:
 ${args.jd.slice(0, 1200)}
 
 STRICT REQUIREMENTS:
-- Every question MUST be specific to the ${args.jobTitle} role — no generic questions
+- Every question MUST be specific to the ${args.jobTitle} role AND its niche (${args.niche || "General"}) — no generic questions, and do NOT default to coding/technical questions unless the niche is actually tech-related
 - Questions must require 2-4 paragraph written answers based on real experience
 - Each question tests a DIFFERENT rubric criterion (match question 1 to criterion 1, etc.)
 - Questions should reveal: depth of expertise, problem-solving, communication quality, judgment
@@ -1305,6 +1325,8 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/brief", async (req, res
       aiSummary: candidate.aiSummary,
       redFlags: candidate.redFlags,
       scoreBreakdown: candidate.scoreBreakdown,
+      niche: job.niche,
+      nicheDetails: job.nicheDetails,
     });
 
     candidate.interviewBrief = brief;
@@ -1347,6 +1369,8 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/assessment/send", async
       jobTitle: job.title,
       rubric: job.rubric,
       jd: job.generatedJD,
+      niche: job.niche,
+      nicheDetails: job.nicheDetails,
     });
 
     const token = generateToken();
