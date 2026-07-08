@@ -10,7 +10,10 @@ import { trackEvent } from "@/lib/trackEvent";
 import { apiUrl, readApiJson } from "@/lib/api";
 import { formatJobDescription } from "@/lib/jobDescription";
 
-const FRONTEND_URL = "https://www.plyndrox.app";
+function getFrontendUrl(): string {
+  if (typeof window !== "undefined" && window.location?.origin) return window.location.origin;
+  return process.env.NEXT_PUBLIC_SITE_URL || "https://www.plyndrox.app";
+}
 
 type Confidence = "high" | "medium" | "low";
 type ScoreBreakdown = { criterion: string; score: number; maxScore: number; reasoning: string; confidence?: Confidence; tier?: 1 | 2 | 3 };
@@ -1608,7 +1611,7 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
 function PostToBoardsTab({ job }: { job: Job }) {
   const [copiedBoard, setCopiedBoard] = useState<string | null>(null);
   const [linkCopiedPost, setLinkCopiedPost] = useState(false);
-  const plyndroxUrl = `${FRONTEND_URL}/recruit/opportunities/${job._id}`;
+  const plyndroxUrl = `${getFrontendUrl()}/recruit/opportunities/${job._id}`;
   const jobDescription = formatJobDescription(job.generatedJD);
 
   const linkedinPost = `🚀 We're Hiring: ${job.title}
