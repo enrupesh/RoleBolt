@@ -1,0 +1,84 @@
+2026-07-08T10:50:09.783031738Z ==> Downloading cache...
+2026-07-08T10:50:09.865452736Z ==> Cloning from https://github.com/rupeshsahu408/ratheeji
+2026-07-08T10:50:16.114450933Z ==> Checking out commit 1dc4d78774245279f355a490da11e450d0d3eca0 in branch main
+2026-07-08T10:50:22.809321514Z ==> Downloaded 372MB in 8s. Extraction took 5s.
+2026-07-08T10:50:31.105652261Z ==> Using Node.js version 24.14.1 (default)
+2026-07-08T10:50:31.105667711Z ==> Docs on specifying a Node.js version: https://render.com/docs/node-version
+2026-07-08T10:50:31.155307234Z ==> Running build command 'npm install && npm run build'...
+2026-07-08T10:51:44.002194302Z 
+2026-07-08T10:51:44.002231883Z up to date, audited 109 packages in 1m
+2026-07-08T10:51:44.002237943Z 
+2026-07-08T10:51:44.002243603Z 9 packages are looking for funding
+2026-07-08T10:51:44.002248563Z   run `npm fund` for details
+2026-07-08T10:51:44.121028981Z 
+2026-07-08T10:51:44.121053231Z 2 vulnerabilities (1 moderate, 1 high)
+2026-07-08T10:51:44.121057941Z 
+2026-07-08T10:51:44.121098902Z To address all issues, run:
+2026-07-08T10:51:44.121107632Z   npm audit fix --force
+2026-07-08T10:51:44.121111362Z 
+2026-07-08T10:51:44.121115192Z Run `npm audit` for details.
+2026-07-08T10:51:44.324746688Z 
+2026-07-08T10:51:44.324773188Z > recruit-frontend@0.1.0 build
+2026-07-08T10:51:44.324779898Z > next build
+2026-07-08T10:51:44.324785808Z 
+2026-07-08T10:51:44.702314274Z ▲ Next.js 16.2.3 (Turbopack)
+2026-07-08T10:51:44.702594249Z 
+2026-07-08T10:51:44.724729212Z   Creating an optimized production build ...
+2026-07-08T10:51:50.846795606Z 
+2026-07-08T10:51:50.846834637Z > Build error occurred
+2026-07-08T10:51:50.849670314Z Error: Turbopack build failed with 2 errors:
+2026-07-08T10:51:50.849683794Z ./src/app/globals.css
+2026-07-08T10:51:50.849689624Z Error evaluating Node.js code
+2026-07-08T10:51:50.849694274Z Error: Cannot find module '@tailwindcss/postcss'
+2026-07-08T10:51:50.849698904Z Require stack:
+2026-07-08T10:51:50.849704594Z - /opt/render/project/src/frontend/.next/build/chunks/[root-of-the-server]__0d-m0h0._.js
+2026-07-08T10:51:50.849709364Z - /opt/render/project/src/frontend/.next/build/chunks/[turbopack]_runtime.js
+2026-07-08T10:51:50.849712675Z - /opt/render/project/src/frontend/.next/build/postcss.js
+2026-07-08T10:51:50.849715775Z     [at Module._resolveFilename (node:internal/modules/cjs/loader:1456:15)]
+2026-07-08T10:51:50.849718845Z     [at defaultResolveImpl (node:internal/modules/cjs/loader:1066:19)]
+2026-07-08T10:51:50.849721875Z     [at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1071:22)]
+2026-07-08T10:51:50.849724845Z     [at Module._load (node:internal/modules/cjs/loader:1242:25)]
+2026-07-08T10:51:50.849727835Z     [at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)]
+2026-07-08T10:51:50.849730825Z     [at Module.require (node:internal/modules/cjs/loader:1556:12)]
+2026-07-08T10:51:50.849733875Z     [at require (node:internal/modules/helpers:152:16)]
+2026-07-08T10:51:50.849737475Z     at require (turbopack:///[turbopack-node]/transforms/postcss.ts:49:25) [/opt/render/project/src/frontend/.next/build/chunks/[root-of-the-server]__0d-m0h0._.js:134:33]
+2026-07-08T10:51:50.849740505Z     [at <anonymous>]
+2026-07-08T10:51:50.849743565Z     at map (turbopack:///[turbopack-node]/transforms/postcss.ts:43:33) [/opt/render/project/src/frontend/.next/build/chunks/[root-of-the-server]__0d-m0h0._.js:129:35]
+2026-07-08T10:51:50.849755145Z 
+2026-07-08T10:51:50.849757665Z Import trace:
+2026-07-08T10:51:50.849759705Z   Client Component Browser:
+2026-07-08T10:51:50.849761836Z     ./src/app/globals.css [Client Component Browser]
+2026-07-08T10:51:50.849764185Z     ./src/app/layout.tsx [Server Component]
+2026-07-08T10:51:50.849765996Z 
+2026-07-08T10:51:50.849767776Z 
+2026-07-08T10:51:50.849769726Z ./src/app/inter_290089b2.module.css
+2026-07-08T10:51:50.849771636Z Error evaluating Node.js code
+2026-07-08T10:51:50.849773506Z Error: Cannot find module '@tailwindcss/postcss'
+2026-07-08T10:51:50.849775386Z Require stack:
+2026-07-08T10:51:50.849777396Z - /opt/render/project/src/frontend/.next/build/chunks/[root-of-the-server]__0d-m0h0._.js
+2026-07-08T10:51:50.849779306Z - /opt/render/project/src/frontend/.next/build/chunks/[turbopack]_runtime.js
+2026-07-08T10:51:50.849781176Z - /opt/render/project/src/frontend/.next/build/postcss.js
+2026-07-08T10:51:50.849783416Z     [at Module._resolveFilename (node:internal/modules/cjs/loader:1456:15)]
+2026-07-08T10:51:50.849785416Z     [at defaultResolveImpl (node:internal/modules/cjs/loader:1066:19)]
+2026-07-08T10:51:50.849787296Z     [at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1071:22)]
+2026-07-08T10:51:50.849789176Z     [at Module._load (node:internal/modules/cjs/loader:1242:25)]
+2026-07-08T10:51:50.849791066Z     [at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)]
+2026-07-08T10:51:50.849792936Z     [at Module.require (node:internal/modules/cjs/loader:1556:12)]
+2026-07-08T10:51:50.849794856Z     [at require (node:internal/modules/helpers:152:16)]
+2026-07-08T10:51:50.849796786Z     at require (turbopack:///[turbopack-node]/transforms/postcss.ts:49:25) [/opt/render/project/src/frontend/.next/build/chunks/[root-of-the-server]__0d-m0h0._.js:134:33]
+2026-07-08T10:51:50.849798726Z     [at <anonymous>]
+2026-07-08T10:51:50.849800746Z     at map (turbopack:///[turbopack-node]/transforms/postcss.ts:43:33) [/opt/render/project/src/frontend/.next/build/chunks/[root-of-the-server]__0d-m0h0._.js:129:35]
+2026-07-08T10:51:50.849802576Z 
+2026-07-08T10:51:50.849804466Z Import trace:
+2026-07-08T10:51:50.849806376Z   Server Component:
+2026-07-08T10:51:50.849808297Z     ./src/app/inter_290089b2.module.css
+2026-07-08T10:51:50.849810237Z     ./src/app/inter_290089b2.js
+2026-07-08T10:51:50.849812086Z     ./src/app/layout.tsx
+2026-07-08T10:51:50.849813906Z 
+2026-07-08T10:51:50.849815677Z 
+2026-07-08T10:51:50.849817567Z     at require (turbopack:///[turbopack-node]/transforms/postcss.ts:49:25) [/opt/render/project/src/frontend/.next/build/chunks/[root-of-the-server]__0d-m0h0._.js:134:33])
+2026-07-08T10:51:50.849819497Z     at map (turbopack:///[turbopack-node]/transforms/postcss.ts:43:33) [/opt/render/project/src/frontend/.next/build/chunks/[root-of-the-server]__0d-m0h0._.js:129:35])
+2026-07-08T10:51:50.849821347Z     at require (turbopack:///[turbopack-node]/transforms/postcss.ts:49:25) [/opt/render/project/src/frontend/.next/build/chunks/[root-of-the-server]__0d-m0h0._.js:134:33])
+2026-07-08T10:51:50.849823217Z     at map (turbopack:///[turbopack-node]/transforms/postcss.ts:43:33) [/opt/render/project/src/frontend/.next/build/chunks/[root-of-the-server]__0d-m0h0._.js:129:35])
+2026-07-08T10:51:50.958012172Z ==> Build failed 😞
+2026-07-08T10:51:50.958036392Z ==> Common ways to troubleshoot your deploy: https://render.com/docs/troubleshooting-deploys
