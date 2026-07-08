@@ -114,27 +114,6 @@ export default async function ApplyPage({
               </div>
             </div>
 
-            {/* Progress steps */}
-            <div className="mt-4 flex items-center gap-0">
-              {[
-                { step: "1", label: "Your info" },
-                { step: "2", label: "Resume" },
-                { step: "3", label: "Submit" },
-              ].map((s, i, arr) => (
-                <div key={s.step} className="flex flex-1 items-center">
-                  <div className="flex flex-col items-center">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0a66c2] text-xs font-black text-white shadow-sm shadow-blue-300">
-                      {s.step}
-                    </div>
-                    <span className="mt-1 text-[10px] font-semibold text-[#0a66c2]">{s.label}</span>
-                  </div>
-                  {i < arr.length - 1 && (
-                    <div className="mx-1 h-0.5 flex-1 rounded-full bg-blue-100" />
-                  )}
-                </div>
-              ))}
-            </div>
-
             {deadlineLabel(job) && (
               <p className="mt-3 text-center text-[11px] font-semibold text-rose-600">
                 ⏰ Apply by {deadlineLabel(job)}
