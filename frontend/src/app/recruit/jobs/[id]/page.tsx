@@ -559,267 +559,206 @@ function RetryIcon() {
   return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /></svg>;
 }
 
-type SocialLinks = { linkedin?: string; instagram?: string; twitter?: string; github?: string; portfolio?: string };
-type SeekerProfileData = {
-  name: string; email: string; phone?: string; headline?: string; bio?: string;
-  skills?: string[]; experience?: { title: string; company: string; location?: string; startDate: string; endDate?: string; current: boolean; description: string }[];
-  education?: { degree: string; institution: string; year?: string; description?: string }[];
-  experienceLevel?: string; preferredNiche?: string; preferredWorkMode?: string; preferredLocation?: string;
-  socialLinks?: SocialLinks; photoUrl?: string;
-};
 type CandidateAppInfo = {
   name: string; email: string; phone?: string;
   location?: string; currentStatus?: string; educationLevel?: string;
   currentClassYear?: string; availability?: string; coverLetter?: string; linkedinUrl?: string;
 };
 
-function SeekerProfileModal({ candidateId, jobId, token, onClose }: {
-  candidateId: string; jobId: string; token: string; onClose: () => void;
+function ApplicantDetailsModal({ c, jobId, token, onClose }: {
+  c: Candidate; jobId: string; token: string; onClose: () => void;
 }) {
   const [loading, setLoading] = useState(true);
-  const [seekerProfile, setSeekerProfile] = useState<SeekerProfileData | null>(null);
-  const [candidateApp, setCandidateApp] = useState<CandidateAppInfo | null>(null);
-  const [noProfile, setNoProfile] = useState(false);
+  const [appData, setAppData] = useState<CandidateAppInfo | null>(null);
+  const [copied, setCopied] = useState<"email" | "phone" | null>(null);
 
   useEffect(() => {
-    fetch(apiUrl(`/recruit/jobs/${jobId}/candidates/${candidateId}/seeker-profile`), {
+    fetch(apiUrl(`/recruit/jobs/${jobId}/candidates/${c._id}/seeker-profile`), {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then(r => readApiJson(r))
-      .then(d => {
-        if (d.candidate) setCandidateApp(d.candidate);
-        if (d.seekerProfile) {
-          setSeekerProfile(d.seekerProfile);
-        } else {
-          setNoProfile(true);
-        }
-      })
-      .catch(() => setNoProfile(true))
+      .then(d => { if (d.candidate) setAppData(d.candidate); })
+      .catch(() => {})
       .finally(() => setLoading(false));
-  }, [candidateId, jobId, token]);
+  }, [c._id, jobId, token]);
 
-  const sl = seekerProfile?.socialLinks;
-  const hasSocialLinks = sl && (sl.linkedin || sl.instagram || sl.twitter || sl.github || sl.portfolio);
+  function copyToClipboard(text: string, field: "email" | "phone") {
+    navigator.clipboard.writeText(text).catch(() => {});
+    setCopied(field);
+    setTimeout(() => setCopied(null), 2000);
+  }
+
+  const pct = (!c.scoringFailed && c.maxScore > 0) ? Math.round((c.totalScore / c.maxScore) * 100) : null;
+  const appliedDate = c.createdAt ? new Date(c.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : null;
+  const hasExtraDetails = appData?.phone || appData?.linkedinUrl || appData?.location || appData?.coverLetter || appData?.currentStatus || appData?.educationLevel || appData?.availability;
+
+  // Close on Escape key
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-white/70 backdrop-blur-sm">
-      <div className="w-full max-w-xl rounded-[2rem] border border-white/[0.09] bg-[#0a0a0f] shadow-2xl max-h-[90vh] flex flex-col">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="applicant-details-title"
+        className="w-full max-w-md rounded-[2rem] border border-white/[0.08] bg-[#0a0a0f] shadow-2xl max-h-[88vh] flex flex-col"
+      >
+
+        {/* Header */}
         <div className="flex items-center justify-between border-b border-white/[0.07] px-6 py-4 shrink-0">
-          <div>
-            <h2 className="text-sm font-semibold text-white">Candidate Profile</h2>
-            <p className="text-xs text-gray-400 mt-0.5">{candidateApp?.name || ""}</p>
+          <div className="min-w-0 flex-1">
+            <h2 id="applicant-details-title" className="text-sm font-bold text-white truncate">{c.name}</h2>
+            <p className="text-[11px] text-gray-400 mt-0.5">Applicant Details</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-white transition">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
-          </button>
+          <div className="flex items-center gap-3 shrink-0 ml-3">
+            {pct !== null && (
+              <div className="text-right">
+                <p className={`text-base font-bold leading-none ${scoreColor(pct)}`}>{pct}%</p>
+                <p className="text-[10px] text-gray-500 mt-0.5">match score</p>
+              </div>
+            )}
+            {appliedDate && (
+              <div className="text-right">
+                <p className="text-[10px] text-gray-400 leading-none">Applied</p>
+                <p className="text-[11px] font-semibold text-gray-300 mt-0.5">{appliedDate}</p>
+              </div>
+            )}
+            <button onClick={onClose} aria-label="Close applicant details" className="ml-1 text-gray-400 hover:text-white transition">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            </button>
+          </div>
         </div>
 
-        <div className="overflow-y-auto flex-1 p-6 space-y-5">
+        <div className="overflow-y-auto flex-1 p-5 space-y-3">
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <svg className="animate-spin h-5 w-5 text-sky-500" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
               </svg>
             </div>
           ) : (
             <>
-              <div className="flex items-start gap-4">
-                <div className="shrink-0">
-                  {seekerProfile?.photoUrl ? (
-                    <img src={seekerProfile.photoUrl} alt="" className="h-14 w-14 rounded-full object-cover border-2 border-zinc-700" />
-                  ) : (
-                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-sky-900 to-sky-700 text-xl font-bold text-white">
-                      {(seekerProfile?.name || candidateApp?.name || "?").slice(0, 1).toUpperCase()}
+              {/* ── Email — always shown, highlighted at top ── */}
+              <div className="rounded-2xl border border-sky-500/30 bg-sky-500/[0.09] p-4">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-sky-400/70 mb-2">Email Address</p>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-bold text-sky-300 break-all leading-snug">{c.email}</p>
+                  <button
+                    onClick={() => copyToClipboard(c.email, "email")}
+                    className="shrink-0 flex items-center gap-1 rounded-lg border border-sky-500/25 bg-sky-500/10 px-2.5 py-1.5 text-[10px] font-bold text-sky-400 hover:bg-sky-500/20 transition"
+                  >
+                    {copied === "email" ? (
+                      <><svg width="9" height="9" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg> Copied</>
+                    ) : (
+                      <><svg width="9" height="9" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</>
+                    )}
+                  </button>
+                </div>
+                <a
+                  href={`mailto:${c.email}`}
+                  className="mt-2.5 inline-flex items-center gap-1.5 text-[11px] font-semibold text-sky-500/80 hover:text-sky-400 transition"
+                >
+                  <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,12 2,6"/></svg>
+                  Send email →
+                </a>
+              </div>
+
+              {/* ── Phone ── */}
+              {appData?.phone && (
+                <div className="rounded-2xl border border-white/[0.07] bg-white/[0.03] p-4 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Phone</p>
+                    <a href={`tel:${appData.phone}`} className="text-sm font-bold text-white hover:text-sky-300 transition">{appData.phone}</a>
+                  </div>
+                  <button
+                    onClick={() => copyToClipboard(appData!.phone!, "phone")}
+                    className="shrink-0 flex items-center gap-1 rounded-lg border border-white/[0.07] bg-white/[0.05] px-2.5 py-1.5 text-[10px] font-bold text-gray-400 hover:bg-white/[0.09] transition"
+                  >
+                    {copied === "phone" ? (
+                      <><svg width="9" height="9" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg> Copied</>
+                    ) : (
+                      <><svg width="9" height="9" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</>
+                    )}
+                  </button>
+                </div>
+              )}
+
+              {/* ── LinkedIn ── */}
+              {appData?.linkedinUrl && (
+                <div className="rounded-2xl border border-blue-500/20 bg-blue-500/[0.05] p-4">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">LinkedIn</p>
+                  <a
+                    href={appData.linkedinUrl.startsWith("http") ? appData.linkedinUrl : `https://${appData.linkedinUrl}`}
+                    target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 text-sm font-semibold text-blue-400 hover:text-blue-300 transition"
+                  >
+                    <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6zM2 9h4v12H2z"/><circle cx="4" cy="4" r="2"/></svg>
+                    View LinkedIn Profile →
+                  </a>
+                </div>
+              )}
+
+              {/* ── Details grid: location, status, education, availability, applied date ── */}
+              {(appData?.location || appData?.currentStatus || appData?.educationLevel || appData?.availability || appliedDate) && (
+                <div className="grid grid-cols-2 gap-2">
+                  {appData?.location && (
+                    <div className="col-span-2 flex items-center gap-2.5 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
+                      <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" className="text-gray-400 shrink-0"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                      <div>
+                        <p className="text-[10px] text-gray-500">Location</p>
+                        <p className="text-xs font-semibold text-gray-200">{appData.location}</p>
+                      </div>
+                    </div>
+                  )}
+                  {appData?.currentStatus && (
+                    <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
+                      <p className="text-[10px] text-gray-500 mb-0.5">Current Status</p>
+                      <p className="text-xs font-semibold text-gray-200">{appData.currentStatus}</p>
+                    </div>
+                  )}
+                  {appData?.availability && (
+                    <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
+                      <p className="text-[10px] text-gray-500 mb-0.5">Availability</p>
+                      <p className="text-xs font-semibold text-gray-200">{appData.availability}</p>
+                    </div>
+                  )}
+                  {appData?.educationLevel && (
+                    <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
+                      <p className="text-[10px] text-gray-500 mb-0.5">Education</p>
+                      <p className="text-xs font-semibold text-gray-200">{appData.educationLevel}{appData.currentClassYear ? ` · ${appData.currentClassYear}` : ""}</p>
+                    </div>
+                  )}
+                  {appliedDate && (
+                    <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
+                      <p className="text-[10px] text-gray-500 mb-0.5">Applied On</p>
+                      <p className="text-xs font-semibold text-gray-200">{appliedDate}</p>
                     </div>
                   )}
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-base font-semibold text-white">{seekerProfile?.name || candidateApp?.name}</p>
-                  {seekerProfile?.headline && <p className="text-xs text-gray-500 mt-0.5">{seekerProfile.headline}</p>}
-                  {candidateApp?.email && <p className="text-xs text-gray-400 mt-0.5">{candidateApp.email}</p>}
-                </div>
-              </div>
-
-              {candidateApp && (candidateApp.location || candidateApp.currentStatus || candidateApp.educationLevel || candidateApp.availability || candidateApp.linkedinUrl) && (
-                <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 space-y-3">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Application Details</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {candidateApp.location && (
-                      <div className="col-span-2 flex items-center gap-2 text-xs text-gray-500">
-                        <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                        {candidateApp.location}
-                      </div>
-                    )}
-                    {candidateApp.currentStatus && (
-                      <div className="rounded-lg border border-white/[0.05] bg-white/[0.03] p-2">
-                        <p className="text-[10px] text-gray-400 mb-0.5">Current Status</p>
-                        <p className="text-[11px] font-semibold text-gray-600">{candidateApp.currentStatus}</p>
-                      </div>
-                    )}
-                    {candidateApp.availability && (
-                      <div className="rounded-lg border border-white/[0.05] bg-white/[0.03] p-2">
-                        <p className="text-[10px] text-gray-400 mb-0.5">Availability</p>
-                        <p className="text-[11px] font-semibold text-gray-600">{candidateApp.availability}</p>
-                      </div>
-                    )}
-                    {candidateApp.educationLevel && (
-                      <div className="rounded-lg border border-white/[0.05] bg-white/[0.03] p-2">
-                        <p className="text-[10px] text-gray-400 mb-0.5">Education</p>
-                        <p className="text-[11px] font-semibold text-gray-600">{candidateApp.educationLevel}{candidateApp.currentClassYear ? ` · ${candidateApp.currentClassYear}` : ""}</p>
-                      </div>
-                    )}
-                    {candidateApp.phone && (
-                      <div className="rounded-lg border border-white/[0.05] bg-white/[0.03] p-2">
-                        <p className="text-[10px] text-gray-400 mb-0.5">Phone</p>
-                        <p className="text-[11px] font-semibold text-gray-600">{candidateApp.phone}</p>
-                      </div>
-                    )}
-                  </div>
-                  {candidateApp.linkedinUrl && (
-                    <a href={candidateApp.linkedinUrl.startsWith("http") ? candidateApp.linkedinUrl : `https://${candidateApp.linkedinUrl}`} target="_blank" rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-400 hover:text-blue-300 transition">
-                      <svg width="11" height="11" fill="currentColor" viewBox="0 0 24 24"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6zM2 9h4v12H2z"/><circle cx="4" cy="4" r="2"/></svg>
-                      View LinkedIn Profile
-                    </a>
-                  )}
-                </div>
               )}
 
-              {candidateApp?.coverLetter && (
+              {/* ── Cover letter ── */}
+              {appData?.coverLetter && (
                 <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Cover Letter</p>
-                  <p className="text-xs text-gray-600 leading-5 whitespace-pre-line">{candidateApp.coverLetter}</p>
+                  <p className="text-xs text-gray-400 leading-5 whitespace-pre-line">{appData.coverLetter}</p>
                 </div>
               )}
 
-              {noProfile || !seekerProfile ? (
-                <div className="flex flex-col items-center justify-center py-6 text-center rounded-2xl border border-dashed border-zinc-800">
-                  <p className="text-sm font-semibold text-gray-500">No Rolebolt profile found</p>
-                  <p className="text-xs text-gray-400 mt-1 max-w-xs">
-                    This candidate hasn't set up a full profile. Their resume and application details are shown above.
-                  </p>
+              {/* ── Empty state ── */}
+              {!loading && !hasExtraDetails && (
+                <div className="rounded-2xl border border-dashed border-zinc-800 p-5 text-center">
+                  <p className="text-xs text-gray-500">No additional contact details were provided.</p>
+                  <p className="text-[11px] text-gray-600 mt-1">Email is the only contact info available.</p>
                 </div>
-              ) : (
-              <>
-              {seekerProfile.bio && (
-                <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Bio</p>
-                  <p className="text-xs text-gray-600 leading-5">{seekerProfile.bio}</p>
-                </div>
-              )}
-
-              {seekerProfile.skills && seekerProfile.skills.length > 0 && (
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Skills</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {seekerProfile.skills.map(s => (
-                      <span key={s} className="rounded-full border border-sky-500/20 bg-sky-500/[0.08] px-2.5 py-1 text-[11px] font-semibold text-sky-400">{s}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {hasSocialLinks && (
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Social & Portfolio</p>
-                  <div className="flex flex-wrap gap-2">
-                    {sl?.linkedin && (
-                      <a href={sl.linkedin.startsWith("http") ? sl.linkedin : `https://${sl.linkedin}`} target="_blank" rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/20 bg-blue-500/[0.08] px-3 py-1.5 text-[11px] font-semibold text-blue-400 hover:bg-blue-500/15 transition">
-                        <svg width="11" height="11" fill="currentColor" viewBox="0 0 24 24"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6zM2 9h4v12H2z"/><circle cx="4" cy="4" r="2"/></svg>
-                        LinkedIn
-                      </a>
-                    )}
-                    {sl?.instagram && (
-                      <a href={sl.instagram.startsWith("http") ? sl.instagram : `https://${sl.instagram}`} target="_blank" rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 rounded-full border border-pink-500/20 bg-pink-500/[0.08] px-3 py-1.5 text-[11px] font-semibold text-pink-400 hover:bg-pink-500/15 transition">
-                        <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
-                        Instagram
-                      </a>
-                    )}
-                    {sl?.twitter && (
-                      <a href={sl.twitter.startsWith("http") ? sl.twitter : `https://${sl.twitter}`} target="_blank" rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 rounded-full border border-zinc-500/20 bg-zinc-500/[0.08] px-3 py-1.5 text-[11px] font-semibold text-gray-500 hover:bg-zinc-500/15 transition">
-                        <svg width="11" height="11" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-                        X / Twitter
-                      </a>
-                    )}
-                    {sl?.github && (
-                      <a href={sl.github.startsWith("http") ? sl.github : `https://${sl.github}`} target="_blank" rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 rounded-full border border-zinc-500/20 bg-zinc-500/[0.08] px-3 py-1.5 text-[11px] font-semibold text-gray-500 hover:bg-zinc-500/15 transition">
-                        <svg width="11" height="11" fill="currentColor" viewBox="0 0 24 24"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
-                        GitHub
-                      </a>
-                    )}
-                    {sl?.portfolio && (
-                      <a href={sl.portfolio.startsWith("http") ? sl.portfolio : `https://${sl.portfolio}`} target="_blank" rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/[0.08] px-3 py-1.5 text-[11px] font-semibold text-emerald-400 hover:bg-emerald-500/15 transition">
-                        <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-                        Portfolio
-                      </a>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {seekerProfile.experience && seekerProfile.experience.length > 0 && (
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Experience</p>
-                  <div className="space-y-2">
-                    {seekerProfile.experience.map((exp, i) => (
-                      <div key={i} className="rounded-xl border border-white/[0.05] bg-white/[0.02] p-3">
-                        <p className="text-xs font-semibold text-white">{exp.title}</p>
-                        <p className="text-[11px] text-gray-500 mt-0.5">{exp.company}{exp.location ? ` · ${exp.location}` : ""}</p>
-                        <p className="text-[10px] text-gray-400 mt-0.5">{exp.startDate} — {exp.current ? "Present" : exp.endDate}</p>
-                        {exp.description && <p className="text-[11px] text-gray-400 mt-1.5 leading-4">{exp.description}</p>}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {seekerProfile.education && seekerProfile.education.length > 0 && (
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Education</p>
-                  <div className="space-y-2">
-                    {seekerProfile.education.map((edu, i) => (
-                      <div key={i} className="rounded-xl border border-white/[0.05] bg-white/[0.02] p-3">
-                        <p className="text-xs font-semibold text-white">{edu.degree}</p>
-                        <p className="text-[11px] text-gray-500 mt-0.5">{edu.institution}{edu.year ? ` · ${edu.year}` : ""}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-3">
-                {seekerProfile.experienceLevel && (
-                  <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] p-3">
-                    <p className="text-[10px] text-gray-400 mb-0.5">Experience Level</p>
-                    <p className="text-xs font-semibold text-gray-600">{seekerProfile.experienceLevel}</p>
-                  </div>
-                )}
-                {seekerProfile.preferredWorkMode && (
-                  <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] p-3">
-                    <p className="text-[10px] text-gray-400 mb-0.5">Preferred Mode</p>
-                    <p className="text-xs font-semibold text-gray-600">{seekerProfile.preferredWorkMode}</p>
-                  </div>
-                )}
-                {seekerProfile.preferredLocation && (
-                  <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] p-3">
-                    <p className="text-[10px] text-gray-400 mb-0.5">Preferred Location</p>
-                    <p className="text-xs font-semibold text-gray-600">{seekerProfile.preferredLocation}</p>
-                  </div>
-                )}
-                {seekerProfile.preferredNiche && (
-                  <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] p-3">
-                    <p className="text-[10px] text-gray-400 mb-0.5">Preferred Niche</p>
-                    <p className="text-xs font-semibold text-gray-600">{seekerProfile.preferredNiche}</p>
-                  </div>
-                )}
-              </div>
-              </>
               )}
             </>
           )}
@@ -853,7 +792,7 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete }: {
   const [loadingRetry, setLoadingRetry] = useState(false);
   const [retryError, setRetryError] = useState("");
   const [showOfferLetterModal, setShowOfferLetterModal] = useState(false);
-  const [showSeekerProfile, setShowSeekerProfile] = useState(false);
+  const [showApplicantDetails, setShowApplicantDetails] = useState(false);
 
   const scoringFailed = c.scoringFailed === true;
   const pct = (!scoringFailed && c.maxScore > 0) ? Math.round((c.totalScore / c.maxScore) * 100) : 0;
@@ -1010,12 +949,12 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete }: {
           onClose={() => setShowOfferLetterModal(false)}
         />
       )}
-      {showSeekerProfile && (
-        <SeekerProfileModal
-          candidateId={c._id}
+      {showApplicantDetails && (
+        <ApplicantDetailsModal
+          c={c}
           jobId={jobId}
           token={token}
-          onClose={() => setShowSeekerProfile(false)}
+          onClose={() => setShowApplicantDetails(false)}
         />
       )}
 
@@ -1111,11 +1050,11 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete }: {
             </select>
 
             <button
-              onClick={() => setShowSeekerProfile(true)}
+              onClick={() => setShowApplicantDetails(true)}
               className="flex items-center gap-1 rounded-xl border border-sky-500/20 bg-sky-500/[0.07] px-3 py-1.5 text-[11px] text-sky-400 hover:bg-sky-500/15 transition"
             >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
-              View Profile
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              Info
             </button>
 
             <button
