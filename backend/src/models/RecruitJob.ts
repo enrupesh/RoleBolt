@@ -37,6 +37,11 @@ export interface IRecruitJob extends Document {
   mustHaveSkills: string;
   niceToHaveSkills: string;
   nicheDetails: Record<string, string>;
+  openings: number;
+  applicationDeadline?: Date;
+  perks: string;
+  languageRequirement: string;
+  timezoneOverlap: string;
   generatedJD: string;
   rubric: IRubricCriteria[];
   status: "active" | "paused" | "closed";
@@ -90,6 +95,11 @@ const RecruitJobSchema = new Schema<IRecruitJob>(
     mustHaveSkills: { type: String, default: "" },
     niceToHaveSkills: { type: String, default: "" },
     nicheDetails: { type: Schema.Types.Mixed, default: {} },
+    openings: { type: Number, default: 1 },
+    applicationDeadline: { type: Date },
+    perks: { type: String, default: "" },
+    languageRequirement: { type: String, default: "" },
+    timezoneOverlap: { type: String, default: "" },
     generatedJD: { type: String, default: "" },
     rubric: { type: [RubricCriteriaSchema], default: [] },
     status: { type: String, enum: ["active", "paused", "closed"], default: "active" },

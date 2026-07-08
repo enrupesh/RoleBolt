@@ -123,6 +123,11 @@ type FormData = {
   freshersAllowed: boolean;
   verifiedCompany: boolean;
   publicVisibility: boolean;
+  openings: string;
+  applicationDeadline: string;
+  perks: string;
+  languageRequirement: string;
+  timezoneOverlap: string;
 };
 
 const DEFAULT: FormData = {
@@ -133,6 +138,7 @@ const DEFAULT: FormData = {
   salaryMin: "", salaryMax: "", salaryCurrency: "INR",
   experienceMin: "", experienceMax: "", educationRequirement: "", noticePeriod: "",
   freshersAllowed: false, verifiedCompany: false, publicVisibility: true,
+  openings: "1", applicationDeadline: "", perks: "", languageRequirement: "", timezoneOverlap: "",
 };
 
 // Heuristic check to catch obviously fake/junk input (e.g. "asdasdasd",
@@ -329,6 +335,8 @@ function NewJobContent() {
           companyType: resolvedCompanyType,
           salaryMin: form.salaryMin ? Number(form.salaryMin) : undefined,
           salaryMax: form.salaryMax ? Number(form.salaryMax) : undefined,
+          openings: form.openings ? Number(form.openings) : 1,
+          applicationDeadline: form.applicationDeadline || undefined,
         }),
       });
       const data = await readApiJson(res);
@@ -341,7 +349,7 @@ function NewJobContent() {
   }
 
   if (createdJob) {
-    const publicUrl = `//recruit/opportunities/${createdJob.id}`;
+    const publicUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/recruit/opportunities/${createdJob.id}`;
     const whatsappMsg = encodeURIComponent(`We're hiring! Check out this job: ${createdJob.title}\n${publicUrl}`);
 
     function copyLink() {
@@ -569,6 +577,16 @@ function NewJobContent() {
                   <Input type="number" value={form.experienceMax} onChange={update("experienceMax")} placeholder="5" />
                 </div>
               </div>
+              <div>
+                <FieldLabel>Number of Openings <span className="text-gray-400 normal-case font-normal">(optional, defaults to 1)</span></FieldLabel>
+                <Input type="number" value={form.openings} onChange={update("openings")} placeholder="1" />
+              </div>
+              {form.workMode === "remote" && (
+                <div>
+                  <FieldLabel>Timezone / Working Hours Overlap <span className="text-gray-400 normal-case font-normal">(optional)</span></FieldLabel>
+                  <Input value={form.timezoneOverlap} onChange={update("timezoneOverlap")} placeholder="e.g. IST business hours, 4hrs overlap with EST" />
+                </div>
+              )}
             </div>
           )}
 
@@ -611,6 +629,19 @@ function NewJobContent() {
                   <FieldLabel>Notice Period</FieldLabel>
                   <Input value={form.noticePeriod} onChange={update("noticePeriod")} placeholder="e.g. Immediate to 30 days" />
                 </div>
+              </div>
+              <div>
+                <FieldLabel>Language Requirement <span className="text-gray-400 normal-case font-normal">(optional)</span></FieldLabel>
+                <Input value={form.languageRequirement} onChange={update("languageRequirement")} placeholder="e.g. Fluent English + Hindi, regional language a plus" />
+              </div>
+              <div>
+                <FieldLabel>Perks & Benefits <span className="text-gray-400 normal-case font-normal">(optional)</span></FieldLabel>
+                <Textarea
+                  rows={2}
+                  value={form.perks}
+                  onChange={update("perks")}
+                  placeholder="e.g. Health insurance, WFH stipend, ESOPs, flexible leave..."
+                />
               </div>
               <div className="flex flex-wrap gap-3">
                 {[
@@ -673,6 +704,10 @@ function NewJobContent() {
                   Salary information is used only by the AI to write better job descriptions. It is not shown publicly unless you paste the generated JD on a job board.
                 </p>
               </div>
+              <div>
+                <FieldLabel>Application Deadline <span className="text-gray-400 normal-case font-normal">(optional)</span></FieldLabel>
+                <Input type="date" value={form.applicationDeadline} onChange={update("applicationDeadline")} placeholder="" />
+              </div>
             </div>
           )}
 
@@ -689,6 +724,11 @@ function NewJobContent() {
                   ["Work Mode", form.workMode],
                   ["Location", form.location],
                   ["Salary", form.salaryMin && form.salaryMax ? `${form.salaryCurrency} ${Number(form.salaryMin).toLocaleString()} – ${Number(form.salaryMax).toLocaleString()}` : "Not disclosed"],
+                  ["Openings", form.openings || "1"],
+                  ["Application Deadline", form.applicationDeadline || "Not set"],
+                  ["Language Requirement", form.languageRequirement || "Not specified"],
+                  ["Perks & Benefits", form.perks || "Not specified"],
+                  ...(form.workMode === "remote" ? [["Timezone Overlap", form.timezoneOverlap || "Not specified"]] : []),
                 ].map(([k, v]) => (
                   <div key={k} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
                     <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">{k}</p>

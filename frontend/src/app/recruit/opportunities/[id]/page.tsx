@@ -39,7 +39,19 @@ type Job = {
   generatedJD?: string;
   mustHaveSkills?: string;
   niceToHaveSkills?: string;
+  openings?: number;
+  applicationDeadline?: string;
+  perks?: string;
+  languageRequirement?: string;
+  timezoneOverlap?: string;
 };
+
+function formatDeadline(value?: string) {
+  if (!value) return null;
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+}
 
 function salary(job: Job) {
   if (!job.salaryMin && !job.salaryMax) return "Salary not disclosed";
@@ -121,6 +133,7 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
   const niceToHave = splitLines(job.niceToHaveSkills);
   const quality = computeJobQuality(job);
   const roleOverview = formatJobDescription(job.generatedJD);
+  const deadlineLabel = formatDeadline(job.applicationDeadline);
 
   const copyText = [
     `${job.title}${job.companyName ? ` — ${job.companyName}` : ""}`,
@@ -136,6 +149,11 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
     `Notice period: ${job.noticePeriod || "Flexible"}`,
     job.freshersAllowed ? "Freshers welcome: Yes" : "",
     job.verifiedCompany ? "Verified company: Yes" : "",
+    job.openings && job.openings > 1 ? `Openings: ${job.openings}` : "",
+    deadlineLabel ? `Apply by: ${deadlineLabel}` : "",
+    job.languageRequirement ? `Language: ${job.languageRequirement}` : "",
+    job.workMode === "remote" && job.timezoneOverlap ? `Timezone: ${job.timezoneOverlap}` : "",
+    job.perks?.trim() ? `Perks: ${job.perks.trim()}` : "",
     "",
     "── Role overview ──",
     roleOverview || "The recruiter has not published a full job description yet.",
@@ -157,6 +175,8 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
     ...(job.workMode ? [{ label: job.workMode.charAt(0).toUpperCase() + job.workMode.slice(1), color: "bg-blue-50 text-[#0a66c2]" }] : []),
     ...(job.freshersAllowed ? [{ label: "Freshers welcome", color: "bg-amber-50 text-amber-700" }] : []),
     ...(job.verifiedCompany ? [{ label: "✓ Verified company", color: "bg-green-50 text-green-700" }] : []),
+    ...(job.openings && job.openings > 1 ? [{ label: `${job.openings} openings`, color: "bg-indigo-50 text-indigo-700" }] : []),
+    ...(deadlineLabel ? [{ label: `Apply by ${deadlineLabel}`, color: "bg-rose-50 text-rose-700" }] : []),
   ];
 
   return (
@@ -274,6 +294,10 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
                 { label: "Company type", value: job.companyType || "Not specified" },
                 { label: "Education", value: job.educationRequirement || "Flexible" },
                 { label: "Notice period", value: job.noticePeriod || "Flexible" },
+                { label: "Openings", value: job.openings && job.openings > 1 ? `${job.openings} positions` : "1 position" },
+                { label: "Apply by", value: deadlineLabel || "Open until filled" },
+                ...(job.languageRequirement ? [{ label: "Language", value: job.languageRequirement }] : []),
+                ...(job.workMode === "remote" && job.timezoneOverlap ? [{ label: "Timezone", value: job.timezoneOverlap }] : []),
               ].map(item => (
                 <div key={item.label}>
                   <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">{item.label}</p>
@@ -282,6 +306,16 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
               ))}
             </div>
           </div>
+
+          {job.perks?.trim() && (
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <h2 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-violet-100 text-violet-700 text-[10px]">★</span>
+                Perks &amp; Benefits
+              </h2>
+              <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{job.perks}</p>
+            </div>
+          )}
 
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex items-center gap-2 mb-4">

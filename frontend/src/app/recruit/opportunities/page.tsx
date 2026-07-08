@@ -60,7 +60,16 @@ type Job = {
   mustHaveSkills?: string;
   generatedJD?: string;
   createdAt?: string;
+  openings?: number;
+  applicationDeadline?: string;
 };
+
+function formatDeadline(value?: string) {
+  if (!value) return null;
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+}
 
 function paramValue(params: PageSearchParams, key: string) {
   const value = params[key];
@@ -409,12 +418,16 @@ export default async function RecruitOpportunitiesPage({ searchParams }: { searc
                         <span>{job.experienceMin ?? 0}{job.experienceMax ? `–${job.experienceMax}` : "+"} yrs</span>
                         {job.seniority && <span>{job.seniority}</span>}
                         {job.noticePeriod && <span>{job.noticePeriod} notice</span>}
+                        {job.openings && job.openings > 1 && <span>{job.openings} openings</span>}
                         {job.createdAt && <span className="ml-auto text-slate-400">{timeAgo(job.createdAt)}</span>}
                       </div>
                       <div className="mt-3 flex flex-wrap gap-2">
                         <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-[#0a66c2]">Apply free</span>
                         {(job.salaryMin || job.salaryMax) && (
                           <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-[11px] font-bold text-emerald-700">₹ Salary visible</span>
+                        )}
+                        {formatDeadline(job.applicationDeadline) && (
+                          <span className="rounded-full bg-rose-50 border border-rose-200 px-2.5 py-1 text-[11px] font-bold text-rose-700">Apply by {formatDeadline(job.applicationDeadline)}</span>
                         )}
                         <span className="rounded-full bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600">Save for later</span>
                         <span className="rounded-full bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600">Track after applying</span>
