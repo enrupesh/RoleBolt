@@ -29,7 +29,6 @@ const INDUSTRIES = [
   "Education", "Real Estate", "Manufacturing", "Other",
 ];
 
-// Copy that adapts depending on which profile type is selected.
 const COPY: Record<ProfileType, {
   nameLabel: string; namePlaceholder: string;
   aboutLabel: string; aboutPlaceholder: string;
@@ -110,32 +109,119 @@ const EMPTY_PROFILE: Profile = {
   socialLinks: { instagram: "", twitter: "", github: "", portfolio: "" },
 };
 
-function Input({ label, ...props }: { label: string } & React.InputHTMLAttributes<HTMLInputElement>) {
+// ─── Validation ──────────────────────────────────────────────────────────────
+
+type FieldErrors = Partial<Record<string, string>>;
+
+function validateProfile(p: Profile): FieldErrors {
+  const errors: FieldErrors = {};
+
+  if (!p.companyName.trim()) errors.companyName = "This field is required.";
+  if (!p.description.trim()) errors.description = "This field is required.";
+  if (!p.location.trim()) errors.location = "This field is required.";
+
+  if (p.profileType === "company") {
+    if (!p.companyType) errors.companyType = "Please select a company type.";
+    if (!p.industry) errors.industry = "Please select an industry.";
+    if (!p.companySize) errors.companySize = "Please select a company size.";
+  }
+
+  if (p.profileType === "educational_institute") {
+    if (!p.instituteType) errors.instituteType = "Please select an institute type.";
+  }
+
+  if (p.profileType === "individual" || p.profileType === "content_creator") {
+    if (!p.niche.trim()) errors.niche = "This field is required.";
+  }
+
+  return errors;
+}
+
+// ─── Base UI components ──────────────────────────────────────────────────────
+
+function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
   return (
-    <div>
-      <label className="mb-1.5 block text-xs font-semibold text-slate-500 uppercase tracking-wide">{label}</label>
-      <input className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-[#0a66c2] focus:ring-2 focus:ring-[#0a66c2]/10 transition" {...props} />
+    <div className="flex items-center gap-1.5 mb-1.5">
+      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide leading-none">{children}</span>
+      {required === true && (
+        <span className="inline-flex items-center text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-red-50 text-red-500 border border-red-200 leading-none">
+          Required
+        </span>
+      )}
+      {required === false && (
+        <span className="inline-flex items-center text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-400 border border-slate-200 leading-none">
+          Optional
+        </span>
+      )}
     </div>
   );
 }
 
-function Textarea({ label, ...props }: { label: string } & React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
+function FieldErr({ msg }: { msg?: string }) {
+  if (!msg) return null;
+  return <p className="mt-1 text-xs text-red-600 font-medium flex items-center gap-1"><span>⚠</span>{msg}</p>;
+}
+
+function Input({
+  label, required, fieldError, ...props
+}: { label: string; required?: boolean; fieldError?: string } & React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <div>
-      <label className="mb-1.5 block text-xs font-semibold text-slate-500 uppercase tracking-wide">{label}</label>
-      <textarea className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-[#0a66c2] focus:ring-2 focus:ring-[#0a66c2]/10 transition resize-none" {...props} />
+      <FieldLabel required={required}>{label}</FieldLabel>
+      <input
+        className={`w-full rounded-lg border px-3 py-2.5 text-sm outline-none focus:ring-2 transition ${
+          fieldError
+            ? "border-red-400 focus:border-red-400 focus:ring-red-400/10"
+            : "border-slate-300 focus:border-[#0a66c2] focus:ring-[#0a66c2]/10"
+        }`}
+        {...props}
+      />
+      <FieldErr msg={fieldError} />
     </div>
   );
 }
 
-function Select({ label, children, ...props }: { label: string } & React.SelectHTMLAttributes<HTMLSelectElement> & { children: React.ReactNode }) {
+function Textarea({
+  label, required, fieldError, ...props
+}: { label: string; required?: boolean; fieldError?: string } & React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return (
     <div>
-      <label className="mb-1.5 block text-xs font-semibold text-slate-500 uppercase tracking-wide">{label}</label>
-      <select className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-[#0a66c2] transition bg-white" {...props}>{children}</select>
+      <FieldLabel required={required}>{label}</FieldLabel>
+      <textarea
+        className={`w-full rounded-lg border px-3 py-2.5 text-sm outline-none focus:ring-2 transition resize-none ${
+          fieldError
+            ? "border-red-400 focus:border-red-400 focus:ring-red-400/10"
+            : "border-slate-300 focus:border-[#0a66c2] focus:ring-[#0a66c2]/10"
+        }`}
+        {...props}
+      />
+      <FieldErr msg={fieldError} />
     </div>
   );
 }
+
+function Select({
+  label, required, fieldError, children, ...props
+}: { label: string; required?: boolean; fieldError?: string } & React.SelectHTMLAttributes<HTMLSelectElement> & { children: React.ReactNode }) {
+  return (
+    <div>
+      <FieldLabel required={required}>{label}</FieldLabel>
+      <select
+        className={`w-full rounded-lg border px-3 py-2.5 text-sm outline-none focus:ring-2 transition bg-white ${
+          fieldError
+            ? "border-red-400 focus:border-red-400 focus:ring-red-400/10"
+            : "border-slate-300 focus:border-[#0a66c2] focus:ring-[#0a66c2]/10"
+        }`}
+        {...props}
+      >
+        {children}
+      </select>
+      <FieldErr msg={fieldError} />
+    </div>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
 
 function RecruiterProfileContent() {
   const router = useRouter();
@@ -150,6 +236,10 @@ function RecruiterProfileContent() {
   const [verificationMessage, setVerificationMessage] = useState("");
   const [authToken, setAuthToken] = useState<string>("");
 
+  // Track whether user has tried to save (to show inline errors)
+  const [saveAttempted, setSaveAttempted] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [logoUploadError, setLogoUploadError] = useState("");
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -157,6 +247,8 @@ function RecruiterProfileContent() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [photoUploadError, setPhotoUploadError] = useState("");
   const photoInputRef = useRef<HTMLInputElement>(null);
+
+  const firstErrorRef = useRef<HTMLDivElement>(null);
 
   const copy = COPY[profile.profileType];
 
@@ -214,6 +306,13 @@ function RecruiterProfileContent() {
     return () => unsub();
   }, [router]);
 
+  // Re-run validation live once user has attempted save
+  useEffect(() => {
+    if (saveAttempted) {
+      setFieldErrors(validateProfile(profile));
+    }
+  }, [profile, saveAttempted]);
+
   async function handleLogoUpload(file: File) {
     if (!authToken) { setLogoUploadError("Please wait for sign-in to finish and try again."); return; }
     setUploadingLogo(true);
@@ -243,7 +342,6 @@ function RecruiterProfileContent() {
   }
 
   function requestVerification() {
-    // Check profile completeness before redirecting
     if (!profile.companyName.trim()) {
       setVerificationMessage("Please fill in your name before requesting verification.");
       return;
@@ -266,6 +364,19 @@ function RecruiterProfileContent() {
   }
 
   async function save() {
+    setSaveAttempted(true);
+    const errors = validateProfile(profile);
+    setFieldErrors(errors);
+
+    if (Object.keys(errors).length > 0) {
+      // Scroll to first error
+      setTimeout(() => {
+        const el = document.querySelector("[data-field-error]");
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 50);
+      return;
+    }
+
     setSaving(true); setError(""); setSaved(false);
     try {
       const auth = getFirebaseAuth();
@@ -290,6 +401,9 @@ function RecruiterProfileContent() {
     }
   }
 
+  const requiredCount = Object.keys(validateProfile(profile)).length;
+  const hasErrors = saveAttempted && requiredCount > 0;
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#f3f6f8]">
@@ -311,6 +425,7 @@ function RecruiterProfileContent() {
     <div className="min-h-screen bg-[#f3f6f8] text-slate-900">
       <RecruitHeader />
 
+      {/* Sticky top bar */}
       <div className="sticky top-[57px] z-30 bg-white/95 backdrop-blur border-b border-slate-200">
         <div className="mx-auto max-w-3xl px-4 sm:px-6 flex items-center justify-between py-2.5">
           <div className="flex items-center gap-3">
@@ -319,7 +434,12 @@ function RecruiterProfileContent() {
             <h1 className="text-sm font-bold text-slate-900">Recruiter Profile</h1>
           </div>
           <div className="flex items-center gap-2">
-            {error && <p className="text-xs text-red-600 hidden sm:block">{error}</p>}
+            {hasErrors && (
+              <span className="text-xs text-red-600 font-semibold hidden sm:block">
+                {requiredCount} required field{requiredCount > 1 ? "s" : ""} missing
+              </span>
+            )}
+            {!hasErrors && error && <p className="text-xs text-red-600 hidden sm:block">{error}</p>}
             {saved && <span className="text-xs font-semibold text-green-600">✓ Saved</span>}
             <button onClick={save} disabled={saving} className="rounded-full bg-[#0a66c2] px-5 py-2 text-xs font-bold text-white hover:bg-[#004182] disabled:opacity-60 transition active:scale-95">
               {saving ? "Saving…" : "Save"}
@@ -330,12 +450,13 @@ function RecruiterProfileContent() {
 
       <main className="mx-auto max-w-3xl px-4 py-5 sm:px-6 sm:py-6 space-y-4">
 
+        {/* Profile type selector */}
         <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm">
           <h2 className="text-sm font-bold text-slate-900 mb-1">Who's hiring?</h2>
           <p className="text-xs text-slate-500 mb-3">Pick the option that best describes you. This changes which fields show up below, so your profile only asks what's relevant.</p>
           <select
             value={profile.profileType}
-            onChange={e => set("profileType", e.target.value as ProfileType)}
+            onChange={e => { set("profileType", e.target.value as ProfileType); setSaveAttempted(false); setFieldErrors({}); }}
             className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-semibold text-slate-900 outline-none focus:border-[#0a66c2] focus:ring-2 focus:ring-[#0a66c2]/10 transition bg-white"
           >
             {PROFILE_TYPES.map(pt => (
@@ -345,77 +466,145 @@ function RecruiterProfileContent() {
           <p className="text-xs text-slate-500 mt-2">{PROFILE_TYPES.find(pt => pt.value === profile.profileType)?.blurb}</p>
         </div>
 
+        {/* Validation summary banner (shown after first save attempt) */}
+        {hasErrors && (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 flex items-start gap-3">
+            <span className="text-red-500 text-base mt-0.5">⚠</span>
+            <div>
+              <p className="text-sm font-semibold text-red-700">Please fill in the required fields</p>
+              <p className="text-xs text-red-600 mt-0.5">
+                {requiredCount} required field{requiredCount > 1 ? "s are" : " is"} empty. Fields marked <span className="font-bold">Required</span> must be filled before saving.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* ── Basic Details ── */}
         <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm">
           <h2 className="text-sm font-bold text-slate-900 mb-4 pb-3 border-b border-slate-100">Basic Details</h2>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Input label={copy.nameLabel} value={profile.companyName} onChange={e => set("companyName", e.target.value)} placeholder={copy.namePlaceholder} />
-            <Input label="Tagline (optional)" value={profile.tagline} onChange={e => set("tagline", e.target.value)} placeholder="A one-line pitch about you or your work" />
+
+            <div {...(fieldErrors.companyName ? { "data-field-error": true } : {})}>
+              <Input
+                label={copy.nameLabel}
+                required={true}
+                value={profile.companyName}
+                onChange={e => set("companyName", e.target.value)}
+                placeholder={copy.namePlaceholder}
+                fieldError={fieldErrors.companyName}
+              />
+            </div>
+
+            <Input
+              label="Tagline"
+              required={false}
+              value={profile.tagline}
+              onChange={e => set("tagline", e.target.value)}
+              placeholder="A one-line pitch about you or your work"
+            />
 
             {copy.showOrgFields && (
               <>
-                <Select label="Company Type" value={profile.companyType} onChange={e => set("companyType", e.target.value)}>
-                  <option value="">Select type</option>
-                  {COMPANY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                </Select>
-                <Select label="Industry" value={profile.industry} onChange={e => set("industry", e.target.value)}>
-                  <option value="">Select industry</option>
-                  {INDUSTRIES.map(i => <option key={i} value={i}>{i}</option>)}
-                </Select>
-                <Select label="Company Size" value={profile.companySize} onChange={e => set("companySize", e.target.value)}>
-                  <option value="">Select size</option>
-                  {COMPANY_SIZES.map(s => <option key={s} value={s}>{s} employees</option>)}
-                </Select>
-                <Input label="Founded Year (optional)" value={profile.foundedYear} onChange={e => set("foundedYear", e.target.value)} placeholder="e.g. 2015" />
+                <div {...(fieldErrors.companyType ? { "data-field-error": true } : {})}>
+                  <Select label="Company Type" required={true} value={profile.companyType} onChange={e => set("companyType", e.target.value)} fieldError={fieldErrors.companyType}>
+                    <option value="">Select type</option>
+                    {COMPANY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                  </Select>
+                </div>
+                <div {...(fieldErrors.industry ? { "data-field-error": true } : {})}>
+                  <Select label="Industry" required={true} value={profile.industry} onChange={e => set("industry", e.target.value)} fieldError={fieldErrors.industry}>
+                    <option value="">Select industry</option>
+                    {INDUSTRIES.map(i => <option key={i} value={i}>{i}</option>)}
+                  </Select>
+                </div>
+                <div {...(fieldErrors.companySize ? { "data-field-error": true } : {})}>
+                  <Select label="Company Size" required={true} value={profile.companySize} onChange={e => set("companySize", e.target.value)} fieldError={fieldErrors.companySize}>
+                    <option value="">Select size</option>
+                    {COMPANY_SIZES.map(s => <option key={s} value={s}>{s} employees</option>)}
+                  </Select>
+                </div>
+                <Input label="Founded Year" required={false} value={profile.foundedYear} onChange={e => set("foundedYear", e.target.value)} placeholder="e.g. 2015" />
               </>
             )}
 
             {copy.showInstituteFields && (
               <>
-                <Select label="Institute Type" value={profile.instituteType} onChange={e => set("instituteType", e.target.value)}>
-                  <option value="">Select type</option>
-                  {INSTITUTE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                </Select>
-                <Input label="Founded Year (optional)" value={profile.foundedYear} onChange={e => set("foundedYear", e.target.value)} placeholder="e.g. 1998" />
+                <div {...(fieldErrors.instituteType ? { "data-field-error": true } : {})}>
+                  <Select label="Institute Type" required={true} value={profile.instituteType} onChange={e => set("instituteType", e.target.value)} fieldError={fieldErrors.instituteType}>
+                    <option value="">Select type</option>
+                    {INSTITUTE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                  </Select>
+                </div>
+                <Input label="Founded Year" required={false} value={profile.foundedYear} onChange={e => set("foundedYear", e.target.value)} placeholder="e.g. 1998" />
               </>
             )}
 
             {profile.profileType === "ngo_government" && (
-              <Input label="Founded Year (optional)" value={profile.foundedYear} onChange={e => set("foundedYear", e.target.value)} placeholder="e.g. 2005" />
+              <Input label="Founded Year" required={false} value={profile.foundedYear} onChange={e => set("foundedYear", e.target.value)} placeholder="e.g. 2005" />
             )}
 
             {copy.showNiche && (
-              <Input label={copy.nicheLabel} value={profile.niche} onChange={e => set("niche", e.target.value)} placeholder={copy.nichePlaceholder} />
+              <div {...(fieldErrors.niche ? { "data-field-error": true } : {})}>
+                <Input
+                  label={copy.nicheLabel}
+                  required={true}
+                  value={profile.niche}
+                  onChange={e => set("niche", e.target.value)}
+                  placeholder={copy.nichePlaceholder}
+                  fieldError={fieldErrors.niche}
+                />
+              </div>
             )}
 
             {copy.showRegistration && (
-              <Input label="Registration Number (optional)" value={profile.registrationNumber} onChange={e => set("registrationNumber", e.target.value)} placeholder="e.g. 12A / FCRA / registration ID" />
+              <Input label="Registration Number" required={false} value={profile.registrationNumber} onChange={e => set("registrationNumber", e.target.value)} placeholder="e.g. 12A / FCRA / registration ID" />
             )}
 
-            <Input label="Location" value={profile.location} onChange={e => set("location", e.target.value)} placeholder="e.g. Bengaluru, Karnataka" />
-            <Input label="Website (optional)" value={profile.website} onChange={e => set("website", e.target.value)} placeholder="https://yourwebsite.com" />
+            <div {...(fieldErrors.location ? { "data-field-error": true } : {})}>
+              <Input
+                label="Location"
+                required={true}
+                value={profile.location}
+                onChange={e => set("location", e.target.value)}
+                placeholder="e.g. Bengaluru, Karnataka"
+                fieldError={fieldErrors.location}
+              />
+            </div>
+
+            <Input label="Website" required={false} value={profile.website} onChange={e => set("website", e.target.value)} placeholder="https://yourwebsite.com" />
           </div>
 
           {copy.showInstituteFields && (
-            <div className="mt-4">
-              <Textarea label="Courses Offered (optional)" value={profile.coursesOffered} onChange={e => set("coursesOffered", e.target.value)} placeholder="e.g. B.Tech, MBA, NEET/JEE coaching…" rows={2} />
-              <div className="mt-4">
-                <Input label="Affiliation / Accreditation Number (optional)" value={profile.affiliationNumber} onChange={e => set("affiliationNumber", e.target.value)} placeholder="e.g. UDISE / AICTE / UGC code" />
-              </div>
+            <div className="mt-4 grid gap-4">
+              <Textarea label="Courses Offered" required={false} value={profile.coursesOffered} onChange={e => set("coursesOffered", e.target.value)} placeholder="e.g. B.Tech, MBA, NEET/JEE coaching…" rows={2} />
+              <Input label="Affiliation / Accreditation Number" required={false} value={profile.affiliationNumber} onChange={e => set("affiliationNumber", e.target.value)} placeholder="e.g. UDISE / AICTE / UGC code" />
             </div>
           )}
         </div>
 
+        {/* ── About / Description ── */}
         <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm space-y-4">
           <h2 className="text-sm font-bold text-slate-900 pb-3 border-b border-slate-100">{copy.aboutLabel}</h2>
-          <Textarea label={copy.aboutLabel} value={profile.description} onChange={e => set("description", e.target.value)} placeholder={copy.aboutPlaceholder} rows={4} />
+          <div {...(fieldErrors.description ? { "data-field-error": true } : {})}>
+            <Textarea
+              label={copy.aboutLabel}
+              required={true}
+              value={profile.description}
+              onChange={e => set("description", e.target.value)}
+              placeholder={copy.aboutPlaceholder}
+              rows={4}
+              fieldError={fieldErrors.description}
+            />
+          </div>
           {copy.showOrgFields && (
             <>
-              <Textarea label="Mission & Values (optional)" value={profile.mission} onChange={e => set("mission", e.target.value)} placeholder="What is your company's mission? What values do you stand for?" rows={3} />
-              <Textarea label="Benefits & Perks (optional)" value={profile.benefits} onChange={e => set("benefits", e.target.value)} placeholder="e.g. Health insurance, flexible hours, remote work, learning budget, equity…" rows={3} />
+              <Textarea label="Mission & Values" required={false} value={profile.mission} onChange={e => set("mission", e.target.value)} placeholder="What is your company's mission? What values do you stand for?" rows={3} />
+              <Textarea label="Benefits & Perks" required={false} value={profile.benefits} onChange={e => set("benefits", e.target.value)} placeholder="e.g. Health insurance, flexible hours, remote work, learning budget, equity…" rows={3} />
             </>
           )}
         </div>
 
+        {/* ── Logo & Links (org types) ── */}
         {copy.showLogo && (
           <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm space-y-4">
             <h2 className="text-sm font-bold text-slate-900 pb-3 border-b border-slate-100">{copy.logoSectionTitle}</h2>
@@ -437,7 +626,10 @@ function RecruiterProfileContent() {
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-slate-900">{copy.logoLabel}</p>
+                <div className="flex items-center gap-2 mb-0.5">
+                  <p className="text-sm font-semibold text-slate-900">{copy.logoLabel}</p>
+                  <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-400 border border-slate-200 leading-none">Optional</span>
+                </div>
                 <p className="text-xs text-slate-500 mt-0.5 mb-3">Upload an image or paste a URL. Square logos work best.</p>
                 <div className="flex flex-wrap gap-2 mb-3">
                   <button type="button" onClick={() => logoInputRef.current?.click()} disabled={uploadingLogo}
@@ -462,16 +654,18 @@ function RecruiterProfileContent() {
                 onChange={e => { const f = e.target.files?.[0]; if (f) handleLogoUpload(f); e.target.value = ""; }} />
             </div>
 
-            <Input label="LinkedIn Page URL (optional)" value={profile.linkedinUrl} onChange={e => set("linkedinUrl", e.target.value)} placeholder="https://linkedin.com/company/…" />
+            <Input label="LinkedIn Page URL" required={false} value={profile.linkedinUrl} onChange={e => set("linkedinUrl", e.target.value)} placeholder="https://linkedin.com/company/…" />
           </div>
         )}
 
+        {/* ── About You (recruiter personal section) ── */}
         <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm space-y-4">
           <div className="pb-3 border-b border-slate-100">
             <h2 className="text-sm font-bold text-slate-900">About You (Recruiter / Hiring Manager)</h2>
             <p className="text-xs text-slate-500 mt-0.5">Tell job seekers about yourself — who you are, your background, and what you look for in candidates.</p>
           </div>
 
+          {/* Profile photo */}
           <div className="flex items-start gap-5 p-4 rounded-2xl bg-slate-50 border border-slate-100">
             <div className="relative shrink-0">
               {profile.photoUrl ? (
@@ -491,7 +685,10 @@ function RecruiterProfileContent() {
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-slate-900">Your Profile Photo</p>
+              <div className="flex items-center gap-2 mb-0.5">
+                <p className="text-sm font-semibold text-slate-900">Your Profile Photo</p>
+                <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-400 border border-slate-200 leading-none">Optional</span>
+              </div>
               <p className="text-xs text-slate-500 mt-0.5 mb-3">Your personal photo shown to job seekers who view your recruiter profile.</p>
               <div className="flex flex-wrap gap-2">
                 <button type="button" onClick={() => photoInputRef.current?.click()} disabled={uploadingPhoto}
@@ -511,44 +708,85 @@ function RecruiterProfileContent() {
               onChange={e => { const f = e.target.files?.[0]; if (f) handlePhotoUpload(f); e.target.value = ""; }} />
           </div>
 
-          <Textarea label="Bio / About you (optional)" value={profile.bio} onChange={e => set("bio", e.target.value)}
-            placeholder="Hi, I'm [Name] — I look for candidates who are passionate, curious, and collaborative…" rows={4} />
+          <Textarea
+            label="Bio / About you"
+            required={false}
+            value={profile.bio}
+            onChange={e => set("bio", e.target.value)}
+            placeholder="Hi, I'm [Name] — I look for candidates who are passionate, curious, and collaborative…"
+            rows={4}
+          />
 
+          {/* Social links */}
           <div>
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Your Social & Portfolio Links (optional)</p>
+            <div className="flex items-center gap-1.5 mb-3">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Your Social & Portfolio Links</p>
+              <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-400 border border-slate-200 leading-none">Optional</span>
+            </div>
             <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label className="mb-1.5 block text-[10px] font-semibold text-slate-400 uppercase tracking-wide">LinkedIn</label>
-                <div className="flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2.5 focus-within:border-[#0a66c2] focus-within:ring-2 focus-within:ring-[#0a66c2]/10 transition">
-                  <svg width="13" height="13" fill="currentColor" className="text-[#0a66c2] shrink-0" viewBox="0 0 24 24"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6zM2 9h4v12H2z"/><circle cx="4" cy="4" r="2"/></svg>
-                  <input value={profile.personalLinkedinUrl} onChange={e => set("personalLinkedinUrl", e.target.value)} placeholder="linkedin.com/in/yourname" className="flex-1 text-sm outline-none bg-transparent" />
+              {([
+                {
+                  key: "personalLinkedinUrl" as const,
+                  label: "LinkedIn",
+                  placeholder: "linkedin.com/in/yourname",
+                  icon: <svg width="13" height="13" fill="currentColor" className="text-[#0a66c2] shrink-0" viewBox="0 0 24 24"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6zM2 9h4v12H2z"/><circle cx="4" cy="4" r="2"/></svg>,
+                  value: profile.personalLinkedinUrl,
+                  onChange: (v: string) => set("personalLinkedinUrl", v),
+                  col: "",
+                },
+                {
+                  key: "instagram" as const,
+                  label: "Instagram",
+                  placeholder: "instagram.com/yourhandle",
+                  icon: <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" className="text-pink-500 shrink-0" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>,
+                  value: profile.socialLinks.instagram,
+                  onChange: (v: string) => set("socialLinks", { ...profile.socialLinks, instagram: v }),
+                  col: "",
+                },
+                {
+                  key: "github" as const,
+                  label: "GitHub",
+                  placeholder: "github.com/yourusername",
+                  icon: <svg width="13" height="13" fill="currentColor" className="text-slate-700 shrink-0" viewBox="0 0 24 24"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>,
+                  value: profile.socialLinks.github,
+                  onChange: (v: string) => set("socialLinks", { ...profile.socialLinks, github: v }),
+                  col: "",
+                },
+                {
+                  key: "twitter" as const,
+                  label: "X / Twitter",
+                  placeholder: "x.com/yourhandle",
+                  icon: <svg width="13" height="13" fill="currentColor" className="text-slate-700 shrink-0" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>,
+                  value: profile.socialLinks.twitter,
+                  onChange: (v: string) => set("socialLinks", { ...profile.socialLinks, twitter: v }),
+                  col: "",
+                },
+                {
+                  key: "portfolio" as const,
+                  label: "Portfolio / Website",
+                  placeholder: "yourwebsite.com",
+                  icon: <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" className="text-emerald-500 shrink-0" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>,
+                  value: profile.socialLinks.portfolio,
+                  onChange: (v: string) => set("socialLinks", { ...profile.socialLinks, portfolio: v }),
+                  col: "sm:col-span-2",
+                },
+              ] as const).map(field => (
+                <div key={field.key} className={field.col}>
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">{field.label}</label>
+                    <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-400 border border-slate-200 leading-none">Optional</span>
+                  </div>
+                  <div className="flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2.5 focus-within:border-[#0a66c2] focus-within:ring-2 focus-within:ring-[#0a66c2]/10 transition">
+                    {field.icon}
+                    <input value={field.value} onChange={e => field.onChange(e.target.value)} placeholder={field.placeholder} className="flex-1 text-sm outline-none bg-transparent" />
+                  </div>
                 </div>
-              </div>
-              <div>
-                <label className="mb-1.5 block text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Instagram</label>
-                <div className="flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2.5 focus-within:border-[#0a66c2] focus-within:ring-2 focus-within:ring-[#0a66c2]/10 transition">
-                  <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" className="text-pink-500 shrink-0" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
-                  <input value={profile.socialLinks.instagram} onChange={e => set("socialLinks", { ...profile.socialLinks, instagram: e.target.value })} placeholder="instagram.com/yourhandle" className="flex-1 text-sm outline-none bg-transparent" />
-                </div>
-              </div>
-              <div>
-                <label className="mb-1.5 block text-[10px] font-semibold text-slate-400 uppercase tracking-wide">X / Twitter</label>
-                <div className="flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2.5 focus-within:border-[#0a66c2] focus-within:ring-2 focus-within:ring-[#0a66c2]/10 transition">
-                  <svg width="13" height="13" fill="currentColor" className="text-slate-700 shrink-0" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-                  <input value={profile.socialLinks.twitter} onChange={e => set("socialLinks", { ...profile.socialLinks, twitter: e.target.value })} placeholder="x.com/yourhandle" className="flex-1 text-sm outline-none bg-transparent" />
-                </div>
-              </div>
-              <div>
-                <label className="mb-1.5 block text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Portfolio / Website</label>
-                <div className="flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2.5 focus-within:border-[#0a66c2] focus-within:ring-2 focus-within:ring-[#0a66c2]/10 transition">
-                  <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" className="text-emerald-500 shrink-0" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-                  <input value={profile.socialLinks.portfolio} onChange={e => set("socialLinks", { ...profile.socialLinks, portfolio: e.target.value })} placeholder="yourwebsite.com" className="flex-1 text-sm outline-none bg-transparent" />
-                </div>
-              </div>
+              ))}
             </div>
           </div>
         </div>
 
+        {/* ── Verification card ── */}
         <div className={`rounded-2xl border shadow-sm overflow-hidden ${verificationStatus === "verified" ? "border-green-200 bg-green-50" : verificationStatus === "requested" ? "border-amber-200 bg-amber-50" : "border-slate-200 bg-white"}`}>
           {verificationStatus === "verified" ? (
             <div className="p-5 flex items-center gap-4">
@@ -597,11 +835,18 @@ function RecruiterProfileContent() {
           )}
         </div>
 
-        <div className="flex justify-end pt-2 pb-6">
+        {/* Bottom save button */}
+        <div className="flex flex-col items-end gap-2 pt-2 pb-6">
+          {hasErrors && (
+            <p className="text-xs text-red-600 font-semibold">
+              {requiredCount} required field{requiredCount > 1 ? "s are" : " is"} still empty — please fill them in above.
+            </p>
+          )}
           <button onClick={save} disabled={saving} className="w-full sm:w-auto rounded-full bg-[#0a66c2] px-8 py-2.5 text-sm font-bold text-white hover:bg-[#004182] disabled:opacity-60 transition active:scale-95">
             {saving ? "Saving…" : saved ? "✓ Saved!" : "Save profile"}
           </button>
         </div>
+
       </main>
     </div>
   );
