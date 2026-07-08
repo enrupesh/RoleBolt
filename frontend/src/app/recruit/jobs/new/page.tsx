@@ -175,6 +175,45 @@ function isMeaningfulText(text: string, minWords = 1, minLength = 3): boolean {
   return words.length >= minWords;
 }
 
+// Returns a human-readable reason why a text value looks like spam/junk.
+// Returns null if the text is fine or empty (empty is handled separately by canProceed).
+function getTextQualityError(text: string, fieldLabel: string, minWords = 1, minLength = 3): string | null {
+  const trimmed = text.trim();
+  if (trimmed.length === 0) return null; // empty — different error
+  if (trimmed.length < minLength) return null; // too short — let canProceed handle it silently
+  const letters = trimmed.toLowerCase().replace(/[^a-z]/g, "");
+  if (letters.length >= 4) {
+    const uniqueChars = new Set(letters).size;
+    if (uniqueChars < 3) {
+      return `"${trimmed}" doesn't look like a real ${fieldLabel}. Please use actual words.`;
+    }
+    const counts: Record<string, number> = {};
+    for (const c of letters) counts[c] = (counts[c] || 0) + 1;
+    const maxCount = Math.max(...Object.values(counts));
+    if (maxCount / letters.length > 0.5) {
+      return `Looks like a repeated character. Please enter a real ${fieldLabel}.`;
+    }
+  }
+  if (letters.length >= 6 && hasRepeatingPattern(letters)) {
+    return `"${trimmed.slice(0, 20)}${trimmed.length > 20 ? "…" : ""}" looks like random text. Please enter a real ${fieldLabel}.`;
+  }
+  const words = trimmed.split(/\s+/).filter(w => /[a-zA-Z]/.test(w));
+  if (words.length < minWords) return null; // word count — handled by canProceed
+  return null;
+}
+
+function FieldError({ message }: { message: string | null }) {
+  if (!message) return null;
+  return (
+    <div className="mt-1.5 flex items-start gap-1.5 rounded-xl border border-rose-500/25 bg-rose-500/10 px-3 py-2">
+      <svg className="mt-0.5 shrink-0" width="12" height="12" fill="none" stroke="#f87171" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="10" /><path d="M12 8v4m0 4h.01" />
+      </svg>
+      <span className="text-xs text-rose-300 leading-snug">{message}</span>
+    </div>
+  );
+}
+
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return <span className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.15em] text-gray-400">{children}</span>;
 }
@@ -306,6 +345,26 @@ function NewJobContent() {
 
   const activeNicheOption = getNicheOption(form.niche);
   const locationRequired = form.workMode !== "remote" && !activeNicheOption?.locationOptional;
+
+  // Returns a human-readable reason blocking the current step, or null if all good.
+  function getBlockReason(): string | null {
+    if (step === 0) {
+      if (!form.title.trim()) return "Job Title is required.";
+      if (!isMeaningfulText(form.title, 1, 3)) return "Job Title looks like random text — please enter a real title (e.g. \"Senior Frontend Engineer\").";
+      if (form.niche === OTHER_NICHE_VALUE || !isMeaningfulText(form.niche, 1, 2)) return "Please select or enter a valid niche for this role.";
+      if (form.companyType === "Other" && !isMeaningfulText(form.companyTypeOther, 1, 2)) return "Please enter a valid company type.";
+      if (locationRequired && !isMeaningfulText(form.location, 1, 2)) return "Location is required for this work mode — please enter a real city or region.";
+      return null;
+    }
+    if (step === 1) {
+      if (!form.responsibilities.trim()) return "Key Responsibilities is required.";
+      if (!isMeaningfulText(form.responsibilities, 4, 15)) return "Key Responsibilities looks like random text. Please describe what the candidate will actually do (at least a few words).";
+      if (!form.mustHaveSkills.trim()) return "Must-Have Skills is required.";
+      if (!isMeaningfulText(form.mustHaveSkills, 2, 6)) return "Must-Have Skills looks like random text. Please list real skills (e.g. \"React, TypeScript, 3+ years experience\").";
+      return null;
+    }
+    return null;
+  }
 
   function canProceed() {
     if (step === 0) {
@@ -472,6 +531,7 @@ function NewJobContent() {
               <div>
                 <FieldLabel>Job Title *</FieldLabel>
                 <Input value={form.title} onChange={update("title")} placeholder="e.g. Senior Frontend Engineer" />
+                <FieldError message={getTextQualityError(form.title, "job title", 1, 3)} />
               </div>
               <div>
                 <FieldLabel>Niche *</FieldLabel>
@@ -509,6 +569,7 @@ function NewJobContent() {
                   {form.companyType === "Other" && (
                     <div className="mt-2">
                       <Input value={form.companyTypeOther} onChange={update("companyTypeOther")} placeholder="e.g. Non-profit, Cooperative" />
+                      <FieldError message={getTextQualityError(form.companyTypeOther, "company type", 1, 2)} />
                     </div>
                   )}
                 </div>
@@ -566,6 +627,7 @@ function NewJobContent() {
                   )}
                 </FieldLabel>
                 <Input value={form.location} onChange={update("location")} placeholder={locationRequired ? "e.g. Bangalore, India" : "e.g. Anywhere / Remote-friendly (optional)"} />
+                <FieldError message={locationRequired ? getTextQualityError(form.location, "location", 1, 2) : null} />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -601,6 +663,7 @@ function NewJobContent() {
                   onChange={update("responsibilities")}
                   placeholder="e.g. Lead architecture decisions for our React frontend, mentor junior developers, collaborate with design and product to ship new features bi-weekly..."
                 />
+                <FieldError message={getTextQualityError(form.responsibilities, "job responsibilities", 4, 15)} />
               </div>
               <div>
                 <FieldLabel>Must-Have Skills * <span className="text-gray-400 normal-case font-normal">(non-negotiable)</span></FieldLabel>
@@ -610,6 +673,7 @@ function NewJobContent() {
                   onChange={update("mustHaveSkills")}
                   placeholder="e.g. 4+ years React, TypeScript, REST API experience, strong communication skills..."
                 />
+                <FieldError message={getTextQualityError(form.mustHaveSkills, "must-have skills", 2, 6)} />
               </div>
               <div>
                 <FieldLabel>Nice-to-Have Skills <span className="text-gray-400 normal-case font-normal">(preferred but not required)</span></FieldLabel>
@@ -817,7 +881,17 @@ function NewJobContent() {
           )}
         </div>
 
-        <div className="mt-6 flex items-center justify-between">
+        {/* Block reason hint — shown only on steps with validation, when Continue would be disabled */}
+        {step < STEPS.length - 1 && !canProceed() && getBlockReason() && (
+          <div className="mt-5 flex items-start gap-2 rounded-2xl border border-amber-500/25 bg-amber-500/10 px-4 py-3">
+            <svg className="mt-0.5 shrink-0" width="13" height="13" fill="none" stroke="#fbbf24" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            <p className="text-xs text-amber-300 leading-snug">{getBlockReason()}</p>
+          </div>
+        )}
+
+        <div className="mt-4 flex items-center justify-between">
           <button
             onClick={() => step > 0 ? setStep(s => s - 1) : router.push("/recruit/dashboard")}
             className="rounded-2xl border border-white/[0.08] bg-white/[0.03] px-5 py-2.5 text-sm text-gray-500 transition hover:text-white"
