@@ -338,20 +338,17 @@ function RecruiterProfileContent() {
 
         <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm">
           <h2 className="text-sm font-bold text-slate-900 mb-1">Who's hiring?</h2>
-          <p className="text-xs text-slate-500 mb-4">Pick the option that best describes you. This changes which fields show up below, so your profile only asks what's relevant.</p>
-          <div className="grid gap-2 sm:grid-cols-2">
+          <p className="text-xs text-slate-500 mb-3">Pick the option that best describes you. This changes which fields show up below, so your profile only asks what's relevant.</p>
+          <select
+            value={profile.profileType}
+            onChange={e => set("profileType", e.target.value as ProfileType)}
+            className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-semibold text-slate-900 outline-none focus:border-[#0a66c2] focus:ring-2 focus:ring-[#0a66c2]/10 transition bg-white"
+          >
             {PROFILE_TYPES.map(pt => (
-              <button
-                key={pt.value}
-                type="button"
-                onClick={() => set("profileType", pt.value)}
-                className={`text-left rounded-xl border px-4 py-3 transition ${profile.profileType === pt.value ? "border-[#0a66c2] bg-blue-50 ring-2 ring-[#0a66c2]/20" : "border-slate-200 hover:border-slate-300"}`}
-              >
-                <p className={`text-sm font-semibold ${profile.profileType === pt.value ? "text-[#0a66c2]" : "text-slate-900"}`}>{pt.label}</p>
-                <p className="text-xs text-slate-500 mt-0.5">{pt.blurb}</p>
-              </button>
+              <option key={pt.value} value={pt.value}>{pt.label}</option>
             ))}
-          </div>
+          </select>
+          <p className="text-xs text-slate-500 mt-2">{PROFILE_TYPES.find(pt => pt.value === profile.profileType)?.blurb}</p>
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm">
