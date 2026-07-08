@@ -328,27 +328,38 @@ Rules for the rubric:
 - Include: core skills, experience depth, communication/culture fit, role-specific competency
 - Descriptions should guide a non-expert reviewer`;
 
-  const raw = await callNvidiaChatCompletions({
-    apiKey: MESHAPI_API_KEY,
-    retries: 2,
-    fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
-    messages: [{ role: "user", content: prompt }],
-    temperature: 0.6,
-    max_tokens: 2000,
-  });
+  const fallbackJd = buildFallbackJobDescription({ ...args, salary });
+  const fallbackRubric = [
+    { name: "Core Skills", weight: 40, description: "Proficiency in the must-have technical skills listed for this role." },
+    { name: "Relevant Experience", weight: 30, description: "Years and quality of experience directly relevant to this role." },
+    { name: "Communication & Culture Fit", weight: 20, description: "Clarity of expression, professionalism, and alignment with team values." },
+    { name: "Growth & Initiative", weight: 10, description: "Evidence of self-driven learning, side projects, or career progression." },
+  ];
+
+  // A transport-level failure (auth, timeout, rate limit, all fallback
+  // models exhausted) must not hard-fail job creation — degrade to the
+  // template JD/rubric instead, same as an unparseable AI response.
+  let raw: string;
+  try {
+    raw = await callNvidiaChatCompletions({
+      apiKey: MESHAPI_API_KEY,
+      retries: 2,
+      fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.6,
+      max_tokens: 2000,
+    });
+  } catch (err) {
+    console.error("[recruit] generateJobDescription: AI call failed, using fallback template:", err);
+    return { jd: fallbackJd, rubric: fallbackRubric };
+  }
 
   const parsed = safeJson(raw);
-  const fallbackJd = buildFallbackJobDescription({ ...args, salary });
   if (!parsed || !parsed.jd || !Array.isArray(parsed.rubric)) {
     const cleanedRaw = cleanGeneratedJobDescription(raw);
     return {
       jd: cleanedRaw && !cleanedRaw.includes('"rubric"') ? cleanedRaw : fallbackJd,
-      rubric: [
-        { name: "Core Skills", weight: 40, description: "Proficiency in the must-have technical skills listed for this role." },
-        { name: "Relevant Experience", weight: 30, description: "Years and quality of experience directly relevant to this role." },
-        { name: "Communication & Culture Fit", weight: 20, description: "Clarity of expression, professionalism, and alignment with team values." },
-        { name: "Growth & Initiative", weight: 10, description: "Evidence of self-driven learning, side projects, or career progression." },
-      ],
+      rubric: fallbackRubric,
     };
   }
   const cleanedJd = cleanGeneratedJobDescription(parsed.jd) || fallbackJd;
@@ -359,12 +370,7 @@ Rules for the rubric:
       description: String(item?.description || "Relevant evidence for this hiring criterion.").slice(0, 300),
     }))
     .filter((item: any) => item.name && item.weight > 0);
-  return { jd: cleanedJd, rubric: rubric.length ? rubric : [
-    { name: "Core Skills", weight: 40, description: "Proficiency in the must-have technical skills listed for this role." },
-    { name: "Relevant Experience", weight: 30, description: "Years and quality of experience directly relevant to this role." },
-    { name: "Communication & Culture Fit", weight: 20, description: "Clarity of expression, professionalism, and alignment with team values." },
-    { name: "Growth & Initiative", weight: 10, description: "Evidence of self-driven learning, side projects, or career progression." },
-  ] };
+  return { jd: cleanedJd, rubric: rubric.length ? rubric : fallbackRubric };
 }
 
 function extractNameFromResume(text: string): string {
@@ -469,14 +475,37 @@ Respond with ONLY this JSON (no markdown, no extra text):
 
 For "tier": classify each criterion as 1 (must-have skill), 2 (experience depth), or 3 (nice-to-have), matching the THREE-TIER SCORING WEIGHTS defined above.`;
 
-  const raw = await callNvidiaChatCompletions({
-    apiKey: MESHAPI_API_KEY,
-    retries: 2,
-    fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
-    messages: [{ role: "user", content: prompt }],
-    temperature: 0.4,
-    max_tokens: 2000,
-  });
+  // Any transport-level failure (auth, timeout, rate limit, all fallback
+  // models exhausted) must NOT bubble up and hard-fail the apply/retry-score
+  // request — it should degrade to the same "scoringFailed" state as an
+  // unparseable AI response, so candidates are still saved and the user sees
+  // a retryable "Scoring Unavailable" state instead of a generic 500.
+  let raw: string;
+  try {
+    raw = await callNvidiaChatCompletions({
+      apiKey: MESHAPI_API_KEY,
+      retries: 2,
+      fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.4,
+      max_tokens: 2000,
+    });
+  } catch (err) {
+    const rubricMaxScore = args.rubric.reduce((sum, r) => sum + r.weight, 0) || 100;
+    const extractedName = extractNameFromResume(args.resumeText);
+    console.error("[recruit] scoreCandidate: AI call failed:", err);
+    return {
+      name: extractedName,
+      email: "",
+      totalScore: 0,
+      maxScore: rubricMaxScore,
+      scoreBreakdown: [],
+      aiSummary: "",
+      redFlags: [],
+      strengths: [],
+      scoringFailed: true,
+    };
+  }
 
   const parsed = safeJson(raw);
   if (!parsed) {
