@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useState } from "react";
+
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -13,12 +14,12 @@ import { getFirebaseAuth } from "@/lib/firebaseClient";
 import { apiUrl } from "@/lib/api";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 
-type Role = "seeker" | "creator";
+type Role = "creator";
 
 function RecruitSignupForm() {
   const router = useRouter();
   const { refreshProfile } = useRecruitAuth();
-  const [role, setRole] = useState<Role>("seeker");
+  const role: Role = "creator";
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -52,12 +53,8 @@ function RecruitSignupForm() {
     return profile.role as Role;
   }
 
-  function redirectByRole(r: Role) {
-    if (r === "creator") {
-      router.replace("/recruit/dashboard");
-    } else {
-      router.replace("/recruit/opportunities");
-    }
+  function redirectByRole(_r: Role) {
+    router.replace("/recruit/dashboard");
   }
 
   async function handleEmailSignup(e: React.FormEvent) {
@@ -109,36 +106,8 @@ function RecruitSignupForm() {
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="mb-4 text-center text-xs font-bold uppercase tracking-widest text-slate-500">I am a</p>
-          <div className="mb-6 grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1">
-            <button
-              type="button"
-              onClick={() => setRole("seeker")}
-              className={`rounded-lg py-2.5 text-sm font-bold transition ${
-                role === "seeker"
-                  ? "bg-[#0a66c2] text-white shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              Job Seeker
-            </button>
-            <button
-              type="button"
-              onClick={() => setRole("creator")}
-              className={`rounded-lg py-2.5 text-sm font-bold transition ${
-                role === "creator"
-                  ? "bg-[#0a66c2] text-white shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              Job Creator
-            </button>
-          </div>
-
           <p className="mb-4 text-center text-[11px] text-slate-400">
-            {role === "seeker"
-              ? "Find jobs, apply, and track your applications"
-              : "Post jobs, evaluate candidates, and manage hiring"}
+            Post jobs, evaluate candidates, and manage hiring
           </p>
 
           {error && (

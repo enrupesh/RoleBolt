@@ -1,13 +1,7 @@
 import Link from "next/link";
-import { Suspense } from "react";
 import RecruitHeader from "@/components/RecruitHeader";
-import ClientSaveButton from "./SaveButton";
 import FilterToggle from "./FilterToggle";
-import RecentlyViewedJobs from "./RecentlyViewedJobs";
-import ProfileNudge from "./ProfileNudge";
 import { computeJobQuality } from "@/lib/jobQuality";
-import RecommendedJobs from "./RecommendedJobs";
-import SavedSearches from "./SavedSearches";
 import PageTracker from "@/components/PageTracker";
 import { apiUrl, readApiJson } from "@/lib/api";
 
@@ -289,9 +283,6 @@ export default async function RecruitOpportunitiesPage({ searchParams }: { searc
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Link href="/recruit/profile" className="hidden rounded-full border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50 sm:inline-flex">
-                Complete profile
-              </Link>
               <FilterToggle hasFilters={!!hasFilters} />
             </div>
           </div>
@@ -350,12 +341,6 @@ export default async function RecruitOpportunitiesPage({ searchParams }: { searc
           </div>
 
           <section className="space-y-3">
-            <ProfileNudge />
-            <Suspense fallback={null}>
-              <SavedSearches />
-            </Suspense>
-            <RecommendedJobs />
-            <RecentlyViewedJobs />
             {jobs.length === 0 ? (
               <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm sm:p-10">
                 <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-2xl">🔍</div>
@@ -366,9 +351,6 @@ export default async function RecruitOpportunitiesPage({ searchParams }: { searc
                 <div className="mt-5 flex flex-col justify-center gap-2 sm:flex-row">
                   <Link href="/recruit/opportunities" className="rounded-full bg-[#0a66c2] px-6 py-2.5 text-sm font-bold text-white transition hover:bg-[#004182]">
                     Clear all filters
-                  </Link>
-                  <Link href="/recruit/profile" className="rounded-full border border-slate-300 px-6 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50">
-                    Complete profile
                   </Link>
                 </div>
               </div>
@@ -429,20 +411,7 @@ export default async function RecruitOpportunitiesPage({ searchParams }: { searc
                         {formatDeadline(job.applicationDeadline) && (
                           <span className="rounded-full bg-rose-50 border border-rose-200 px-2.5 py-1 text-[11px] font-bold text-rose-700">Apply by {formatDeadline(job.applicationDeadline)}</span>
                         )}
-                        <span className="rounded-full bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600">Save for later</span>
-                        <span className="rounded-full bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600">Track after applying</span>
                       </div>
-                    </div>
-                    <div className="relative z-10 shrink-0 self-start pt-0.5">
-                      <ClientSaveButton
-                        jobId={job._id}
-                        title={job.title}
-                        companyName={job.companyName}
-                        location={job.location}
-                        workMode={job.workMode}
-                        jobType={job.jobType}
-                        niche={job.niche}
-                      />
                     </div>
                   </div>
                 </div>
