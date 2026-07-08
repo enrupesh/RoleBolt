@@ -10,17 +10,9 @@ import { useTheme } from "@/components/ThemeProvider";
 
 type NavLink = { href: string; label: string };
 
-const SEEKER_NAV: NavLink[] = [
-  { href: "/recruit/opportunities", label: "Find Jobs" },
-  { href: "/recruit/niches", label: "Niches" },
-  { href: "/recruit/saved-jobs", label: "Saved Jobs" },
-  { href: "/recruit/job-alerts", label: "Job Alerts" },
-  { href: "/recruit/my-applications", label: "My Applications" },
-  { href: "/recruit/profile", label: "My Profile" },
-];
-
 const CREATOR_NAV: NavLink[] = [
   { href: "/recruit/dashboard", label: "Dashboard" },
+  { href: "/recruit/opportunities", label: "Find Jobs" },
   { href: "/recruit/analytics", label: "Analytics" },
   { href: "/recruit/talent-pool", label: "Talent Pool" },
   { href: "/recruit/recruiter-profile", label: "Recruiter Profile" },
@@ -82,12 +74,9 @@ export default function RecruitHeader() {
 
   const role = recruitProfile?.role ?? null;
   const isLoggedIn = !!firebaseUser && !!recruitProfile;
-  const navLinks = role === "creator" ? CREATOR_NAV : role === "seeker" ? SEEKER_NAV : [];
+  const navLinks = role === "creator" ? CREATOR_NAV : [];
 
   function isActive(href: string) {
-    if (href === "/recruit/niches") {
-      return pathname === href || pathname.startsWith("/recruit/niche/");
-    }
     return pathname === href || (pathname.startsWith(href + "/") && href !== "/recruit");
   }
 
@@ -128,13 +117,6 @@ export default function RecruitHeader() {
           </nav>
         )}
 
-        {!isLoggedIn && (
-          <nav className="hidden md:flex items-center gap-0.5">
-            <Link href="/recruit/opportunities" className="rounded-full px-3.5 py-1.5 text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--surface-muted)] hover:text-[var(--foreground)] transition">
-              Find Jobs
-            </Link>
-          </nav>
-        )}
 
         <div className="flex items-center gap-2">
           <ThemeToggle />
@@ -148,12 +130,6 @@ export default function RecruitHeader() {
                 >
                   Post a job
                 </Link>
-              )}
-              {role === "seeker" && (
-                <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 px-3 py-1.5 text-[11px] font-semibold text-[#0a66c2]">
-                  <span className="h-1.5 w-1.5 rounded-full bg-[#0a66c2]" />
-                  Job Seeker
-                </span>
               )}
               <button
                 onClick={handleSignOut}
@@ -204,11 +180,6 @@ export default function RecruitHeader() {
                 {link.label}
               </Link>
             ))}
-            {!isLoggedIn && (
-              <Link href="/recruit/opportunities" onClick={() => setMobileOpen(false)} className="rounded-xl px-4 py-3 text-sm font-semibold text-[var(--text-secondary)] hover:bg-[var(--surface-muted)] transition">
-                Find Jobs
-              </Link>
-            )}
             <div className="mt-2 border-t border-[var(--border)] pt-2 flex flex-col gap-1">
               {isLoggedIn ? (
                 <>
