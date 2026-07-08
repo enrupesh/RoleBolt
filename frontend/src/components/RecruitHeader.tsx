@@ -102,7 +102,7 @@ export default function RecruitHeader() {
     <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--surface)]/95 backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
         <Link href="/recruit" className="flex items-center gap-2.5 shrink-0">
-          <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-[#0a66c2] text-sm font-black text-white">R</span>
+          <img src="/plyndrox-icon.png" alt="Plyndrox" className="h-7 w-7 rounded-lg object-cover shrink-0" />
           <span className="hidden sm:block">
             <span className="block text-sm font-bold leading-tight text-[var(--foreground)]">Plyndrox Recruit AI</span>
             <span className="block text-[11px] text-[var(--text-muted)] leading-tight">India Jobs Network</span>

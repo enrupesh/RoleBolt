@@ -38,6 +38,15 @@ export const metadata: Metadata = {
     template: "%s | Recruit",
   },
   description: "Post jobs, discover opportunities, and match candidates with AI-powered scoring.",
+  icons: {
+    icon: [
+      { url: "/plyndrox-icon.png", type: "image/png", sizes: "512x512" },
+    ],
+    apple: [
+      { url: "/plyndrox-icon.png", type: "image/png", sizes: "512x512" },
+    ],
+    shortcut: "/plyndrox-icon.png",
+  },
 };
 
 export const viewport: Viewport = {
