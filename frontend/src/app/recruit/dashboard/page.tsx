@@ -182,9 +182,7 @@ function RecruitDashboardContent() {
       <header className="sticky top-0 z-20 bg-white border-b border-slate-200 shadow-sm">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3.5 sm:px-6 lg:px-8">
           <Link href="/recruit" className="flex items-center gap-2.5">
-            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-700 shadow">
-              <img src="/plyndrox-logo.svg" alt="" className="h-10 w-10 object-contain plyndrox-logo-img" draggable={false} />
-            </span>
+            <img src="/plyndrox-icon.png" alt="Plyndrox" className="h-9 w-9 rounded-xl object-cover shrink-0 shadow-sm" />
             <span>
               <span className="block text-sm font-bold text-slate-900 leading-none">Plyndrox Recruit AI</span>
               <span className="block text-[10px] text-slate-400 mt-0.5">Dashboard</span>
