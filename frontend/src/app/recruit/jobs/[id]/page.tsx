@@ -1408,7 +1408,7 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
           <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => {
-                const url = `${FRONTEND_URL}/recruit/opportunities/${id}`;
+                const url = `${getFrontendUrl()}/recruit/opportunities/${id}`;
                 navigator.clipboard.writeText(url).then(() => {
                   setLinkCopied(true);
                   setTimeout(() => setLinkCopied(false), 2000);
