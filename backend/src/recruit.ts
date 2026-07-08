@@ -1,5 +1,6 @@
 import express from "express";
 import crypto from "crypto";
+import multer from "multer";
 import { connectMongo } from "./db";
 import { RecruitJob } from "./models/RecruitJob";
 import { RecruitCandidate } from "./models/RecruitCandidate";
@@ -10,6 +11,41 @@ import { RecruitJobAlert } from "./models/RecruitJobAlert";
 import { UsageEvent } from "./models/UsageEvent";
 import { RecruitProfile } from "./models/RecruitProfile";
 import { RecruitImage } from "./models/RecruitImage";
+
+// ─── Resume parser (in-memory only, no disk storage) ──────────────────────────
+const RESUME_ALLOWED_TYPES = [
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "text/plain",
+];
+
+const resumeUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+  fileFilter: (_req, file, cb) => {
+    if (RESUME_ALLOWED_TYPES.includes(file.mimetype)) cb(null, true);
+    else cb(new Error("Only PDF, DOCX, or TXT files are allowed."));
+  },
+});
+
+// Simple in-memory rate limiter for the expensive parse-resume route
+const parseResumeIpCounts = new Map<string, { count: number; resetAt: number }>();
+function resumeRateLimit(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
+  const now = Date.now();
+  const window = 60_000; // 1 minute
+  const limit = 10;
+  const entry = parseResumeIpCounts.get(ip);
+  if (!entry || now > entry.resetAt) {
+    parseResumeIpCounts.set(ip, { count: 1, resetAt: now + window });
+    return next();
+  }
+  if (entry.count >= limit) {
+    return res.status(429).json({ error: "Too many resume uploads. Please wait a minute and try again." });
+  }
+  entry.count++;
+  return next();
+}
 
 function trackEvent(event: string, uid?: string, data?: Record<string, unknown>) {
   UsageEvent.create({ event, uid, data: data ?? {} }).catch(() => {});
@@ -1144,6 +1180,56 @@ recruitPublicRouter.get("/jobs", async (req, res) => {
     return res.status(500).json({ error: err.message || "Failed to load jobs." });
   }
 });
+
+// ─── Parse resume file → extract text ────────────────────────────────────────
+recruitPublicRouter.post(
+  "/parse-resume",
+  resumeRateLimit,
+  (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    resumeUpload.single("resume")(req, res, (err) => {
+      if (err) {
+        // Normalise multer/file-filter errors into clean JSON
+        const status = err.code === "LIMIT_FILE_SIZE" ? 413 : 400;
+        return res.status(status).json({ error: err.message || "File upload error." });
+      }
+      next();
+    });
+  },
+  async (req: express.Request, res: express.Response) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: "No file uploaded." });
+
+      const { mimetype, buffer } = req.file;
+      let text = "";
+
+      if (mimetype === "application/pdf") {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const pdfParse = require("pdf-parse");
+        const data = await pdfParse(buffer);
+        text = data.text ?? "";
+      } else if (mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const mammoth = require("mammoth");
+        const result = await mammoth.extractRawText({ buffer });
+        text = result.value ?? "";
+      } else if (mimetype === "text/plain") {
+        text = buffer.toString("utf-8");
+      } else {
+        return res.status(400).json({ error: "Unsupported file type. Upload PDF, DOCX, or TXT." });
+      }
+
+      text = text.replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+      if (text.length < 40) {
+        return res.status(422).json({ error: "Could not extract enough text from this file. Try pasting your resume manually." });
+      }
+
+      return res.json({ ok: true, text });
+    } catch (err: any) {
+      console.error("[recruit-public] POST /parse-resume", err);
+      return res.status(500).json({ error: err.message || "Failed to parse resume." });
+    }
+  }
+);
 
 recruitPublicRouter.get("/jobs/:jobId", async (req, res) => {
   try {
