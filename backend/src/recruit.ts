@@ -9,6 +9,7 @@ import { callNvidiaChatCompletions } from "./ai/nvidiaClient";
 import { RecruitJobAlert } from "./models/RecruitJobAlert";
 import { UsageEvent } from "./models/UsageEvent";
 import { RecruitProfile } from "./models/RecruitProfile";
+import { RecruitImage } from "./models/RecruitImage";
 
 function trackEvent(event: string, uid?: string, data?: Record<string, unknown>) {
   UsageEvent.create({ event, uid, data: data ?? {} }).catch(() => {});
@@ -23,6 +24,39 @@ const FRONTEND_URL = process.env.FRONTEND_URL ?? "https://www.plyndrox.app";
 function getUid(req: express.Request): string {
   return (req as any).user?.uid ?? "";
 }
+
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024; // 4MB decoded
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+
+// ─── Image uploads (stored in MongoDB — no external storage bucket needed) ────
+
+recruitRouter.post("/uploads/image", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "Unauthorized" });
+
+    const { data, contentType } = req.body as { data?: string; contentType?: string };
+    if (!data || !contentType) {
+      return res.status(400).json({ error: "Missing data or contentType." });
+    }
+    if (!ALLOWED_IMAGE_TYPES.includes(contentType)) {
+      return res.status(400).json({ error: "Unsupported image type." });
+    }
+
+    const base64 = data.includes(",") ? data.split(",")[1] : data;
+    const buffer = Buffer.from(base64, "base64");
+    if (buffer.length > MAX_IMAGE_BYTES) {
+      return res.status(413).json({ error: "Image too large (max 4MB)." });
+    }
+
+    const image = await RecruitImage.create({ uid, contentType, data: buffer });
+    return res.json({ url: `/recruit-public/uploads/${image._id}` });
+  } catch (err: any) {
+    console.error("[recruit] POST /uploads/image", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
 
 recruitRouter.post("/auth/profile", async (req, res) => {
   try {
@@ -1887,6 +1921,20 @@ recruitRouter.get("/jobs/:jobId/candidates/:candidateId/seeker-profile", async (
     });
   } catch (err: any) {
     console.error("[recruit] GET /seeker-profile", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+recruitPublicRouter.get("/uploads/:id", async (req, res) => {
+  try {
+    await connectMongo();
+    const image = await RecruitImage.findById(req.params.id).lean();
+    if (!image) return res.status(404).json({ error: "Image not found." });
+    res.set("Content-Type", image.contentType);
+    res.set("Cache-Control", "public, max-age=31536000, immutable");
+    return res.send(image.data.buffer ? Buffer.from(image.data.buffer) : image.data);
+  } catch (err: any) {
+    console.error("[recruit-public] GET /uploads/:id", err);
     return res.status(500).json({ error: err.message });
   }
 });

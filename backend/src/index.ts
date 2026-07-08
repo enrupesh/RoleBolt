@@ -130,7 +130,7 @@ app.use(
   })
 );
 
-app.use(express.json({ limit: "2mb" }));
+app.use(express.json({ limit: "6mb" }));
 
 app.use("/recruit-public", recruitPublicRouter);
 app.use("/recruit", requireFirebaseAuth, recruitRouter);
