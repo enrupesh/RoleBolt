@@ -13,7 +13,7 @@ import { apiUrl, readApiJson } from "@/lib/api";
 type ProfileType = "company" | "educational_institute" | "individual" | "content_creator" | "ngo_government";
 
 const PROFILE_TYPES: { value: ProfileType; label: string; blurb: string }[] = [
-  { value: "company", label: "Company / Startup", blurb: "A registered company, startup, agency or consultancy" },
+  { value: "company", label: "Company / Organisation", blurb: "Any registered business — startup, MNC, agency, hospital, real estate, or other" },
   { value: "educational_institute", label: "Educational Institute", blurb: "School, college, university or coaching institute" },
   { value: "individual", label: "Individual / Freelance Recruiter", blurb: "Hiring on your own, not on behalf of a registered company" },
   { value: "content_creator", label: "Content Creator / Personal Brand", blurb: "Hiring editors, writers, VAs or team members for your brand" },
