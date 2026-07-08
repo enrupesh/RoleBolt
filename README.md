@@ -15,7 +15,7 @@ MongoDB and Firebase project, existing data and logins keep working.
 ```bash
 cd backend
 npm install
-cp .env.example .env   # fill in MONGODB_URI, FIREBASE_SERVICE_ACCOUNT_JSON, NVIDIA_API_KEY, CORS_ORIGIN
+cp .env.example .env   # fill in MONGODB_URI, FIREBASE_SERVICE_ACCOUNT_JSON, MESHAPI_API_KEY, CORS_ORIGIN
 npm run dev             # local dev on port 8080
 ```
 
