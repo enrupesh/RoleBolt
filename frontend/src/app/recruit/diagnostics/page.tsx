@@ -313,7 +313,7 @@ function RecruitDiagnosticsContent() {
           </div>
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Production Backend</p>
-            <p className="mt-2 break-all font-mono text-xs text-slate-700">https://raina-1.onrender.com</p>
+            <p className="mt-2 break-all font-mono text-xs text-slate-700">{API_BASE_URL}</p>
           </div>
         </div>
 
