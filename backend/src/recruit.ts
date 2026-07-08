@@ -219,12 +219,25 @@ function buildFallbackJobDescription(args: {
   mustHaveSkills: string;
   niceToHaveSkills: string;
   salary: string;
+  niche?: string;
+  openings?: number;
+  perks?: string;
+  languageRequirement?: string;
+  timezoneOverlap?: string;
+  applicationDeadline?: Date;
 }): string {
   const responsibilities = listFromText(args.responsibilities) || "own meaningful work, collaborate with the team, and deliver reliable outcomes";
   const mustHave = listFromText(args.mustHaveSkills) || "relevant experience, strong communication, ownership, and problem-solving";
   const niceToHave = listFromText(args.niceToHaveSkills) || "experience with similar tools, fast-moving teams, or customer-focused environments";
+  const extraBits = [
+    args.openings && args.openings > 1 ? `We are hiring for ${args.openings} openings for this role.` : "",
+    args.workMode === "remote" && args.timezoneOverlap?.trim() ? `Working hours: ${args.timezoneOverlap.trim()}.` : "",
+    args.languageRequirement?.trim() ? `Language requirement: ${args.languageRequirement.trim()}.` : "",
+    args.applicationDeadline ? `Applications close on ${args.applicationDeadline.toDateString()}.` : "",
+  ].filter(Boolean).join(" ");
+  const perksLine = args.perks?.trim() ? `\n- ${args.perks.trim()}` : "";
   return `About the role
-We are hiring a ${args.seniority || "motivated"} ${args.title} to join the ${args.department || "team"} and contribute to practical, high-impact work. This role is based in ${args.location || "India"} with a ${args.workMode || "flexible"} working model.
+We are hiring a ${args.seniority || "motivated"} ${args.title} to join the ${args.department || "team"} and contribute to practical, high-impact work in ${args.niche || "this field"}. This role is based in ${args.location || "India"} with a ${args.workMode || "flexible"} working model.${extraBits ? ` ${extraBits}` : ""}
 
 What you will do
 - ${responsibilities}
@@ -240,7 +253,7 @@ Good to have
 - ${niceToHave}.
 
 Compensation and benefits
-${args.salary}. The final offer will depend on skills, experience, and interview performance.`;
+${args.salary}. The final offer will depend on skills, experience, and interview performance.${perksLine}`;
 }
 
 function serializeRecruitJob(job: any) {
@@ -423,7 +436,7 @@ Rules for the rubric:
 - Include: core skills, experience depth, communication/culture fit, role-specific competency
 - Descriptions should guide a non-expert reviewer`;
 
-  const fallbackJd = buildFallbackJobDescription({ ...args, salary });
+  const fallbackJd = buildFallbackJobDescription({ ...args, salary, niche: args.niche });
   const fallbackRubric = [
     { name: "Core Skills", weight: 40, description: "Proficiency in the must-have technical skills listed for this role." },
     { name: "Relevant Experience", weight: 30, description: "Years and quality of experience directly relevant to this role." },
@@ -731,6 +744,7 @@ async function generateInterviewBrief(args: {
   scoreBreakdown: { criterion: string; score: number; maxScore: number; reasoning: string }[];
   niche?: string;
   nicheDetails?: Record<string, string>;
+  languageRequirement?: string;
 }): Promise<string> {
   const lowScores = args.scoreBreakdown
     .filter((b) => b.score / b.maxScore < 0.6)
@@ -738,11 +752,14 @@ async function generateInterviewBrief(args: {
     .join("; ");
 
   const nicheContext = formatNicheContext(args.niche, args.nicheDetails);
+  const languageLine = args.languageRequirement?.trim()
+    ? `\nLanguage Requirement for this role: ${args.languageRequirement.trim()} — include at least one probing point to verify the candidate's proficiency in this.`
+    : "";
 
   const prompt = `You are a senior talent acquisition specialist. Write a concise interview preparation brief for the interviewer.
 
 Candidate: ${args.candidateName}
-Role: ${args.jobTitle}${nicheContext}
+Role: ${args.jobTitle}${nicheContext}${languageLine}
 AI Summary: ${args.aiSummary}
 Red Flags: ${args.redFlags.join(", ") || "None identified"}
 Weak Areas: ${lowScores || "None"}
@@ -778,12 +795,16 @@ async function generateAssessmentQuestions(args: {
   jd: string;
   niche?: string;
   nicheDetails?: Record<string, string>;
+  languageRequirement?: string;
 }): Promise<{ id: string; text: string }[]> {
   const rubricText = args.rubric
     .map((r, i) => `${i + 1}. ${r.name} (${r.weight} pts): ${r.description}`)
     .join("\n");
 
   const nicheContext = formatNicheContext(args.niche, args.nicheDetails);
+  const languageRule = args.languageRequirement?.trim()
+    ? `\n- This role requires: ${args.languageRequirement.trim()}. At least one question should let the candidate demonstrate this in their written answer.`
+    : "";
 
   const prompt = `You are a senior hiring manager at a fast-growing company. Generate exactly 5 written assessment questions for a candidate applying to be a ${args.jobTitle}.
 ${nicheContext}
@@ -800,7 +821,7 @@ STRICT REQUIREMENTS:
 - Each question tests a DIFFERENT rubric criterion (match question 1 to criterion 1, etc.)
 - Questions should reveal: depth of expertise, problem-solving, communication quality, judgment
 - Do NOT ask trivial, yes/no, or easily-Googled questions
-- Start each question with "Tell us about a time...", "Describe how you...", "Walk us through...", or "How would you approach..."
+- Start each question with "Tell us about a time...", "Describe how you...", "Walk us through...", or "How would you approach..."${languageRule}
 
 Respond with ONLY this exact JSON structure, no markdown, no extra text:
 {"questions":[{"id":"q1","text":"..."},{"id":"q2","text":"..."},{"id":"q3","text":"..."},{"id":"q4","text":"..."},{"id":"q5","text":"..."}]}`;
@@ -1563,6 +1584,7 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/brief", async (req, res
       scoreBreakdown: candidate.scoreBreakdown,
       niche: job.niche,
       nicheDetails: job.nicheDetails,
+      languageRequirement: job.languageRequirement,
     });
 
     candidate.interviewBrief = brief;
@@ -1607,6 +1629,7 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/assessment/send", async
       jd: job.generatedJD,
       niche: job.niche,
       nicheDetails: job.nicheDetails,
+      languageRequirement: job.languageRequirement,
     });
 
     const token = generateToken();
