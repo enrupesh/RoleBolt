@@ -6,6 +6,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { getFirebaseAuth, isFirebaseAvailable } from "@/lib/firebaseClient";
 import { RecruitGuard } from "@/components/RecruitGuard";
 import Link from "next/link";
+import { RoleboltLogo } from "@/components/RoleboltLogo";
 
 function NewJobChoiceContent() {
   const router = useRouter();
@@ -77,7 +78,7 @@ function NewJobChoiceContent() {
       <header className="sticky top-0 z-20 bg-white border-b border-slate-200 shadow-sm">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3.5 sm:px-6">
           <Link href="/recruit/dashboard" className="flex items-center gap-2.5">
-            <img src="/rolebolt-icon.png" alt="Rolebolt" className="h-8 w-8 rounded-xl object-cover shadow-sm" />
+            <RoleboltLogo size="md" />
             <span className="text-sm font-bold text-slate-900">Rolebolt</span>
           </Link>
           <Link href="/recruit/dashboard" className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 transition">
