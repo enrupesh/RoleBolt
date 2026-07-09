@@ -1,0 +1,73 @@
+2026-07-09T04:11:21.589904466Z ==> Downloading cache...
+
+2026-07-09T04:11:21.635695354Z ==> Cloning from https://github.com/rupeshsahu408/ratheeji
+
+2026-07-09T04:11:22.311437413Z ==> Checking out commit 05d8b2f447719c26de9fe93f65f34a40ae5f4b98 in branch main
+
+2026-07-09T04:11:26.19425198Z ==> Downloaded 106MB in 3s. Extraction took 2s.
+
+2026-07-09T04:11:31.790891123Z ==> Requesting Node.js version >=20.0.0
+
+2026-07-09T04:11:31.924767057Z ==> Using Node.js version 26.5.0 via /opt/render/project/src/backend/package.json
+
+2026-07-09T04:11:31.924787928Z ==> Docs on specifying a Node.js version: https://render.com/docs/node-version
+
+2026-07-09T04:11:31.924962872Z ==> Installing Node.js version 26.5.0...
+
+2026-07-09T04:11:33.475244558Z ==> Running build command 'npm install && npm run build'...
+
+2026-07-09T04:11:37.974899951Z 
+
+2026-07-09T04:11:37.974922941Z added 1 package, and audited 310 packages in 4s
+
+2026-07-09T04:11:37.974933702Z 
+
+2026-07-09T04:11:37.975057414Z 52 packages are looking for funding
+
+2026-07-09T04:11:37.975144427Z   run `npm fund` for details
+
+2026-07-09T04:11:37.983826382Z 
+
+2026-07-09T04:11:37.983836032Z 8 moderate severity vulnerabilities
+
+2026-07-09T04:11:37.983839992Z 
+
+2026-07-09T04:11:37.983844363Z To address issues that do not require attention, run:
+
+2026-07-09T04:11:37.983848373Z   npm audit fix
+
+2026-07-09T04:11:37.983852043Z 
+
+2026-07-09T04:11:37.983855903Z To address all issues (including breaking changes), run:
+
+2026-07-09T04:11:37.983859953Z   npm audit fix --force
+
+2026-07-09T04:11:37.983863613Z 
+
+2026-07-09T04:11:37.983867853Z Run `npm audit` for details.
+
+2026-07-09T04:11:38.138273977Z 
+
+2026-07-09T04:11:38.138290468Z > recruit-backend@1.0.0 build
+
+2026-07-09T04:11:38.138295788Z > tsc -p tsconfig.json
+
+2026-07-09T04:11:38.138299648Z 
+
+2026-07-09T04:11:41.801547742Z src/mailer.ts(7,17): error TS2694: Namespace '"/opt/render/project/src/backend/node_modules/@getbrevo/brevo/dist/cjs/index"' has no exported member 'TransactionalEmailsApi'.
+
+2026-07-09T04:11:41.801702995Z src/mailer.ts(9,26): error TS2694: Namespace '"/opt/render/project/src/backend/node_modules/@getbrevo/brevo/dist/cjs/index"' has no exported member 'TransactionalEmailsApi'.
+
+2026-07-09T04:11:41.801721436Z src/mailer.ts(12,22): error TS2339: Property 'TransactionalEmailsApi' does not exist on type 'typeof import("/opt/render/project/src/backend/node_modules/@getbrevo/brevo/dist/cjs/index")'.
+
+2026-07-09T04:11:41.801733646Z src/mailer.ts(13,26): error TS2339: Property 'TransactionalEmailsApiApiKeys' does not exist on type 'typeof import("/opt/render/project/src/backend/node_modules/@getbrevo/brevo/dist/cjs/index")'.
+
+2026-07-09T04:11:41.801750707Z src/mailer.ts(41,28): error TS2339: Property 'SendSmtpEmail' does not exist on type 'typeof import("/opt/render/project/src/backend/node_modules/@getbrevo/brevo/dist/cjs/index")'.
+
+2026-07-09T04:11:41.801814628Z src/mailer.ts(75,34): error TS2339: Property 'AccountApi' does not exist on type 'typeof import("/opt/render/project/src/backend/node_modules/@getbrevo/brevo/dist/cjs/index")'.
+
+2026-07-09T04:11:41.801823868Z src/mailer.ts(76,32): error TS2339: Property 'AccountApiApiKeys' does not exist on type 'typeof import("/opt/render/project/src/backend/node_modules/@getbrevo/brevo/dist/cjs/index")'.
+
+2026-07-09T04:11:41.90015983Z ==> Build failed 😞
+
+2026-07-09T04:11:41.900193551Z ==> Common ways to troubleshoot your deploy: https://render.com/docs/troubleshooting-
