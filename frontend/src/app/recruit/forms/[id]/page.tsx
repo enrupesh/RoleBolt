@@ -33,6 +33,7 @@ type FormResponse = {
   submittedName: string;
   submittedEmail: string;
   submittedPhone: string;
+  resumeText?: string;
   createdAt: string;
 };
 
@@ -128,12 +129,231 @@ function ShareModal({ slug, title, onClose }: { slug: string; title: string; onC
   );
 }
 
+function FormResumeSection({ resumeText }: { resumeText: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const PREVIEW_CHARS = 600;
+  const isLong = resumeText.length > PREVIEW_CHARS;
+  const displayed = expanded || !isLong ? resumeText : resumeText.slice(0, PREVIEW_CHARS) + "…";
+
+  function copyResume() {
+    navigator.clipboard.writeText(resumeText).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-4">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Resume</p>
+        <button
+          onClick={copyResume}
+          className="flex items-center gap-1 rounded-lg border border-white/[0.07] bg-white/[0.05] px-2.5 py-1 text-[10px] font-bold text-gray-400 hover:bg-white/[0.09] transition"
+          title="Copy full resume text"
+        >
+          {copied ? (
+            <><svg width="9" height="9" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg> Copied</>
+          ) : (
+            <><svg width="9" height="9" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</>
+          )}
+        </button>
+      </div>
+      <pre className="text-[11px] text-gray-300 leading-5 whitespace-pre-wrap break-words font-sans">{displayed}</pre>
+      {isLong && (
+        <button
+          onClick={() => setExpanded(e => !e)}
+          className="mt-3 text-[11px] font-semibold text-sky-500 hover:text-sky-400 transition"
+        >
+          {expanded ? "Show less ↑" : "Show full resume ↓"}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function FormResponseInfoModal({ r, onClose }: { r: FormResponse; onClose: () => void }) {
+  const [copiedField, setCopiedField] = useState<"email" | "phone" | null>(null);
+
+  const displayName = r.submittedName || r.answers.find(a => a.label.toLowerCase().includes("name"))?.value || "Candidate";
+  const displayEmail = r.submittedEmail || r.answers.find(a => a.label.toLowerCase().includes("email"))?.value || "";
+  const appliedDate = r.createdAt ? new Date(r.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : null;
+  const textAnswers = r.answers.filter(a => a.value && a.value.trim() && a.value !== "__file_uploaded__");
+
+  function copy(text: string, field: "email" | "phone") {
+    navigator.clipboard.writeText(text).catch(() => {});
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
+  }
+
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="form-info-title"
+        className="w-full max-w-md rounded-[2rem] border border-white/[0.08] bg-[#0a0a0f] shadow-2xl max-h-[88vh] flex flex-col"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-white/[0.07] px-6 py-4 shrink-0">
+          <div className="min-w-0 flex-1">
+            <h2 id="form-info-title" className="text-sm font-bold text-white truncate">{displayName}</h2>
+            <p className="text-[11px] text-gray-400 mt-0.5">Applicant Details</p>
+          </div>
+          <div className="flex items-center gap-3 shrink-0 ml-3">
+            {!r.scoringFailed && (
+              <div className="text-right">
+                <p className={`text-base font-bold leading-none ${r.aiScore >= 75 ? "text-emerald-400" : r.aiScore >= 50 ? "text-amber-400" : "text-rose-400"}`}>{r.aiScore}%</p>
+                <p className="text-[10px] text-gray-500 mt-0.5">AI score</p>
+              </div>
+            )}
+            {appliedDate && (
+              <div className="text-right">
+                <p className="text-[10px] text-gray-400 leading-none">Applied</p>
+                <p className="text-[11px] font-semibold text-gray-300 mt-0.5">{appliedDate}</p>
+              </div>
+            )}
+            <button onClick={onClose} aria-label="Close" className="ml-1 text-gray-400 hover:text-white transition">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Scrollable body */}
+        <div className="overflow-y-auto flex-1 p-5 space-y-3">
+
+          {/* Email */}
+          {displayEmail && (
+            <div className="rounded-2xl border border-sky-500/30 bg-sky-500/[0.09] p-4">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-sky-400/70 mb-2">Email Address</p>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-bold text-sky-300 break-all leading-snug">{displayEmail}</p>
+                <button
+                  onClick={() => copy(displayEmail, "email")}
+                  className="shrink-0 flex items-center gap-1 rounded-lg border border-sky-500/25 bg-sky-500/10 px-2.5 py-1.5 text-[10px] font-bold text-sky-400 hover:bg-sky-500/20 transition"
+                >
+                  {copiedField === "email" ? (
+                    <><svg width="9" height="9" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg> Copied</>
+                  ) : (
+                    <><svg width="9" height="9" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</>
+                  )}
+                </button>
+              </div>
+              <a href={`mailto:${displayEmail}`} className="mt-2.5 inline-flex items-center gap-1.5 text-[11px] font-semibold text-sky-500/80 hover:text-sky-400 transition">
+                <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,12 2,6"/></svg>
+                Send email →
+              </a>
+            </div>
+          )}
+
+          {/* Phone */}
+          {r.submittedPhone && (
+            <div className="rounded-2xl border border-white/[0.07] bg-white/[0.03] p-4 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Phone</p>
+                <a href={`tel:${r.submittedPhone}`} className="text-sm font-bold text-white hover:text-sky-300 transition">{r.submittedPhone}</a>
+              </div>
+              <button
+                onClick={() => copy(r.submittedPhone, "phone")}
+                className="shrink-0 flex items-center gap-1 rounded-lg border border-white/[0.07] bg-white/[0.05] px-2.5 py-1.5 text-[10px] font-bold text-gray-400 hover:bg-white/[0.09] transition"
+              >
+                {copiedField === "phone" ? (
+                  <><svg width="9" height="9" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg> Copied</>
+                ) : (
+                  <><svg width="9" height="9" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</>
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* AI Summary */}
+          {r.aiSummary && !r.scoringFailed && (
+            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">AI Assessment</p>
+              <p className="text-xs text-gray-300 leading-5">{r.aiSummary}</p>
+            </div>
+          )}
+
+          {/* Strengths */}
+          {r.strengths.length > 0 && (
+            <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.05] p-4">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-500/70 mb-2">Strengths</p>
+              <ul className="space-y-1.5">
+                {r.strengths.map((s, i) => (
+                  <li key={i} className="flex items-start gap-2 text-xs text-emerald-300">
+                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
+                    {s}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Red flags */}
+          {r.redFlags.length > 0 && (
+            <div className="rounded-2xl border border-rose-500/20 bg-rose-500/[0.05] p-4">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-rose-400/70 mb-2">Red Flags</p>
+              <ul className="space-y-1.5">
+                {r.redFlags.map((f, i) => (
+                  <li key={i} className="flex items-start gap-2 text-xs text-rose-300">
+                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400" />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Form answers */}
+          {textAnswers.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 px-1">Form Answers</p>
+              {textAnswers.map(a => (
+                <div key={a.questionId} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
+                  <p className="text-[10px] font-bold text-gray-500 mb-1.5">{a.label}</p>
+                  <p className="text-xs text-gray-200 leading-5 whitespace-pre-wrap">{a.value}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Resume */}
+          {r.resumeText?.trim() ? (
+            <FormResumeSection resumeText={r.resumeText} />
+          ) : (
+            <div className="rounded-2xl border border-dashed border-zinc-800 p-4">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Resume</p>
+              <p className="text-xs text-gray-600">No resume was submitted with this application.</p>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-end border-t border-white/[0.07] px-6 py-4 shrink-0">
+          <button onClick={onClose} className="rounded-xl bg-zinc-800 px-5 py-2 text-sm font-bold text-white hover:bg-zinc-700 transition">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ResponseCard({ r, token, formId, onUpdate }: {
   r: FormResponse; token: string; formId: string;
   onUpdate: (id: string, patch: Partial<FormResponse>) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState<"email" | "phone" | null>(null);
+  const [showInfo, setShowInfo] = useState(false);
 
   async function updateStage(stage: Stage) {
     try {
@@ -217,6 +437,14 @@ function ResponseCard({ r, token, formId, onUpdate }: {
             {expanded ? "Collapse" : "View Answers"}
           </button>
 
+          <button
+            onClick={() => setShowInfo(true)}
+            className="flex items-center gap-1 rounded-xl border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-[11px] font-semibold text-violet-600 hover:bg-violet-100 transition"
+          >
+            <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            Info
+          </button>
+
           {displayEmail && (
             <a href={`mailto:${displayEmail}`} className="flex items-center gap-1 rounded-xl border border-sky-200 bg-sky-50 px-2.5 py-1.5 text-[11px] font-semibold text-sky-600 hover:bg-sky-100 transition">
               <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,12 2,6"/></svg>
@@ -225,6 +453,9 @@ function ResponseCard({ r, token, formId, onUpdate }: {
           )}
         </div>
       </div>
+
+      {/* Info modal */}
+      {showInfo && <FormResponseInfoModal r={r} onClose={() => setShowInfo(false)} />}
 
       {/* Expanded: contact + answers */}
       {expanded && (
