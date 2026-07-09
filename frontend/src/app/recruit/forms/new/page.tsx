@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
-import { getFirebaseAuth } from "@/lib/firebaseClient";
+import { getFirebaseAuth, isFirebaseAvailable } from "@/lib/firebaseClient";
 import { RecruitGuard } from "@/components/RecruitGuard";
 import Link from "next/link";
 import { apiUrl, readApiJson } from "@/lib/api";
@@ -253,6 +253,7 @@ function FormBuilderContent() {
   const [loadingEdit, setLoadingEdit] = useState(!!editId);
 
   useEffect(() => {
+    if (!isFirebaseAvailable()) return;
     const auth = getFirebaseAuth();
     const unsub = onAuthStateChanged(auth, async (u) => {
       if (!u) { router.push("/recruit/login"); return; }

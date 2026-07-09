@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { RecruitGuard } from "@/components/RecruitGuard";
-import { getFirebaseAuth } from "@/lib/firebaseClient";
+import { getFirebaseAuth, isFirebaseAvailable } from "@/lib/firebaseClient";
 import Link from "next/link";
 import { computeJobQuality } from "@/lib/jobQuality";
 import { apiUrl, readApiJson } from "@/lib/api";
@@ -539,10 +539,11 @@ function NewJobContent() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
+    if (!isFirebaseAvailable()) return;
     const auth = getFirebaseAuth();
     const unsub = onAuthStateChanged(auth, async (u) => {
       if (u) setToken(await u.getIdToken());
-      else router.push("/login");
+      else router.push("/recruit/login");
     });
     return () => unsub();
   }, [router]);

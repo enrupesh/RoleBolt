@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
-import { getFirebaseAuth } from "@/lib/firebaseClient";
+import { getFirebaseAuth, isFirebaseAvailable } from "@/lib/firebaseClient";
 import { apiUrl } from "@/lib/api";
 
 export type RecruitRole = "creator" | "seeker";
@@ -32,7 +32,7 @@ interface RecruitAuthState {
 const RecruitAuthContext = createContext<RecruitAuthState>({
   firebaseUser: null,
   recruitProfile: null,
-  loading: true,
+  loading: false,
   signOutFromRecruit: async () => {},
   refreshProfile: async () => {},
 });
@@ -80,12 +80,20 @@ export function RecruitAuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const auth = getFirebaseAuth();
-    const unsub = onAuthStateChanged(auth, (user) => {
-      setLoading(true);
-      loadProfile(user);
-    });
-    return unsub;
+    if (!isFirebaseAvailable()) {
+      setLoading(false);
+      return;
+    }
+    try {
+      const auth = getFirebaseAuth();
+      const unsub = onAuthStateChanged(auth, (user) => {
+        setLoading(true);
+        loadProfile(user);
+      });
+      return unsub;
+    } catch {
+      setLoading(false);
+    }
   }, [loadProfile]);
 
   const signOutFromRecruit = useCallback(async () => {

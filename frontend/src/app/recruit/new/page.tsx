@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
-import { getFirebaseAuth } from "@/lib/firebaseClient";
+import { getFirebaseAuth, isFirebaseAvailable } from "@/lib/firebaseClient";
 import { RecruitGuard } from "@/components/RecruitGuard";
 import Link from "next/link";
 
@@ -12,6 +12,7 @@ function NewJobChoiceContent() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!isFirebaseAvailable()) { setLoading(false); return; }
     const auth = getFirebaseAuth();
     const unsub = onAuthStateChanged(auth, (u) => {
       if (!u) router.push("/recruit/login");
