@@ -121,10 +121,33 @@ export default function AssessmentPage({ params }: { params: Promise<{ token: st
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#050508] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <Spinner size={8} />
-          <p className="text-gray-400 text-sm">Loading your assessment...</p>
+      <div className="min-h-screen bg-[#050508] flex flex-col animate-[rb-fade-in_0.3s_ease_both]"
+           style={{ "--sk-from": "#1a1a24", "--sk-mid": "#22222e", "--sk-to": "#1a1a24" } as React.CSSProperties}>
+        {/* Progress bar area */}
+        <div className="w-full px-4 pt-8 pb-6 max-w-2xl mx-auto">
+          <div className="flex items-center justify-between mb-2">
+            <div className="h-3 w-24 rounded-full" style={{ background: "#22222e" }} />
+            <div className="h-3 w-12 rounded-full" style={{ background: "#22222e" }} />
+          </div>
+          <div className="h-1.5 w-full rounded-full" style={{ background: "#22222e" }}>
+            <div className="h-1.5 w-1/3 rounded-full" style={{ background: "#3d3d55" }} />
+          </div>
+        </div>
+        {/* Question card */}
+        <div className="flex-1 flex items-start justify-center px-4 pb-10">
+          <div className="w-full max-w-2xl rounded-2xl border p-6 sm:p-8 space-y-5"
+               style={{ background: "#0d0d13", borderColor: "#1e1e2a" }}>
+            <div className="h-3 w-20 rounded-full" style={{ background: "#22222e" }} />
+            <div className="space-y-2">
+              <div className="h-5 w-full rounded-lg" style={{ background: "#22222e" }} />
+              <div className="h-5 w-4/5 rounded-lg" style={{ background: "#22222e" }} />
+            </div>
+            <div className="h-36 w-full rounded-xl" style={{ background: "#22222e" }} />
+            <div className="flex items-center justify-between pt-2">
+              <div className="h-9 w-20 rounded-lg" style={{ background: "#22222e" }} />
+              <div className="h-9 w-28 rounded-lg" style={{ background: "#22222e" }} />
+            </div>
+          </div>
         </div>
       </div>
     );

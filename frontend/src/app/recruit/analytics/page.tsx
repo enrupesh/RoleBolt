@@ -7,6 +7,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { getFirebaseAuth, isFirebaseAvailable } from "@/lib/firebaseClient";
 import Link from "next/link";
 import { apiUrl, readApiJson } from "@/lib/api";
+import { Sk, SkStatCard, SkSectionCard } from "@/components/Skeleton";
 
 type FunnelStage = { stage: string; count: number; dropoffPct: number };
 type SourceEntry = { source: string; count: number; pct: number };
@@ -180,10 +181,30 @@ function RecruitAnalyticsContent() {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-24">
-            <div className="flex items-center gap-2.5 text-slate-400 text-sm">
-              <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-              Loading analytics…
+          <div className="space-y-8 animate-[rb-fade-in_0.3s_ease_both]">
+            {/* Stats skeleton */}
+            <section>
+              <Sk className="h-3 w-20 rounded-full mb-4" />
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                {Array.from({ length: 6 }).map((_, i) => <SkStatCard key={i} />)}
+              </div>
+            </section>
+            {/* Funnel + Source skeletons */}
+            <SkSectionCard rows={6} />
+            <SkSectionCard rows={4} />
+            {/* Job table skeleton */}
+            <div className="rounded-2xl bg-white border border-black/[0.06] p-6 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
+              <Sk className="h-3 w-24 rounded-full mb-5" />
+              <div className="space-y-3">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-4">
+                    <Sk className="h-4 flex-1 rounded-full" />
+                    <Sk className="h-4 w-12 rounded-full" />
+                    <Sk className="h-4 w-12 rounded-full" />
+                    <Sk className="h-4 w-12 rounded-full" />
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         ) : error ? (

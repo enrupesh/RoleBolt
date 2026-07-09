@@ -271,11 +271,32 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <svg className="animate-spin h-6 w-6 text-violet-500" fill="none" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-        </svg>
+      <div className="min-h-screen bg-slate-50 animate-[rb-fade-in_0.3s_ease_both]">
+        <div className="mx-auto max-w-xl px-4 py-10 sm:py-14">
+          {/* Header bar skeleton */}
+          <div className="mb-8 flex items-center gap-2.5">
+            <div className="h-7 w-7 rounded-lg rb-skeleton" />
+            <div className="h-4 w-20 rounded-full rb-skeleton" />
+          </div>
+          {/* Form card skeleton */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-6">
+            {/* Title + description */}
+            <div className="space-y-2 pb-4 border-b border-slate-100">
+              <div className="h-6 w-3/4 rounded-lg rb-skeleton" />
+              <div className="h-3.5 w-full rounded-full rb-skeleton" />
+              <div className="h-3.5 w-4/5 rounded-full rb-skeleton" />
+            </div>
+            {/* Question skeletons */}
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="space-y-2">
+                <div className="h-3.5 w-2/5 rounded-full rb-skeleton" />
+                <div className="h-11 w-full rounded-xl rb-skeleton" />
+              </div>
+            ))}
+            {/* Submit button skeleton */}
+            <div className="h-11 w-full rounded-xl rb-skeleton mt-2" />
+          </div>
+        </div>
       </div>
     );
   }

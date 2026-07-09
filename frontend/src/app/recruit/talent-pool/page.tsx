@@ -7,6 +7,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { getFirebaseAuth, isFirebaseAvailable } from "@/lib/firebaseClient";
 import Link from "next/link";
 import { apiUrl, readApiJson } from "@/lib/api";
+import { SkStatCard, SkCandidateCard } from "@/components/Skeleton";
 
 type PoolCandidate = {
   _id: string;
@@ -363,17 +364,23 @@ function TalentPoolContent() {
         </div>
 
         {/* ── Stats ─────────────────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-8">
-          {stats.map(s => (
-            <div key={s.label} className="relative overflow-hidden rounded-2xl bg-white border border-black/[0.06] p-4
-              shadow-[0_1px_3px_rgba(0,0,0,0.05),0_4px_16px_rgba(0,0,0,0.04)]">
-              <div className={`absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r ${s.bar}`} />
-              <p className={`text-[26px] font-bold leading-none tabular-nums mt-1 ${s.accent}`}>{s.value}</p>
-              <p className="mt-2 text-[11px] font-semibold text-slate-800 leading-snug">{s.label}</p>
-              <p className="text-[10px] text-slate-400 mt-0.5 leading-none">{s.sub}</p>
-            </div>
-          ))}
-        </div>
+        {loading ? (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-8 animate-[rb-fade-in_0.3s_ease_both]">
+            {Array.from({ length: 4 }).map((_, i) => <SkStatCard key={i} />)}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-8 animate-[rb-fade-in_0.3s_ease_both]">
+            {stats.map(s => (
+              <div key={s.label} className="relative overflow-hidden rounded-2xl bg-white border border-black/[0.06] p-4
+                shadow-[0_1px_3px_rgba(0,0,0,0.05),0_4px_16px_rgba(0,0,0,0.04)]">
+                <div className={`absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r ${s.bar}`} />
+                <p className={`text-[26px] font-bold leading-none tabular-nums mt-1 ${s.accent}`}>{s.value}</p>
+                <p className="mt-2 text-[11px] font-semibold text-slate-800 leading-snug">{s.label}</p>
+                <p className="text-[10px] text-slate-400 mt-0.5 leading-none">{s.sub}</p>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* ── Search + filter row ──────────────────────────────────────── */}
         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -425,14 +432,8 @@ function TalentPoolContent() {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-24">
-            <div className="flex items-center gap-2 text-slate-400 text-sm">
-              <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              Loading talent pool…
-            </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 animate-[rb-fade-in_0.3s_ease_both]">
+            {Array.from({ length: 6 }).map((_, i) => <SkCandidateCard key={i} />)}
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">

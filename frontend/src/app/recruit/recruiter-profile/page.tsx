@@ -408,16 +408,42 @@ function RecruiterProfileContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#f3f6f8]">
+      <div className="min-h-screen bg-[#f3f6f8] animate-[rb-fade-in_0.3s_ease_both]">
         <RecruitHeader />
-        <div className="flex items-center justify-center py-32">
-          <div className="flex items-center gap-3 text-slate-400 text-sm">
-            <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-            Loading…
+        {/* Sticky top bar skeleton */}
+        <div className="sticky top-[57px] z-30 bg-white/95 border-b border-slate-200">
+          <div className="mx-auto max-w-3xl px-4 sm:px-6 flex items-center justify-between py-2.5">
+            <div className="flex items-center gap-3">
+              <div className="h-4 w-24 rounded-full rb-skeleton" />
+              <div className="h-4 w-28 rounded-full rb-skeleton" />
+            </div>
+            <div className="h-8 w-24 rounded-xl rb-skeleton" />
           </div>
+        </div>
+        <div className="mx-auto max-w-3xl px-4 sm:px-6 py-8 space-y-5">
+          {/* Avatar + name */}
+          <div className="rounded-2xl bg-white border border-slate-200 p-6 flex items-center gap-5">
+            <div className="h-20 w-20 rounded-full rb-skeleton shrink-0" />
+            <div className="flex-1 space-y-2.5">
+              <div className="h-5 w-48 rounded-lg rb-skeleton" />
+              <div className="h-3.5 w-32 rounded-full rb-skeleton" />
+              <div className="h-3.5 w-56 rounded-full rb-skeleton" />
+            </div>
+          </div>
+          {/* Form sections */}
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="rounded-2xl bg-white border border-slate-200 p-6 space-y-4">
+              <div className="h-4 w-36 rounded-full rb-skeleton" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {Array.from({ length: 4 }).map((_, j) => (
+                  <div key={j} className="space-y-1.5">
+                    <div className="h-3 w-20 rounded-full rb-skeleton" />
+                    <div className="h-10 w-full rounded-xl rb-skeleton" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     );

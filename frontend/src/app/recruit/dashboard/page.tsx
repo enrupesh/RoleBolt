@@ -7,6 +7,7 @@ import { getFirebaseAuth, isFirebaseAvailable } from "@/lib/firebaseClient";
 import Link from "next/link";
 import { apiUrl, readApiJson } from "@/lib/api";
 import { RecruitGuard } from "@/components/RecruitGuard";
+import { SkStatCard, SkJobCard } from "@/components/Skeleton";
 
 type Job = {
   _id: string;
@@ -492,18 +493,24 @@ function RecruitDashboardContent() {
         </div>
 
         {/* ── Stats ─────────────────────────────────────────────────────── */}
-        <div className={`grid grid-cols-2 gap-3 mb-8 ${activeTab === "jobs" ? "sm:grid-cols-3 lg:grid-cols-5" : "sm:grid-cols-2 lg:grid-cols-2 max-w-md"}`}>
-          {stats.map(s => (
-            <div key={s.label} className="relative overflow-hidden rounded-2xl bg-white border border-black/[0.06] p-4
-              shadow-[0_1px_3px_rgba(0,0,0,0.05),0_4px_16px_rgba(0,0,0,0.04)]">
-              {/* colored top accent strip */}
-              <div className={`absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r ${s.bar}`} />
-              <p className={`text-[26px] font-bold leading-none tabular-nums mt-1 ${s.accent}`}>{s.value}</p>
-              <p className="mt-2 text-[11px] font-semibold text-slate-800 leading-snug">{s.label}</p>
-              <p className="text-[10px] text-slate-400 mt-0.5 leading-none">{s.sub}</p>
-            </div>
-          ))}
-        </div>
+        {loading ? (
+          <div className={`grid grid-cols-2 gap-3 mb-8 ${activeTab === "jobs" ? "sm:grid-cols-3 lg:grid-cols-5" : "sm:grid-cols-2 lg:grid-cols-2 max-w-md"} animate-[rb-fade-in_0.3s_ease_both]`}>
+            {Array.from({ length: activeTab === "jobs" ? 5 : 2 }).map((_, i) => <SkStatCard key={i} />)}
+          </div>
+        ) : (
+          <div className={`grid grid-cols-2 gap-3 mb-8 ${activeTab === "jobs" ? "sm:grid-cols-3 lg:grid-cols-5" : "sm:grid-cols-2 lg:grid-cols-2 max-w-md"} animate-[rb-fade-in_0.3s_ease_both]`}>
+            {stats.map(s => (
+              <div key={s.label} className="relative overflow-hidden rounded-2xl bg-white border border-black/[0.06] p-4
+                shadow-[0_1px_3px_rgba(0,0,0,0.05),0_4px_16px_rgba(0,0,0,0.04)]">
+                {/* colored top accent strip */}
+                <div className={`absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r ${s.bar}`} />
+                <p className={`text-[26px] font-bold leading-none tabular-nums mt-1 ${s.accent}`}>{s.value}</p>
+                <p className="mt-2 text-[11px] font-semibold text-slate-800 leading-snug">{s.label}</p>
+                <p className="text-[10px] text-slate-400 mt-0.5 leading-none">{s.sub}</p>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* ── Tab bar ───────────────────────────────────────────────────── */}
         <div className="flex items-stretch gap-1.5 mb-6 bg-white rounded-2xl p-1.5
@@ -585,14 +592,8 @@ function RecruitDashboardContent() {
             </div>
 
             {loading ? (
-              <div className="flex items-center justify-center py-24">
-                <div className="flex items-center gap-2 text-slate-400 text-sm">
-                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                  Loading jobs…
-                </div>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 animate-[rb-fade-in_0.3s_ease_both]">
+                {Array.from({ length: 6 }).map((_, i) => <SkJobCard key={i} />)}
               </div>
             ) : filteredJobs.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-24 text-center">
@@ -745,14 +746,8 @@ function RecruitDashboardContent() {
             </div>
 
             {loading ? (
-              <div className="flex items-center justify-center py-24">
-                <div className="flex items-center gap-2 text-slate-400 text-sm">
-                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                  Loading forms…
-                </div>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 animate-[rb-fade-in_0.3s_ease_both]">
+                {Array.from({ length: 6 }).map((_, i) => <SkJobCard key={i} />)}
               </div>
             ) : filteredForms.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-24 text-center">
