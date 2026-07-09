@@ -1,29 +1,29 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #0a0a0a;
+  --background: #f1f3f8;
+  --foreground: #0f1420;
   --surface: #ffffff;
   --surface-elevated: #ffffff;
-  --surface-muted: #f8fafc;
-  --border: #e2e8f0;
-  --border-strong: #cbd5e1;
-  --text-secondary: #475569;
-  --text-muted: #94a3b8;
-  --accent: #0a66c2;
-  --accent-hover: #004182;
-  --accent-light: #dbeafe;
+  --surface-muted: #eaedf5;
+  --border: #d7dbe7;
+  --border-strong: #b7bdd1;
+  --text-secondary: #384056;
+  --text-muted: #6b7286;
+  --accent: #4338ca;
+  --accent-hover: #322aa8;
+  --accent-light: #e0e0fb;
 
   /* Shadows */
-  --shadow-xs: 0 1px 2px 0 rgba(0,0,0,0.05);
-  --shadow-sm: 0 1px 3px 0 rgba(0,0,0,0.07), 0 1px 2px -1px rgba(0,0,0,0.07);
-  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -2px rgba(0,0,0,0.07);
-  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.07), 0 4px 6px -4px rgba(0,0,0,0.05);
-  --shadow-xl: 0 20px 25px -5px rgba(0,0,0,0.08), 0 8px 10px -6px rgba(0,0,0,0.05);
-  --shadow-card: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-  --shadow-card-hover: 0 8px 20px rgba(0,0,0,0.08), 0 3px 8px rgba(0,0,0,0.04);
-  --shadow-button: 0 2px 8px rgba(10,102,194,0.28);
-  --shadow-button-hover: 0 4px 16px rgba(10,102,194,0.38);
+  --shadow-xs: 0 1px 2px 0 rgba(15,20,32,0.06);
+  --shadow-sm: 0 1px 3px 0 rgba(15,20,32,0.10), 0 1px 2px -1px rgba(15,20,32,0.08);
+  --shadow-md: 0 4px 10px -2px rgba(15,20,32,0.12), 0 2px 4px -2px rgba(15,20,32,0.08);
+  --shadow-lg: 0 12px 24px -6px rgba(15,20,32,0.16), 0 4px 8px -4px rgba(15,20,32,0.08);
+  --shadow-xl: 0 24px 40px -8px rgba(15,20,32,0.20), 0 8px 16px -6px rgba(15,20,32,0.10);
+  --shadow-card: 0 1px 2px rgba(15,20,32,0.06), 0 8px 16px -6px rgba(15,20,32,0.10);
+  --shadow-card-hover: 0 12px 28px -6px rgba(15,20,32,0.18), 0 4px 10px -4px rgba(15,20,32,0.10);
+  --shadow-button: 0 4px 12px rgba(67,56,202,0.32);
+  --shadow-button-hover: 0 6px 20px rgba(67,56,202,0.42);
 
   /* Radius */
   --radius-sm: 8px;
@@ -117,12 +117,12 @@ h1, h2, h3, h4, h5, h6, li, td, th {
 }
 .rb-card:hover {
   box-shadow: var(--shadow-card-hover);
-  border-color: rgba(10,102,194,0.25);
+  border-color: rgba(67,56,202,0.30);
 }
 .rb-card-interactive:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-card-hover);
-  border-color: rgba(10,102,194,0.25);
+  border-color: rgba(67,56,202,0.30);
 }
 
 /* ── Button System ─────────────────────────────────────────────────────── */
@@ -203,7 +203,7 @@ h1, h2, h3, h4, h5, h6, li, td, th {
 }
 .rb-input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(10,102,194,0.12);
+  box-shadow: 0 0 0 3px rgba(67,56,202,0.14);
 }
 .rb-input::placeholder { color: var(--text-muted); }
 
@@ -431,7 +431,7 @@ h1, h2, h3, h4, h5, h6, li, td, th {
 
 /* ── Gradient Text ─────────────────────────────────────────────────────── */
 .text-gradient {
-  background: linear-gradient(135deg, #0a66c2, #0043a8);
+  background: linear-gradient(135deg, #4338ca, #312e81);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -455,7 +455,7 @@ h1, h2, h3, h4, h5, h6, li, td, th {
 
 /* ── Dot Pattern ───────────────────────────────────────────────────────── */
 .dot-pattern {
-  background-image: radial-gradient(circle, rgba(10,102,194,0.12) 1px, transparent 1px);
+  background-image: radial-gradient(circle, rgba(67,56,202,0.14) 1px, transparent 1px);
   background-size: 24px 24px;
 }
 
