@@ -6,7 +6,7 @@ import { RecruitJob } from "./models/RecruitJob";
 import { RecruitCandidate } from "./models/RecruitCandidate";
 import { RecruitSeekerProfile } from "./models/RecruitSeekerProfile";
 import { RecruitCompanyProfile } from "./models/RecruitCompanyProfile";
-import { callNvidiaChatCompletions } from "./ai/nvidiaClient";
+import { callMeshChatCompletions } from "./ai/meshClient";
 import { RecruitJobAlert } from "./models/RecruitJobAlert";
 import { UsageEvent } from "./models/UsageEvent";
 import { RecruitProfile } from "./models/RecruitProfile";
@@ -449,7 +449,7 @@ Rules for the rubric:
   // template JD/rubric instead, same as an unparseable AI response.
   let raw: string;
   try {
-    raw = await callNvidiaChatCompletions({
+    raw = await callMeshChatCompletions({
       apiKey: MESHAPI_API_KEY,
       retries: 2,
       fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
@@ -590,7 +590,7 @@ For "tier": classify each criterion as 1 (must-have skill), 2 (experience depth)
   // a retryable "Scoring Unavailable" state instead of a generic 500.
   let raw: string;
   try {
-    raw = await callNvidiaChatCompletions({
+    raw = await callMeshChatCompletions({
       apiKey: MESHAPI_API_KEY,
       retries: 2,
       fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
@@ -775,7 +775,7 @@ Write a practical interview brief (250-350 words) covering:
 Write in plain text, no JSON, no markdown headers.`;
 
   try {
-    return await callNvidiaChatCompletions({
+    return await callMeshChatCompletions({
       apiKey: MESHAPI_API_KEY,
       retries: 2,
       fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
@@ -836,7 +836,7 @@ Respond with ONLY this exact JSON structure, no markdown, no extra text:
 
   let raw: string;
   try {
-    raw = await callNvidiaChatCompletions({
+    raw = await callMeshChatCompletions({
       apiKey: MESHAPI_API_KEY,
       retries: 2,
       fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
@@ -925,7 +925,7 @@ Rules:
 
   let raw: string | null = null;
   try {
-    raw = await callNvidiaChatCompletions({
+    raw = await callMeshChatCompletions({
       apiKey: MESHAPI_API_KEY,
       retries: 2,
       fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
@@ -1002,7 +1002,7 @@ TONE RULES:
 - Do not use bullet points or formal headers`;
 
   try {
-    return await callNvidiaChatCompletions({
+    return await callMeshChatCompletions({
       apiKey: MESHAPI_API_KEY,
       retries: 2,
       fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
@@ -2116,7 +2116,7 @@ FORMAT RULES:
 - End with a signature block for the hiring manager`;
 
   try {
-    return await callNvidiaChatCompletions({
+    return await callMeshChatCompletions({
       apiKey: MESHAPI_API_KEY,
       retries: 2,
       fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
@@ -2585,7 +2585,7 @@ Rules:
 
   let raw: string;
   try {
-    raw = await callNvidiaChatCompletions({
+    raw = await callMeshChatCompletions({
       apiKey: MESHAPI_API_KEY,
       retries: 2,
       fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
