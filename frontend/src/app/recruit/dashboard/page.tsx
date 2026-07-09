@@ -488,57 +488,64 @@ function RecruitDashboardContent() {
         </div>
 
         {/* ── Tab bar ───────────────────────────────────────────────────── */}
-        <div className="flex items-center gap-1.5 mb-6 bg-white rounded-2xl p-1.5
+        <div className="flex items-stretch gap-1.5 mb-6 bg-white rounded-2xl p-1.5
           border border-black/[0.06] shadow-[0_1px_3px_rgba(0,0,0,0.05),0_4px_12px_rgba(0,0,0,0.04)]">
           <button
             onClick={() => setActiveTab("jobs")}
-            className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-[13px] font-semibold transition-all ${
+            className={`flex flex-1 flex-col items-start gap-1 rounded-xl px-4 py-2.5 text-left transition-all ${
               activeTab === "jobs"
                 ? "bg-[#0a66c2] text-white shadow-[0_2px_8px_rgba(10,102,194,0.35)]"
                 : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
             }`}
           >
-            <BriefcaseIcon size={14} />
-            Standard Jobs
-            {jobs.length > 0 && (
-              <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none ${activeTab === "jobs" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"}`}>
-                {jobs.length}
-              </span>
-            )}
+            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide ${
+              activeTab === "jobs" ? "bg-white/20 text-white" : "bg-amber-50 text-amber-700 border border-amber-200/80"
+            }`}>
+              🏷 Big Business
+            </span>
+            <span className="flex items-center gap-2 text-[13px] font-semibold">
+              <BriefcaseIcon size={14} />
+              Standard Jobs
+              {jobs.length > 0 && (
+                <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none ${activeTab === "jobs" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"}`}>
+                  {jobs.length}
+                </span>
+              )}
+            </span>
           </button>
           <button
             onClick={() => setActiveTab("forms")}
-            className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-[13px] font-semibold transition-all ${
+            className={`flex flex-1 flex-col items-start gap-1 rounded-xl px-4 py-2.5 text-left transition-all ${
               activeTab === "forms"
                 ? "bg-violet-600 text-white shadow-[0_2px_8px_rgba(124,58,237,0.35)]"
                 : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
             }`}
           >
-            <FormIcon size={14} />
-            Form Jobs
-            {forms.length > 0 && (
-              <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none ${activeTab === "forms" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"}`}>
-                {forms.length}
-              </span>
-            )}
+            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide ${
+              activeTab === "forms" ? "bg-white/20 text-white" : "bg-amber-50 text-amber-700 border border-amber-200/80"
+            }`}>
+              🏷 Small Business
+            </span>
+            <span className="flex items-center gap-2 text-[13px] font-semibold">
+              <FormIcon size={14} />
+              Form Jobs
+              {forms.length > 0 && (
+                <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none ${activeTab === "forms" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"}`}>
+                  {forms.length}
+                </span>
+              )}
+            </span>
           </button>
         </div>
 
         {/* ── Standard Jobs tab ─────────────────────────────────────────── */}
         {activeTab === "jobs" && (
           <>
-            {/* Premium tag */}
-            <div className="mb-5 flex flex-wrap items-center gap-2.5">
-              <div className="relative inline-flex shrink-0 items-center gap-1.5 overflow-hidden rounded-full border border-amber-300/90 bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 px-3 py-1.5 shadow-sm">
-                <div className="animate-gold-shimmer absolute inset-0 w-1/2 bg-gradient-to-r from-transparent via-white/55 to-transparent" />
-                <span className="relative text-[11px] leading-none">✦</span>
-                <span className="relative whitespace-nowrap text-[11px] font-extrabold tracking-tight text-amber-900">Made for Big Business</span>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {["Large Companies", "Corporate Hiring", "Enterprise Recruitment", "Structured Teams"].map(ex => (
-                  <span key={ex} className="rounded-full border border-amber-200/80 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">{ex}</span>
-                ))}
-              </div>
+            {/* Example roles */}
+            <div className="mb-5 flex flex-wrap items-center gap-1.5">
+              {["Large Companies", "Corporate Hiring", "Enterprise Recruitment", "Structured Teams"].map(ex => (
+                <span key={ex} className="rounded-full border border-amber-200/80 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">{ex}</span>
+              ))}
             </div>
 
             {/* Filter row */}
@@ -694,18 +701,11 @@ function RecruitDashboardContent() {
         {/* ── Form Jobs tab ──────────────────────────────────────────────── */}
         {activeTab === "forms" && (
           <>
-            {/* Premium tag */}
-            <div className="mb-5 flex flex-wrap items-center gap-2.5">
-              <div className="relative inline-flex shrink-0 items-center gap-1.5 overflow-hidden rounded-full border border-amber-300/90 bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 px-3 py-1.5 shadow-sm">
-                <div className="animate-gold-shimmer absolute inset-0 w-1/2 bg-gradient-to-r from-transparent via-white/55 to-transparent" />
-                <span className="relative text-[11px] leading-none">✦</span>
-                <span className="relative whitespace-nowrap text-[11px] font-extrabold tracking-tight text-amber-900">Made for Small Business</span>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {["Script Writer", "Video Editor", "Content Creator", "Graphic Designer"].map(ex => (
-                  <span key={ex} className="rounded-full border border-amber-200/80 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">{ex}</span>
-                ))}
-              </div>
+            {/* Example roles */}
+            <div className="mb-5 flex flex-wrap items-center gap-1.5">
+              {["Script Writer", "Video Editor", "Content Creator", "Graphic Designer"].map(ex => (
+                <span key={ex} className="rounded-full border border-amber-200/80 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">{ex}</span>
+              ))}
             </div>
 
             {/* Filter row */}
