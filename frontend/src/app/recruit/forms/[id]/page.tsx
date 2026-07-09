@@ -18,7 +18,26 @@ const STAGES: { id: Stage; label: string; color: string; bg: string }[] = [
   { id: "rejected", label: "Rejected", color: "text-rose-600", bg: "bg-rose-50 border-rose-200" },
 ];
 
+type QuestionType =
+  | "short" | "paragraph" | "number" | "email"
+  | "phone" | "dropdown" | "multiple_choice" | "yes_no" | "file";
+
+type FormQuestion = {
+  id: string;
+  label: string;
+  type: QuestionType;
+  required: boolean;
+  options: string[];
+  placeholder: string;
+};
+
 type Answer = { questionId: string; label: string; value: string };
+
+type AnswerSignal = {
+  questionId: string;
+  signal: "strong" | "ok" | "thin";
+  note: string;
+};
 
 type FormResponse = {
   _id: string;
@@ -28,6 +47,7 @@ type FormResponse = {
   aiSummary: string;
   strengths: string[];
   redFlags: string[];
+  answerSignals: AnswerSignal[];
   scoringFailed: boolean;
   stage: Stage;
   submittedName: string;
@@ -44,8 +64,11 @@ type Form = {
   slug: string;
   status: "active" | "closed";
   responseCount: number;
+  questions: FormQuestion[];
   createdAt: string;
 };
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function scoreColor(pct: number) {
   if (pct >= 75) return "text-emerald-600";
@@ -69,6 +92,181 @@ function timeAgo(dateStr: string) {
   if (days < 30) return `${days}d ago`;
   return new Date(dateStr).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
 }
+
+function SparkIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
+    </svg>
+  );
+}
+
+function RetryIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+      <path d="M3 3v5h5"/>
+    </svg>
+  );
+}
+
+function SpinnerIcon() {
+  return (
+    <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+    </svg>
+  );
+}
+
+// ─── Answer signal badge ──────────────────────────────────────────────────────
+
+function SignalBadge({ signal, note }: { signal: "strong" | "ok" | "thin"; note: string }) {
+  if (signal === "strong") {
+    return (
+      <span title={note} className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold text-emerald-700 shrink-0">
+        <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        Strong
+      </span>
+    );
+  }
+  if (signal === "thin") {
+    return (
+      <span title={note} className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-bold text-amber-700 shrink-0">
+        <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Thin
+      </span>
+    );
+  }
+  return null; // "ok" — no badge, keep UI clean
+}
+
+// Dark-theme signal badge (for the info modal)
+function SignalBadgeDark({ signal, note }: { signal: "strong" | "ok" | "thin"; note: string }) {
+  if (signal === "strong") {
+    return (
+      <span title={note} className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 px-2 py-0.5 text-[10px] font-bold text-emerald-400 shrink-0">
+        <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        Strong
+      </span>
+    );
+  }
+  if (signal === "thin") {
+    return (
+      <span title={note} className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 border border-amber-500/25 px-2 py-0.5 text-[10px] font-bold text-amber-400 shrink-0">
+        <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Thin
+      </span>
+    );
+  }
+  return null;
+}
+
+// ─── Scoring Criteria Card ─────────────────────────────────────────────────────
+
+const CONTACT_KEYWORDS = ["name", "email", "phone", "mobile", "contact", "address"];
+const STRUCTURAL_TYPES: QuestionType[] = ["email", "phone", "number", "file"];
+
+function isContactQuestion(q: FormQuestion): boolean {
+  const lbl = q.label.toLowerCase();
+  return (
+    STRUCTURAL_TYPES.includes(q.type) ||
+    CONTACT_KEYWORDS.some(k => lbl.includes(k))
+  );
+}
+
+function buildCriteriaFromQuestions(questions: FormQuestion[], formTitle: string): string[] {
+  const criteria: string[] = [];
+
+  const hasResume = questions.some(q => q.type === "file");
+  const evalQuestions = questions.filter(q => !isContactQuestion(q));
+
+  if (evalQuestions.length === 0 && !hasResume) {
+    criteria.push(`Overall relevance and fit for "${formTitle}"`);
+    return criteria;
+  }
+
+  for (const q of evalQuestions) {
+    const lbl = q.label;
+    if (q.type === "paragraph" || q.type === "short") {
+      criteria.push(`"${lbl}" — depth, specificity, and relevance of the answer`);
+    } else if (q.type === "yes_no") {
+      criteria.push(`"${lbl}" — whether the response meets the requirement`);
+    } else if (q.type === "dropdown" || q.type === "multiple_choice") {
+      criteria.push(`"${lbl}" — alignment of the selected option with role needs`);
+    } else {
+      criteria.push(`"${lbl}"`);
+    }
+  }
+
+  if (hasResume) {
+    criteria.push("Resume quality — experience and skills relevant to the role");
+  }
+
+  return criteria;
+}
+
+function ScoringCriteriaCard({ questions, formTitle }: { questions: FormQuestion[]; formTitle: string }) {
+  const [open, setOpen] = useState(false);
+  const criteria = buildCriteriaFromQuestions(questions, formTitle);
+  const hasResume = questions.some(q => q.type === "file");
+
+  return (
+    <div className="rounded-2xl border border-violet-200 bg-violet-50 overflow-hidden">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-violet-100/60 transition"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-violet-500"><SparkIcon /></span>
+          <span className="text-xs font-bold text-violet-700">What the AI looks for</span>
+          <span className="rounded-full bg-violet-200 px-2 py-0.5 text-[10px] font-bold text-violet-600">{criteria.length} dimension{criteria.length !== 1 ? "s" : ""}</span>
+        </div>
+        <svg
+          className={`w-3.5 h-3.5 text-violet-500 transition-transform ${open ? "rotate-180" : ""}`}
+          fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"
+        >
+          <path d="m6 9 6 6 6-6"/>
+        </svg>
+      </button>
+
+      {open && (
+        <div className="px-4 pb-4 space-y-3 border-t border-violet-100">
+          <p className="text-[11px] text-violet-500/80 pt-3 leading-5">
+            The AI evaluates every response against these dimensions and assigns an overall score from 0–100.
+            {hasResume && " Resume quality is factored in alongside the form answers."}
+          </p>
+
+          <div className="space-y-1.5">
+            {criteria.map((c, i) => (
+              <div key={i} className="flex items-start gap-2 text-[11px] text-violet-800">
+                <span className="mt-0.5 text-violet-400 shrink-0">·</span>
+                <span>{c}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="rounded-xl border border-violet-200/60 bg-white/60 px-3 py-2.5 space-y-1">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-violet-400 mb-1.5">Score tiers</p>
+            {[
+              { range: "80–100", label: "Strong fit", color: "text-emerald-600" },
+              { range: "60–79", label: "Good candidate, minor gaps", color: "text-blue-600" },
+              { range: "40–59", label: "Partial match, unclear fit", color: "text-amber-600" },
+              { range: "0–39", label: "Significant mismatch or thin answers", color: "text-rose-500" },
+            ].map(t => (
+              <div key={t.range} className="flex items-center gap-2 text-[11px]">
+                <span className={`font-bold w-12 shrink-0 ${t.color}`}>{t.range}</span>
+                <span className="text-slate-500">{t.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Share modal ───────────────────────────────────────────────────────────────
 
 function ShareModal({ slug, title, onClose }: { slug: string; title: string; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
@@ -129,6 +327,8 @@ function ShareModal({ slug, title, onClose }: { slug: string; title: string; onC
   );
 }
 
+// ─── Resume section (for info modal) ──────────────────────────────────────────
+
 function FormResumeSection({ resumeText }: { resumeText: string }) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -171,6 +371,8 @@ function FormResumeSection({ resumeText }: { resumeText: string }) {
   );
 }
 
+// ─── Info modal ────────────────────────────────────────────────────────────────
+
 function FormResponseInfoModal({ r, onClose }: { r: FormResponse; onClose: () => void }) {
   const [copiedField, setCopiedField] = useState<"email" | "phone" | null>(null);
 
@@ -178,6 +380,9 @@ function FormResponseInfoModal({ r, onClose }: { r: FormResponse; onClose: () =>
   const displayEmail = r.submittedEmail || r.answers.find(a => a.label.toLowerCase().includes("email"))?.value || "";
   const appliedDate = r.createdAt ? new Date(r.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : null;
   const textAnswers = r.answers.filter(a => a.value && a.value.trim() && a.value !== "__file_uploaded__");
+
+  const signalMap: Record<string, AnswerSignal> = {};
+  for (const s of (r.answerSignals || [])) signalMap[s.questionId] = s;
 
   function copy(text: string, field: "email" | "phone") {
     navigator.clipboard.writeText(text).catch(() => {});
@@ -312,16 +517,25 @@ function FormResponseInfoModal({ r, onClose }: { r: FormResponse; onClose: () =>
             </div>
           )}
 
-          {/* Form answers */}
+          {/* Form answers with per-answer signals */}
           {textAnswers.length > 0 && (
             <div className="space-y-2">
               <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 px-1">Form Answers</p>
-              {textAnswers.map(a => (
-                <div key={a.questionId} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
-                  <p className="text-[10px] font-bold text-gray-500 mb-1.5">{a.label}</p>
-                  <p className="text-xs text-gray-200 leading-5 whitespace-pre-wrap">{a.value}</p>
-                </div>
-              ))}
+              {textAnswers.map(a => {
+                const sig = signalMap[a.questionId];
+                return (
+                  <div key={a.questionId} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
+                    <div className="flex items-start justify-between gap-2 mb-1.5">
+                      <p className="text-[10px] font-bold text-gray-500">{a.label}</p>
+                      {sig && <SignalBadgeDark signal={sig.signal} note={sig.note} />}
+                    </div>
+                    <p className="text-xs text-gray-200 leading-5 whitespace-pre-wrap">{a.value}</p>
+                    {sig?.note && (
+                      <p className="mt-1.5 text-[10px] text-gray-500 italic">{sig.note}</p>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
 
@@ -347,6 +561,8 @@ function FormResponseInfoModal({ r, onClose }: { r: FormResponse; onClose: () =>
   );
 }
 
+// ─── Response card ─────────────────────────────────────────────────────────────
+
 function ResponseCard({ r, token, formId, onUpdate }: {
   r: FormResponse; token: string; formId: string;
   onUpdate: (id: string, patch: Partial<FormResponse>) => void;
@@ -354,6 +570,8 @@ function ResponseCard({ r, token, formId, onUpdate }: {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState<"email" | "phone" | null>(null);
   const [showInfo, setShowInfo] = useState(false);
+  const [loadingRetry, setLoadingRetry] = useState(false);
+  const [retryError, setRetryError] = useState("");
 
   async function updateStage(stage: Stage) {
     try {
@@ -366,6 +584,32 @@ function ResponseCard({ r, token, formId, onUpdate }: {
     } catch { /* silent */ }
   }
 
+  async function retryScoring() {
+    setLoadingRetry(true);
+    setRetryError("");
+    try {
+      const res = await fetch(apiUrl(`/recruit/forms/${formId}/responses/${r._id}/retry-score`), {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await readApiJson(res);
+      if (!res.ok) throw new Error(data.error || "Retry failed.");
+      const updated = data.response;
+      onUpdate(r._id, {
+        aiScore: updated.aiScore,
+        aiSummary: updated.aiSummary,
+        strengths: updated.strengths,
+        redFlags: updated.redFlags,
+        answerSignals: updated.answerSignals,
+        scoringFailed: updated.scoringFailed,
+      });
+    } catch (e: any) {
+      setRetryError(e.message || "Retry failed. Please try again.");
+    } finally {
+      setLoadingRetry(false);
+    }
+  }
+
   function copy(text: string, field: "email" | "phone") {
     navigator.clipboard.writeText(text).catch(() => {});
     setCopied(field);
@@ -376,6 +620,10 @@ function ResponseCard({ r, token, formId, onUpdate }: {
   const displayName = r.submittedName || r.answers.find(a => a.label.toLowerCase().includes("name"))?.value || "Candidate";
   const displayEmail = r.submittedEmail || r.answers.find(a => a.label.toLowerCase().includes("email"))?.value || "";
   const textAnswers = r.answers.filter(a => a.value && a.value.trim() && a.value !== "__file_uploaded__");
+
+  // Build a map from questionId → signal for O(1) lookup
+  const signalMap: Record<string, AnswerSignal> = {};
+  for (const s of (r.answerSignals || [])) signalMap[s.questionId] = s;
 
   return (
     <div className="rounded-3xl border border-slate-200 bg-white shadow-sm overflow-hidden">
@@ -395,10 +643,14 @@ function ResponseCard({ r, token, formId, onUpdate }: {
             {displayEmail && <p className="text-xs text-slate-500">{displayEmail}</p>}
             <p className="text-[11px] text-slate-400 mt-0.5">{timeAgo(r.createdAt)}</p>
           </div>
-          {!r.scoringFailed && (
+          {!r.scoringFailed ? (
             <div className="text-right shrink-0">
               <p className={`text-xl font-bold leading-none ${scoreColor(r.aiScore)}`}>{r.aiScore}%</p>
               <p className="text-[10px] text-slate-400 mt-0.5">AI score</p>
+            </div>
+          ) : (
+            <div className="text-right shrink-0">
+              <p className="text-sm font-semibold text-amber-500 leading-snug">Scoring<br/>unavailable</p>
             </div>
           )}
         </div>
@@ -410,14 +662,15 @@ function ResponseCard({ r, token, formId, onUpdate }: {
           </div>
         )}
 
-        {/* AI Summary */}
+        {/* AI Summary / scoring failed notice */}
         {r.aiSummary && !r.scoringFailed && (
           <p className="text-xs text-slate-600 leading-5 line-clamp-2 mb-3">{r.aiSummary}</p>
         )}
         {r.scoringFailed && (
-          <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-3">
-            AI scoring unavailable for this response.
-          </p>
+          <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
+            <p className="text-xs text-amber-700">AI scoring unavailable — click &ldquo;Retry Scoring&rdquo; to try again.</p>
+            {retryError && <p className="mt-1 text-[11px] text-rose-500">{retryError}</p>}
+          </div>
         )}
 
         {/* Actions row */}
@@ -450,6 +703,17 @@ function ResponseCard({ r, token, formId, onUpdate }: {
               <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,12 2,6"/></svg>
               Email
             </a>
+          )}
+
+          {r.scoringFailed && (
+            <button
+              onClick={retryScoring}
+              disabled={loadingRetry}
+              className="flex items-center gap-1 rounded-xl border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-[11px] font-semibold text-amber-700 hover:bg-amber-100 transition disabled:opacity-50"
+            >
+              {loadingRetry ? <SpinnerIcon /> : <RetryIcon />}
+              {loadingRetry ? "Retrying…" : "Retry Scoring"}
+            </button>
           )}
         </div>
       </div>
@@ -516,17 +780,26 @@ function ResponseCard({ r, token, formId, onUpdate }: {
             </div>
           )}
 
-          {/* All answers */}
+          {/* All answers with per-answer signals */}
           {textAnswers.length > 0 && (
             <div>
               <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Form Answers</p>
               <div className="space-y-2">
-                {textAnswers.map(a => (
-                  <div key={a.questionId} className="rounded-xl border border-slate-200 bg-white px-3.5 py-2.5">
-                    <p className="text-[10px] font-bold text-slate-400 mb-0.5">{a.label}</p>
-                    <p className="text-sm text-slate-800 whitespace-pre-wrap">{a.value}</p>
-                  </div>
-                ))}
+                {textAnswers.map(a => {
+                  const sig = signalMap[a.questionId];
+                  return (
+                    <div key={a.questionId} className="rounded-xl border border-slate-200 bg-white px-3.5 py-2.5">
+                      <div className="flex items-start justify-between gap-2 mb-1">
+                        <p className="text-[10px] font-bold text-slate-400">{a.label}</p>
+                        {sig && <SignalBadge signal={sig.signal} note={sig.note} />}
+                      </div>
+                      <p className="text-sm text-slate-800 whitespace-pre-wrap">{a.value}</p>
+                      {sig?.note && sig.signal !== "ok" && (
+                        <p className="mt-1 text-[10px] text-slate-400 italic">{sig.note}</p>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -535,6 +808,8 @@ function ResponseCard({ r, token, formId, onUpdate }: {
     </div>
   );
 }
+
+// ─── Page ──────────────────────────────────────────────────────────────────────
 
 function FormResponsesContent({ id }: { id: string }) {
   const router = useRouter();
@@ -653,6 +928,11 @@ function FormResponsesContent({ id }: { id: string }) {
             </div>
           ))}
         </div>
+
+        {/* Scoring criteria card — only show when there are form questions */}
+        {form.questions && form.questions.length > 0 && (
+          <ScoringCriteriaCard questions={form.questions} formTitle={form.title} />
+        )}
 
         {/* Filter tabs */}
         <div className="flex flex-wrap gap-2 items-center">
