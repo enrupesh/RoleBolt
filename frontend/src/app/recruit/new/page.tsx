@@ -23,11 +23,50 @@ function NewJobChoiceContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <svg className="animate-spin h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-        </svg>
+      <div className="min-h-screen bg-slate-50 animate-[rb-fade-in_0.3s_ease_both]">
+        <header className="sticky top-0 z-20 bg-white border-b border-slate-200 shadow-sm">
+          <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3.5 sm:px-6">
+            <div className="flex items-center gap-2.5">
+              <div className="h-8 w-8 rounded-xl rb-skeleton" />
+              <div className="h-4 w-16 rounded-full rb-skeleton" />
+            </div>
+            <div className="h-4 w-28 rounded-full rb-skeleton" />
+          </div>
+        </header>
+        <main className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
+          <div className="text-center mb-10 space-y-2">
+            <div className="h-7 w-48 rounded-lg rb-skeleton mx-auto" />
+            <div className="h-4 w-64 rounded-full rb-skeleton mx-auto" />
+          </div>
+          <div className="grid gap-5 sm:grid-cols-2">
+            <div className="rounded-3xl border-2 border-slate-200 bg-white p-7 space-y-4">
+              <div className="h-12 w-12 rounded-2xl rb-skeleton" />
+              <div className="h-5 w-40 rounded-lg rb-skeleton" />
+              <div className="space-y-2">
+                <div className="h-3.5 w-full rounded-full rb-skeleton" />
+                <div className="h-3.5 w-4/5 rounded-full rb-skeleton" />
+                <div className="h-3.5 w-3/5 rounded-full rb-skeleton" />
+              </div>
+              <div className="flex gap-2">
+                <div className="h-5 w-16 rounded-full rb-skeleton" />
+                <div className="h-5 w-20 rounded-full rb-skeleton" />
+              </div>
+            </div>
+            <div className="rounded-3xl border-2 border-slate-200 bg-white p-7 space-y-4">
+              <div className="h-12 w-12 rounded-2xl rb-skeleton" />
+              <div className="h-5 w-32 rounded-lg rb-skeleton" />
+              <div className="space-y-2">
+                <div className="h-3.5 w-full rounded-full rb-skeleton" />
+                <div className="h-3.5 w-4/5 rounded-full rb-skeleton" />
+                <div className="h-3.5 w-3/5 rounded-full rb-skeleton" />
+              </div>
+              <div className="flex gap-2">
+                <div className="h-5 w-16 rounded-full rb-skeleton" />
+                <div className="h-5 w-20 rounded-full rb-skeleton" />
+              </div>
+            </div>
+          </div>
+        </main>
       </div>
     );
   }

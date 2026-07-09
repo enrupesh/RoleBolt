@@ -83,16 +83,27 @@ export default function RecruiterProfilePage({ params }: { params: Promise<{ job
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-white">
+      <div className="min-h-screen bg-white animate-[rb-fade-in_0.3s_ease_both]">
         <RecruitHeader />
-        <div className="flex items-center justify-center py-32">
-          <div className="flex items-center gap-3 text-slate-400 text-sm">
-            <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-            Loading recruiter profile…
+        <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 space-y-5">
+          {/* Company banner */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 flex items-center gap-5">
+            <div className="h-16 w-16 rounded-2xl rb-skeleton shrink-0" />
+            <div className="flex-1 space-y-2.5">
+              <div className="h-5 w-48 rounded-lg rb-skeleton" />
+              <div className="h-3.5 w-32 rounded-full rb-skeleton" />
+              <div className="h-3.5 w-64 rounded-full rb-skeleton" />
+            </div>
           </div>
+          {/* Content blocks */}
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="rounded-2xl border border-slate-200 bg-white p-6 space-y-3">
+              <div className="h-4 w-32 rounded-full rb-skeleton" />
+              <div className="h-3.5 w-full rounded-full rb-skeleton" />
+              <div className="h-3.5 w-5/6 rounded-full rb-skeleton" />
+              <div className="h-3.5 w-4/6 rounded-full rb-skeleton" />
+            </div>
+          ))}
         </div>
       </div>
     );
