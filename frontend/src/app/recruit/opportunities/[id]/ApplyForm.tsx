@@ -75,10 +75,38 @@ const STEPS = [
 /* ─── Shared input styles ────────────────────────────────────────────────── */
 const inputCls =
   "w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none focus:border-[#0a66c2] focus:ring-2 focus:ring-[#0a66c2]/10 transition placeholder:text-slate-400";
+const inputErrorCls =
+  "w-full rounded-xl border border-red-300 bg-red-50/40 px-3.5 py-2.5 text-sm text-slate-800 outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100 transition placeholder:text-slate-400";
 const selectCls =
   "w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none focus:border-[#0a66c2] transition";
 const labelCls =
   "mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-slate-400";
+const fieldErrCls = "mt-1 text-[11px] font-medium text-red-600";
+
+/* ─── Validation helpers ──────────────────────────────────────────────────── */
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/;
+
+function isValidEmail(v: string): boolean {
+  return EMAIL_RE.test(v.trim());
+}
+
+// Normalize first (strip everything but leading "+" and digits), then validate the
+// canonical form. This keeps input permissive (any spacing/parens/hyphens are fine)
+// while the underlying rule stays simple: optional leading "+", 7-15 digits.
+function normalizePhone(v: string): string {
+  const trimmed = v.trim();
+  const hasPlus = trimmed.startsWith("+");
+  const digits = trimmed.replace(/[^0-9]/g, "");
+  return (hasPlus ? "+" : "") + digits;
+}
+
+function isValidPhone(v: string): boolean {
+  const trimmed = v.trim();
+  if (!trimmed) return true; // phone is optional — only validate format if provided
+  const normalized = normalizePhone(trimmed);
+  const digitCount = normalized.replace(/[^0-9]/g, "").length;
+  return /^\+?[0-9]+$/.test(normalized) && digitCount >= 7 && digitCount <= 15;
+}
 
 /* ─── Helper: extract name suggestion from LinkedIn URL ──────────────────── */
 function suggestNameFromLinkedIn(url: string): string {
@@ -366,6 +394,7 @@ export default function ApplyForm({
   const [form, setForm] = useState<Form>(EMPTY);
   const [step, setStep] = useState<Step>(1);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof Form, string>>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [draftSaved, setDraftSaved] = useState(false);
@@ -418,6 +447,35 @@ export default function ApplyForm({
   function set<K extends keyof Form>(key: K, value: string) {
     setForm(prev => ({ ...prev, [key]: value }));
     setError("");
+    setFieldErrors(prev => (prev[key] ? { ...prev, [key]: undefined } : prev));
+  }
+
+  function validateField(key: keyof Form, value: string): string {
+    switch (key) {
+      case "name":
+        return value.trim() ? "" : "Full name is required.";
+      case "email":
+        if (!value.trim()) return "Email address is required.";
+        return isValidEmail(value) ? "" : "Please enter a valid email address (e.g. name@example.com).";
+      case "phone":
+        return isValidPhone(value) ? "" : "Please enter a valid phone number (digits only, 7–15 digits, optional + country code).";
+      default:
+        return "";
+    }
+  }
+
+  function handleBlur(key: keyof Form) {
+    const msg = validateField(key, form[key]);
+    setFieldErrors(prev => ({ ...prev, [key]: msg || undefined }));
+  }
+
+  function handlePhoneChange(value: string) {
+    // Only allow digits, spaces, +, -, ( ) — block letters/other special characters at input time.
+    // Keep a leading "+" only; strip any "+" that appears elsewhere in the string.
+    let cleaned = value.replace(/[^0-9+\s\-()]/g, "");
+    const hasLeadingPlus = cleaned.startsWith("+");
+    cleaned = (hasLeadingPlus ? "+" : "") + cleaned.replace(/\+/g, "");
+    set("phone", cleaned);
   }
 
   /* LinkedIn URL auto-suggest name */
@@ -441,14 +499,20 @@ export default function ApplyForm({
   /* ── Validation per step ── */
   function validateStep(s: Step): string {
     if (s === 1) {
-      if (!form.name.trim()) return "Please enter your full name.";
-      if (!form.email.trim()) return "Please enter your email address.";
-      if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
-        return "Please enter a valid email address.";
+      const nameErr = validateField("name", form.name);
+      const emailErr = validateField("email", form.email);
+      const phoneErr = validateField("phone", form.phone);
+      setFieldErrors(prev => ({ ...prev, name: nameErr || undefined, email: emailErr || undefined, phone: phoneErr || undefined }));
+      if (nameErr) return nameErr;
+      if (emailErr) return emailErr;
+      if (phoneErr) return phoneErr;
     }
     if (s === 3) {
-      if (!form.resumeText.trim())
+      if (!form.resumeText.trim()) {
+        setFieldErrors(prev => ({ ...prev, resumeText: "Please add your resume or work history." }));
         return "Please upload your resume or type/paste your work history — recruiters need this.";
+      }
+      setFieldErrors(prev => ({ ...prev, resumeText: undefined }));
     }
     return "";
   }
@@ -468,6 +532,10 @@ export default function ApplyForm({
   }
 
   async function submit() {
+    const step1Err = validateStep(1);
+    if (step1Err) { setError(step1Err); setStep(1); return; }
+    const step3Err = validateStep(3);
+    if (step3Err) { setError(step3Err); setStep(3); return; }
     setSubmitting(true);
     setError("");
     try {
@@ -537,11 +605,14 @@ export default function ApplyForm({
                 <input
                   value={form.name}
                   onChange={e => set("name", e.target.value)}
+                  onBlur={() => handleBlur("name")}
                   placeholder="Rahul Sharma"
-                  className={inputCls}
+                  className={fieldErrors.name ? inputErrorCls : inputCls}
                   autoFocus
                   autoComplete="name"
+                  aria-invalid={Boolean(fieldErrors.name)}
                 />
+                {fieldErrors.name && <p className={fieldErrCls}>{fieldErrors.name}</p>}
               </div>
 
               <div>
@@ -549,24 +620,30 @@ export default function ApplyForm({
                 <input
                   value={form.email}
                   onChange={e => set("email", e.target.value)}
+                  onBlur={() => handleBlur("email")}
                   placeholder="rahul@email.com"
                   type="email"
-                  className={inputCls}
+                  className={fieldErrors.email ? inputErrorCls : inputCls}
                   autoComplete="email"
+                  aria-invalid={Boolean(fieldErrors.email)}
                 />
+                {fieldErrors.email && <p className={fieldErrCls}>{fieldErrors.email}</p>}
               </div>
 
               <div>
                 <label className={labelCls}>Phone number</label>
                 <input
                   value={form.phone}
-                  onChange={e => set("phone", e.target.value)}
+                  onChange={e => handlePhoneChange(e.target.value)}
+                  onBlur={() => handleBlur("phone")}
                   placeholder="+91 98765 43210"
                   type="tel"
-                  className={inputCls}
+                  className={fieldErrors.phone ? inputErrorCls : inputCls}
                   autoComplete="tel"
                   inputMode="tel"
+                  aria-invalid={Boolean(fieldErrors.phone)}
                 />
+                {fieldErrors.phone && <p className={fieldErrCls}>{fieldErrors.phone}</p>}
               </div>
 
               <div>
@@ -744,11 +821,14 @@ export default function ApplyForm({
                 <textarea
                   value={form.resumeText}
                   onChange={e => set("resumeText", e.target.value)}
+                  onBlur={() => setFieldErrors(prev => ({ ...prev, resumeText: form.resumeText.trim() ? undefined : "Please add your resume or work history." }))}
                   placeholder="Paste your resume, LinkedIn summary, or work history here. Include skills, experience, education and achievements for the best AI match score…"
                   rows={9}
-                  className={`${inputCls} resize-none leading-relaxed`}
+                  className={`${fieldErrors.resumeText ? inputErrorCls : inputCls} resize-none leading-relaxed`}
                   autoFocus
+                  aria-invalid={Boolean(fieldErrors.resumeText)}
                 />
+                {fieldErrors.resumeText && <p className={fieldErrCls}>{fieldErrors.resumeText}</p>}
                 <p className="mt-1 text-[11px] text-slate-400">
                   Tip: Copy-paste from your LinkedIn &quot;About&quot; + &quot;Experience&quot; for a quick fill.
                 </p>
