@@ -1,5 +1,5 @@
-const DEFAULT_BACKEND_URL = "https://raina-1.onrender.com";
-const FRONTEND_HOSTS = new Set(["rolebolt.app", "www.rolebolt.app"]);
+const DEFAULT_BACKEND_URL = "https://ratheeji.onrender.com";
+const FRONTEND_HOSTS = new Set(["forjob.onrender.com", "rolebolt.app", "www.rolebolt.app"]);
 
 function defaultApiBaseUrl(): string {
   if (process.env.NODE_ENV === "production") return DEFAULT_BACKEND_URL;

@@ -220,7 +220,14 @@ function RecruitDiagnosticsContent() {
       apiUrl("/recruit/pipeline-summary")
     );
 
-    const initial = [publicJobs, backendHealth, authGuard, authenticated];
+    const smtpCheck = baseCheck(
+      "smtp",
+      "SMTP email connectivity",
+      "Connects to the configured SMTP server and verifies credentials without sending a real email. Fails if SMTP env vars are missing or the host is unreachable.",
+      apiUrl("/recruit/smtp-verify")
+    );
+
+    const initial = [publicJobs, backendHealth, authGuard, authenticated, smtpCheck];
     setChecks(initial);
     setRunning(true);
 
@@ -266,7 +273,12 @@ function RecruitDiagnosticsContent() {
       ));
     }
 
-    setChecks(results);
+    results.push(await runJsonCheck(smtpCheck, smtpCheck.endpoint, {}, (response, data) => ({
+      status: response.ok ? "pass" : response.status === 502 ? "fail" : "warn",
+      message: data?.message || (response.ok ? "SMTP is reachable and credentials are valid." : "SMTP check failed — see message for details."),
+    })));
+    setChecks([...results]);
+
     setLastRun(new Date().toLocaleString());
     setRunning(false);
   }
