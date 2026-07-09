@@ -266,6 +266,74 @@ function CopyShareModal({ form, onClose }: { form: Form; onClose: () => void }) 
   );
 }
 
+function DeleteFormModal({ form, token, onClose, onDeleted }: { form: Form; token: string; onClose: () => void; onDeleted: (id: string) => void }) {
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleDelete() {
+    setDeleting(true);
+    setError("");
+    try {
+      const res = await fetch(apiUrl(`/recruit/forms/${form._id}`), {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const data = await readApiJson(res);
+        throw new Error(data.error || "Failed to delete form.");
+      }
+      onDeleted(form._id);
+      onClose();
+    } catch (e: any) {
+      setError(e.message || "Something went wrong. Please try again.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+      onClick={e => { if (e.target === e.currentTarget && !deleting) onClose(); }}
+    >
+      <div role="dialog" aria-modal="true" className="w-full max-w-sm rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
+        <div className="px-6 pt-6 pb-5">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-50 border border-rose-100 mb-4">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-rose-500">
+              <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+            </svg>
+          </div>
+          <h2 className="text-base font-bold text-slate-900 mb-1">Delete this form?</h2>
+          <p className="text-sm text-slate-500 leading-relaxed">
+            <span className="font-semibold text-slate-700">{form.title}</span> and all its responses will be permanently removed. This cannot be undone.
+          </p>
+          {error && <p className="mt-3 text-xs text-rose-600 font-medium">{error}</p>}
+        </div>
+        <div className="flex items-center gap-2 px-6 pb-6">
+          <button
+            onClick={onClose}
+            disabled={deleting}
+            className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100 transition disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-rose-700 transition disabled:opacity-50"
+          >
+            {deleting ? (
+              <><svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Deleting…</>
+            ) : (
+              "Delete Form"
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function RecruitDashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -282,6 +350,7 @@ function RecruitDashboardContent() {
   const [pipeline, setPipeline] = useState<PipelineSummary | null>(null);
   const [shareForm, setShareForm] = useState<Form | null>(null);
   const [jobToDelete, setJobToDelete] = useState<Job | null>(null);
+  const [formToDelete, setFormToDelete] = useState<Form | null>(null);
 
   useEffect(() => {
     const auth = getFirebaseAuth();
@@ -347,6 +416,14 @@ function RecruitDashboardContent() {
           token={token}
           onClose={() => setJobToDelete(null)}
           onDeleted={(id) => setJobs(prev => prev.filter(j => j._id !== id))}
+        />
+      )}
+      {formToDelete && token && (
+        <DeleteFormModal
+          form={formToDelete}
+          token={token}
+          onClose={() => setFormToDelete(null)}
+          onDeleted={(id) => setForms(prev => prev.filter(f => f._id !== id))}
         />
       )}
 
@@ -628,10 +705,19 @@ function RecruitDashboardContent() {
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
                           <FormIcon size={18} />
                         </div>
-                        <span className={`flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${isActive ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-slate-100 text-slate-500 border border-slate-200"}`}>
-                          <span className={`h-1.5 w-1.5 rounded-full ${isActive ? "bg-emerald-500" : "bg-slate-400"}`} />
-                          {isActive ? "Active" : "Closed"}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className={`flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${isActive ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-slate-100 text-slate-500 border border-slate-200"}`}>
+                            <span className={`h-1.5 w-1.5 rounded-full ${isActive ? "bg-emerald-500" : "bg-slate-400"}`} />
+                            {isActive ? "Active" : "Closed"}
+                          </span>
+                          <button
+                            onClick={e => { e.stopPropagation(); setFormToDelete(form); }}
+                            title="Delete form"
+                            className="flex items-center justify-center h-6 w-6 rounded-lg text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition opacity-0 group-hover:opacity-100"
+                          >
+                            <TrashIcon />
+                          </button>
+                        </div>
                       </div>
 
                       <Link href={`/recruit/forms/${form._id}`}>
