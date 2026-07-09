@@ -559,10 +559,47 @@ function RetryIcon() {
   return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /></svg>;
 }
 
+function ResumeSection({ resumeText }: { resumeText: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const PREVIEW_CHARS = 600;
+  const isLong = resumeText.length > PREVIEW_CHARS;
+  const displayed = expanded || !isLong ? resumeText : resumeText.slice(0, PREVIEW_CHARS) + "…";
+
+  function copyResume() {
+    navigator.clipboard.writeText(resumeText).catch(() => {});
+  }
+
+  return (
+    <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-4">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Resume</p>
+        <button
+          onClick={copyResume}
+          className="flex items-center gap-1 rounded-lg border border-white/[0.07] bg-white/[0.05] px-2.5 py-1 text-[10px] font-bold text-gray-400 hover:bg-white/[0.09] transition"
+          title="Copy full resume text"
+        >
+          <svg width="9" height="9" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          Copy
+        </button>
+      </div>
+      <pre className="text-[11px] text-gray-300 leading-5 whitespace-pre-wrap break-words font-sans">{displayed}</pre>
+      {isLong && (
+        <button
+          onClick={() => setExpanded(e => !e)}
+          className="mt-3 text-[11px] font-semibold text-sky-500 hover:text-sky-400 transition"
+        >
+          {expanded ? "Show less ↑" : "Show full resume ↓"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 type CandidateAppInfo = {
   name: string; email: string; phone?: string;
   location?: string; currentStatus?: string; educationLevel?: string;
   currentClassYear?: string; availability?: string; coverLetter?: string; linkedinUrl?: string;
+  resumeText?: string;
 };
 
 function ApplicantDetailsModal({ c, jobId, token, onClose }: {
@@ -590,7 +627,7 @@ function ApplicantDetailsModal({ c, jobId, token, onClose }: {
 
   const pct = (!c.scoringFailed && c.maxScore > 0) ? Math.round((c.totalScore / c.maxScore) * 100) : null;
   const appliedDate = c.createdAt ? new Date(c.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : null;
-  const hasExtraDetails = appData?.phone || appData?.linkedinUrl || appData?.location || appData?.coverLetter || appData?.currentStatus || appData?.educationLevel || appData?.availability;
+  const hasExtraDetails = appData?.phone || appData?.linkedinUrl || appData?.location || appData?.coverLetter || appData?.currentStatus || appData?.educationLevel || appData?.availability || appData?.resumeText;
 
   // Close on Escape key
   useEffect(() => {
@@ -751,6 +788,18 @@ function ApplicantDetailsModal({ c, jobId, token, onClose }: {
                   <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Cover Letter</p>
                   <p className="text-xs text-gray-400 leading-5 whitespace-pre-line">{appData.coverLetter}</p>
                 </div>
+              )}
+
+              {/* ── Resume ── */}
+              {appData?.resumeText ? (
+                <ResumeSection resumeText={appData.resumeText} />
+              ) : (
+                !loading && (
+                  <div className="rounded-2xl border border-dashed border-zinc-800 p-4">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Resume</p>
+                    <p className="text-xs text-gray-600">No resume was submitted with this application.</p>
+                  </div>
+                )
               )}
 
               {/* ── Empty state ── */}
