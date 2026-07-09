@@ -568,7 +568,7 @@ function RecruitDashboardContent() {
           <>
             {/* Example roles */}
             <div className="mb-5 flex flex-wrap items-center gap-1.5">
-              {["Large Companies", "Corporate Hiring", "Enterprise Recruitment", "Structured Teams"].map(ex => (
+              {["Large Companies", "Corporate Hiring", "Enterprise Recruitment", "Structured Teams", "etc."].map(ex => (
                 <span key={ex} className="rounded-full border border-amber-200/80 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">{ex}</span>
               ))}
             </div>
@@ -722,7 +722,7 @@ function RecruitDashboardContent() {
           <>
             {/* Example roles */}
             <div className="mb-5 flex flex-wrap items-center gap-1.5">
-              {["Script Writer", "Video Editor", "Content Creator", "Graphic Designer"].map(ex => (
+              {["Vlogger", "YouTuber", "Influencer", "Podcaster", "Freelancer", "Small Business", "etc."].map(ex => (
                 <span key={ex} className="rounded-full border border-amber-200/80 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">{ex}</span>
               ))}
             </div>
