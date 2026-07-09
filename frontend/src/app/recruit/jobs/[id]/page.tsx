@@ -27,6 +27,17 @@ type AssessmentImpact = {
   reasoning: string;
 };
 
+type EmailLogEntry = {
+  _id?: string;
+  type: string;
+  to: string;
+  subject: string;
+  body: string;
+  sentAt: string;
+  status: "sent" | "failed" | "skipped";
+  error?: string;
+};
+
 type Candidate = {
   _id: string;
   name: string;
@@ -50,6 +61,7 @@ type Candidate = {
   hiringDecision: HiringDecision;
   assessmentImpact?: AssessmentImpact;
   scoringFailed?: boolean;
+  emailLog?: EmailLogEntry[];
 };
 
 type RubricCriteria = { name: string; weight: number; description: string };
@@ -171,9 +183,15 @@ function CopyIcon() {
 function BellIcon() {
   return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg>;
 }
+function MailIcon() {
+  return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>;
+}
+function CheckIcon() {
+  return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>;
+}
 
-function AssessmentLinkModal({ link, candidateName, candidateEmail, onClose }: {
-  link: string; candidateName: string; candidateEmail: string; onClose: () => void;
+function AssessmentLinkModal({ link, candidateName, candidateEmail, emailSent, onClose }: {
+  link: string; candidateName: string; candidateEmail: string; emailSent?: boolean; onClose: () => void;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -189,24 +207,34 @@ function AssessmentLinkModal({ link, candidateName, candidateEmail, onClose }: {
       <div className="w-full max-w-lg rounded-[2rem] border border-white/[0.09] bg-[#0a0a0f] shadow-2xl">
         <div className="flex items-center justify-between border-b border-white/[0.07] px-6 py-4">
           <div>
-            <h2 className="text-sm font-semibold text-white">Assessment Link Ready</h2>
-            <p className="text-xs text-gray-400 mt-0.5">Share this with {candidateName}</p>
+            <h2 className="text-sm font-semibold text-white">Assessment Ready</h2>
+            <p className="text-xs text-gray-400 mt-0.5">For {candidateName}</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-white transition"><XIcon /></button>
         </div>
         <div className="p-6 space-y-4">
-          {candidateEmail && (
-            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] px-4 py-2.5">
-              <p className="text-[10px] text-gray-400 mb-0.5">Email</p>
-              <p className="text-sm text-gray-600">{candidateEmail}</p>
+          {!candidateEmail ? (
+            <div className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.06] px-4 py-2.5">
+              <p className="text-[11px] text-amber-300/80">No email address on file for {candidateName} — share this link manually.</p>
+            </div>
+          ) : emailSent ? (
+            <div className="flex items-center gap-2.5 rounded-2xl border border-emerald-500/25 bg-emerald-500/[0.08] px-4 py-3">
+              <span className="text-emerald-400 shrink-0"><CheckIcon /></span>
+              <p className="text-[12px] text-emerald-300 leading-5">
+                Assessment link emailed to <strong>{candidateEmail}</strong>. The URL below is a backup.
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.06] px-4 py-2.5">
+              <p className="text-[11px] text-amber-300/80">
+                Email not sent automatically (SMTP may not be configured). Copy this link and share with {candidateName} at <strong>{candidateEmail}</strong>.
+              </p>
             </div>
           )}
           <div>
-            <label className="block text-[11px] font-semibold uppercase tracking-widest text-gray-400 mb-2">Assessment URL</label>
+            <label className="block text-[11px] font-semibold uppercase tracking-widest text-gray-400 mb-2">Assessment URL (backup / share manually)</label>
             <div className="flex items-center gap-2">
-              <div className="flex-1 rounded-2xl border border-white/[0.08] bg-white px-4 py-3 text-xs text-gray-500 break-all min-w-0">
-                {link}
-              </div>
+              <div className="flex-1 rounded-2xl border border-white/[0.08] bg-white px-4 py-3 text-xs text-gray-500 break-all min-w-0">{link}</div>
               <button
                 onClick={copy}
                 className={`shrink-0 flex items-center gap-1.5 rounded-2xl px-4 py-3 text-xs font-semibold transition ${
@@ -217,60 +245,93 @@ function AssessmentLinkModal({ link, candidateName, candidateEmail, onClose }: {
               </button>
             </div>
           </div>
-          <div className="rounded-2xl border border-indigo-500/15 bg-indigo-500/[0.05] px-4 py-3">
-            <p className="text-[11px] text-indigo-300/70 leading-5">
-              Send this link to <strong>{candidateName}</strong> via email or WhatsApp. When they complete it, the AI will analyze their answers and update their score automatically.
-            </p>
-          </div>
         </div>
         <div className="flex justify-end border-t border-white/[0.07] px-6 py-4">
-          <button onClick={onClose} className="rounded-xl bg-indigo-500 px-5 py-2 text-sm font-bold text-white hover:bg-indigo-400 transition">
-            Done
-          </button>
+          <button onClick={onClose} className="rounded-xl bg-indigo-500 px-5 py-2 text-sm font-bold text-white hover:bg-indigo-400 transition">Done</button>
         </div>
       </div>
     </div>
   );
 }
 
-function RejectionEmailModal({ email, candidateName, candidateEmail, onClose }: {
-  email: string; candidateName: string; candidateEmail: string; onClose: () => void;
+function RejectionEmailModal({ email, candidateName, candidateEmail, jobId, candidateId, token, onClose, onSent }: {
+  email: string; candidateName: string; candidateEmail: string;
+  jobId: string; candidateId: string; token: string;
+  onClose: () => void; onSent: (entry: EmailLogEntry) => void;
 }) {
-  const [copied, setCopied] = useState(false);
+  const [body, setBody] = useState(email);
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [sendError, setSendError] = useState("");
+  const subject = `Update on your application`;
 
-  function copy() {
-    navigator.clipboard.writeText(email).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
+  async function send() {
+    if (!candidateEmail) { setSendError("No email address on file for this candidate."); return; }
+    setSending(true); setSendError("");
+    try {
+      const res = await fetch(apiUrl(`/recruit/jobs/${jobId}/candidates/${candidateId}/send-email`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ type: "rejected", subject, body }),
+      });
+      const data = await readApiJson(res);
+      if (!res.ok) throw new Error(data.error || "Send failed.");
+      setSent(true);
+      onSent({ type: "rejected", to: candidateEmail, subject, body, sentAt: data.sentAt || new Date().toISOString(), status: "sent" });
+    } catch (e: any) {
+      setSendError(e.message);
+      // Record failed attempt in history so log is always truthful
+      if (candidateEmail) {
+        onSent({ type: "rejected", to: candidateEmail, subject, body, sentAt: new Date().toISOString(), status: "failed", error: e.message });
+      }
+    }
+    finally { setSending(false); }
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-white/70 backdrop-blur-sm">
-      <div className="w-full max-w-xl rounded-[2rem] border border-white/[0.09] bg-[#0a0a0f] shadow-2xl">
-        <div className="flex items-center justify-between border-b border-white/[0.07] px-6 py-4">
+      <div className="w-full max-w-xl rounded-[2rem] border border-white/[0.09] bg-[#0a0a0f] shadow-2xl flex flex-col max-h-[90vh]">
+        <div className="flex items-center justify-between border-b border-white/[0.07] px-6 py-4 shrink-0">
           <div>
             <h2 className="text-sm font-semibold text-white">AI Rejection Email</h2>
-            <p className="text-xs text-gray-400 mt-0.5">For {candidateName}{candidateEmail ? ` · ${candidateEmail}` : ""}</p>
+            <p className="text-xs text-gray-400 mt-0.5">To: {candidateName}{candidateEmail ? ` · ${candidateEmail}` : " · ⚠ no email on file"}</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-white transition"><XIcon /></button>
         </div>
-        <div className="p-6">
-          <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] px-5 py-4 max-h-72 overflow-y-auto">
-            <p className="text-sm text-gray-600 leading-7 whitespace-pre-wrap">{email}</p>
-          </div>
-          <p className="mt-3 text-[11px] text-gray-400">Copy and send via your email client. You can edit before sending.</p>
+        <div className="p-6 flex-1 overflow-y-auto space-y-3">
+          {sent ? (
+            <div className="flex flex-col items-center gap-3 py-6 text-center">
+              <span className="text-3xl">✅</span>
+              <p className="text-sm font-semibold text-emerald-400">Email sent to {candidateEmail}</p>
+              <p className="text-xs text-gray-400">It will appear in the Email History panel below.</p>
+            </div>
+          ) : (
+            <>
+              <p className="text-[11px] text-gray-400">Edit the email below before sending. Your edits only affect this send — the AI text is not saved.</p>
+              <textarea
+                value={body}
+                onChange={e => setBody(e.target.value)}
+                rows={12}
+                className="w-full rounded-2xl border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-sm text-gray-200 leading-7 placeholder-zinc-600 outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/30 resize-none"
+              />
+              {sendError && <p className="text-xs text-rose-400">{sendError}</p>}
+            </>
+          )}
         </div>
-        <div className="flex justify-end gap-3 border-t border-white/[0.07] px-6 py-4">
-          <button onClick={onClose} className="rounded-xl border border-white/[0.08] px-4 py-2 text-sm text-gray-400 hover:text-white transition">Close</button>
-          <button
-            onClick={copy}
-            className={`flex items-center gap-2 rounded-xl px-5 py-2 text-sm font-bold transition ${
-              copied ? "bg-emerald-500 text-white" : "bg-indigo-500 text-white hover:bg-indigo-400"
-            }`}
-          >
-            <CopyIcon /> {copied ? "Copied!" : "Copy Email"}
+        <div className="flex justify-between gap-3 border-t border-white/[0.07] px-6 py-4 shrink-0">
+          <button onClick={onClose} className="rounded-xl border border-white/[0.08] px-4 py-2 text-sm text-gray-400 hover:text-white transition">
+            {sent ? "Close" : "Cancel"}
           </button>
+          {!sent && (
+            <button
+              onClick={send}
+              disabled={sending || !body.trim()}
+              className="flex items-center gap-2 rounded-xl bg-indigo-500 px-5 py-2 text-sm font-bold text-white hover:bg-indigo-400 disabled:opacity-50 transition"
+            >
+              {sending ? <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> : <SendIcon />}
+              {sending ? "Sending…" : "Send to Candidate"}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -279,11 +340,12 @@ function RejectionEmailModal({ email, candidateName, candidateEmail, onClose }: 
 
 const SOURCE_OPTIONS = ["LinkedIn", "Indeed", "Naukri", "Referral", "Company Website", "Angel List", "Walk-in", "Other"];
 
-function OfferLetterModal({ candidate, job, token, onClose }: {
+function OfferLetterModal({ candidate, job, token, onClose, onSent }: {
   candidate: Candidate & { name: string; email: string };
   job: Job;
   token: string;
   onClose: () => void;
+  onSent: (entry: EmailLogEntry) => void;
 }) {
   const [startDate, setStartDate] = useState("");
   const [salary, setSalary] = useState("");
@@ -296,6 +358,30 @@ function OfferLetterModal({ candidate, job, token, onClose }: {
   const [letter, setLetter] = useState("");
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  const [sendingOffer, setSendingOffer] = useState(false);
+  const [offerSent, setOfferSent] = useState(false);
+  const [offerSendError, setOfferSendError] = useState("");
+
+  async function sendOffer() {
+    if (!candidate.email) { setOfferSendError("No email address on file for this candidate."); return; }
+    setSendingOffer(true); setOfferSendError("");
+    const offerSubject = `Job Offer — ${job.title}`;
+    try {
+      const res = await fetch(apiUrl(`/recruit/jobs/${job._id}/candidates/${candidate._id}/send-email`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ type: "offer", subject: offerSubject, body: letter }),
+      });
+      const data = await readApiJson(res);
+      if (!res.ok) throw new Error(data.error || "Send failed.");
+      setOfferSent(true);
+      onSent({ type: "offer", to: candidate.email, subject: offerSubject, body: letter, sentAt: data.sentAt || new Date().toISOString(), status: "sent" });
+    } catch (e: any) {
+      setOfferSendError(e.message);
+      onSent({ type: "offer", to: candidate.email, subject: offerSubject, body: letter, sentAt: new Date().toISOString(), status: "failed", error: e.message });
+    }
+    finally { setSendingOffer(false); }
+  }
 
   async function generate(regenerate = false) {
     if (!startDate.trim() || !salary.trim()) { setError("Start date and salary are required."); return; }
@@ -332,6 +418,7 @@ function OfferLetterModal({ candidate, job, token, onClose }: {
 
         {!letter ? (
           <div className="p-6 overflow-y-auto flex-1 space-y-4">
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-[11px] font-semibold uppercase tracking-[0.15em] text-gray-400 mb-1.5">Start Date *</label>
@@ -383,17 +470,32 @@ function OfferLetterModal({ candidate, job, token, onClose }: {
           </div>
         )}
 
+        {offerSendError && (
+          <div className="px-6 pb-2 shrink-0">
+            <p className="text-xs text-rose-400">{offerSendError}</p>
+          </div>
+        )}
         <div className="flex items-center justify-between gap-3 border-t border-white/[0.07] px-6 py-4 shrink-0">
           {letter ? (
             <>
-              <button onClick={() => setLetter("")} className="rounded-xl border border-white/[0.08] px-4 py-2 text-xs text-gray-400 hover:text-white transition">Edit Details</button>
+              <button onClick={() => { setLetter(""); setOfferSent(false); setOfferSendError(""); }} className="rounded-xl border border-white/[0.08] px-4 py-2 text-xs text-gray-400 hover:text-white transition">Edit Details</button>
               <div className="flex items-center gap-2">
-                <button onClick={() => generate(true)} disabled={loading} className="rounded-xl border border-indigo-500/20 bg-indigo-500/[0.07] px-4 py-2 text-xs text-indigo-400 hover:bg-indigo-500/15 transition disabled:opacity-50">
+                <button onClick={() => { generate(true); setOfferSent(false); setOfferSendError(""); }} disabled={loading} className="rounded-xl border border-indigo-500/20 bg-indigo-500/[0.07] px-4 py-2 text-xs text-indigo-400 hover:bg-indigo-500/15 transition disabled:opacity-50">
                   Regenerate
                 </button>
-                <button onClick={copyLetter} className="flex items-center gap-1.5 rounded-xl bg-indigo-500 px-5 py-2 text-xs font-bold text-white hover:bg-indigo-400 transition">
-                  {copied ? "Copied!" : <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg> Copy Letter</>}
+                <button onClick={copyLetter} className="flex items-center gap-1.5 rounded-xl border border-white/[0.08] px-4 py-2 text-xs text-white hover:bg-white/[0.05] transition">
+                  {copied ? "Copied!" : <><CopyIcon /> Copy</>}
                 </button>
+                {offerSent ? (
+                  <span className="flex items-center gap-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/25 px-4 py-2 text-xs font-semibold text-emerald-400">
+                    <CheckIcon /> Sent ✓
+                  </span>
+                ) : (
+                  <button onClick={sendOffer} disabled={sendingOffer || !candidate.email} className="flex items-center gap-1.5 rounded-xl bg-indigo-500 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-400 disabled:opacity-50 transition">
+                    {sendingOffer ? <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> : <MailIcon />}
+                    {sendingOffer ? "Sending…" : "Send to Candidate"}
+                  </button>
+                )}
               </div>
             </>
           ) : (
@@ -842,6 +944,23 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete }: {
   const [retryError, setRetryError] = useState("");
   const [showOfferLetterModal, setShowOfferLetterModal] = useState(false);
   const [showApplicantDetails, setShowApplicantDetails] = useState(false);
+  const [localEmailLog, setLocalEmailLog] = useState<EmailLogEntry[]>(c.emailLog || []);
+  const [assessmentEmailSent, setAssessmentEmailSent] = useState(false);
+  const [showEmailHistory, setShowEmailHistory] = useState(false);
+
+  // Keep local email log in sync when parent refreshes the candidate (e.g. after re-fetch)
+  // Using c._id as the key so we only reset when the candidate identity changes, not on every render
+  const prevCandidateId = React.useRef(c._id);
+  React.useEffect(() => {
+    if (prevCandidateId.current !== c._id) {
+      prevCandidateId.current = c._id;
+      setLocalEmailLog(c.emailLog || []);
+    } else if (c.emailLog && c.emailLog.length > localEmailLog.length) {
+      // Parent has more entries (e.g. after refetch) — merge without losing local additions
+      setLocalEmailLog(c.emailLog);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [c._id, c.emailLog?.length]);
 
   const scoringFailed = c.scoringFailed === true;
   const pct = (!scoringFailed && c.maxScore > 0) ? Math.round((c.totalScore / c.maxScore) * 100) : 0;
@@ -858,7 +977,21 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete }: {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ stage }),
       });
-      if (res.ok) onUpdate(c._id, { stage });
+      if (res.ok) {
+        onUpdate(c._id, { stage });
+        // Optimistically show auto-sent email in history so recruiter sees it immediately
+        const autoStages: Record<string, string> = {
+          screened: "Your application has been shortlisted",
+          interview: "Interview Invitation",
+          hired: "Welcome to the team!",
+        };
+        if (autoStages[stage] && c.email) {
+          setLocalEmailLog(prev => [...prev, {
+            type: stage, to: c.email, subject: autoStages[stage],
+            body: "", sentAt: new Date().toISOString(), status: "sent",
+          }]);
+        }
+      }
     } catch { /* silent */ }
   }
 
@@ -887,8 +1020,15 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete }: {
       if (!res.ok) throw new Error(data.error);
       const link = data.assessmentUrl;
       setAssessmentLink(link);
+      setAssessmentEmailSent(Boolean(data.emailSent));
       setShowAssessmentModal(true);
       onUpdate(c._id, { assessmentStatus: "sent", assessmentSentAt: new Date().toISOString() });
+      if (data.emailSent && c.email) {
+        setLocalEmailLog(prev => [...prev, {
+          type: "assessment", to: c.email, subject: `Complete your assessment`, body: "",
+          sentAt: new Date().toISOString(), status: "sent",
+        }]);
+      }
     } catch (e: any) {
       alert(e.message || "Failed to send assessment.");
     } finally {
@@ -906,8 +1046,15 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete }: {
       const data = await readApiJson(res);
       if (!res.ok) throw new Error(data.error);
       setAssessmentLink(data.assessmentUrl);
+      setAssessmentEmailSent(Boolean(data.emailSent));
       setShowAssessmentModal(true);
       onUpdate(c._id, { assessmentReminderSentAt: new Date().toISOString() });
+      if (data.emailSent && c.email) {
+        setLocalEmailLog(prev => [...prev, {
+          type: "assessment_reminder", to: c.email, subject: `Assessment reminder`, body: "",
+          sentAt: new Date().toISOString(), status: "sent",
+        }]);
+      }
     } catch (e: any) {
       alert(e.message || "Failed to send reminder.");
     } finally {
@@ -979,6 +1126,7 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete }: {
           link={assessmentLink}
           candidateName={c.name}
           candidateEmail={c.email}
+          emailSent={assessmentEmailSent}
           onClose={() => setShowAssessmentModal(false)}
         />
       )}
@@ -987,7 +1135,11 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete }: {
           email={rejectionEmail}
           candidateName={c.name}
           candidateEmail={c.email}
+          jobId={jobId}
+          candidateId={c._id}
+          token={token}
           onClose={() => setShowRejectModal(false)}
+          onSent={(entry) => setLocalEmailLog(prev => [...prev, entry])}
         />
       )}
       {showOfferLetterModal && (
@@ -996,6 +1148,7 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete }: {
           job={job}
           token={token}
           onClose={() => setShowOfferLetterModal(false)}
+          onSent={(entry) => setLocalEmailLog(prev => [...prev, entry])}
         />
       )}
       {showApplicantDetails && (
@@ -1287,6 +1440,48 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete }: {
                 <p className="text-xs text-[var(--text-secondary)] leading-6 whitespace-pre-wrap">{brief}</p>
               </div>
             )}
+
+            {/* ── Email History ── */}
+            <div>
+              <button
+                onClick={() => setShowEmailHistory(v => !v)}
+                className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--foreground)] transition mb-2"
+              >
+                <MailIcon />
+                Emails sent ({localEmailLog.length})
+                <span className="ml-1 text-[9px]">{showEmailHistory ? "▲" : "▼"}</span>
+              </button>
+              {showEmailHistory && (
+                localEmailLog.length === 0 ? (
+                  <p className="text-[11px] text-[var(--text-muted)] pl-1">No emails sent yet for this candidate.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {[...localEmailLog].reverse().map((entry, i) => (
+                      <div key={i} className="rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2.5">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className={`h-1.5 w-1.5 shrink-0 rounded-full mt-0.5 ${entry.status === "sent" ? "bg-emerald-500" : "bg-rose-500"}`} />
+                            <div className="min-w-0">
+                              <span className="text-[11px] font-semibold text-[var(--foreground)] capitalize">{entry.type.replace(/_/g, " ")}</span>
+                              <span className="text-[10px] text-[var(--text-muted)] ml-1.5">→ {entry.to}</span>
+                              <p className="text-[10px] text-[var(--text-muted)] truncate">{entry.subject}</p>
+                            </div>
+                          </div>
+                          <span className="text-[10px] text-[var(--text-muted)] shrink-0 whitespace-nowrap">
+                            {new Date(entry.sentAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
+                            {" "}
+                            {new Date(entry.sentAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        </div>
+                        {entry.status === "failed" && (
+                          <p className="text-[10px] text-rose-400 mt-1 pl-3">Failed: {entry.error}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )
+              )}
+            </div>
           </div>
         )}
       </div>

@@ -1,0 +1,188 @@
+// ── Email templates for the recruitment pipeline ──────────────────────────────
+// All templates use inline CSS for maximum email-client compatibility.
+
+export type EmailPayload = { subject: string; html: string; text: string };
+
+function esc(s: string) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function nl2br(s: string) {
+  return esc(s).replace(/\n/g, "<br>");
+}
+
+function shell(candidateName: string, subject: string, bodyHtml: string): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>${esc(subject)}</title>
+</head>
+<body style="margin:0;padding:0;background:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:36px 16px;">
+    <tr><td align="center">
+      <table width="100%" style="max-width:580px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 1px 6px rgba(0,0,0,0.07);">
+        <tr>
+          <td style="background:#4f46e5;padding:24px 32px;">
+            <span style="font-size:18px;font-weight:700;color:#fff;letter-spacing:-0.3px;">ForJob</span>
+            <span style="font-size:12px;color:rgba(255,255,255,0.6);margin-left:10px;">Powered by AI Hiring</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:32px 32px 24px;">
+            <p style="margin:0 0 18px 0;font-size:15px;color:#111;">Hi <strong>${esc(candidateName.split(" ")[0] || candidateName)}</strong>,</p>
+            ${bodyHtml}
+          </td>
+        </tr>
+        <tr>
+          <td style="border-top:1px solid #f0f0f0;padding:16px 32px;background:#fafafa;">
+            <p style="margin:0;font-size:11px;color:#aaa;line-height:1.5;">
+              You received this email because you applied for a job via ForJob. If you believe this was sent in error, please disregard it.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+function btn(text: string, href: string) {
+  return `<table cellpadding="0" cellspacing="0" style="margin:24px 0 8px;">
+    <tr><td style="background:#4f46e5;border-radius:10px;padding:13px 28px;">
+      <a href="${href}" style="color:#fff;font-size:14px;font-weight:600;text-decoration:none;">${text}</a>
+    </td></tr>
+  </table>`;
+}
+
+// ── 1. Screened ───────────────────────────────────────────────────────────────
+export function screened(candidateName: string, jobTitle: string, companyName: string): EmailPayload {
+  const co = companyName ? ` at <strong>${esc(companyName)}</strong>` : "";
+  const subject = `Your application for ${jobTitle}${companyName ? ` at ${companyName}` : ""} has been shortlisted`;
+  const html = shell(candidateName, subject, `
+    <p style="margin:0 0 16px;font-size:15px;color:#333;line-height:1.65;">
+      Great news — your application for <strong>${esc(jobTitle)}</strong>${co} has been reviewed and you've been <strong>shortlisted</strong> for the next stage of our hiring process.
+    </p>
+    <p style="margin:0 0 16px;font-size:15px;color:#333;line-height:1.65;">
+      Our team will now review your profile in detail and reach out with next steps. Please keep an eye on your inbox over the next few days.
+    </p>
+    <p style="margin:0 0 24px;font-size:15px;color:#333;line-height:1.65;">
+      Thank you for the time and effort you put into your application — it made a strong impression.
+    </p>
+    <p style="margin:0;font-size:15px;color:#333;">Warm regards,<br><strong>The Hiring Team${companyName ? `, ${esc(companyName)}` : ""}</strong></p>
+  `);
+  const text = `Hi ${candidateName},\n\nGreat news — your application for ${jobTitle}${companyName ? ` at ${companyName}` : ""} has been shortlisted.\n\nOur team will reach out with next steps soon.\n\nWarm regards,\nThe Hiring Team`;
+  return { subject, html, text };
+}
+
+// ── 2. Assessment ─────────────────────────────────────────────────────────────
+export function assessment(candidateName: string, jobTitle: string, companyName: string, assessmentUrl: string): EmailPayload {
+  const co = companyName ? ` at <strong>${esc(companyName)}</strong>` : "";
+  const subject = `Action required: Complete your assessment for ${jobTitle}${companyName ? ` at ${companyName}` : ""}`;
+  const html = shell(candidateName, subject, `
+    <p style="margin:0 0 16px;font-size:15px;color:#333;line-height:1.65;">
+      Congratulations on advancing to the next stage! We've prepared a written assessment for your application to <strong>${esc(jobTitle)}</strong>${co}.
+    </p>
+    <p style="margin:0 0 16px;font-size:15px;color:#333;line-height:1.65;">
+      The assessment has <strong>5 written questions</strong> and typically takes <strong>20–40 minutes</strong> to complete. There's no timer — take your time and write thoughtful answers. Quality matters more than speed.
+    </p>
+    ${btn("Start Your Assessment →", assessmentUrl)}
+    <p style="margin:8px 0 6px;font-size:12px;color:#999;">Or copy this link into your browser:</p>
+    <p style="margin:0 0 24px;font-size:11px;color:#bbb;word-break:break-all;">${esc(assessmentUrl)}</p>
+    <p style="margin:0;font-size:15px;color:#333;">Best of luck,<br><strong>The Hiring Team${companyName ? `, ${esc(companyName)}` : ""}</strong></p>
+  `);
+  const text = `Hi ${candidateName},\n\nCongratulations! You've been selected to complete a written assessment for the ${jobTitle} role${companyName ? ` at ${companyName}` : ""}.\n\nPlease complete it here: ${assessmentUrl}\n\nBest of luck,\nThe Hiring Team`;
+  return { subject, html, text };
+}
+
+// ── 3. Assessment Reminder ────────────────────────────────────────────────────
+export function assessmentReminder(candidateName: string, jobTitle: string, companyName: string, assessmentUrl: string): EmailPayload {
+  const subject = `Reminder: Your assessment for ${jobTitle} is pending`;
+  const html = shell(candidateName, subject, `
+    <p style="margin:0 0 16px;font-size:15px;color:#333;line-height:1.65;">
+      Just a friendly reminder — your written assessment for the <strong>${esc(jobTitle)}</strong>${companyName ? ` at <strong>${esc(companyName)}</strong>` : ""} role is still pending.
+    </p>
+    <p style="margin:0 0 16px;font-size:15px;color:#333;line-height:1.65;">
+      This assessment is your opportunity to stand out. The link below is still active — take your time and share your genuine thinking.
+    </p>
+    ${btn("Complete Your Assessment →", assessmentUrl)}
+    <p style="margin:8px 0 6px;font-size:12px;color:#999;">Or copy this link:</p>
+    <p style="margin:0 0 24px;font-size:11px;color:#bbb;word-break:break-all;">${esc(assessmentUrl)}</p>
+    <p style="margin:0;font-size:15px;color:#333;">Warm regards,<br><strong>The Hiring Team${companyName ? `, ${esc(companyName)}` : ""}</strong></p>
+  `);
+  const text = `Hi ${candidateName},\n\nJust a reminder — your assessment for ${jobTitle}${companyName ? ` at ${companyName}` : ""} is still pending.\n\nComplete it here: ${assessmentUrl}\n\nWarm regards,\nThe Hiring Team`;
+  return { subject, html, text };
+}
+
+// ── 4. Interview Invitation ───────────────────────────────────────────────────
+export function interview(candidateName: string, jobTitle: string, companyName: string): EmailPayload {
+  const co = companyName ? ` at <strong>${esc(companyName)}</strong>` : "";
+  const subject = `Interview Invitation — ${jobTitle}${companyName ? ` at ${companyName}` : ""}`;
+  const html = shell(candidateName, subject, `
+    <p style="margin:0 0 16px;font-size:15px;color:#333;line-height:1.65;">
+      Excellent news! After carefully reviewing your application and assessment, we'd like to invite you for an <strong>interview</strong> for the <strong>${esc(jobTitle)}</strong>${co} role.
+    </p>
+    <p style="margin:0 0 16px;font-size:15px;color:#333;line-height:1.65;">
+      Our team will reach out shortly to schedule a convenient time. Please keep your calendar flexible over the coming days.
+    </p>
+    <p style="margin:0 0 24px;font-size:15px;color:#333;line-height:1.65;">
+      In the meantime, feel free to review the job description and prepare any questions you'd like to ask.
+    </p>
+    <p style="margin:0;font-size:15px;color:#333;">Looking forward to meeting you,<br><strong>The Hiring Team${companyName ? `, ${esc(companyName)}` : ""}</strong></p>
+  `);
+  const text = `Hi ${candidateName},\n\nWe'd like to invite you for an interview for the ${jobTitle} role${companyName ? ` at ${companyName}` : ""}.\n\nOur team will reach out shortly to schedule.\n\nLooking forward to meeting you,\nThe Hiring Team`;
+  return { subject, html, text };
+}
+
+// ── 5. Offer Letter ───────────────────────────────────────────────────────────
+export function offerEmail(candidateName: string, jobTitle: string, companyName: string, offerBody: string): EmailPayload {
+  const subject = `Job Offer — ${jobTitle}${companyName ? ` at ${companyName}` : ""}`;
+  const html = shell(candidateName, subject, `
+    <p style="margin:0 0 20px;font-size:15px;color:#333;line-height:1.65;">
+      We are pleased to share your formal offer letter below. Please read it carefully and confirm your acceptance.
+    </p>
+    <div style="background:#f8f8ff;border-left:3px solid #4f46e5;border-radius:6px;padding:20px 24px;margin:0 0 20px;">
+      <p style="margin:0;font-size:13.5px;color:#333;line-height:1.9;white-space:pre-wrap;font-family:Georgia,serif;">${nl2br(offerBody)}</p>
+    </div>
+    <p style="margin:0;font-size:13px;color:#666;">To accept this offer, please reply to this email with your confirmation.</p>
+  `);
+  const text = `Hi ${candidateName},\n\nPlease find your offer letter below.\n\n${offerBody}\n\nTo accept, please reply to this email.`;
+  return { subject, html, text };
+}
+
+// ── 6. Hired / Welcome ────────────────────────────────────────────────────────
+export function hired(candidateName: string, jobTitle: string, companyName: string, startDate?: string): EmailPayload {
+  const subject = `Welcome to the team, ${candidateName.split(" ")[0]}! 🎉`;
+  const html = shell(candidateName, subject, `
+    <p style="margin:0 0 16px;font-size:15px;color:#333;line-height:1.65;">
+      We are absolutely thrilled to officially welcome you to the team! 🎉
+    </p>
+    <p style="margin:0 0 16px;font-size:15px;color:#333;line-height:1.65;">
+      You've been selected for the <strong>${esc(jobTitle)}</strong>${companyName ? ` at <strong>${esc(companyName)}</strong>` : ""}${startDate ? `, starting <strong>${esc(startDate)}</strong>` : ""}.
+    </p>
+    <p style="margin:0 0 24px;font-size:15px;color:#333;line-height:1.65;">
+      You'll be hearing from us very soon with onboarding details and everything you need to get started. We're genuinely excited to have you with us and can't wait to see what you'll accomplish.
+    </p>
+    <p style="margin:0;font-size:15px;color:#333;">Welcome aboard,<br><strong>The Hiring Team${companyName ? `, ${esc(companyName)}` : ""}</strong></p>
+  `);
+  const text = `Hi ${candidateName},\n\nWe're thrilled to welcome you to the team!\n\nYou've been selected for ${jobTitle}${companyName ? ` at ${companyName}` : ""}${startDate ? `, starting ${startDate}` : ""}.\n\nYou'll hear from us soon with onboarding details.\n\nWelcome aboard,\nThe Hiring Team`;
+  return { subject, html, text };
+}
+
+// ── 7. Rejection ──────────────────────────────────────────────────────────────
+export function rejectionEmailHtml(candidateName: string, jobTitle: string, companyName: string, body: string): EmailPayload {
+  const subject = `Update on your application — ${jobTitle}${companyName ? ` at ${companyName}` : ""}`;
+  const html = shell(candidateName, subject, `
+    <p style="margin:0;font-size:15px;color:#333;line-height:1.8;">${nl2br(body)}</p>
+  `);
+  return { subject, html, text: body };
+}
+
+// ── 8. Generic (custom / manually composed) ───────────────────────────────────
+export function genericEmail(candidateName: string, subject: string, body: string): string {
+  return shell(candidateName, subject, `
+    <p style="margin:0;font-size:15px;color:#333;line-height:1.8;">${nl2br(body)}</p>
+  `);
+}
