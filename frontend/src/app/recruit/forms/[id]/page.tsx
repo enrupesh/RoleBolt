@@ -371,12 +371,14 @@ function FormComposeEmailModal({
 }
 
 function FormRejectionEmailModal({
-  initialEmail, candidateName, candidateEmail, formId, responseId, token, onClose, onSent,
+  initialEmail, candidateName, candidateEmail, formId, responseId, token, onClose, onSent, deleteMode, onDeleted,
 }: {
   initialEmail: string; candidateName: string; candidateEmail: string;
   formId: string; responseId: string; token: string;
   onClose: () => void;
   onSent: (entry: EmailLogEntry) => void;
+  deleteMode?: boolean;
+  onDeleted?: () => void;
 }) {
   const [body, setBody] = useState(initialEmail);
   const [sending, setSending] = useState(false);
@@ -399,9 +401,11 @@ function FormRejectionEmailModal({
         body: JSON.stringify({ type: "rejected", subject, body: body.trim() }),
       });
       const data = await readApiJson(res);
-      // If SMTP failed, backend still returns logEntry — show it in history before displaying error
       if (data.logEntry) onSent(data.logEntry);
       if (!res.ok) throw new Error(data.error || "Send failed.");
+      if (deleteMode) {
+        onDeleted?.();
+      }
       onClose();
     } catch (e: any) {
       setError(e.message || "Failed to send. Please try again.");
@@ -418,21 +422,28 @@ function FormRejectionEmailModal({
       <div role="dialog" aria-modal="true" className="w-full max-w-lg rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
           <div>
-            <h2 className="text-sm font-bold text-slate-900">Rejection Email</h2>
+            <h2 className="text-sm font-bold text-slate-900">{deleteMode ? "Send Email & Remove" : "Rejection Email"}</h2>
             <p className="text-xs text-slate-500 mt-0.5">To: <strong>{candidateName}</strong> · {candidateEmail}</p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-700 transition">
             <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
           </button>
         </div>
-        <div className="p-6">
-          <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-2">AI-Generated · Edit before sending</p>
+        <div className="p-6 space-y-3">
+          {deleteMode && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+              <p className="text-[11px] text-amber-800 leading-5">
+                <span className="font-bold">Why send this email?</span> This lets the applicant know they were not selected, so they can move on and apply elsewhere instead of waiting indefinitely for a response.
+              </p>
+            </div>
+          )}
+          <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">AI-Generated · Edit before sending</p>
           <textarea
             value={body} onChange={e => setBody(e.target.value)}
-            rows={8}
+            rows={deleteMode ? 7 : 8}
             className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-rose-300 focus:ring-2 focus:ring-rose-100 resize-none transition"
           />
-          {error && <p className="mt-2 text-xs text-rose-500">{error}</p>}
+          {error && <p className="text-xs text-rose-500">{error}</p>}
         </div>
         <div className="flex justify-end gap-2 px-6 py-4 border-t border-slate-100">
           <button onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition">Cancel</button>
@@ -441,7 +452,7 @@ function FormRejectionEmailModal({
             disabled={sending}
             className="rounded-xl bg-rose-500 px-5 py-2 text-sm font-bold text-white hover:bg-rose-600 transition disabled:opacity-60"
           >
-            {sending ? "Sending…" : "Send Rejection"}
+            {sending ? "Sending…" : deleteMode ? "Send & Remove" : "Send Rejection"}
           </button>
         </div>
       </div>
@@ -743,9 +754,10 @@ function FormResponseInfoModal({ r, onClose }: { r: FormResponse; onClose: () =>
 
 // ─── Response card ─────────────────────────────────────────────────────────────
 
-function ResponseCard({ r, token, formId, formTitle, onUpdate }: {
+function ResponseCard({ r, token, formId, formTitle, onUpdate, onDelete }: {
   r: FormResponse; token: string; formId: string; formTitle: string;
   onUpdate: (id: string, patch: Partial<FormResponse>) => void;
+  onDelete: (id: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState<"email" | "phone" | null>(null);
@@ -763,6 +775,7 @@ function ResponseCard({ r, token, formId, formTitle, onUpdate }: {
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectionDraft, setRejectionDraft] = useState("");
   const [loadingReject, setLoadingReject] = useState(false);
+  const [deleteMode, setDeleteMode] = useState(false);
 
   async function updateStage(stage: Stage) {
     try {
@@ -775,8 +788,9 @@ function ResponseCard({ r, token, formId, formTitle, onUpdate }: {
     } catch { /* silent */ }
   }
 
-  async function generateRejectionEmail() {
+  async function generateRejectionEmail(forDelete = false) {
     setLoadingReject(true);
+    if (forDelete) setDeleteMode(true);
     try {
       const res = await fetch(apiUrl(`/recruit/forms/${formId}/responses/${r._id}/reject-email`), {
         method: "POST",
@@ -787,10 +801,30 @@ function ResponseCard({ r, token, formId, formTitle, onUpdate }: {
       setRejectionDraft(data.email);
       setShowRejectModal(true);
     } catch (e: any) {
+      if (forDelete) setDeleteMode(false);
       alert(e.message || "Failed to generate rejection email.");
     } finally {
       setLoadingReject(false);
     }
+  }
+
+  async function deleteResponseRecord() {
+    try {
+      const res = await fetch(apiUrl(`/recruit/forms/${formId}/responses/${r._id}`), {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) onDelete(r._id);
+    } catch { /* silent */ }
+  }
+
+  async function handleRemove() {
+    if (!displayEmail) {
+      if (!confirm(`Remove ${displayName} from this form?`)) return;
+      await deleteResponseRecord();
+      return;
+    }
+    await generateRejectionEmail(true);
   }
 
   async function retryScoring() {
@@ -945,7 +979,7 @@ function ResponseCard({ r, token, formId, formTitle, onUpdate }: {
 
           {displayEmail && r.stage !== "rejected" && (
             <button
-              onClick={generateRejectionEmail}
+              onClick={() => generateRejectionEmail()}
               disabled={loadingReject}
               className="flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[11px] font-semibold text-rose-600 hover:bg-rose-100 transition disabled:opacity-50"
             >
@@ -981,6 +1015,19 @@ function ResponseCard({ r, token, formId, formTitle, onUpdate }: {
               {loadingRetry ? "Retrying…" : "Retry Scoring"}
             </button>
           )}
+
+          {/* Remove button — opens email flow if email is available */}
+          <button
+            onClick={handleRemove}
+            disabled={loadingReject && deleteMode}
+            title="Remove applicant"
+            className="ml-auto flex items-center justify-center h-6 w-6 rounded-lg border border-slate-200 text-slate-400 hover:text-rose-500 hover:border-rose-200 hover:bg-rose-50 transition disabled:opacity-50"
+          >
+            {loadingReject && deleteMode
+              ? <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+              : <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            }
+          </button>
         </div>
 
         {/* Interview questions panel */}
@@ -1069,8 +1116,10 @@ function ResponseCard({ r, token, formId, formTitle, onUpdate }: {
           formId={formId}
           responseId={r._id}
           token={token}
-          onClose={() => setShowRejectModal(false)}
+          onClose={() => { setShowRejectModal(false); setDeleteMode(false); }}
           onSent={(entry) => setLocalEmailLog(prev => [...prev, entry])}
+          deleteMode={deleteMode}
+          onDeleted={deleteResponseRecord}
         />
       )}
 
@@ -1207,6 +1256,10 @@ function FormResponsesContent({ id }: { id: string }) {
     setResponses(prev => prev.map(r => r._id === responseId ? { ...r, ...patch } : r));
   }
 
+  function onDelete(responseId: string) {
+    setResponses(prev => prev.filter(r => r._id !== responseId));
+  }
+
   const filtered = stageFilter === "all" ? responses : responses.filter(r => r.stage === stageFilter);
 
   const stats = [
@@ -1324,7 +1377,7 @@ function FormResponsesContent({ id }: { id: string }) {
         ) : (
           <div className="space-y-4">
             {filtered.map(r => (
-              <ResponseCard key={r._id} r={r} token={token!} formId={id} formTitle={form.title} onUpdate={onUpdate} />
+              <ResponseCard key={r._id} r={r} token={token!} formId={id} formTitle={form.title} onUpdate={onUpdate} onDelete={onDelete} />
             ))}
           </div>
         )}

@@ -254,10 +254,11 @@ function AssessmentLinkModal({ link, candidateName, candidateEmail, emailSent, o
   );
 }
 
-function RejectionEmailModal({ email, candidateName, candidateEmail, jobId, candidateId, token, onClose, onSent }: {
+function RejectionEmailModal({ email, candidateName, candidateEmail, jobId, candidateId, token, onClose, onSent, deleteMode, onDeleted }: {
   email: string; candidateName: string; candidateEmail: string;
   jobId: string; candidateId: string; token: string;
   onClose: () => void; onSent: (entry: EmailLogEntry) => void;
+  deleteMode?: boolean; onDeleted?: () => void;
 }) {
   const [body, setBody] = useState(email);
   const [sending, setSending] = useState(false);
@@ -276,11 +277,15 @@ function RejectionEmailModal({ email, candidateName, candidateEmail, jobId, cand
       });
       const data = await readApiJson(res);
       if (!res.ok) throw new Error(data.error || "Send failed.");
-      setSent(true);
       onSent({ type: "rejected", to: candidateEmail, subject, body, sentAt: data.sentAt || new Date().toISOString(), status: "sent" });
+      if (deleteMode) {
+        onDeleted?.();
+        onClose();
+      } else {
+        setSent(true);
+      }
     } catch (e: any) {
       setSendError(e.message);
-      // Record failed attempt in history so log is always truthful
       if (candidateEmail) {
         onSent({ type: "rejected", to: candidateEmail, subject, body, sentAt: new Date().toISOString(), status: "failed", error: e.message });
       }
@@ -293,7 +298,7 @@ function RejectionEmailModal({ email, candidateName, candidateEmail, jobId, cand
       <div className="w-full max-w-xl rounded-[2rem] border border-white/[0.09] bg-[#0a0a0f] shadow-2xl flex flex-col max-h-[90vh]">
         <div className="flex items-center justify-between border-b border-white/[0.07] px-6 py-4 shrink-0">
           <div>
-            <h2 className="text-sm font-semibold text-white">AI Rejection Email</h2>
+            <h2 className="text-sm font-semibold text-white">{deleteMode ? "Send Email & Remove" : "AI Rejection Email"}</h2>
             <p className="text-xs text-gray-400 mt-0.5">To: {candidateName}{candidateEmail ? ` · ${candidateEmail}` : " · ⚠ no email on file"}</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-white transition"><XIcon /></button>
@@ -307,11 +312,18 @@ function RejectionEmailModal({ email, candidateName, candidateEmail, jobId, cand
             </div>
           ) : (
             <>
+              {deleteMode && (
+                <div className="rounded-2xl border border-amber-500/25 bg-amber-500/[0.08] px-4 py-3">
+                  <p className="text-[11px] text-amber-300 leading-5">
+                    <span className="font-bold">Why send this email?</span> This lets the applicant know they were not selected, so they can move on and apply elsewhere instead of waiting indefinitely for a response.
+                  </p>
+                </div>
+              )}
               <p className="text-[11px] text-gray-400">Edit the email below before sending. Your edits only affect this send — the AI text is not saved.</p>
               <textarea
                 value={body}
                 onChange={e => setBody(e.target.value)}
-                rows={12}
+                rows={deleteMode ? 10 : 12}
                 className="w-full rounded-2xl border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-sm text-gray-200 leading-7 placeholder-zinc-600 outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/30 resize-none"
               />
               {sendError && <p className="text-xs text-rose-400">{sendError}</p>}
@@ -329,7 +341,7 @@ function RejectionEmailModal({ email, candidateName, candidateEmail, jobId, cand
               className="flex items-center gap-2 rounded-xl bg-indigo-500 px-5 py-2 text-sm font-bold text-white hover:bg-indigo-400 disabled:opacity-50 transition"
             >
               {sending ? <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> : <SendIcon />}
-              {sending ? "Sending…" : "Send to Candidate"}
+              {sending ? "Sending…" : deleteMode ? "Send & Remove" : "Send to Candidate"}
             </button>
           )}
         </div>
@@ -947,6 +959,7 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete }: {
   const [localEmailLog, setLocalEmailLog] = useState<EmailLogEntry[]>(c.emailLog || []);
   const [assessmentEmailSent, setAssessmentEmailSent] = useState(false);
   const [showEmailHistory, setShowEmailHistory] = useState(false);
+  const [deleteMode, setDeleteMode] = useState(false);
 
   // Keep local email log in sync when parent refreshes the candidate (e.g. after re-fetch)
   // Using c._id as the key so we only reset when the candidate identity changes, not on every render
@@ -1074,6 +1087,7 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete }: {
       setRejectionEmail(data.email);
       setShowRejectModal(true);
     } catch (e: any) {
+      setDeleteMode(false); // reset delete mode if generation failed
       alert(e.message || "Failed to generate rejection email.");
     } finally {
       setLoadingReject(false);
@@ -1109,6 +1123,13 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete }: {
   }
 
   async function handleDelete() {
+    // If candidate has an email, send a rejection email first then remove
+    if (c.email) {
+      setDeleteMode(true);
+      await generateRejectionEmail();
+      return;
+    }
+    // No email on file — fall back to direct removal
     if (!confirm(`Remove ${c.name} from this pipeline?`)) return;
     try {
       await fetch(apiUrl(`/recruit/jobs/${jobId}/candidates/${c._id}`), {
@@ -1116,6 +1137,16 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete }: {
         headers: { Authorization: `Bearer ${token}` },
       });
       onDelete(c._id);
+    } catch { /* silent */ }
+  }
+
+  async function deleteCandidateRecord() {
+    try {
+      const res = await fetch(apiUrl(`/recruit/jobs/${jobId}/candidates/${c._id}`), {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) onDelete(c._id);
     } catch { /* silent */ }
   }
 
@@ -1138,8 +1169,10 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete }: {
           jobId={jobId}
           candidateId={c._id}
           token={token}
-          onClose={() => setShowRejectModal(false)}
+          onClose={() => { setShowRejectModal(false); setDeleteMode(false); }}
           onSent={(entry) => setLocalEmailLog(prev => [...prev, entry])}
+          deleteMode={deleteMode}
+          onDeleted={deleteCandidateRecord}
         />
       )}
       {showOfferLetterModal && (
