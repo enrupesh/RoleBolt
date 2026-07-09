@@ -93,6 +93,83 @@ function ChevronRightIcon() {
   );
 }
 
+function TrashIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+    </svg>
+  );
+}
+
+function DeleteJobModal({ job, token, onClose, onDeleted }: { job: Job; token: string; onClose: () => void; onDeleted: (id: string) => void }) {
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleDelete() {
+    if (!token) return;
+    setDeleting(true);
+    setError("");
+    try {
+      const res = await fetch(apiUrl(`/recruit/jobs/${job._id}`), {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const data = await readApiJson(res);
+        throw new Error(data.error || "Failed to delete job.");
+      }
+      onDeleted(job._id);
+      onClose();
+    } catch (e: any) {
+      setError(e.message || "Something went wrong. Please try again.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+      onClick={e => { if (e.target === e.currentTarget && !deleting) onClose(); }}
+    >
+      <div role="dialog" aria-modal="true" className="w-full max-w-sm rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
+        <div className="px-6 pt-6 pb-5">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-50 border border-rose-100 mb-4">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-rose-500">
+              <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+            </svg>
+          </div>
+          <h2 className="text-base font-bold text-slate-900 mb-1">Delete this job?</h2>
+          <p className="text-sm text-slate-500 leading-relaxed">
+            <span className="font-semibold text-slate-700">{job.title}</span> and all its candidates will be permanently removed. This cannot be undone.
+          </p>
+          {error && <p className="mt-3 text-xs text-rose-600 font-medium">{error}</p>}
+        </div>
+        <div className="flex items-center gap-2 px-6 pb-6">
+          <button
+            onClick={onClose}
+            disabled={deleting}
+            className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100 transition disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleDelete}
+            disabled={deleting || !token}
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-rose-700 transition disabled:opacity-50"
+          >
+            {deleting ? (
+              <><svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Deleting…</>
+            ) : (
+              "Delete Job"
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function BarChartIcon() {
   return (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -204,6 +281,7 @@ function RecruitDashboardContent() {
   const [seenCounts, setSeenCounts] = useState<Record<string, number>>({});
   const [pipeline, setPipeline] = useState<PipelineSummary | null>(null);
   const [shareForm, setShareForm] = useState<Form | null>(null);
+  const [jobToDelete, setJobToDelete] = useState<Job | null>(null);
 
   useEffect(() => {
     const auth = getFirebaseAuth();
@@ -263,6 +341,14 @@ function RecruitDashboardContent() {
   return (
     <div className="min-h-screen bg-slate-50">
       {shareForm && <CopyShareModal form={shareForm} onClose={() => setShareForm(null)} />}
+      {jobToDelete && token && (
+        <DeleteJobModal
+          job={jobToDelete}
+          token={token}
+          onClose={() => setJobToDelete(null)}
+          onDeleted={(id) => setJobs(prev => prev.filter(j => j._id !== id))}
+        />
+      )}
 
       <header className="sticky top-0 z-20 bg-white border-b border-slate-200 shadow-sm">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3.5 sm:px-6 lg:px-8">
@@ -400,10 +486,8 @@ function RecruitDashboardContent() {
                   const hasNew = newCount > 0 && lastSeen > 0;
 
                   return (
-                    <Link
+                    <div
                       key={job._id}
-                      href={`/recruit/jobs/${job._id}`}
-                      onClick={() => markJobSeen(job._id, job.candidateCount || 0)}
                       className="group relative flex flex-col rounded-2xl bg-white border border-slate-200 p-5 shadow-sm hover:shadow-md hover:border-blue-300 transition-all"
                     >
                       <div className="flex items-start justify-between gap-3 mb-4">
@@ -420,31 +504,52 @@ function RecruitDashboardContent() {
                             <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
                             {s.label}
                           </span>
+                          <button
+                            onClick={e => { e.stopPropagation(); setJobToDelete(job); }}
+                            title="Delete job"
+                            className="flex items-center justify-center h-6 w-6 rounded-lg text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition opacity-0 group-hover:opacity-100"
+                          >
+                            <TrashIcon />
+                          </button>
                         </div>
                       </div>
 
-                      <h3 className="text-sm font-semibold text-slate-900 group-hover:text-blue-700 transition line-clamp-1 mb-0.5">
-                        {job.title}
-                      </h3>
-                      <p className="text-xs text-slate-500">
-                        {job.seniority}{job.department ? ` · ${job.department}` : ""}
-                      </p>
+                      <Link
+                        href={`/recruit/jobs/${job._id}`}
+                        onClick={() => markJobSeen(job._id, job.candidateCount || 0)}
+                        className="block"
+                      >
+                        <h3 className="text-sm font-semibold text-slate-900 group-hover:text-blue-700 transition line-clamp-1 mb-0.5">
+                          {job.title}
+                        </h3>
+                        <p className="text-xs text-slate-500">
+                          {job.seniority}{job.department ? ` · ${job.department}` : ""}
+                        </p>
 
-                      <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-400">
-                        <span className="flex items-center gap-1"><MapPinIcon /> {job.location}</span>
-                        <span>{WORK_MODE_LABELS[job.workMode] ?? job.workMode}</span>
-                      </div>
+                        <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-400">
+                          <span className="flex items-center gap-1"><MapPinIcon /> {job.location}</span>
+                          <span>{WORK_MODE_LABELS[job.workMode] ?? job.workMode}</span>
+                        </div>
+                      </Link>
 
                       <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
-                        <span className={`flex items-center gap-1.5 text-xs font-medium ${hasNew ? "text-blue-700" : "text-slate-500"}`}>
+                        <Link
+                          href={`/recruit/jobs/${job._id}`}
+                          onClick={() => markJobSeen(job._id, job.candidateCount || 0)}
+                          className={`flex items-center gap-1.5 text-xs font-medium ${hasNew ? "text-blue-700" : "text-slate-500"} hover:text-blue-700 transition`}
+                        >
                           <UsersIcon /> {job.candidateCount || 0} candidate{job.candidateCount !== 1 ? "s" : ""}
-                        </span>
-                        <div className="flex items-center gap-1 text-xs text-slate-400">
+                        </Link>
+                        <Link
+                          href={`/recruit/jobs/${job._id}`}
+                          onClick={() => markJobSeen(job._id, job.candidateCount || 0)}
+                          className="flex items-center gap-1 text-xs text-slate-400 hover:text-blue-600 transition"
+                        >
                           {timeAgo(job.createdAt)}
                           <ChevronRightIcon />
-                        </div>
+                        </Link>
                       </div>
-                    </Link>
+                    </div>
                   );
                 })}
 
