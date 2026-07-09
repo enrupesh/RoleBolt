@@ -123,11 +123,11 @@ function RecruitSignupForm() {
                   />
                 </div>
                 <div>
-                  <label htmlFor="email" className="block text-xs font-semibold text-slate-700 mb-1.5">Work email</label>
+                  <label htmlFor="email" className="block text-xs font-semibold text-slate-700 mb-1.5">Email address</label>
                   <input
                     id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} required
                     className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm outline-none focus:border-[#0a66c2] focus:ring-2 focus:ring-[#0a66c2]/15 transition-all placeholder:text-slate-400"
-                    placeholder="you@company.com" autoComplete="email"
+                    placeholder="john@example.com" autoComplete="email"
                   />
                 </div>
                 <div>
