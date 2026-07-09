@@ -1274,11 +1274,46 @@ function FormResponsesContent({ id }: { id: string }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <svg className="animate-spin h-6 w-6 text-violet-600" fill="none" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-        </svg>
+      <div className="min-h-screen bg-slate-50 animate-[rb-fade-in_0.3s_ease_both]">
+        {/* Header */}
+        <header className="sticky top-0 z-20 bg-white border-b border-slate-200 shadow-sm">
+          <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-3 sm:px-6">
+            <div className="flex items-center gap-3">
+              <div className="h-4 w-20 rounded-full rb-skeleton" />
+              <div className="h-4 w-32 rounded-full rb-skeleton" />
+            </div>
+            <div className="flex gap-2">
+              <div className="h-8 w-20 rounded-lg rb-skeleton" />
+              <div className="h-8 w-24 rounded-lg rb-skeleton" />
+            </div>
+          </div>
+        </header>
+        <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 space-y-5">
+          {/* Stats row */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="rounded-2xl bg-white border border-slate-200 p-4 space-y-2">
+                <div className="h-6 w-10 rounded-lg rb-skeleton" />
+                <div className="h-3 w-20 rounded-full rb-skeleton" />
+              </div>
+            ))}
+          </div>
+          {/* Response list */}
+          <div className="rounded-2xl bg-white border border-slate-200 p-5 space-y-3">
+            <div className="h-4 w-32 rounded-full rb-skeleton mb-4" />
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-4 p-3 rounded-xl border border-slate-100">
+                <div className="h-10 w-10 rounded-full rb-skeleton shrink-0" />
+                <div className="flex-1 space-y-1.5">
+                  <div className="h-3.5 w-36 rounded-full rb-skeleton" />
+                  <div className="h-3 w-24 rounded-full rb-skeleton" />
+                </div>
+                <div className="h-6 w-12 rounded-lg rb-skeleton" />
+                <div className="h-6 w-16 rounded-full rb-skeleton" />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
