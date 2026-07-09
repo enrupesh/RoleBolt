@@ -39,6 +39,16 @@ type AnswerSignal = {
   note: string;
 };
 
+type EmailLogEntry = {
+  type: string;
+  to: string;
+  subject: string;
+  body: string;
+  sentAt: string;
+  status: "sent" | "failed";
+  error?: string;
+};
+
 type FormResponse = {
   _id: string;
   formId: string;
@@ -55,6 +65,7 @@ type FormResponse = {
   submittedEmail: string;
   submittedPhone: string;
   resumeText?: string;
+  emailLog: EmailLogEntry[];
   createdAt: string;
 };
 
@@ -267,6 +278,177 @@ function ScoringCriteriaCard({ questions, formTitle }: { questions: FormQuestion
   );
 }
 
+// ─── Email modals ──────────────────────────────────────────────────────────────
+
+function FormComposeEmailModal({
+  candidateName, candidateEmail, formId, responseId, token, onClose, onSent,
+}: {
+  candidateName: string; candidateEmail: string;
+  formId: string; responseId: string; token: string;
+  onClose: () => void;
+  onSent: (entry: EmailLogEntry) => void;
+}) {
+  const [subject, setSubject] = useState("");
+  const [body, setBody] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  async function send() {
+    if (!subject.trim() || !body.trim()) { setError("Subject and body are required."); return; }
+    setSending(true); setError("");
+    try {
+      const res = await fetch(apiUrl(`/recruit/forms/${formId}/responses/${responseId}/send-email`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ type: "custom", subject: subject.trim(), body: body.trim() }),
+      });
+      const data = await readApiJson(res);
+      // If SMTP failed, backend still returns logEntry — show it in history before displaying error
+      if (data.logEntry) onSent(data.logEntry);
+      if (!res.ok) throw new Error(data.error || "Send failed.");
+      onClose();
+    } catch (e: any) {
+      setError(e.message || "Failed to send. Please try again.");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div role="dialog" aria-modal="true" className="w-full max-w-lg rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-bold text-slate-900">Compose Email</h2>
+            <p className="text-xs text-slate-500 mt-0.5">To: <strong>{candidateName}</strong> · {candidateEmail}</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 transition">
+            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="block text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">Subject</label>
+            <input
+              value={subject} onChange={e => setSubject(e.target.value)}
+              placeholder="Email subject"
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition"
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">Message</label>
+            <textarea
+              value={body} onChange={e => setBody(e.target.value)}
+              placeholder="Type your message…"
+              rows={7}
+              className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 resize-none transition"
+            />
+          </div>
+          {error && <p className="text-xs text-rose-500">{error}</p>}
+        </div>
+        <div className="flex justify-end gap-2 px-6 py-4 border-t border-slate-100">
+          <button onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition">Cancel</button>
+          <button
+            onClick={send}
+            disabled={sending}
+            className="rounded-xl bg-violet-600 px-5 py-2 text-sm font-bold text-white hover:bg-violet-700 transition disabled:opacity-60"
+          >
+            {sending ? "Sending…" : "Send Email"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FormRejectionEmailModal({
+  initialEmail, candidateName, candidateEmail, formId, responseId, token, onClose, onSent,
+}: {
+  initialEmail: string; candidateName: string; candidateEmail: string;
+  formId: string; responseId: string; token: string;
+  onClose: () => void;
+  onSent: (entry: EmailLogEntry) => void;
+}) {
+  const [body, setBody] = useState(initialEmail);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
+  const subject = `Update on your application`;
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  async function send() {
+    if (!body.trim()) { setError("Email body cannot be empty."); return; }
+    setSending(true); setError("");
+    try {
+      const res = await fetch(apiUrl(`/recruit/forms/${formId}/responses/${responseId}/send-email`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ type: "rejected", subject, body: body.trim() }),
+      });
+      const data = await readApiJson(res);
+      // If SMTP failed, backend still returns logEntry — show it in history before displaying error
+      if (data.logEntry) onSent(data.logEntry);
+      if (!res.ok) throw new Error(data.error || "Send failed.");
+      onClose();
+    } catch (e: any) {
+      setError(e.message || "Failed to send. Please try again.");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div role="dialog" aria-modal="true" className="w-full max-w-lg rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-bold text-slate-900">Rejection Email</h2>
+            <p className="text-xs text-slate-500 mt-0.5">To: <strong>{candidateName}</strong> · {candidateEmail}</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 transition">
+            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
+        <div className="p-6">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-2">AI-Generated · Edit before sending</p>
+          <textarea
+            value={body} onChange={e => setBody(e.target.value)}
+            rows={8}
+            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-rose-300 focus:ring-2 focus:ring-rose-100 resize-none transition"
+          />
+          {error && <p className="mt-2 text-xs text-rose-500">{error}</p>}
+        </div>
+        <div className="flex justify-end gap-2 px-6 py-4 border-t border-slate-100">
+          <button onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition">Cancel</button>
+          <button
+            onClick={send}
+            disabled={sending}
+            className="rounded-xl bg-rose-500 px-5 py-2 text-sm font-bold text-white hover:bg-rose-600 transition disabled:opacity-60"
+          >
+            {sending ? "Sending…" : "Send Rejection"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Share modal ───────────────────────────────────────────────────────────────
 
 function ShareModal({ slug, title, onClose }: { slug: string; title: string; onClose: () => void }) {
@@ -453,10 +635,7 @@ function FormResponseInfoModal({ r, onClose }: { r: FormResponse; onClose: () =>
                   )}
                 </button>
               </div>
-              <a href={`mailto:${displayEmail}`} className="mt-2.5 inline-flex items-center gap-1.5 text-[11px] font-semibold text-sky-500/80 hover:text-sky-400 transition">
-                <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,12 2,6"/></svg>
-                Send email →
-              </a>
+              <p className="mt-2.5 text-[11px] text-sky-500/60 italic">Use the Email button on the card to send emails.</p>
             </div>
           )}
 
@@ -564,8 +743,8 @@ function FormResponseInfoModal({ r, onClose }: { r: FormResponse; onClose: () =>
 
 // ─── Response card ─────────────────────────────────────────────────────────────
 
-function ResponseCard({ r, token, formId, onUpdate }: {
-  r: FormResponse; token: string; formId: string;
+function ResponseCard({ r, token, formId, formTitle, onUpdate }: {
+  r: FormResponse; token: string; formId: string; formTitle: string;
   onUpdate: (id: string, patch: Partial<FormResponse>) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -577,6 +756,14 @@ function ResponseCard({ r, token, formId, onUpdate }: {
   const [questionsError, setQuestionsError] = useState("");
   const [showQuestions, setShowQuestions] = useState(false);
 
+  // ── Email state ──────────────────────────────────────────────────────────────
+  const [localEmailLog, setLocalEmailLog] = useState<EmailLogEntry[]>(r.emailLog || []);
+  const [showEmailHistory, setShowEmailHistory] = useState(false);
+  const [showComposeModal, setShowComposeModal] = useState(false);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectionDraft, setRejectionDraft] = useState("");
+  const [loadingReject, setLoadingReject] = useState(false);
+
   async function updateStage(stage: Stage) {
     try {
       const res = await fetch(apiUrl(`/recruit/forms/${formId}/responses/${r._id}`), {
@@ -586,6 +773,24 @@ function ResponseCard({ r, token, formId, onUpdate }: {
       });
       if (res.ok) onUpdate(r._id, { stage });
     } catch { /* silent */ }
+  }
+
+  async function generateRejectionEmail() {
+    setLoadingReject(true);
+    try {
+      const res = await fetch(apiUrl(`/recruit/forms/${formId}/responses/${r._id}/reject-email`), {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await readApiJson(res);
+      if (!res.ok) throw new Error(data.error);
+      setRejectionDraft(data.email);
+      setShowRejectModal(true);
+    } catch (e: any) {
+      alert(e.message || "Failed to generate rejection email.");
+    } finally {
+      setLoadingReject(false);
+    }
   }
 
   async function retryScoring() {
@@ -729,10 +934,26 @@ function ResponseCard({ r, token, formId, onUpdate }: {
           </button>
 
           {displayEmail && (
-            <a href={`mailto:${displayEmail}`} className="flex items-center gap-1 rounded-xl border border-sky-200 bg-sky-50 px-2.5 py-1.5 text-[11px] font-semibold text-sky-600 hover:bg-sky-100 transition">
+            <button
+              onClick={() => setShowComposeModal(true)}
+              className="flex items-center gap-1 rounded-xl border border-sky-200 bg-sky-50 px-2.5 py-1.5 text-[11px] font-semibold text-sky-600 hover:bg-sky-100 transition"
+            >
               <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,12 2,6"/></svg>
               Email
-            </a>
+            </button>
+          )}
+
+          {displayEmail && r.stage !== "rejected" && (
+            <button
+              onClick={generateRejectionEmail}
+              disabled={loadingReject}
+              className="flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[11px] font-semibold text-rose-600 hover:bg-rose-100 transition disabled:opacity-50"
+            >
+              {loadingReject ? <SpinnerIcon /> : (
+                <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,12 2,6"/></svg>
+              )}
+              {loadingReject ? "Generating…" : "Reject"}
+            </button>
           )}
 
           {!r.scoringFailed && (
@@ -783,10 +1004,75 @@ function ResponseCard({ r, token, formId, onUpdate }: {
             </ol>
           </div>
         )}
+
+        {/* Email history */}
+        <div className="mt-3">
+          <button
+            onClick={() => setShowEmailHistory(v => !v)}
+            className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-slate-700 transition"
+          >
+            <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,12 2,6"/></svg>
+            Emails sent ({localEmailLog.length})
+            <span className="ml-0.5 text-[9px]">{showEmailHistory ? "▲" : "▼"}</span>
+          </button>
+          {showEmailHistory && (
+            localEmailLog.length === 0 ? (
+              <p className="mt-1.5 text-[11px] text-slate-400 pl-1">No emails sent yet for this applicant.</p>
+            ) : (
+              <div className="mt-2 space-y-2">
+                {[...localEmailLog].reverse().map((entry, i) => (
+                  <div key={i} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className={`h-1.5 w-1.5 shrink-0 rounded-full mt-0.5 ${entry.status === "sent" ? "bg-emerald-500" : "bg-rose-500"}`} />
+                        <div className="min-w-0">
+                          <span className="text-[11px] font-semibold text-slate-700 capitalize">{entry.type.replace(/_/g, " ")}</span>
+                          <span className="text-[10px] text-slate-400 ml-1.5">→ {entry.to}</span>
+                          <p className="text-[10px] text-slate-400 truncate">{entry.subject}</p>
+                        </div>
+                      </div>
+                      <span className="text-[10px] text-slate-400 shrink-0 whitespace-nowrap">
+                        {new Date(entry.sentAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
+                        {" "}
+                        {new Date(entry.sentAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    </div>
+                    {entry.status === "failed" && (
+                      <p className="text-[10px] text-rose-500 mt-1 pl-3">Failed: {entry.error}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )
+          )}
+        </div>
       </div>
 
-      {/* Info modal */}
+      {/* Modals */}
       {showInfo && <FormResponseInfoModal r={r} onClose={() => setShowInfo(false)} />}
+      {showComposeModal && displayEmail && (
+        <FormComposeEmailModal
+          candidateName={displayName}
+          candidateEmail={displayEmail}
+          formId={formId}
+          responseId={r._id}
+          token={token}
+          onClose={() => setShowComposeModal(false)}
+          onSent={(entry) => setLocalEmailLog(prev => [...prev, entry])}
+        />
+      )}
+      {showRejectModal && rejectionDraft && displayEmail && (
+        <FormRejectionEmailModal
+          initialEmail={rejectionDraft}
+          candidateName={displayName}
+          candidateEmail={displayEmail}
+          formId={formId}
+          responseId={r._id}
+          token={token}
+          onClose={() => setShowRejectModal(false)}
+          onSent={(entry) => setLocalEmailLog(prev => [...prev, entry])}
+        />
+      )}
 
       {/* Expanded: contact + answers */}
       {expanded && (
@@ -1038,7 +1324,7 @@ function FormResponsesContent({ id }: { id: string }) {
         ) : (
           <div className="space-y-4">
             {filtered.map(r => (
-              <ResponseCard key={r._id} r={r} token={token!} formId={id} onUpdate={onUpdate} />
+              <ResponseCard key={r._id} r={r} token={token!} formId={id} formTitle={form.title} onUpdate={onUpdate} />
             ))}
           </div>
         )}
