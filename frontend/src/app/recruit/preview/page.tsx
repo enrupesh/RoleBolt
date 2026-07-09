@@ -112,6 +112,54 @@ const BADGE_STYLES: Record<string, string> = {
   Candidate: "bg-amber-500/10 text-amber-700 border-amber-500/20",
 };
 
+// ─── Architecture diagram helpers ────────────────────────────────────────────
+
+function ArchNode({
+  icon,
+  label,
+  sublabel,
+  color,
+  borderColor,
+  highlight,
+}: {
+  icon?: React.ReactNode;
+  label: string;
+  sublabel?: string;
+  color: string;
+  borderColor?: string;
+  highlight?: boolean;
+}) {
+  return (
+    <div
+      className={`w-full rounded-xl px-4 py-3 flex items-center gap-3 border ${borderColor ?? "border-transparent"} ${color} ${
+        highlight ? "ring-2 ring-violet-400 ring-offset-2 shadow-lg" : ""
+      }`}
+    >
+      {icon && <span className="shrink-0 opacity-90">{icon}</span>}
+      <div className="min-w-0 flex-1">
+        <p className="text-[13px] font-bold leading-snug">{label}</p>
+        {sublabel && <p className="text-[11px] opacity-70 mt-0.5 truncate">{sublabel}</p>}
+      </div>
+    </div>
+  );
+}
+
+function ArchArrow({ label }: { label?: string }) {
+  return (
+    <div className="flex flex-col items-center my-1 w-full">
+      <div className="h-3 w-px bg-slate-200" />
+      {label && (
+        <span className="text-[9px] font-semibold uppercase tracking-wider text-slate-300 my-0.5">
+          {label}
+        </span>
+      )}
+      <svg width="10" height="10" fill="currentColor" className="text-slate-300" viewBox="0 0 10 10">
+        <polygon points="5,0 10,10 0,10" />
+      </svg>
+    </div>
+  );
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function ProductPreviewPage() {
@@ -248,6 +296,331 @@ export default function ProductPreviewPage() {
               </div>
             </article>
           ))}
+        </div>
+
+        {/* ── How Mesh API Powers Rolebolt ─────────────────────────────────── */}
+        <div className="mt-24">
+          {/* Header */}
+          <div className="max-w-2xl mx-auto text-center mb-12">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#0a66c2]/30 bg-[#0a66c2]/8 px-4 py-1.5 text-[11px] font-bold text-[#0a66c2] mb-5 uppercase tracking-widest">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+              Powered by Mesh API
+            </div>
+            <h2 className="text-3xl font-black text-slate-900 tracking-tight sm:text-4xl leading-tight">
+              How Mesh API powers Rolebolt
+            </h2>
+            <p className="mt-4 text-slate-500 leading-relaxed max-w-lg mx-auto">
+              Every AI capability in Rolebolt is routed through Mesh API — giving us access to 1,000+ models with automatic fallback chains, so hiring never stops even when a single provider has issues.
+            </p>
+          </div>
+
+          {/* Model badge */}
+          <div className="flex flex-wrap items-center justify-center gap-2.5 mb-10">
+            {[
+              { label: "Primary", model: "GPT-4o mini", color: "bg-emerald-50 border-emerald-200 text-emerald-700" },
+              { label: "Fallback 1", model: "Claude 3 Haiku", color: "bg-violet-50 border-violet-200 text-violet-700" },
+              { label: "Fallback 2", model: "Gemini 2.5 Flash Lite", color: "bg-blue-50 border-blue-200 text-blue-700" },
+            ].map((m) => (
+              <span key={m.model} className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[12px] font-semibold ${m.color}`}>
+                <span className="text-[9px] font-bold uppercase tracking-wider opacity-60">{m.label}</span>
+                <span className="h-3 w-px bg-current opacity-20" />
+                {m.model}
+              </span>
+            ))}
+          </div>
+
+          {/* Workflow cards */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {[
+              {
+                icon: (
+                  <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+                  </svg>
+                ),
+                title: "AI Resume Analysis",
+                desc: "When a candidate applies, Mesh API parses the uploaded PDF/DOCX resume and extracts structured signals: skills, experience depth, career trajectory, and role alignment — all in seconds.",
+                model: "openai/gpt-4o-mini",
+                accentColor: "text-[#0a66c2]",
+                accentBg: "bg-blue-50 border-blue-100",
+                badge: "Application pipeline",
+              },
+              {
+                icon: (
+                  <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                  </svg>
+                ),
+                title: "AI Candidate Scoring",
+                desc: "Every applicant receives a 0–100 AI fit score broken down across 5 weighted criteria: Technical Skills, Experience Depth, Communication, Role Fit, and Cultural Ownership — with written rationale for each.",
+                model: "openai/gpt-4o-mini",
+                accentColor: "text-amber-500",
+                accentBg: "bg-amber-50 border-amber-100",
+                badge: "AI Evaluation",
+              },
+              {
+                icon: (
+                  <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                    <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                  </svg>
+                ),
+                title: "AI Candidate Matching",
+                desc: "Rolebolt cross-references each candidate's full profile — resume, background, and self-reported experience — against the job's scoring rubric to produce a precise match signal.",
+                model: "openai/gpt-4o-mini",
+                accentColor: "text-emerald-600",
+                accentBg: "bg-emerald-50 border-emerald-100",
+                badge: "Matching engine",
+              },
+              {
+                icon: (
+                  <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                    <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                  </svg>
+                ),
+                title: "AI Job Description Generation",
+                desc: "A 4-step wizard collects the role basics, and Mesh API generates a full job description — including requirements, responsibilities, and a custom scoring rubric — ready to publish instantly.",
+                model: "openai/gpt-4o-mini",
+                accentColor: "text-violet-600",
+                accentBg: "bg-violet-50 border-violet-100",
+                badge: "Job creation",
+              },
+              {
+                icon: (
+                  <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                  </svg>
+                ),
+                title: "AI Recruitment Assistant",
+                desc: "Recruiters can ask natural-language questions about their pipeline — 'Who are my top 3 candidates for this role?' or 'Summarise this applicant's background' — and get instant AI answers.",
+                model: "openai/gpt-4o-mini",
+                accentColor: "text-rose-500",
+                accentBg: "bg-rose-50 border-rose-100",
+                badge: "Recruiter tools",
+              },
+              {
+                icon: (
+                  <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                  </svg>
+                ),
+                title: "AI Form Response Scoring",
+                desc: "When candidates submit custom intake forms, Mesh API scores each answer against the form's criteria — giving small businesses the same AI evaluation power as the full pipeline, without requiring a resume.",
+                model: "openai/gpt-4o-mini",
+                accentColor: "text-indigo-600",
+                accentBg: "bg-indigo-50 border-indigo-100",
+                badge: "Form jobs",
+              },
+            ].map((wf) => (
+              <div key={wf.title} className="relative rounded-2xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col">
+                {/* Icon */}
+                <div className={`mb-4 inline-flex h-11 w-11 items-center justify-center rounded-xl border ${wf.accentBg} ${wf.accentColor}`}>
+                  {wf.icon}
+                </div>
+                {/* Badge */}
+                <span className="inline-flex items-center rounded-full bg-slate-100 border border-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-3 w-fit">
+                  {wf.badge}
+                </span>
+                <h3 className="text-[15px] font-bold text-slate-900 leading-snug mb-2">{wf.title}</h3>
+                <p className="text-[13px] text-slate-500 leading-relaxed flex-1">{wf.desc}</p>
+                {/* Model chip */}
+                <div className="mt-4 pt-4 border-t border-slate-100 flex items-center gap-1.5">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-300"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                  <span className="text-[11px] font-mono text-slate-400">{wf.model}</span>
+                  <span className="ml-auto text-[10px] text-slate-300 font-medium">+ 2 fallbacks</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Fallback explanation strip */}
+          <div className="mt-6 rounded-xl bg-slate-50 border border-slate-200 px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+            <div className="shrink-0 flex h-8 w-8 items-center justify-center rounded-lg bg-white border border-slate-200 text-emerald-500">
+              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            </div>
+            <div className="flex-1">
+              <p className="text-[13px] font-semibold text-slate-800">Automatic fallback chain on every AI call</p>
+              <p className="text-[12px] text-slate-500 mt-0.5">If GPT-4o mini is unavailable or rate-limited, Mesh API automatically retries with Claude 3 Haiku, then Gemini 2.5 Flash Lite — so AI scoring never blocks a candidate&apos;s application.</p>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Architecture / System Flow ────────────────────────────────────── */}
+        <div className="mt-24">
+          {/* Header */}
+          <div className="max-w-2xl mx-auto text-center mb-12">
+            <div className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-slate-100 px-4 py-1.5 text-[11px] font-bold text-slate-500 mb-5 uppercase tracking-widest">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>
+              System Architecture
+            </div>
+            <h2 className="text-3xl font-black text-slate-900 tracking-tight sm:text-4xl leading-tight">
+              How it all fits together
+            </h2>
+            <p className="mt-4 text-slate-500 leading-relaxed max-w-lg mx-auto">
+              A request from a hiring manager or a candidate touches multiple layers — here&apos;s how data flows through the full stack in under 3 seconds.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+            {/* Diagram area */}
+            <div className="p-8 sm:p-10 lg:p-12">
+
+              {/* ── Desktop layout (lg+): two columns ── */}
+              <div className="hidden lg:flex items-start gap-6">
+
+                {/* Left column: Main request flow */}
+                <div className="flex-1 flex flex-col items-center gap-0">
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-4">Request flow</div>
+
+                  {/* User */}
+                  <ArchNode
+                    icon={<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>}
+                    label="Recruiter / Candidate"
+                    sublabel="Web browser"
+                    color="bg-slate-800 text-white"
+                    borderColor="border-slate-700"
+                  />
+                  <ArchArrow label="HTTPS request" />
+
+                  {/* Firebase Auth */}
+                  <ArchNode
+                    icon={<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>}
+                    label="Firebase Auth"
+                    sublabel="JWT session"
+                    color="bg-amber-500 text-white"
+                    borderColor="border-amber-400"
+                  />
+                  <ArchArrow label="Verified token" />
+
+                  {/* Frontend */}
+                  <ArchNode
+                    icon={<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>}
+                    label="Next.js Frontend"
+                    sublabel="Rolebolt UI · Port 5000"
+                    color="bg-[#0a66c2] text-white"
+                    borderColor="border-[#004182]"
+                  />
+                  <ArchArrow label="REST API call" />
+
+                  {/* Backend */}
+                  <ArchNode
+                    icon={<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>}
+                    label="Express Backend"
+                    sublabel="Node.js · Port 8080"
+                    color="bg-slate-700 text-white"
+                    borderColor="border-slate-600"
+                  />
+                  <ArchArrow label="AI workflow triggered" />
+
+                  {/* Mesh API */}
+                  <ArchNode
+                    icon={<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>}
+                    label="Mesh API"
+                    sublabel="api.meshapi.ai · 1,000+ models"
+                    color="bg-violet-600 text-white"
+                    borderColor="border-violet-500"
+                    highlight
+                  />
+                  <ArchArrow label="Model routing" />
+
+                  {/* AI Models */}
+                  <div className="flex items-center gap-3 w-full justify-center">
+                    {[
+                      { name: "GPT-4o mini", tag: "Primary", color: "border-emerald-300 bg-emerald-50 text-emerald-800" },
+                      { name: "Claude 3 Haiku", tag: "Fallback 1", color: "border-violet-300 bg-violet-50 text-violet-800" },
+                      { name: "Gemini Flash", tag: "Fallback 2", color: "border-blue-300 bg-blue-50 text-blue-800" },
+                    ].map((m) => (
+                      <div key={m.name} className={`rounded-xl border ${m.color} px-3 py-2.5 text-center flex-1`}>
+                        <p className="text-[9px] font-bold uppercase tracking-wider opacity-50 mb-0.5">{m.tag}</p>
+                        <p className="text-[12px] font-bold leading-tight">{m.name}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Divider */}
+                <div className="w-px self-stretch bg-slate-100 mt-8" />
+
+                {/* Right column: Data & storage */}
+                <div className="w-56 flex flex-col items-center gap-0">
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-4">Data layer</div>
+
+                  <ArchNode
+                    icon={<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>}
+                    label="MongoDB Atlas"
+                    sublabel="Jobs · Candidates · Forms"
+                    color="bg-emerald-600 text-white"
+                    borderColor="border-emerald-500"
+                  />
+
+                  <div className="flex flex-col items-center my-2 gap-0.5">
+                    <div className="h-3 w-px bg-slate-200" />
+                    <svg width="10" height="10" fill="currentColor" className="text-slate-300" viewBox="0 0 10 10"><polygon points="5,0 10,10 0,10"/></svg>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 w-full text-center">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Stored entities</p>
+                    {["RecruitJob", "RecruitCandidate", "RecruitForm", "RecruitFormResponse", "RecruitProfile"].map((e) => (
+                      <p key={e} className="text-[11px] font-mono text-slate-500 py-0.5 border-b border-slate-100 last:border-0">{e}</p>
+                    ))}
+                  </div>
+
+                  <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-3 w-full text-center">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-amber-500 mb-1.5">Firebase Admin</p>
+                    <p className="text-[11px] text-amber-700">Token verification on every protected API route</p>
+                  </div>
+
+                  <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 w-full text-center">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Email</p>
+                    <p className="text-[11px] text-slate-500">Assessment delivery &amp; candidate notifications via Nodemailer</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Mobile / tablet layout: single column simplified ── */}
+              <div className="flex lg:hidden flex-col items-center gap-0">
+                <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-5">Full system flow</div>
+
+                {[
+                  { label: "User (Browser)", sub: "Recruiter or Candidate", bg: "bg-slate-800 text-white" },
+                  { label: "Firebase Auth", sub: "JWT session validation", bg: "bg-amber-500 text-white" },
+                  { label: "Next.js Frontend", sub: "Rolebolt UI · Port 5000", bg: "bg-[#0a66c2] text-white" },
+                  { label: "Express Backend", sub: "Node.js API · Port 8080", bg: "bg-slate-700 text-white" },
+                  { label: "MongoDB Atlas", sub: "Jobs, Candidates, Forms", bg: "bg-emerald-600 text-white" },
+                  { label: "Mesh API", sub: "Model router · 1,000+ models", bg: "bg-violet-600 text-white", highlight: true },
+                  { label: "AI Models", sub: "GPT-4o mini → Claude 3 Haiku → Gemini Flash", bg: "bg-slate-100 text-slate-700" },
+                ].map((node, i, arr) => (
+                  <div key={node.label} className="flex flex-col items-center w-full max-w-xs">
+                    <div className={`w-full rounded-xl px-4 py-3 text-center ${node.bg} ${node.highlight ? "ring-2 ring-violet-400 ring-offset-2" : ""}`}>
+                      <p className="text-[13px] font-bold leading-snug">{node.label}</p>
+                      <p className="text-[11px] opacity-70 mt-0.5">{node.sub}</p>
+                    </div>
+                    {i < arr.length - 1 && (
+                      <div className="flex flex-col items-center my-1">
+                        <div className="h-4 w-px bg-slate-200" />
+                        <svg width="10" height="10" fill="currentColor" className="text-slate-300" viewBox="0 0 10 10"><polygon points="5,0 10,10 0,10"/></svg>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Footer legend */}
+            <div className="border-t border-slate-100 bg-slate-50 px-8 py-4 flex flex-wrap items-center gap-x-6 gap-y-2">
+              {[
+                { color: "bg-[#0a66c2]", label: "Frontend (Next.js)" },
+                { color: "bg-slate-700", label: "Backend (Express / Node)" },
+                { color: "bg-violet-600", label: "Mesh API (AI gateway)" },
+                { color: "bg-emerald-600", label: "MongoDB (persistence)" },
+                { color: "bg-amber-500", label: "Firebase (auth)" },
+              ].map((l) => (
+                <span key={l.label} className="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium">
+                  <span className={`h-2.5 w-2.5 rounded-full ${l.color}`} />
+                  {l.label}
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* ── Previous Work — VeilChat ──────────────────────────────────────── */}
