@@ -6,6 +6,7 @@ import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { signOut } from "firebase/auth";
 import { getFirebaseAuth, isFirebaseAvailable } from "@/lib/firebaseClient";
 import { useRouter } from "next/navigation";
+import { RoleboltLogo } from "@/components/RoleboltLogo";
 
 const NICHES = [
   { label: "AI, Data & Software", full: "AI, Data, Software & Product Tech", emoji: "💻", color: "from-blue-50 to-indigo-50 border-blue-100 hover:border-blue-300", text: "text-blue-700" },
@@ -61,7 +62,7 @@ export default function RecruitLandingPage() {
       <header className="sticky top-0 z-50 bg-white/96 backdrop-blur-xl border-b border-slate-200/80 shadow-[0_1px_0_rgba(0,0,0,0.04),0_2px_12px_rgba(0,0,0,0.04)]">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
           <Link href="/recruit" className="flex items-center gap-2.5 shrink-0 group">
-            <img src="/rolebolt-logo.png" alt="Rolebolt" className="h-8 w-8 rounded-lg object-cover shadow-[0_2px_8px_rgba(10,102,194,0.3)] group-hover:shadow-[0_4px_14px_rgba(10,102,194,0.4)] group-hover:scale-105 transition-all" />
+            <RoleboltLogo size="md" className="group-hover:shadow-[0_4px_14px_rgba(10,102,194,0.4)] group-hover:scale-105 transition-all" />
             <div>
               <p className="text-sm font-bold text-slate-900 leading-none tracking-tight">Rolebolt</p>
               <p className="text-[10.5px] text-slate-400 leading-none mt-0.5 font-medium">Global Jobs Network</p>
