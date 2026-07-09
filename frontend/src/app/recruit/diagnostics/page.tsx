@@ -273,10 +273,23 @@ function RecruitDiagnosticsContent() {
       ));
     }
 
-    results.push(await runJsonCheck(smtpCheck, smtpCheck.endpoint, {}, (response, data) => ({
-      status: response.ok ? "pass" : response.status === 502 ? "fail" : "warn",
-      message: data?.message || (response.ok ? "SMTP is reachable and credentials are valid." : "SMTP check failed — see message for details."),
-    })));
+    if (!auth.token) {
+      results.push({
+        ...smtpCheck,
+        status: "skipped",
+        message: auth.error || "Sign in to run the SMTP connectivity check.",
+      });
+    } else {
+      results.push(await runJsonCheck(
+        smtpCheck,
+        smtpCheck.endpoint,
+        { headers: { Authorization: `Bearer ${auth.token}` } },
+        (response, data) => ({
+          status: response.ok ? "pass" : response.status === 502 ? "fail" : "warn",
+          message: data?.message || (response.ok ? "SMTP is reachable and credentials are valid." : "SMTP check failed — see message for details."),
+        })
+      ));
+    }
     setChecks([...results]);
 
     setLastRun(new Date().toLocaleString());
