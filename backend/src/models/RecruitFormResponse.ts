@@ -22,6 +22,7 @@ export interface IRecruitFormResponse extends Document {
   strengths: string[];
   redFlags: string[];
   answerSignals: IAnswerSignal[];
+  interviewQuestions: string[];
   scoringFailed: boolean;
   stage: "new" | "shortlisted" | "interview" | "hired" | "rejected";
   submittedName: string;
@@ -60,6 +61,7 @@ const RecruitFormResponseSchema = new Schema<IRecruitFormResponse>(
     strengths: { type: [String], default: [] },
     redFlags: { type: [String], default: [] },
     answerSignals: { type: [AnswerSignalSchema], default: [] },
+    interviewQuestions: { type: [String], default: [] },
     scoringFailed: { type: Boolean, default: false },
     stage: {
       type: String,

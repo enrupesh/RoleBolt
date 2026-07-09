@@ -370,6 +370,105 @@ formRouter.patch("/:formId/responses/:responseId", async (req, res) => {
   }
 });
 
+// POST /recruit/forms/:formId/responses/:responseId/interview-questions
+// Generates (or returns cached) tailored interview questions for a response
+formRouter.post("/:formId/responses/:responseId/interview-questions", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "Unauthorized" });
+
+    const form = await RecruitForm.findOne({ _id: req.params.formId, uid }).lean();
+    if (!form) return res.status(404).json({ error: "Form not found." });
+
+    const response = await RecruitFormResponse.findOne({
+      _id: req.params.responseId,
+      formId: req.params.formId,
+      uid,
+    }).lean();
+    if (!response) return res.status(404).json({ error: "Response not found." });
+
+    // Return cached questions if already generated
+    if (Array.isArray(response.interviewQuestions) && response.interviewQuestions.length > 0) {
+      return res.json({ questions: response.interviewQuestions });
+    }
+
+    // Build the answer context for the AI
+    const textAnswers = (response.answers as Array<{ questionId: string; label: string; value: string }>)
+      .filter(a => a.value?.trim() && a.value !== "__file_uploaded__")
+      .map((a, i) => `[${i + 1}] ${a.label}: ${a.value}`)
+      .join("\n");
+
+    const hasResume = !!(response.resumeText?.trim() && response.resumeText !== "__scanned_pdf__");
+
+    const prompt = `You are preparing for an interview with a candidate who applied for: "${form.title}".
+
+THEIR FORM ANSWERS:
+${textAnswers || "(no text answers provided)"}
+
+${hasResume ? `RESUME SUMMARY (first 1500 chars):\n${(response.resumeText ?? "").slice(0, 1500)}` : ""}
+
+Generate 5-7 sharp, tailored interview questions based specifically on what this candidate wrote.
+
+Rules:
+- Reference their actual words, claims, or examples directly — no generic questions
+- For strong, detailed answers: go deeper ("You mentioned X — walk me through the toughest part of that")
+- For brief or vague answers: probe for specifics ("Your answer on Y was brief — can you give a concrete example?")
+- Mix question types: follow-up probes, hypotheticals, and verification questions
+- Each question must be standalone and interviewable without re-reading the form
+- Do NOT include preamble or numbering in the question text itself
+
+Return ONLY this JSON (no markdown):
+{
+  "questions": [
+    "Question text here",
+    "Another question here"
+  ]
+}`;
+
+    let raw: string;
+    try {
+      raw = await callNvidiaChatCompletions({
+        apiKey: MESHAPI_API_KEY,
+        retries: 2,
+        fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.45,
+        max_tokens: 700,
+      });
+    } catch (err) {
+      console.error("[forms] interview-questions: AI call failed:", err);
+      return res.status(500).json({ error: "AI is temporarily unavailable. Please try again shortly." });
+    }
+
+    const parsed = safeJson(raw);
+    if (!parsed || !Array.isArray(parsed.questions)) {
+      console.error("[forms] interview-questions: unparseable AI response:", raw?.slice(0, 300));
+      return res.status(500).json({ error: "Failed to generate questions. Please try again." });
+    }
+
+    const questions: string[] = parsed.questions
+      .filter((q: unknown) => typeof q === "string" && (q as string).trim())
+      .map((q: string) => q.trim())
+      .slice(0, 7);
+
+    if (questions.length === 0) {
+      console.error("[forms] interview-questions: AI returned empty list:", raw?.slice(0, 300));
+      return res.status(500).json({ error: "AI returned no questions. Please try again." });
+    }
+
+    // Cache on the response document
+    await RecruitFormResponse.findByIdAndUpdate(response._id, {
+      $set: { interviewQuestions: questions },
+    });
+
+    return res.json({ questions });
+  } catch (err: any) {
+    console.error("[forms] POST interview-questions:", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /recruit/forms/:formId/responses/:responseId/retry-score
 // Re-runs AI scoring for a response where scoringFailed === true
 formRouter.post("/:formId/responses/:responseId/retry-score", async (req, res) => {

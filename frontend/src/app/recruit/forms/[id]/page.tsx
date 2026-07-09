@@ -48,6 +48,7 @@ type FormResponse = {
   strengths: string[];
   redFlags: string[];
   answerSignals: AnswerSignal[];
+  interviewQuestions: string[];
   scoringFailed: boolean;
   stage: Stage;
   submittedName: string;
@@ -572,6 +573,9 @@ function ResponseCard({ r, token, formId, onUpdate }: {
   const [showInfo, setShowInfo] = useState(false);
   const [loadingRetry, setLoadingRetry] = useState(false);
   const [retryError, setRetryError] = useState("");
+  const [loadingQuestions, setLoadingQuestions] = useState(false);
+  const [questionsError, setQuestionsError] = useState("");
+  const [showQuestions, setShowQuestions] = useState(false);
 
   async function updateStage(stage: Stage) {
     try {
@@ -607,6 +611,32 @@ function ResponseCard({ r, token, formId, onUpdate }: {
       setRetryError(e.message || "Retry failed. Please try again.");
     } finally {
       setLoadingRetry(false);
+    }
+  }
+
+  async function generateInterviewQuestions() {
+    // If already cached on the response, just toggle display
+    if ((r.interviewQuestions || []).length > 0) {
+      setShowQuestions(q => !q);
+      return;
+    }
+    setLoadingQuestions(true);
+    setQuestionsError("");
+    try {
+      const res = await fetch(apiUrl(`/recruit/forms/${formId}/responses/${r._id}/interview-questions`), {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await readApiJson(res);
+      if (!res.ok) throw new Error(data.error || "Failed to generate questions.");
+      const qs: string[] = Array.isArray(data.questions) ? data.questions : [];
+      if (qs.length === 0) throw new Error("AI returned no questions. Please try again.");
+      onUpdate(r._id, { interviewQuestions: qs });
+      setShowQuestions(true);
+    } catch (e: any) {
+      setQuestionsError(e.message || "Generation failed. Please try again.");
+    } finally {
+      setLoadingQuestions(false);
     }
   }
 
@@ -705,6 +735,21 @@ function ResponseCard({ r, token, formId, onUpdate }: {
             </a>
           )}
 
+          {!r.scoringFailed && (
+            <button
+              onClick={generateInterviewQuestions}
+              disabled={loadingQuestions}
+              className="flex items-center gap-1 rounded-xl border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-[11px] font-semibold text-indigo-600 hover:bg-indigo-100 transition disabled:opacity-50"
+            >
+              {loadingQuestions ? <SpinnerIcon /> : <SparkIcon />}
+              {loadingQuestions
+                ? "Generating…"
+                : (r.interviewQuestions || []).length > 0
+                  ? (showQuestions ? "Hide Questions" : "Interview Qs")
+                  : "Interview Qs"}
+            </button>
+          )}
+
           {r.scoringFailed && (
             <button
               onClick={retryScoring}
@@ -716,6 +761,28 @@ function ResponseCard({ r, token, formId, onUpdate }: {
             </button>
           )}
         </div>
+
+        {/* Interview questions panel */}
+        {questionsError && (
+          <p className="mt-2 text-[11px] text-rose-500 px-1">{questionsError}</p>
+        )}
+        {showQuestions && (r.interviewQuestions || []).length > 0 && (
+          <div className="mt-3 rounded-2xl border border-indigo-100 bg-indigo-50 p-4">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-500 mb-3 flex items-center gap-1">
+              <SparkIcon /> Interview Questions
+            </p>
+            <ol className="space-y-2.5">
+              {r.interviewQuestions.map((q, i) => (
+                <li key={i} className="flex items-start gap-2.5">
+                  <span className="shrink-0 mt-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-indigo-200 text-[9px] font-bold text-indigo-700">
+                    {i + 1}
+                  </span>
+                  <p className="text-xs text-indigo-900 leading-5">{q}</p>
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
       </div>
 
       {/* Info modal */}
