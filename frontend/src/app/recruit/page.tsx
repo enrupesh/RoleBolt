@@ -637,45 +637,23 @@ export default function RecruitLandingPage() {
             <p className="mt-4 text-slate-500 leading-relaxed">We're builders who believe hiring should be faster, fairer, and smarter for everyone.</p>
           </div>
 
-          <div className="flex flex-col sm:flex-row justify-center gap-8 max-w-2xl mx-auto">
+          <div className="flex flex-col sm:flex-row justify-center gap-6 max-w-xl mx-auto">
             {[
-              {
-                name: "Rupesh Gupta",
-                role: "Founder",
-                initials: "RG",
-                gradient: "from-[#0a66c2] to-indigo-600",
-                desc: "Passionate about using AI to solve real-world hiring challenges.",
-              },
-              {
-                name: "Lorik Kumar",
-                role: "Co-Founder",
-                initials: "LK",
-                gradient: "from-indigo-500 to-violet-600",
-                desc: "Building the infrastructure for next-generation recruitment platforms.",
-              },
+              { name: "Rupesh Gupta", role: "Founder", initials: "RG" },
+              { name: "Lorik Kumar", role: "Co-Founder", initials: "LK" },
             ].map((member) => (
               <div
                 key={member.name}
-                className="group flex-1 flex flex-col items-center rounded-2xl border border-slate-100 bg-white p-8 shadow-[0_2px_12px_rgba(0,0,0,0.04)] hover:shadow-[0_12px_32px_rgba(0,0,0,0.09)] hover:border-[#0a66c2]/20 hover:-translate-y-1.5 transition-all duration-300"
+                className="group flex-1 flex flex-col items-center rounded-2xl border border-slate-200 bg-white px-10 py-8 shadow-sm hover:shadow-md hover:border-slate-300 hover:-translate-y-1 transition-all duration-200"
               >
                 {/* Avatar */}
-                <div className={`relative h-24 w-24 rounded-2xl bg-gradient-to-br ${member.gradient} flex items-center justify-center shadow-[0_8px_24px_rgba(10,102,194,0.25)] mb-6 group-hover:scale-105 transition-transform duration-300`}>
-                  <span className="text-2xl font-black text-white tracking-tight">{member.initials}</span>
-                  {/* Shine overlay */}
-                  <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-white/20 to-transparent pointer-events-none" />
+                <div className="h-20 w-20 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center mb-5 group-hover:bg-slate-50 transition-colors duration-200">
+                  <span className="text-xl font-bold text-slate-500 tracking-wide">{member.initials}</span>
                 </div>
 
                 {/* Name + role */}
-                <h3 className="text-xl font-black text-slate-950 tracking-tight">{member.name}</h3>
-                <span className="mt-1.5 inline-flex items-center rounded-full bg-[#0a66c2]/8 border border-[#0a66c2]/15 px-3 py-1 text-[11px] font-bold text-[#0a66c2] uppercase tracking-wider">
-                  {member.role}
-                </span>
-
-                {/* Divider */}
-                <div className="my-5 h-px w-12 bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
-
-                {/* Desc */}
-                <p className="text-sm text-slate-500 leading-relaxed text-center">{member.desc}</p>
+                <h3 className="text-base font-bold text-slate-900 tracking-tight">{member.name}</h3>
+                <p className="mt-1 text-[12px] font-medium text-slate-400 uppercase tracking-widest">{member.role}</p>
               </div>
             ))}
           </div>
