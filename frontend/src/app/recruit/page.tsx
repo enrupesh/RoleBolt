@@ -157,12 +157,15 @@ export default function RecruitLandingPage() {
 
           <nav className="hidden md:flex items-center gap-0.5">
             <Link href="/recruit/opportunities" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">Find Jobs</Link>
+            <a href="#how-it-works" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">How it Works</a>
+            <a href="#features" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">Features</a>
+            <a href="#why-rolebolt" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">Why Rolebolt</a>
+            <a href="#team" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">Team</a>
             {!isLoggedIn && <Link href="/recruit/signup" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">For Recruiters</Link>}
             {isLoggedIn && role === "creator" && <>
               <Link href="/recruit/dashboard" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">Dashboard</Link>
               <Link href="/recruit/analytics" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">Analytics</Link>
             </>}
-            <a href="#team" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">Team</a>
           </nav>
 
           <div className="flex items-center gap-2 shrink-0">
@@ -184,6 +187,9 @@ export default function RecruitLandingPage() {
           <div className="md:hidden border-t border-slate-100 bg-white px-4 pb-5 pt-3">
             <nav className="flex flex-col gap-1">
               <Link href="/recruit/opportunities" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Find Jobs</Link>
+              <a href="#how-it-works" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">How it Works</a>
+              <a href="#features" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Features</a>
+              <a href="#why-rolebolt" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Why Rolebolt</a>
               <a href="#team" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Team</a>
               {isLoggedIn ? <>
                 <Link href="/recruit/dashboard" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Dashboard</Link>
@@ -355,7 +361,7 @@ export default function RecruitLandingPage() {
       </section>
 
       {/* ── How it works ────────────────────────────────────────────────────── */}
-      <section className="py-20 bg-white">
+      <section id="how-it-works" className="py-20 bg-white">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="max-w-2xl mx-auto text-center mb-14">
             <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#0a66c2] mb-3">How it works</p>
@@ -389,7 +395,7 @@ export default function RecruitLandingPage() {
       </section>
 
       {/* ── Features ────────────────────────────────────────────────────────── */}
-      <section className="py-20 bg-[#f8fafc] border-t border-slate-100">
+      <section id="features" className="py-20 bg-[#f8fafc] border-t border-slate-100">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="max-w-2xl mx-auto text-center mb-14">
             <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#0a66c2] mb-3">Features</p>
@@ -414,7 +420,7 @@ export default function RecruitLandingPage() {
       </section>
 
       {/* ── Why Rolebolt ────────────────────────────────────────────────────── */}
-      <section className="py-20 bg-white border-t border-slate-100">
+      <section id="why-rolebolt" className="py-20 bg-white border-t border-slate-100">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="max-w-2xl mx-auto text-center mb-14">
             <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#0a66c2] mb-3">Why Rolebolt</p>
