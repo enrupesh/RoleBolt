@@ -191,13 +191,6 @@ export default function RecruitLandingPage() {
             <a href="#features" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">Features</a>
             <a href="#why-rolebolt" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">Why Rolebolt</a>
             <a href="#team" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">Team</a>
-            <Link href="/recruit/preview" className="relative px-3 py-1.5 rounded-lg text-[13px] font-medium transition-all group overflow-hidden">
-              <span className="relative z-10 bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 bg-clip-text text-transparent font-bold animate-[shimmer_2.5s_linear_infinite] bg-[length:200%_100%]">
-                Product Preview
-              </span>
-              <span className="absolute inset-0 rounded-lg bg-amber-400/8 group-hover:bg-amber-400/15 transition-colors" />
-              <span className="absolute bottom-0.5 left-3 right-3 h-px bg-gradient-to-r from-transparent via-amber-400/60 to-transparent" />
-            </Link>
             {!isLoggedIn && <Link href="/recruit/signup" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">For Recruiters</Link>}
             {isLoggedIn && role === "creator" && <>
               <Link href="/recruit/dashboard" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">Dashboard</Link>
@@ -228,11 +221,6 @@ export default function RecruitLandingPage() {
               <a href="#features" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Features</a>
               <a href="#why-rolebolt" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Why Rolebolt</a>
               <a href="#team" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Team</a>
-              <Link href="/recruit/preview" onClick={() => setMobileMenuOpen(false)} className="relative rounded-xl px-4 py-2.5 text-sm font-bold bg-amber-400/8 border border-amber-400/20 overflow-hidden">
-                <span className="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 bg-clip-text text-transparent">
-                  Product Preview
-                </span>
-              </Link>
               {isLoggedIn ? <>
                 <Link href="/recruit/dashboard" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Dashboard</Link>
                 <button onClick={() => { setMobileMenuOpen(false); handleSignOut(); }} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-500 hover:bg-slate-50 text-left">Sign out</button>
@@ -324,6 +312,23 @@ export default function RecruitLandingPage() {
                   {t}
                 </span>
               ))}
+            </div>
+
+            {/* Judges CTA */}
+            <div className="mt-10 flex flex-col items-center gap-3">
+              <div className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/35 bg-amber-400/10 px-3.5 py-1 text-[11px] font-bold text-amber-300 tracking-wide">
+                <svg width="11" height="11" fill="currentColor" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                For Hackathon Judges
+              </div>
+              <Link
+                href="/recruit/preview"
+                className="group inline-flex items-center gap-2.5 rounded-xl border border-amber-400/30 bg-amber-400/8 px-6 py-3 text-[13px] font-bold text-amber-200 hover:bg-amber-400/15 hover:border-amber-400/50 hover:text-white hover:-translate-y-0.5 transition-all duration-200"
+              >
+                <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+                Explore Product Preview
+                <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" className="group-hover:translate-x-0.5 transition-transform"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+              </Link>
+              <p className="text-[11px] text-slate-600">Real screenshots · 12 screens · Click to enlarge</p>
             </div>
           </div>
 
