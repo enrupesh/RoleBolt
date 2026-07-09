@@ -442,7 +442,7 @@ function RecruitDashboardContent() {
       <header className="sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-black/[0.07] shadow-[0_1px_0_rgba(0,0,0,0.04),0_4px_20px_rgba(0,0,0,0.05)]">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
           <Link href="/recruit" className="flex items-center gap-3">
-            <img src="/plyndrox-icon.png" alt="Rolebolt" className="h-9 w-9 rounded-xl object-cover shrink-0 shadow-[0_2px_8px_rgba(0,0,0,0.12)]" />
+            <img src="/rolebolt-icon.png" alt="Rolebolt" className="h-9 w-9 rounded-xl object-cover shrink-0 shadow-[0_2px_8px_rgba(0,0,0,0.12)]" />
             <span>
               <span className="block text-[15px] font-bold text-slate-900 leading-none tracking-tight">Rolebolt</span>
               <span className="block text-[10px] font-semibold text-slate-400 mt-0.5 tracking-widest uppercase">Dashboard</span>

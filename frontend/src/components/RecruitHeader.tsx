@@ -51,7 +51,7 @@ export default function RecruitHeader() {
           </div>
           <div className="hidden sm:block">
             <p className="text-sm font-bold text-slate-900 leading-none tracking-tight">Rolebolt</p>
-            <p className="text-[10.5px] text-slate-400 leading-none mt-0.5 font-medium">India Jobs Network</p>
+            <p className="text-[10.5px] text-slate-400 leading-none mt-0.5 font-medium">Global Jobs Network</p>
           </div>
           <p className="block sm:hidden text-sm font-bold text-slate-900 leading-none">Rolebolt</p>
         </Link>
