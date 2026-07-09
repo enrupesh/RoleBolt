@@ -369,6 +369,24 @@ formRouter.delete("/:formId", async (req, res) => {
   }
 });
 
+// DELETE /recruit/forms/:formId/responses/:responseId — remove a single response
+formRouter.delete("/:formId/responses/:responseId", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "Unauthorized" });
+
+    const form = await RecruitForm.findOne({ _id: req.params.formId, uid }).lean();
+    if (!form) return res.status(404).json({ error: "Form not found." });
+
+    await RecruitFormResponse.deleteOne({ _id: req.params.responseId, formId: req.params.formId });
+    return res.json({ ok: true });
+  } catch (err: any) {
+    console.error("[forms] DELETE /recruit/forms/:formId/responses/:responseId:", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /recruit/forms/:formId/responses — get all responses
 formRouter.get("/:formId/responses", async (req, res) => {
   try {
