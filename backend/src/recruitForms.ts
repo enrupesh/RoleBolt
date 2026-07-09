@@ -77,20 +77,34 @@ async function extractResumeText(file: Express.Multer.File): Promise<string> {
 }
 
 // ─── AI scoring for form responses ────────────────────────────────────────────
+interface ScoredAnswer {
+  questionId: string;
+  label: string;
+  value: string;
+}
+
+interface AnswerSignal {
+  questionId: string;
+  signal: "strong" | "ok" | "thin";
+  note: string;
+}
+
 async function scoreFormResponse(args: {
   formTitle: string;
-  answers: { label: string; value: string }[];
+  answers: ScoredAnswer[];
   resumeText?: string;
 }): Promise<{
   aiScore: number;
   aiSummary: string;
   strengths: string[];
   redFlags: string[];
+  answerSignals: AnswerSignal[];
   scoringFailed: boolean;
 }> {
-  const answersText = args.answers
-    .filter(a => a.value && a.value.trim())
-    .map(a => `${a.label}: ${a.value}`)
+  // Build a numbered list so the AI can reference answers by index
+  const indexedAnswers = args.answers.filter(a => a.value && a.value.trim());
+  const answersText = indexedAnswers
+    .map((a, i) => `[${i + 1}] ${a.label}: ${a.value}`)
     .join("\n");
 
   const prompt = `You are screening a candidate who applied via a form for: "${args.formTitle}".
@@ -105,7 +119,12 @@ Evaluate this candidate and respond with ONLY this JSON (no markdown):
   "aiScore": <integer 0-100 representing overall fit>,
   "aiSummary": "<2-3 sentence direct assessment — mention their strongest relevant point and one area of uncertainty>",
   "strengths": ["<specific strength 1>", "<specific strength 2>"],
-  "redFlags": ["<only genuine concern — leave empty array if none>"]
+  "redFlags": ["<only genuine concern — leave empty array if none>"],
+  "answerSignals": [
+    { "idx": 1, "signal": "strong", "note": "<one short phrase why — e.g. specific examples, deep expertise>" },
+    { "idx": 2, "signal": "ok", "note": "<one short phrase>" },
+    { "idx": 3, "signal": "thin", "note": "<one short phrase why — e.g. very brief, vague, no examples>" }
+  ]
 }
 
 Scoring guide:
@@ -114,6 +133,12 @@ Scoring guide:
 - 40-59: Some relevant background, unclear fit
 - Below 40: Significant mismatch or very thin responses
 
+Answer signal guide (for each numbered answer above):
+- "strong": detailed, specific, compelling — concrete examples or clear expertise shown
+- "ok": adequate but generic — answers the question without standing out
+- "thin": very brief, vague, off-topic, or missing entirely
+
+Only include signals for answers that were actually provided (match the [idx] numbers above). Skip contact-info-only answers (name, email, phone).
 Be specific and honest. If answers are very short or empty, note that in the summary.`;
 
   let raw: string;
@@ -124,17 +149,35 @@ Be specific and honest. If answers are very short or empty, note that in the sum
       fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
       messages: [{ role: "user", content: prompt }],
       temperature: 0.3,
-      max_tokens: 600,
+      max_tokens: 900,
     });
   } catch (err) {
     console.error("[forms] scoreFormResponse: AI call failed:", err);
-    return { aiScore: 0, aiSummary: "", strengths: [], redFlags: [], scoringFailed: true };
+    return { aiScore: 0, aiSummary: "", strengths: [], redFlags: [], answerSignals: [], scoringFailed: true };
   }
 
   const parsed = safeJson(raw);
   if (!parsed) {
     console.error("[forms] scoreFormResponse: unparseable AI response:", raw?.slice(0, 300));
-    return { aiScore: 0, aiSummary: "", strengths: [], redFlags: [], scoringFailed: true };
+    return { aiScore: 0, aiSummary: "", strengths: [], redFlags: [], answerSignals: [], scoringFailed: true };
+  }
+
+  // Map AI's 1-based indices back to questionIds
+  const answerSignals: AnswerSignal[] = [];
+  if (Array.isArray(parsed.answerSignals)) {
+    for (const s of parsed.answerSignals) {
+      const idx = Number(s.idx);
+      if (!idx || idx < 1 || idx > indexedAnswers.length) continue;
+      const answer = indexedAnswers[idx - 1];
+      if (!answer) continue;
+      const sig = String(s.signal || "").toLowerCase();
+      if (!["strong", "ok", "thin"].includes(sig)) continue;
+      answerSignals.push({
+        questionId: answer.questionId,
+        signal: sig as "strong" | "ok" | "thin",
+        note: String(s.note || "").trim().slice(0, 120),
+      });
+    }
   }
 
   return {
@@ -142,6 +185,7 @@ Be specific and honest. If answers are very short or empty, note that in the sum
     aiSummary: String(parsed.aiSummary || "").trim(),
     strengths: Array.isArray(parsed.strengths) ? parsed.strengths.filter((s: unknown) => typeof s === "string" && s.trim()) : [],
     redFlags: Array.isArray(parsed.redFlags) ? parsed.redFlags.filter((f: unknown) => typeof f === "string" && f.trim()) : [],
+    answerSignals,
     scoringFailed: false,
   };
 }
@@ -326,6 +370,58 @@ formRouter.patch("/:formId/responses/:responseId", async (req, res) => {
   }
 });
 
+// POST /recruit/forms/:formId/responses/:responseId/retry-score
+// Re-runs AI scoring for a response where scoringFailed === true
+formRouter.post("/:formId/responses/:responseId/retry-score", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "Unauthorized" });
+
+    // Verify the form belongs to this recruiter
+    const form = await RecruitForm.findOne({ _id: req.params.formId, uid }).lean();
+    if (!form) return res.status(404).json({ error: "Form not found." });
+
+    const response = await RecruitFormResponse.findOne({
+      _id: req.params.responseId,
+      formId: req.params.formId,
+      uid,
+    }).lean();
+    if (!response) return res.status(404).json({ error: "Response not found." });
+
+    // Build scored answers with questionIds (skip file-upload placeholders)
+    const textAnswers: ScoredAnswer[] = (response.answers as Array<{ questionId: string; label: string; value: string }>)
+      .filter(a => a.value && a.value.trim() && a.value !== "__file_uploaded__")
+      .map(a => ({ questionId: a.questionId, label: a.label, value: a.value }));
+
+    const scored = await scoreFormResponse({
+      formTitle: form.title,
+      answers: textAnswers,
+      resumeText: response.resumeText || undefined,
+    });
+
+    const updated = await RecruitFormResponse.findByIdAndUpdate(
+      response._id,
+      {
+        $set: {
+          aiSummary: scored.aiSummary,
+          aiScore: scored.aiScore,
+          strengths: scored.strengths,
+          redFlags: scored.redFlags,
+          answerSignals: scored.answerSignals,
+          scoringFailed: scored.scoringFailed,
+        },
+      },
+      { new: true }
+    ).lean();
+
+    return res.json({ response: updated });
+  } catch (err: any) {
+    console.error("[forms] POST retry-score:", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── Public routes (/recruit-public/forms) ────────────────────────────────────
 
 // GET /recruit-public/forms/:slug — get public form (questions only, no responses)
@@ -414,6 +510,7 @@ formPublicRouter.post(
         aiScore: 0,
         strengths: [],
         redFlags: [],
+        answerSignals: [],
         scoringFailed: true, // will be patched after async scoring
         stage: "new",
         submittedName,
@@ -430,9 +527,9 @@ formPublicRouter.post(
       res.status(201).json({ ok: true, responseId: response._id });
 
       // ── 4. Score in background and patch result ───────────────────────────
-      const textAnswers = rawAnswers
-        .map(a => ({ label: a.label, value: a.value }))
-        .filter(a => a.value?.trim());
+      const textAnswers: ScoredAnswer[] = rawAnswers
+        .filter(a => a.value?.trim() && a.value !== "__file_uploaded__")
+        .map(a => ({ questionId: a.questionId, label: a.label, value: a.value }));
 
       setImmediate(async () => {
         try {
@@ -447,6 +544,7 @@ formPublicRouter.post(
               aiScore: scored.aiScore,
               strengths: scored.strengths,
               redFlags: scored.redFlags,
+              answerSignals: scored.answerSignals,
               scoringFailed: scored.scoringFailed,
             },
           });

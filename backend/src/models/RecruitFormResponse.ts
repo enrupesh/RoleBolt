@@ -6,6 +6,12 @@ export interface IFormAnswer {
   value: string;
 }
 
+export interface IAnswerSignal {
+  questionId: string;
+  signal: "strong" | "ok" | "thin";
+  note: string;
+}
+
 export interface IRecruitFormResponse extends Document {
   formId: mongoose.Types.ObjectId;
   uid: string; // owner of the form (recruiter)
@@ -15,6 +21,7 @@ export interface IRecruitFormResponse extends Document {
   aiScore: number; // 0-100
   strengths: string[];
   redFlags: string[];
+  answerSignals: IAnswerSignal[];
   scoringFailed: boolean;
   stage: "new" | "shortlisted" | "interview" | "hired" | "rejected";
   submittedName: string;
@@ -33,6 +40,15 @@ const FormAnswerSchema = new Schema<IFormAnswer>(
   { _id: false }
 );
 
+const AnswerSignalSchema = new Schema<IAnswerSignal>(
+  {
+    questionId: { type: String, required: true },
+    signal: { type: String, enum: ["strong", "ok", "thin"], required: true },
+    note: { type: String, default: "" },
+  },
+  { _id: false }
+);
+
 const RecruitFormResponseSchema = new Schema<IRecruitFormResponse>(
   {
     formId: { type: Schema.Types.ObjectId, required: true, ref: "RecruitForm", index: true },
@@ -43,6 +59,7 @@ const RecruitFormResponseSchema = new Schema<IRecruitFormResponse>(
     aiScore: { type: Number, default: 0 },
     strengths: { type: [String], default: [] },
     redFlags: { type: [String], default: [] },
+    answerSignals: { type: [AnswerSignalSchema], default: [] },
     scoringFailed: { type: Boolean, default: false },
     stage: {
       type: String,
