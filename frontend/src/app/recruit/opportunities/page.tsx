@@ -164,7 +164,7 @@ export default async function RecruitOpportunitiesPage({ searchParams }: { searc
             {/* Title */}
             <div>
               <h1 className="text-lg font-bold tracking-tight text-slate-950">Find Jobs</h1>
-              <p className="text-xs text-slate-400 mt-0.5">Browse roles across India — verified &amp; free to apply</p>
+              <p className="text-xs text-slate-400 mt-0.5">Browse verified roles — free to apply worldwide</p>
             </div>
             {/* Result count + clear */}
             <div className="flex items-center gap-2 text-xs text-slate-500">
@@ -273,7 +273,7 @@ export default async function RecruitOpportunitiesPage({ searchParams }: { searc
                       <p className="mt-0.5 text-sm text-slate-500 truncate">
                         <span className="font-medium text-slate-700">{job.companyName || "Company"}</span>
                         {job.companyType ? ` · ${job.companyType}` : ""}
-                        {" · "}{job.location || "India"}
+                        {" · "}{job.location || "Remote"}
                       </p>
 
                       {/* Work mode · Job type · Niche */}

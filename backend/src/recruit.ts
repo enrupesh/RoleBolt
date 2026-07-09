@@ -237,7 +237,7 @@ function buildFallbackJobDescription(args: {
   ].filter(Boolean).join(" ");
   const perksLine = args.perks?.trim() ? `\n- ${args.perks.trim()}` : "";
   return `About the role
-We are hiring a ${args.seniority || "motivated"} ${args.title} to join the ${args.department || "team"} and contribute to practical, high-impact work in ${args.niche || "this field"}. This role is based in ${args.location || "India"} with a ${args.workMode || "flexible"} working model.${extraBits ? ` ${extraBits}` : ""}
+We are hiring a ${args.seniority || "motivated"} ${args.title} to join the ${args.department || "team"} and contribute to practical, high-impact work in ${args.niche || "this field"}. This role is based in ${args.location || "the specified location"} with a ${args.workMode || "flexible"} working model.${extraBits ? ` ${extraBits}` : ""}
 
 What you will do
 - ${responsibilities}
@@ -392,7 +392,7 @@ async function generateJobDescription(args: {
     args.applicationDeadline ? `- Application Deadline: ${args.applicationDeadline.toDateString()}` : "",
   ].filter(Boolean).join("\n");
 
-  const prompt = `You are a senior recruiter and job-description copywriter for an India-first job marketplace. Generate polished, candidate-friendly hiring content.
+  const prompt = `You are a senior recruiter and job-description copywriter for a global job marketplace. Generate polished, candidate-friendly hiring content.
 
 INPUT:
 - Job Niche/Category: ${args.niche || "General"}
@@ -2551,7 +2551,7 @@ async function generateJobMatch(args: {
 JOB:
 - Title: ${args.job.title}
 - Niche: ${args.job.niche || args.job.department || "General"}
-- Location: ${args.job.location || "India"}
+- Location: ${args.job.location || "the specified location"}
 - Work Mode: ${args.job.workMode || "Not specified"}
 - Salary: ${jobSalary}
 - Seniority Level: ${(args.job as any).seniority || "Not specified"}

@@ -81,7 +81,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       noIndex: true,
     });
   }
-  const location = job.location || "India";
+  const location = job.location || "Remote";
   const mode = job.workMode ? ` · ${job.workMode.charAt(0).toUpperCase() + job.workMode.slice(1)}` : "";
   const description = `${job.title} role${job.companyName ? ` at ${job.companyName}` : ""} in ${location}${mode}. ${job.mustHaveSkills ? `Skills: ${job.mustHaveSkills.split(",").slice(0, 4).join(", ")}.` : ""} Apply free on Rolebolt.`;
   const skills = job.mustHaveSkills
@@ -94,9 +94,9 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     keywords: [
       job.title,
       ...(job.companyName ? [`${job.title} at ${job.companyName}`] : []),
-      `${job.title} jobs India`,
-      ...(location !== "India" ? [`${job.title} jobs ${location}`] : []),
-      ...skills.map((s: string) => `${s} jobs India`),
+      `${job.title} jobs`,
+      ...(location !== "Remote" ? [`${job.title} jobs ${location}`] : []),
+      ...skills.map((s: string) => `${s} jobs`),
       "Rolebolt",
     ],
   });
@@ -132,7 +132,7 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
     `${job.title}${job.companyName ? ` — ${job.companyName}` : ""}`,
     "",
     `Company: ${job.companyName || "—"}${job.companyType ? ` (${job.companyType})` : ""}`,
-    `Location: ${job.location || "India"}${job.workMode ? ` · ${job.workMode}` : ""}`,
+    `Location: ${job.location || "Remote"}${job.workMode ? ` · ${job.workMode}` : ""}`,
     `Job type: ${job.jobType || "Full-time"}`,
     `Seniority: ${job.seniority || "Open level"}`,
     `Experience: ${job.experienceMin ?? 0}${job.experienceMax ? `–${job.experienceMax}` : "+"} years`,
@@ -213,7 +213,7 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
               <p className="mt-1 text-sm text-slate-500">
                 <span className="font-medium text-slate-700">{job.companyName || "Company"}</span>
                 {job.companyType ? ` · ${job.companyType}` : ""}
-                {` · ${job.location || "India"}`}
+                {` · ${job.location || "Remote"}`}
               </p>
               {(job.niche || job.department) && (
                 <p className="mt-0.5 text-xs text-slate-400">{job.niche || job.department}</p>

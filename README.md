@@ -1,12 +1,12 @@
 # Recruit — Standalone Project
 
 This is a standalone extraction of the "Recruit" tool (jobs, applications, AI resume
-matching) from the main Plyndrox app. It is a self-contained two-part project:
+matching) from the main Rolebolt app. It is a self-contained two-part project:
 
 - `backend/` — Express + MongoDB + Firebase Admin API server (only the recruit routes)
 - `frontend/` — Next.js app with only the recruit pages (`/recruit`, `/recruit-public`)
 
-It is wired to work exactly like it does inside plyndrox.app today — same database
+It is wired to work exactly like it does inside rolebolt.app today — same database
 model shapes, same auth flow, same API contract — so if you point it at the same
 MongoDB and Firebase project, existing data and logins keep working.
 
