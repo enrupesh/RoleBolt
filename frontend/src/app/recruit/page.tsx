@@ -791,6 +791,20 @@ export default function RecruitLandingPage() {
                   ].map(l => <li key={l.label}><Link href={l.href} className="text-xs text-slate-500 hover:text-slate-300 transition-colors">{l.label}</Link></li>)}
                 </ul>
               </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-4">Status</p>
+                <ul className="space-y-2.5">
+                  <li>
+                    <Link href="/recruit/mesh-api-status" className="text-xs text-slate-500 hover:text-slate-300 transition-colors inline-flex items-center gap-1.5">
+                      <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                      Mesh API Status
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="/recruit/preview" className="text-xs text-slate-500 hover:text-slate-300 transition-colors">Product Preview</Link>
+                  </li>
+                </ul>
+              </div>
             </div>
           </div>
 
