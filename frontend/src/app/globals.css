@@ -405,6 +405,15 @@ body.app-theme .shadow-black\/15 {
   pointer-events: none;
 }
 
+/* ── Golden shimmer sweep ───────────────────────────────────────────────── */
+@keyframes goldShimmer {
+  0%        { transform: translateX(-120%) skewX(-12deg); }
+  60%, 100% { transform: translateX(320%)  skewX(-12deg); }
+}
+.animate-gold-shimmer {
+  animation: goldShimmer 2.4s ease-in-out infinite;
+}
+
 /* Animations */
 @keyframes providerFadeIn {
   0% {
