@@ -357,7 +357,13 @@ function TalentPoolContent() {
 
         {/* ── Page title ────────────────────────────────────────────────── */}
         <div className="mb-8">
-          <h1 className="text-[28px] font-bold tracking-tight text-slate-900 leading-tight">Talent Pool</h1>
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="text-[28px] font-bold tracking-tight text-slate-900 leading-tight">Talent Pool</h1>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+              Coming Soon – Full Features
+            </span>
+          </div>
           <p className="mt-1.5 text-[13px] text-slate-500 leading-relaxed">
             Strong candidates who weren&apos;t hired — starred and kept warm for future roles.
           </p>
