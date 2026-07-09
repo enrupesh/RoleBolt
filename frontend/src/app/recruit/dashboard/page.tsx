@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
-import { getFirebaseAuth } from "@/lib/firebaseClient";
+import { getFirebaseAuth, isFirebaseAvailable } from "@/lib/firebaseClient";
 import Link from "next/link";
 import { apiUrl, readApiJson } from "@/lib/api";
 import { RecruitGuard } from "@/components/RecruitGuard";
@@ -355,10 +355,11 @@ function RecruitDashboardContent() {
   const [formToDelete, setFormToDelete] = useState<Form | null>(null);
 
   useEffect(() => {
+    if (!isFirebaseAvailable()) return;
     const auth = getFirebaseAuth();
     const unsub = onAuthStateChanged(auth, async (u) => {
       if (u) { const t = await u.getIdToken(); setToken(t); }
-      else router.push("/login");
+      else router.push("/recruit/login");
     });
     return () => unsub();
   }, [router]);

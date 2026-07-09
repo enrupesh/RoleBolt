@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { RecruitGuard } from "@/components/RecruitGuard";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
-import { getFirebaseAuth } from "@/lib/firebaseClient";
+import { getFirebaseAuth, isFirebaseAvailable } from "@/lib/firebaseClient";
 import Link from "next/link";
 import RecruitHeader from "@/components/RecruitHeader";
 import { apiUrl, readApiJson } from "@/lib/api";
@@ -253,9 +253,10 @@ function RecruiterProfileContent() {
   const copy = COPY[profile.profileType];
 
   useEffect(() => {
+    if (!isFirebaseAvailable()) return;
     const auth = getFirebaseAuth();
     const unsub = onAuthStateChanged(auth, async (u) => {
-      if (!u) { router.push("/login"); return; }
+      if (!u) { router.push("/recruit/login"); return; }
       try {
         const token = await u.getIdToken();
         setAuthToken(token);
@@ -379,6 +380,7 @@ function RecruiterProfileContent() {
 
     setSaving(true); setError(""); setSaved(false);
     try {
+      if (!isFirebaseAvailable()) throw new Error("Authentication unavailable in this environment.");
       const auth = getFirebaseAuth();
       const user = auth.currentUser;
       if (!user) throw new Error("You must be signed in to save.");

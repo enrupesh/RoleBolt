@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef, use } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { RecruitGuard } from "@/components/RecruitGuard";
-import { getFirebaseAuth } from "@/lib/firebaseClient";
+import { getFirebaseAuth, isFirebaseAvailable } from "@/lib/firebaseClient";
 import Link from "next/link";
 import { trackEvent } from "@/lib/trackEvent";
 import { apiUrl, readApiJson } from "@/lib/api";
@@ -1534,10 +1534,11 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
   const [stageFilter, setStageFilter] = useState<CandidateStage | "all">("all");
 
   useEffect(() => {
+    if (!isFirebaseAvailable()) return;
     const auth = getFirebaseAuth();
     const unsub = onAuthStateChanged(auth, async (u) => {
       if (u) setToken(await u.getIdToken());
-      else router.push("/login");
+      else router.push("/recruit/login");
     });
     return () => unsub();
   }, [router]);

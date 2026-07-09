@@ -3,18 +3,7 @@
 import { getApps, initializeApp } from "firebase/app";
 import { getAuth, type Auth } from "firebase/auth";
 
-// Note: Firebase Storage is intentionally not used in this app — image uploads
-// (logos, photos) are stored in MongoDB via the backend instead, since this
-// project does not have a Firebase Storage bucket subscription.
-type FirebaseConfig = {
-  apiKey: string | undefined;
-  authDomain: string | undefined;
-  projectId: string | undefined;
-  messagingSenderId: string | undefined;
-  appId: string | undefined;
-};
-
-function getFirebaseConfig(): FirebaseConfig {
+function getFirebaseConfig() {
   return {
     apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
     authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -25,42 +14,47 @@ function getFirebaseConfig(): FirebaseConfig {
 }
 
 let authInstance: Auth | null = null;
-let initError: Error | null = null;
+let firebaseUnavailable = false;
 
 function initFirebase() {
   if (authInstance) return;
-  if (initError) throw initError;
+  if (firebaseUnavailable) return;
 
-  const firebaseConfig = getFirebaseConfig();
-
-  const missing = Object.entries(firebaseConfig)
-    .filter(([, v]) => !v)
-    .map(([k]) => k);
+  const config = getFirebaseConfig();
+  const missing = Object.entries(config).filter(([, v]) => !v).map(([k]) => k);
 
   if (missing.length) {
-    initError = new Error(
-      `Missing Firebase env vars: ${missing.join(
-        ", "
-      )}. Add them to frontend/.env.local with NEXT_PUBLIC_ prefixes.`
-    );
-    throw initError;
+    firebaseUnavailable = true;
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(`[firebase] Missing env vars: ${missing.join(", ")}. Auth disabled in this environment.`);
+    }
+    return;
   }
 
-  const safeConfig = {
-    apiKey: firebaseConfig.apiKey!,
-    authDomain: firebaseConfig.authDomain!,
-    projectId: firebaseConfig.projectId!,
-    messagingSenderId: firebaseConfig.messagingSenderId!,
-    appId: firebaseConfig.appId!,
-  };
-
-  const app =
-    getApps().length > 0 ? getApps()[0]! : initializeApp(safeConfig);
-
-  authInstance = getAuth(app);
+  try {
+    const app = getApps().length > 0 ? getApps()[0]! : initializeApp({
+      apiKey: config.apiKey!,
+      authDomain: config.authDomain!,
+      projectId: config.projectId!,
+      messagingSenderId: config.messagingSenderId!,
+      appId: config.appId!,
+    });
+    authInstance = getAuth(app);
+  } catch (err) {
+    firebaseUnavailable = true;
+    console.warn("[firebase] Init failed:", err);
+  }
 }
 
 export function getFirebaseAuth(): Auth {
   initFirebase();
-  return authInstance!;
+  if (!authInstance) {
+    throw new Error("Firebase Auth is not configured. Add NEXT_PUBLIC_FIREBASE_* env vars.");
+  }
+  return authInstance;
+}
+
+export function isFirebaseAvailable(): boolean {
+  initFirebase();
+  return authInstance !== null;
 }

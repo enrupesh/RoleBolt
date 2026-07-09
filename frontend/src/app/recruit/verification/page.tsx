@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { onAuthStateChanged } from "firebase/auth";
-import { getFirebaseAuth } from "@/lib/firebaseClient";
+import { getFirebaseAuth, isFirebaseAvailable } from "@/lib/firebaseClient";
 import { apiUrl, readApiJson } from "@/lib/api";
 import { RecruitGuard } from "@/components/RecruitGuard";
 
@@ -132,6 +132,7 @@ function VerificationContent() {
   }, []);
 
   useEffect(() => {
+    if (!isFirebaseAvailable()) return;
     const auth = getFirebaseAuth();
     const unsub = onAuthStateChanged(auth, async (u) => {
       if (!u) { router.replace("/recruit/login"); return; }
@@ -173,9 +174,9 @@ function VerificationContent() {
     setSubmitting(true);
     setError("");
     try {
-      // Always use a fresh token at submit time
-      const auth = getFirebaseAuth();
-      const freshToken = auth.currentUser ? await auth.currentUser.getIdToken() : authToken;
+      const freshToken = isFirebaseAvailable() && getFirebaseAuth().currentUser
+        ? await getFirebaseAuth().currentUser!.getIdToken()
+        : authToken;
       const res = await fetch(apiUrl("/recruit/company/request-verification"), {
         method: "POST",
         headers: { Authorization: `Bearer ${freshToken}` },
