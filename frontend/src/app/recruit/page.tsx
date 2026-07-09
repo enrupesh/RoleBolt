@@ -245,6 +245,40 @@ export default function RecruitLandingPage() {
         <div className="relative mx-auto max-w-7xl px-4 pt-20 pb-16 sm:px-6 sm:pt-28 sm:pb-20 lg:px-8 lg:pt-32 lg:pb-28">
           <div className="mx-auto max-w-4xl text-center">
 
+            {/* ── Hackathon Judges floating badge ── */}
+            <div className="flex justify-center mb-8">
+              <Link
+                href="/recruit/preview"
+                style={{ animation: "float 3s ease-in-out infinite" }}
+                className="group relative inline-flex items-center gap-2.5 rounded-full px-5 py-2.5 text-[12px] font-bold text-amber-200 tracking-wide cursor-pointer select-none"
+              >
+                {/* Outer glow halo */}
+                <span className="absolute inset-0 rounded-full bg-amber-400/25 blur-[10px] group-hover:bg-amber-400/40 transition-all duration-500" />
+                {/* Inner pill surface */}
+                <span className="absolute inset-0 rounded-full border border-amber-400/50 bg-gradient-to-r from-[#1a0f00]/90 via-slate-900/95 to-[#1a0f00]/90 group-hover:border-amber-400/80 transition-all duration-300" />
+                {/* Shimmer sweep */}
+                <span
+                  className="absolute inset-0 rounded-full overflow-hidden pointer-events-none"
+                  aria-hidden="true"
+                >
+                  <span
+                    style={{
+                      background: "linear-gradient(105deg, transparent 35%, rgba(251,191,36,0.18) 50%, transparent 65%)",
+                      backgroundSize: "200% 100%",
+                      animation: "shimmer 2.8s linear infinite",
+                    }}
+                    className="absolute inset-0"
+                  />
+                </span>
+                {/* Content */}
+                <span className="relative flex items-center gap-2">
+                  <svg width="13" height="13" fill="currentColor" className="text-amber-400 drop-shadow-[0_0_4px_rgba(251,191,36,0.8)]" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                  <span className="text-amber-100">For Hackathon Judges</span>
+                  <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" className="text-amber-400 group-hover:translate-x-0.5 transition-transform duration-200"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                </span>
+              </Link>
+            </div>
+
             {/* Badge */}
             <div className="inline-flex items-stretch rounded-lg border border-[#0a66c2]/35 bg-slate-950/70 text-[11px] font-bold mb-8 overflow-hidden">
               {/* Left: Mesh API brand tab */}
@@ -291,6 +325,10 @@ export default function RecruitLandingPage() {
                 <Link href="/recruit/jobs/new" className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/8 px-8 py-4 text-sm font-bold text-white hover:bg-white/14 hover:-translate-y-0.5 transition-all backdrop-blur-sm">
                   Post a New Job
                 </Link>
+                <Link href="/recruit/preview" className="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-400/30 bg-amber-400/8 px-8 py-4 text-sm font-bold text-amber-200 hover:bg-amber-400/15 hover:border-amber-400/50 hover:-translate-y-0.5 transition-all backdrop-blur-sm">
+                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+                  Explore Product Preview
+                </Link>
               </div>
             ) : (
               <div className="mt-10 flex flex-col sm:flex-row gap-3 justify-center">
@@ -298,8 +336,9 @@ export default function RecruitLandingPage() {
                   Start hiring free
                   <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
                 </Link>
-                <Link href="/recruit/opportunities" className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/8 px-8 py-4 text-sm font-bold text-white hover:bg-white/14 hover:-translate-y-0.5 transition-all backdrop-blur-sm">
-                  Browse open roles
+                <Link href="/recruit/preview" className="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-400/30 bg-amber-400/8 px-8 py-4 text-sm font-bold text-amber-200 hover:bg-amber-400/15 hover:border-amber-400/50 hover:-translate-y-0.5 transition-all backdrop-blur-sm">
+                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+                  Explore Product Preview
                 </Link>
               </div>
             )}
@@ -314,22 +353,6 @@ export default function RecruitLandingPage() {
               ))}
             </div>
 
-            {/* Judges CTA */}
-            <div className="mt-10 flex flex-col items-center gap-3">
-              <div className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/35 bg-amber-400/10 px-3.5 py-1 text-[11px] font-bold text-amber-300 tracking-wide">
-                <svg width="11" height="11" fill="currentColor" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-                For Hackathon Judges
-              </div>
-              <Link
-                href="/recruit/preview"
-                className="group inline-flex items-center gap-2.5 rounded-xl border border-amber-400/30 bg-amber-400/8 px-6 py-3 text-[13px] font-bold text-amber-200 hover:bg-amber-400/15 hover:border-amber-400/50 hover:text-white hover:-translate-y-0.5 transition-all duration-200"
-              >
-                <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-                Explore Product Preview
-                <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" className="group-hover:translate-x-0.5 transition-transform"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-              </Link>
-              <p className="text-[11px] text-slate-600">Real screenshots · 12 screens · Click to enlarge</p>
-            </div>
           </div>
 
           {/* Hero UI mockup */}
