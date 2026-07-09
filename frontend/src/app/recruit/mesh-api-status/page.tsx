@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { RoleboltLogo } from "@/components/RoleboltLogo";
+import { JudgesTestingKit } from "@/components/JudgesTestingKit";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -500,6 +501,13 @@ export default function MeshApiStatusPage() {
         </div>
 
       </main>
+
+      {/* ── Judges Testing Kit ───────────────────────────────────────────────── */}
+      <div className="mx-auto max-w-6xl px-4 pb-4 sm:px-6 lg:px-8">
+        <div className="border-t border-white/6 pt-12">
+          <JudgesTestingKit dark={true} />
+        </div>
+      </div>
 
       {/* ── Footer ───────────────────────────────────────────────────────────── */}
       <footer className="border-t border-white/6 mt-16">
