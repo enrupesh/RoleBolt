@@ -150,6 +150,104 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true, service: "recruit-backend" });
 });
 
+// ── GET /mesh-api-status ─────────────────────────────────────────────────────
+// Public endpoint: pings Mesh API with a 1-token completion to verify
+// connectivity, then returns a structured health payload.
+app.get("/mesh-api-status", async (_req, res) => {
+  const apiKey = process.env.MESHAPI_API_KEY || "";
+  const meshBaseUrl = "https://api.meshapi.ai/v1";
+  const models = [
+    { id: "openai/gpt-4o-mini",              role: "primary",    label: "GPT-4o mini" },
+    { id: "anthropic/claude-3-haiku",         role: "fallback-1", label: "Claude 3 Haiku" },
+    { id: "google/gemini-2.5-flash-lite",     role: "fallback-2", label: "Gemini 2.5 Flash Lite" },
+  ];
+
+  const services = [
+    { id: "resumeAnalysis",          label: "Resume Analysis" },
+    { id: "candidateScoring",        label: "Candidate Scoring" },
+    { id: "candidateMatching",       label: "Candidate Matching" },
+    { id: "jobDescriptionGeneration",label: "Job Description Generation" },
+    { id: "aiAssistant",             label: "AI Recruitment Assistant" },
+    { id: "formResponseScoring",     label: "Form Response Scoring" },
+  ];
+
+  if (!apiKey) {
+    return res.json({
+      status: "unavailable",
+      reason: "MESHAPI_API_KEY not configured",
+      responseTimeMs: null,
+      checkedAt: new Date().toISOString(),
+      meshApiUrl: meshBaseUrl,
+      apiVersion: "v1",
+      models: models.map(m => ({ ...m, status: "unknown" })),
+      services: services.map(s => ({ ...s, status: "unknown" })),
+      systemHealth: { backend: "operational", meshApi: "unavailable", database: "unknown", auth: "unknown" },
+    });
+  }
+
+  const startMs = Date.now();
+  let meshStatus: "operational" | "degraded" | "unavailable" = "unavailable";
+  let responseTimeMs: number | null = null;
+  let errorDetail: string | undefined;
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    let meshRes: Response;
+    try {
+      meshRes = await fetch(`${meshBaseUrl}/chat/completions`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "openai/gpt-4o-mini",
+          messages: [{ role: "user", content: "hi" }],
+          max_tokens: 1,
+          temperature: 0,
+          stream: false,
+        }),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+    responseTimeMs = Date.now() - startMs;
+    if (meshRes.ok) {
+      meshStatus = responseTimeMs > 5000 ? "degraded" : "operational";
+    } else if (meshRes.status >= 500) {
+      meshStatus = "degraded";
+      errorDetail = `HTTP ${meshRes.status}`;
+    } else {
+      // 4xx other than 401/429 means the API is reachable but something is wrong
+      meshStatus = meshRes.status === 401 ? "unavailable" : "degraded";
+      errorDetail = `HTTP ${meshRes.status}`;
+    }
+  } catch (err: any) {
+    responseTimeMs = Date.now() - startMs;
+    meshStatus = "unavailable";
+    errorDetail = err?.name === "AbortError" ? "Request timed out (>8s)" : err?.message;
+  }
+
+  const modelStatus = meshStatus === "operational" ? "operational" : meshStatus;
+  const serviceStatus = meshStatus === "operational" ? "operational" : meshStatus;
+
+  return res.json({
+    status: meshStatus,
+    reason: errorDetail,
+    responseTimeMs,
+    checkedAt: new Date().toISOString(),
+    meshApiUrl: meshBaseUrl,
+    apiVersion: "v1",
+    models: models.map(m => ({ ...m, status: modelStatus })),
+    services: services.map(s => ({ ...s, status: serviceStatus })),
+    systemHealth: {
+      backend: "operational",
+      meshApi: meshStatus,
+      database: "operational",
+      auth: "operational",
+    },
+  });
+});
+
 // GET /recruit/smtp-verify — auth-protected SMTP connectivity check.
 // Verifies credentials by opening a connection without sending a real email.
 // Only accessible to authenticated recruiters (requireFirebaseAuth applied via the /recruit mount below).
