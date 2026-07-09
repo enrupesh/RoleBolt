@@ -20,6 +20,27 @@ interface Screenshot {
 
 const SCREENSHOTS: Screenshot[] = [
   {
+    src: "/screenshots/create-new.png",
+    title: "Create Something New",
+    desc: "Choose between a Standard Job Post (full AI pipeline) or a Form Builder (custom intake form). Two hiring modes built for different team sizes.",
+    category: "Dashboard",
+    badge: "Dashboard",
+  },
+  {
+    src: "/screenshots/job-create.png",
+    title: "AI Job Posting Wizard",
+    desc: "A guided 4-step wizard — Role Basics, Skills & Scope, Compensation, Review & Generate. The AI writes the full JD and scoring rubric automatically.",
+    category: "Dashboard",
+    badge: "Dashboard",
+  },
+  {
+    src: "/screenshots/form-builder.png",
+    title: "Form Builder",
+    desc: "Drag-and-drop form builder with typed question fields (short answer, email, etc.), required toggles, and reordering. Share the link anywhere — AI scores every response.",
+    category: "Dashboard",
+    badge: "Dashboard",
+  },
+  {
     src: "/screenshots/dashboard.png",
     title: "Recruiter Dashboard",
     desc: "A unified command centre showing active roles, total candidates, shortlisted applicants, interview stage, and hires — all at a glance.",
@@ -149,7 +170,7 @@ export default function ProductPreviewPage() {
           </p>
           <div className="mt-6 flex flex-wrap items-center justify-center gap-4 text-[12px] text-slate-500">
             {[
-              { label: "9 screens", icon: "M4 6h16M4 10h16M4 14h16M4 18h7" },
+              { label: "12 screens", icon: "M4 6h16M4 10h16M4 14h16M4 18h7" },
               { label: "4 feature areas", icon: "M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z" },
               { label: "Click to enlarge", icon: "M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" },
             ].map(({ label, icon }) => (
