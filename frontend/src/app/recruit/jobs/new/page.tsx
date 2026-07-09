@@ -347,17 +347,17 @@ function getTextQualityError(text: string, fieldLabel: string, minWords = 1, min
 function FieldError({ message }: { message: string | null }) {
   if (!message) return null;
   return (
-    <div className="mt-1.5 flex items-start gap-1.5 rounded-xl border border-rose-500/25 bg-rose-500/10 px-3 py-2">
-      <svg className="mt-0.5 shrink-0" width="12" height="12" fill="none" stroke="#f87171" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+    <div className="mt-1.5 flex items-start gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2">
+      <svg className="mt-0.5 shrink-0" width="12" height="12" fill="none" stroke="#e11d48" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
         <circle cx="12" cy="12" r="10" /><path d="M12 8v4m0 4h.01" />
       </svg>
-      <span className="text-xs text-rose-300 leading-snug">{message}</span>
+      <span className="text-xs text-rose-600 leading-snug font-medium">{message}</span>
     </div>
   );
 }
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <span className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.15em] text-gray-400">{children}</span>;
+  return <span className="mb-2 block text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400">{children}</span>;
 }
 
 function Input({ value, onChange, placeholder, type = "text" }: {
@@ -369,7 +369,7 @@ function Input({ value, onChange, placeholder, type = "text" }: {
       value={value}
       onChange={e => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full rounded-2xl border border-white/[0.08] bg-white px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none transition focus:border-indigo-500/50 focus:bg-gray-50 focus:ring-1 focus:ring-indigo-500/30"
+      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 placeholder-slate-400 outline-none transition focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100"
     />
   );
 }
@@ -383,7 +383,7 @@ function Textarea({ value, onChange, placeholder, rows = 4 }: {
       onChange={e => onChange(e.target.value)}
       placeholder={placeholder}
       rows={rows}
-      className="w-full rounded-2xl border border-white/[0.08] bg-white px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none transition focus:border-indigo-500/50 focus:bg-gray-50 focus:ring-1 focus:ring-indigo-500/30 resize-none"
+      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 placeholder-slate-400 outline-none transition focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100 resize-none"
     />
   );
 }
@@ -407,56 +407,56 @@ function CurrencySelect({ value, onChange }: { value: string; onChange: (v: stri
       <button
         type="button"
         onClick={() => { setOpen(o => !o); setQuery(""); }}
-        className="w-full flex items-center justify-between gap-3 rounded-2xl border border-white/[0.08] bg-white px-4 py-3 text-sm outline-none transition focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/30"
+        className="w-full flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 hover:border-slate-300"
       >
         <span className="flex items-center gap-2.5 min-w-0">
-          <span className="shrink-0 w-9 text-center rounded-lg border border-indigo-500/30 bg-indigo-500/10 py-0.5 text-[11px] font-black text-indigo-300">
+          <span className="shrink-0 w-9 text-center rounded-lg border border-indigo-200 bg-indigo-50 py-0.5 text-[11px] font-black text-indigo-700">
             {selected.code}
           </span>
-          <span className="text-sm text-white truncate">{selected.name || selected.code}</span>
+          <span className="text-sm font-medium text-slate-900 truncate">{selected.name || selected.code}</span>
         </span>
-        <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-gray-400 transition-transform" style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }} viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+        <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-slate-400 transition-transform" style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }} viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
       </button>
 
       {open && (
-        <div className="absolute z-30 mt-1.5 w-full rounded-2xl border border-white/[0.1] bg-gray-900 shadow-2xl overflow-hidden">
+        <div className="absolute z-30 mt-1.5 w-full rounded-2xl border border-black/[0.07] bg-white shadow-[0_12px_36px_rgba(0,0,0,0.14)] overflow-hidden">
           {/* Search */}
-          <div className="flex items-center gap-2 border-b border-white/[0.08] px-3 py-2.5">
-            <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-gray-400" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <div className="flex items-center gap-2 border-b border-slate-100 px-3 py-2.5">
+            <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-slate-400" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
             <input
               autoFocus
               value={query}
               onChange={e => setQuery(e.target.value)}
               placeholder="Search by name or code (e.g. EUR, Yen, Rupee)…"
-              className="flex-1 bg-transparent text-sm text-white placeholder-zinc-500 outline-none"
+              className="flex-1 bg-transparent text-sm text-slate-800 placeholder-slate-400 outline-none"
             />
             {query && (
-              <button type="button" onClick={() => setQuery("")} className="text-gray-500 hover:text-gray-300 text-xs">✕</button>
+              <button type="button" onClick={() => setQuery("")} className="text-slate-400 hover:text-slate-600 text-xs">✕</button>
             )}
           </div>
 
           {/* List */}
           <div className="max-h-56 overflow-y-auto">
             {filtered.length === 0 ? (
-              <p className="px-4 py-4 text-xs text-gray-400 text-center">No currency found for "{query}"</p>
+              <p className="px-4 py-4 text-xs text-slate-400 text-center">No currency found for "{query}"</p>
             ) : (
               filtered.map(c => (
                 <button
                   type="button"
                   key={c.code}
                   onClick={() => { onChange(c.code); setOpen(false); setQuery(""); }}
-                  className={`flex w-full items-center gap-3 px-4 py-2.5 text-sm transition hover:bg-indigo-500/10 ${c.code === value ? "bg-indigo-500/15 text-indigo-300" : "text-white"}`}
+                  className={`flex w-full items-center gap-3 px-4 py-2.5 text-sm transition hover:bg-indigo-50 ${c.code === value ? "bg-indigo-50 text-indigo-700" : "text-slate-700"}`}
                 >
-                  <span className="shrink-0 w-9 text-center rounded-md border border-white/[0.08] bg-white/[0.04] py-0.5 text-[10px] font-black text-gray-300">{c.code}</span>
+                  <span className="shrink-0 w-9 text-center rounded-md border border-slate-200 bg-slate-50 py-0.5 text-[10px] font-black text-slate-600">{c.code}</span>
                   <span className="flex-1 text-left text-sm truncate">{c.name}</span>
-                  <span className="shrink-0 text-xs text-gray-500">{c.symbol}</span>
+                  <span className="shrink-0 text-xs text-slate-400">{c.symbol}</span>
                 </button>
               ))
             )}
           </div>
 
           {/* Footer count */}
-          <div className="border-t border-white/[0.06] px-4 py-2 text-[10px] text-gray-500">
+          <div className="border-t border-slate-100 px-4 py-2 text-[10px] font-semibold text-slate-400">
             {filtered.length} of {ALL_CURRENCIES.length} currencies
           </div>
         </div>
@@ -481,19 +481,19 @@ function NicheSelect({ value, onChange, customValue, onCustomChange }: {
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between rounded-2xl border border-white/[0.08] bg-white px-4 py-3 text-sm text-white outline-none transition focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/30"
+        className="w-full flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 hover:border-slate-300"
       >
-        <span className={isOther ? "text-gray-400" : ""}>{isOther ? "Other (type below)" : value}</span>
-        <span className="text-gray-400 text-xs">▾</span>
+        <span className={isOther ? "text-slate-400 font-normal" : ""}>{isOther ? "Other (type below)" : value}</span>
+        <span className="text-slate-400 text-xs">▾</span>
       </button>
       {open && (
-        <div className="absolute z-20 mt-1.5 w-full rounded-2xl border border-white/[0.1] bg-gray-50 shadow-xl overflow-hidden">
+        <div className="absolute z-20 mt-1.5 w-full rounded-2xl border border-black/[0.07] bg-white shadow-[0_12px_36px_rgba(0,0,0,0.14)] overflow-hidden">
           <input
             autoFocus
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder="Search niches..."
-            className="w-full border-b border-white/[0.08] bg-transparent px-4 py-3 text-sm text-white outline-none placeholder-zinc-600"
+            className="w-full border-b border-slate-100 bg-transparent px-4 py-3 text-sm text-slate-800 outline-none placeholder-slate-400"
           />
           <div className="max-h-56 overflow-y-auto">
             {filtered.map(n => (
@@ -501,18 +501,18 @@ function NicheSelect({ value, onChange, customValue, onCustomChange }: {
                 type="button"
                 key={n.label}
                 onClick={() => { onChange(n.label); setOpen(false); setQuery(""); }}
-                className={`block w-full text-left px-4 py-2.5 text-sm hover:bg-indigo-500/10 transition ${n.label === value && !isOther ? "text-indigo-400 font-semibold" : "text-white"}`}
+                className={`block w-full text-left px-4 py-2.5 text-sm hover:bg-indigo-50 transition ${n.label === value && !isOther ? "text-indigo-700 font-semibold bg-indigo-50/50" : "text-slate-700"}`}
               >
                 {n.label}
               </button>
             ))}
             {filtered.length === 0 && (
-              <p className="px-4 py-3 text-xs text-gray-400">No match — try "Other" below.</p>
+              <p className="px-4 py-3 text-xs text-slate-400">No match — try "Other" below.</p>
             )}
             <button
               type="button"
               onClick={() => { onChange(OTHER_NICHE_VALUE); setOpen(false); setQuery(""); }}
-              className={`block w-full text-left px-4 py-2.5 text-sm border-t border-white/[0.06] hover:bg-indigo-500/10 transition ${isOther ? "text-indigo-400 font-semibold" : "text-gray-400"}`}
+              className={`block w-full text-left px-4 py-2.5 text-sm border-t border-slate-100 hover:bg-indigo-50 transition ${isOther ? "text-indigo-700 font-semibold" : "text-slate-500"}`}
             >
               + Other (my role doesn't fit these)
             </button>
@@ -663,25 +663,26 @@ function NewJobContent() {
     ];
 
     return (
-      <div className="min-h-screen bg-white text-[#1d2226] flex items-center justify-center p-4">
-        <div className="w-full max-w-lg text-center">
-          <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-emerald-500/15 border border-emerald-500/25 mx-auto mb-6">
-            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-400">
+      <div className="min-h-screen bg-[#f0f2f5] flex items-center justify-center p-4">
+        <div className="w-full max-w-lg text-center rounded-3xl bg-white border border-black/[0.06] p-8 sm:p-10
+          shadow-[0_1px_3px_rgba(0,0,0,0.05),0_12px_36px_rgba(0,0,0,0.08)]">
+          <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-emerald-50 border border-emerald-200 mx-auto mb-6">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-600">
               <path d="M20 6 9 17l-5-5" />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-white mb-2">Job Posted!</h1>
-          <p className="text-gray-500 text-sm mb-6">
-            <span className="text-white font-semibold">{createdJob.title}</span> is live. Share the link to start getting applicants.
+          <h1 className="text-[26px] font-bold text-slate-900 mb-2">Job Posted!</h1>
+          <p className="text-slate-500 text-sm mb-6 leading-relaxed">
+            <span className="text-slate-900 font-semibold">{createdJob.title}</span> is live. Share the link to start getting applicants.
           </p>
 
           {/* Link copy row */}
-          <div className="flex items-center gap-2 rounded-2xl border border-white/[0.1] bg-white/[0.05] px-4 py-3 text-left mb-5">
-            <p className="flex-1 text-xs text-gray-400 truncate font-mono">{publicUrl}</p>
+          <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left mb-5">
+            <p className="flex-1 text-xs text-slate-500 truncate font-mono">{publicUrl}</p>
             <button
               onClick={copyLink}
               className={`shrink-0 rounded-xl px-3 py-1.5 text-xs font-bold transition ${
-                copied ? "bg-emerald-500/20 text-emerald-400" : "bg-white/[0.1] text-gray-300 hover:bg-white/[0.18]"
+                copied ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-700 hover:bg-slate-300"
               }`}
             >
               {copied ? "✓ Copied!" : "Copy"}
@@ -690,7 +691,7 @@ function NewJobContent() {
 
           {/* Share platforms grid */}
           <div className="mb-6">
-            <p className="text-[11px] font-bold uppercase tracking-widest text-gray-500 mb-3 text-left">Share on</p>
+            <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-3 text-left">Share on</p>
             <div className="grid grid-cols-4 gap-2.5">
               {sharePlatforms.map(p => (
                 <a
@@ -711,13 +712,14 @@ function NewJobContent() {
           <div className="flex flex-col gap-2">
             <Link
               href={`/recruit/jobs/${createdJob.id}`}
-              className="flex items-center justify-center gap-2 rounded-2xl bg-indigo-500 py-3 text-sm font-bold text-white hover:bg-indigo-400 transition"
+              className="flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 py-3 text-sm font-bold text-white transition
+                shadow-[0_2px_8px_rgba(79,70,229,0.30)] hover:bg-indigo-700 hover:shadow-[0_4px_16px_rgba(79,70,229,0.40)] hover:-translate-y-px"
             >
               View Pipeline & Candidates
             </Link>
             <Link
               href="/recruit/dashboard"
-              className="text-xs text-gray-400 hover:text-gray-500 transition py-2"
+              className="text-xs font-semibold text-slate-500 hover:text-slate-800 transition py-2"
             >
               Back to Dashboard
             </Link>
@@ -728,26 +730,24 @@ function NewJobContent() {
   }
 
   return (
-    <div className="min-h-screen bg-white text-[#1d2226]">
-      
-
-      <header className="relative z-10 border-b border-white/[0.07] bg-gray-100 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-3xl items-center gap-4 px-4 py-4 sm:px-6">
-          <Link href="/recruit/dashboard" className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 transition">
+    <div className="min-h-screen bg-[#f0f2f5]">
+      <header className="sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-black/[0.07] shadow-[0_1px_0_rgba(0,0,0,0.04),0_4px_20px_rgba(0,0,0,0.05)]">
+        <div className="mx-auto flex max-w-3xl items-center gap-2.5 px-4 py-3 sm:px-6">
+          <Link href="/recruit/dashboard" className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition">
             <ChevronLeftIcon /> Dashboard
           </Link>
-          <span className="text-zinc-700">·</span>
-          <span className="text-xs text-gray-500 font-medium">New Job Posting</span>
+          <span className="text-slate-300">/</span>
+          <span className="text-[13px] font-bold text-slate-900">New Job Posting</span>
         </div>
       </header>
 
-      <main className="relative z-10 mx-auto max-w-3xl px-4 py-10 sm:px-6">
-        <div className="mb-10">
-          <div className="inline-flex items-center gap-2 rounded-full border border-indigo-400/20 bg-indigo-400/8 px-3 py-1 text-[11px] font-semibold text-indigo-300 mb-4">
+      <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+        <div className="mb-8">
+          <div className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-[11px] font-bold text-indigo-700 mb-4">
             <SparkIcon /> AI Job Description Generator
           </div>
-          <h1 className="text-2xl font-semibold text-white sm:text-3xl">Create a New Job Posting</h1>
-          <p className="mt-2 text-sm text-gray-400">Answer a few questions. The AI generates a full JD and scoring rubric automatically.</p>
+          <h1 className="text-[26px] font-bold tracking-tight text-slate-900 sm:text-[28px]">Create a New Job Posting</h1>
+          <p className="mt-2 text-[13px] text-slate-500 leading-relaxed">Answer a few questions. The AI generates a full JD and scoring rubric automatically.</p>
         </div>
 
         <div className="mb-8 flex items-center gap-2">
@@ -755,24 +755,25 @@ function NewJobContent() {
             <div key={s} className="flex items-center gap-2 flex-1">
               <button
                 onClick={() => i < step && setStep(i)}
-                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold transition ${
-                  i < step ? "bg-indigo-500 text-white cursor-pointer"
-                  : i === step ? "border-2 border-indigo-500 text-indigo-400"
-                  : "border border-gray-200 text-gray-400"
+                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold transition ${
+                  i < step ? "bg-indigo-600 text-white cursor-pointer shadow-[0_2px_6px_rgba(79,70,229,0.35)]"
+                  : i === step ? "border-2 border-indigo-500 text-indigo-600 bg-white"
+                  : "border border-slate-300 text-slate-400 bg-white"
                 }`}
               >
                 {i < step ? <CheckIcon /> : i + 1}
               </button>
-              <span className={`hidden text-xs sm:block truncate ${i === step ? "text-white font-medium" : "text-gray-400"}`}>{s}</span>
-              {i < STEPS.length - 1 && <div className={`flex-1 h-px ${i < step ? "bg-indigo-500/40" : "bg-gray-50"}`} />}
+              <span className={`hidden text-[12px] sm:block truncate font-semibold ${i === step ? "text-slate-900" : "text-slate-400"}`}>{s}</span>
+              {i < STEPS.length - 1 && <div className={`flex-1 h-px ${i < step ? "bg-indigo-300" : "bg-slate-200"}`} />}
             </div>
           ))}
         </div>
 
-        <div className="rounded-[2rem] border border-white/[0.08] bg-white/[0.03] p-6 sm:p-8">
+        <div className="rounded-[1.75rem] bg-white border border-black/[0.06] p-6 sm:p-8
+          shadow-[0_1px_3px_rgba(0,0,0,0.05),0_8px_28px_rgba(0,0,0,0.06)]">
           {step === 0 && (
             <div className="space-y-5">
-              <h2 className="text-base font-semibold text-white mb-6">Role Basics</h2>
+              <h2 className="text-[17px] font-bold text-slate-900 mb-6">Role Basics</h2>
               <div>
                 <FieldLabel>Job Title *</FieldLabel>
                 <Input value={form.title} onChange={update("title")} placeholder="e.g. Senior Frontend Engineer" />
@@ -807,9 +808,9 @@ function NewJobContent() {
                   <select
                     value={form.companyType}
                     onChange={e => update("companyType")(e.target.value)}
-                    className="w-full rounded-2xl border border-white/[0.08] bg-white px-4 py-3 text-sm text-white outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/30"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition"
                   >
-                    {COMPANY_TYPES.map(t => <option key={t} value={t} className="bg-gray-50">{t}</option>)}
+                    {COMPANY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
                   {form.companyType === "Other" && (
                     <div className="mt-2">
@@ -829,9 +830,9 @@ function NewJobContent() {
                   <select
                     value={form.seniority}
                     onChange={e => update("seniority")(e.target.value)}
-                    className="w-full rounded-2xl border border-white/[0.08] bg-white px-4 py-3 text-sm text-white outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/30"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition"
                   >
-                    {SENIORITY_OPTIONS.map(s => <option key={s} value={s} className="bg-gray-50">{s}</option>)}
+                    {SENIORITY_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
                 <div>
@@ -839,9 +840,9 @@ function NewJobContent() {
                   <select
                     value={form.jobType}
                     onChange={e => update("jobType")(e.target.value)}
-                    className="w-full rounded-2xl border border-white/[0.08] bg-white px-4 py-3 text-sm text-white outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/30"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition"
                   >
-                    {JOB_TYPES.map(t => <option key={t} value={t} className="bg-gray-50">{t}</option>)}
+                    {JOB_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
               </div>
@@ -853,10 +854,10 @@ function NewJobContent() {
                       <button
                         key={m.value}
                         onClick={() => update("workMode")(m.value)}
-                        className={`flex-1 rounded-2xl border py-3 text-xs font-semibold transition ${
+                        className={`flex-1 rounded-xl border py-3 text-xs font-bold transition ${
                           form.workMode === m.value
-                            ? "border-indigo-500/50 bg-indigo-500/15 text-indigo-300"
-                            : "border-white/[0.08] bg-white/[0.02] text-gray-400 hover:text-gray-600"
+                            ? "border-indigo-400 bg-indigo-50 text-indigo-700 shadow-[0_1px_3px_rgba(79,70,229,0.15)]"
+                            : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700"
                         }`}
                       >
                         {m.label}
@@ -868,7 +869,7 @@ function NewJobContent() {
               <div>
                 <FieldLabel>
                   {locationRequired ? "Location *" : (
-                    <>Location <span className="text-gray-400 normal-case font-normal">(optional for this niche/work mode)</span></>
+                    <>Location <span className="text-slate-400 normal-case font-medium">(optional for this niche/work mode)</span></>
                   )}
                 </FieldLabel>
                 <Input value={form.location} onChange={update("location")} placeholder={locationRequired ? "e.g. Bangalore, India" : "e.g. Anywhere / Remote-friendly (optional)"} />
@@ -885,12 +886,12 @@ function NewJobContent() {
                 </div>
               </div>
               <div>
-                <FieldLabel>Number of Openings <span className="text-gray-400 normal-case font-normal">(optional, defaults to 1)</span></FieldLabel>
+                <FieldLabel>Number of Openings <span className="text-slate-400 normal-case font-medium">(optional, defaults to 1)</span></FieldLabel>
                 <Input type="number" value={form.openings} onChange={update("openings")} placeholder="1" />
               </div>
               {form.workMode === "remote" && (
                 <div>
-                  <FieldLabel>Timezone / Working Hours Overlap <span className="text-gray-400 normal-case font-normal">(optional)</span></FieldLabel>
+                  <FieldLabel>Timezone / Working Hours Overlap <span className="text-slate-400 normal-case font-medium">(optional)</span></FieldLabel>
                   <Input value={form.timezoneOverlap} onChange={update("timezoneOverlap")} placeholder="e.g. IST business hours, 4hrs overlap with EST" />
                 </div>
               )}
@@ -899,9 +900,9 @@ function NewJobContent() {
 
           {step === 1 && (
             <div className="space-y-5">
-              <h2 className="text-base font-semibold text-white mb-6">Skills & Responsibilities</h2>
+              <h2 className="text-[17px] font-bold text-slate-900 mb-6">Skills & Responsibilities</h2>
               <div>
-                <FieldLabel>Key Responsibilities * <span className="text-gray-400 normal-case font-normal">(what they'll actually do)</span></FieldLabel>
+                <FieldLabel>Key Responsibilities * <span className="text-slate-400 normal-case font-medium">(what they'll actually do)</span></FieldLabel>
                 <Textarea
                   rows={5}
                   value={form.responsibilities}
@@ -911,7 +912,7 @@ function NewJobContent() {
                 <FieldError message={getTextQualityError(form.responsibilities, "job responsibilities", 4, 15)} />
               </div>
               <div>
-                <FieldLabel>Must-Have Skills * <span className="text-gray-400 normal-case font-normal">(non-negotiable)</span></FieldLabel>
+                <FieldLabel>Must-Have Skills * <span className="text-slate-400 normal-case font-medium">(non-negotiable)</span></FieldLabel>
                 <Textarea
                   rows={3}
                   value={form.mustHaveSkills}
@@ -921,7 +922,7 @@ function NewJobContent() {
                 <FieldError message={getTextQualityError(form.mustHaveSkills, "must-have skills", 2, 6)} />
               </div>
               <div>
-                <FieldLabel>Nice-to-Have Skills <span className="text-gray-400 normal-case font-normal">(preferred but not required)</span></FieldLabel>
+                <FieldLabel>Nice-to-Have Skills <span className="text-slate-400 normal-case font-medium">(preferred but not required)</span></FieldLabel>
                 <Textarea
                   rows={3}
                   value={form.niceToHaveSkills}
@@ -940,11 +941,11 @@ function NewJobContent() {
                 </div>
               </div>
               <div>
-                <FieldLabel>Language Requirement <span className="text-gray-400 normal-case font-normal">(optional)</span></FieldLabel>
+                <FieldLabel>Language Requirement <span className="text-slate-400 normal-case font-medium">(optional)</span></FieldLabel>
                 <Input value={form.languageRequirement} onChange={update("languageRequirement")} placeholder="e.g. Fluent English + Hindi, regional language a plus" />
               </div>
               <div>
-                <FieldLabel>Perks & Benefits <span className="text-gray-400 normal-case font-normal">(optional)</span></FieldLabel>
+                <FieldLabel>Perks & Benefits <span className="text-slate-400 normal-case font-medium">(optional)</span></FieldLabel>
                 <Textarea
                   rows={2}
                   value={form.perks}
@@ -961,25 +962,25 @@ function NewJobContent() {
                     key={key}
                     type="button"
                     onClick={() => setForm(prev => ({ ...prev, [key]: !prev[key as keyof FormData] }))}
-                    className={`rounded-full border px-4 py-2 text-xs font-semibold transition ${
-                      form[key as keyof FormData] ? "border-indigo-500/40 bg-indigo-500/15 text-indigo-300" : "border-white/[0.08] text-gray-400 hover:text-gray-600"
+                    className={`rounded-full border px-4 py-2 text-xs font-bold transition ${
+                      form[key as keyof FormData] ? "border-indigo-300 bg-indigo-50 text-indigo-700" : "border-slate-200 bg-white text-slate-500 hover:text-slate-700 hover:border-slate-300"
                     }`}
                   >
                     {label}
                   </button>
                 ))}
               </div>
-              <p className="text-[11px] text-gray-400">
-                ✓ <span className="text-gray-400">Verified company badge</span> — automatically added when your company is verified.{" "}
-                <a href="/recruit/recruiter-profile" className="text-indigo-400 hover:underline">Request verification →</a>
+              <p className="text-[11px] text-slate-400 font-medium">
+                ✓ <span className="text-slate-500">Verified company badge</span> — automatically added when your company is verified.{" "}
+                <a href="/recruit/recruiter-profile" className="text-indigo-600 font-semibold hover:underline">Request verification →</a>
               </p>
             </div>
           )}
 
           {step === 2 && (
             <div className="space-y-5">
-              <h2 className="text-base font-semibold text-white mb-2">Compensation</h2>
-              <p className="text-xs text-gray-400 mb-6">Adding a salary range helps attract better-fit candidates and reduces time wasted on mismatched expectations. You can skip this.</p>
+              <h2 className="text-[17px] font-bold text-slate-900 mb-2">Compensation</h2>
+              <p className="text-[13px] text-slate-500 mb-6 leading-relaxed">Adding a salary range helps attract better-fit candidates and reduces time wasted on mismatched expectations. You can skip this.</p>
               <div>
                 <FieldLabel>Currency</FieldLabel>
                 <CurrencySelect value={form.salaryCurrency} onChange={update("salaryCurrency")} />
@@ -994,13 +995,13 @@ function NewJobContent() {
                   <Input type="number" value={form.salaryMax} onChange={update("salaryMax")} placeholder="e.g. 1400000" />
                 </div>
               </div>
-              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
-                <p className="text-xs text-gray-400">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs text-slate-500 leading-relaxed">
                   Salary information is used only by the AI to write better job descriptions. It is not shown publicly unless you paste the generated JD on a job board.
                 </p>
               </div>
               <div>
-                <FieldLabel>Application Deadline <span className="text-gray-400 normal-case font-normal">(optional)</span></FieldLabel>
+                <FieldLabel>Application Deadline <span className="text-slate-400 normal-case font-medium">(optional)</span></FieldLabel>
                 <Input type="date" value={form.applicationDeadline} onChange={update("applicationDeadline")} placeholder="" />
               </div>
             </div>
@@ -1008,7 +1009,7 @@ function NewJobContent() {
 
           {step === 3 && (
             <div className="space-y-5">
-              <h2 className="text-base font-semibold text-white mb-6">Review & Generate</h2>
+              <h2 className="text-[17px] font-bold text-slate-900 mb-6">Review & Generate</h2>
               <div className="grid gap-3 sm:grid-cols-2">
                 {[
                   ["Role", `${form.seniority} ${form.title}`],
@@ -1025,15 +1026,15 @@ function NewJobContent() {
                   ["Perks & Benefits", form.perks || "Not specified"],
                   ...(form.workMode === "remote" ? [["Timezone Overlap", form.timezoneOverlap || "Not specified"]] : []),
                 ].map(([k, v]) => (
-                  <div key={k} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
-                    <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">{k}</p>
-                    <p className="mt-1 text-sm text-white">{v}</p>
+                  <div key={k} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{k}</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-900">{v}</p>
                   </div>
                 ))}
               </div>
-              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2">Must-Have Skills</p>
-                <p className="text-sm text-gray-600 leading-6">{form.mustHaveSkills}</p>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Must-Have Skills</p>
+                <p className="text-sm text-slate-700 leading-6">{form.mustHaveSkills}</p>
               </div>
 
               {(() => {
@@ -1048,42 +1049,42 @@ function NewJobContent() {
                   companyName: form.companyName,
                 });
                 const pct = q.score;
-                const ringColor = q.tier === "high" ? "#22c55e" : q.tier === "standard" ? "#818cf8" : "#6b7280";
+                const ringColor = q.tier === "high" ? "#22c55e" : q.tier === "standard" ? "#6366f1" : "#94a3b8";
                 return (
-                  <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
-                    <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">Listing quality preview</p>
+                  <div className="rounded-2xl bg-white border border-black/[0.06] p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Listing quality preview</p>
                     <div className="flex items-center gap-4 mb-3">
                       <div className="relative flex h-14 w-14 shrink-0 items-center justify-center">
                         <svg width="56" height="56" viewBox="0 0 56 56" className="absolute inset-0">
-                          <circle cx="28" cy="28" r="22" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="5" />
+                          <circle cx="28" cy="28" r="22" fill="none" stroke="#e2e8f0" strokeWidth="5" />
                           <circle cx="28" cy="28" r="22" fill="none" stroke={ringColor} strokeWidth="5"
                             strokeDasharray={`${(pct / 100) * 138.2} 138.2`} strokeLinecap="round" transform="rotate(-90 28 28)" />
                         </svg>
-                        <span className="text-sm font-black text-white">{pct}</span>
+                        <span className="text-sm font-black text-slate-900">{pct}</span>
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-white">{q.label}</p>
-                        <p className="text-[11px] text-gray-400 mt-0.5">Based on what you've filled in so far</p>
+                        <p className="text-sm font-bold text-slate-900">{q.label}</p>
+                        <p className="text-[11px] text-slate-400 mt-0.5">Based on what you've filled in so far</p>
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-1.5">
                       {q.signals.filter(s => s.label !== "Full job description" && s.label !== "Verified company").map(s => (
                         <div key={s.label} className="flex items-center gap-2">
-                          <span className={`text-[10px] font-bold ${s.present ? "text-green-400" : "text-gray-400"}`}>{s.present ? "✓" : "–"}</span>
-                          <span className={`text-[11px] ${s.present ? "text-gray-600" : "text-gray-400"}`}>{s.label}</span>
+                          <span className={`text-[10px] font-bold ${s.present ? "text-emerald-600" : "text-slate-300"}`}>{s.present ? "✓" : "–"}</span>
+                          <span className={`text-[11px] font-medium ${s.present ? "text-slate-600" : "text-slate-400"}`}>{s.label}</span>
                         </div>
                       ))}
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold text-indigo-400">✦</span>
-                        <span className="text-[11px] text-indigo-400">Full JD — AI will generate</span>
+                        <span className="text-[10px] font-bold text-indigo-500">✦</span>
+                        <span className="text-[11px] font-medium text-indigo-600">Full JD — AI will generate</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold text-gray-400">✦</span>
-                        <span className="text-[11px] text-gray-400">Verified company — by Rolebolt</span>
+                        <span className="text-[10px] font-bold text-slate-300">✦</span>
+                        <span className="text-[11px] font-medium text-slate-400">Verified company — by Rolebolt</span>
                       </div>
                     </div>
                     {q.tier !== "high" && (
-                      <p className="mt-3 text-[11px] text-gray-400">
+                      <p className="mt-3 text-[11px] text-slate-400 font-medium">
                         {!form.salaryMin && !form.salaryMax && "Adding a salary range +20 pts · "}
                         {!form.mustHaveSkills.trim() && "Skills listed +15 pts · "}
                         {!form.companyName.trim() && "Company name +5 pts"}
@@ -1093,12 +1094,12 @@ function NewJobContent() {
                 );
               })()}
 
-              <div className="rounded-2xl border border-indigo-500/20 bg-indigo-500/[0.06] p-4">
-                <div className="flex items-center gap-2 text-indigo-300 mb-2">
+              <div className="rounded-2xl border border-indigo-200 bg-indigo-50 p-4">
+                <div className="flex items-center gap-2 text-indigo-700 mb-2">
                   <SparkIcon />
-                  <span className="text-xs font-semibold">What the AI will generate</span>
+                  <span className="text-xs font-bold">What the AI will generate</span>
                 </div>
-                <ul className="space-y-1 text-xs text-gray-500">
+                <ul className="space-y-1 text-xs text-indigo-700/80 font-medium">
                   <li>✦ Full job description (400–600 words, bias-reduced)</li>
                   <li>✦ 4–6 criterion scoring rubric with descriptions</li>
                   <li>✦ Rubric automatically used to score every future candidate</li>
@@ -1106,7 +1107,7 @@ function NewJobContent() {
               </div>
 
               {error && (
-                <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">{error}</div>
+                <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{error}</div>
               )}
             </div>
           )}
@@ -1114,18 +1115,19 @@ function NewJobContent() {
 
         {/* Block reason hint — shown only on steps with validation, when Continue would be disabled */}
         {step < STEPS.length - 1 && !canProceed() && getBlockReason() && (
-          <div className="mt-5 flex items-start gap-2 rounded-2xl border border-amber-500/25 bg-amber-500/10 px-4 py-3">
-            <svg className="mt-0.5 shrink-0" width="13" height="13" fill="none" stroke="#fbbf24" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+          <div className="mt-5 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <svg className="mt-0.5 shrink-0" width="13" height="13" fill="none" stroke="#d97706" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
               <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
             </svg>
-            <p className="text-xs text-amber-300 leading-snug">{getBlockReason()}</p>
+            <p className="text-xs text-amber-700 font-medium leading-snug">{getBlockReason()}</p>
           </div>
         )}
 
-        <div className="mt-4 flex items-center justify-between">
+        <div className="mt-5 flex items-center justify-between">
           <button
             onClick={() => step > 0 ? setStep(s => s - 1) : router.push("/recruit/dashboard")}
-            className="rounded-2xl border border-white/[0.08] bg-white/[0.03] px-5 py-2.5 text-sm text-gray-500 transition hover:text-white"
+            className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 transition
+              shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:bg-slate-50 hover:border-slate-300 hover:text-slate-900"
           >
             {step === 0 ? "Cancel" : "Back"}
           </button>
@@ -1134,7 +1136,9 @@ function NewJobContent() {
             <button
               onClick={() => setStep(s => s + 1)}
               disabled={!canProceed()}
-              className="rounded-2xl bg-indigo-500 px-7 py-2.5 text-sm font-bold text-white transition hover:bg-indigo-400 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="rounded-xl bg-indigo-600 px-7 py-2.5 text-sm font-bold text-white transition
+                shadow-[0_2px_8px_rgba(79,70,229,0.30)]
+                hover:bg-indigo-700 hover:shadow-[0_4px_16px_rgba(79,70,229,0.40)] hover:-translate-y-px disabled:opacity-40 disabled:translate-y-0 disabled:cursor-not-allowed disabled:shadow-none"
             >
               Continue
             </button>
@@ -1142,7 +1146,9 @@ function NewJobContent() {
             <button
               onClick={handleSubmit}
               disabled={loading}
-              className="flex items-center gap-2 rounded-2xl bg-indigo-500 px-7 py-2.5 text-sm font-bold text-white shadow-lg shadow-indigo-500/25 transition hover:bg-indigo-400 disabled:opacity-60"
+              className="flex items-center gap-2 rounded-xl bg-indigo-600 px-7 py-2.5 text-sm font-bold text-white transition
+                shadow-[0_4px_16px_rgba(79,70,229,0.35)]
+                hover:bg-indigo-700 hover:shadow-[0_6px_20px_rgba(79,70,229,0.45)] hover:-translate-y-px disabled:opacity-60 disabled:translate-y-0"
             >
               {loading ? (
                 <>
