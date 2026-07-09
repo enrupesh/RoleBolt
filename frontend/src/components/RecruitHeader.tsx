@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { signOut } from "firebase/auth";
 import { getFirebaseAuth, isFirebaseAvailable } from "@/lib/firebaseClient";
+import { RoleboltLogo } from "@/components/RoleboltLogo";
 
 const CREATOR_NAV = [
   { href: "/recruit/dashboard", label: "Dashboard" },
@@ -46,7 +47,7 @@ export default function RecruitHeader() {
 
         {/* Logo */}
         <Link href="/recruit" className="flex items-center gap-2.5 shrink-0 group">
-          <img src="/rolebolt-logo.png" alt="Rolebolt" className="h-8 w-8 rounded-lg object-cover shadow-[0_2px_8px_rgba(10,102,194,0.3)] transition group-hover:shadow-[0_4px_14px_rgba(10,102,194,0.4)] group-hover:scale-105" />
+          <RoleboltLogo size="md" className="transition group-hover:shadow-[0_4px_14px_rgba(10,102,194,0.4)] group-hover:scale-105" />
           <div className="hidden sm:block">
             <p className="text-sm font-bold text-slate-900 leading-none tracking-tight">Rolebolt</p>
             <p className="text-[10.5px] text-slate-400 leading-none mt-0.5 font-medium">Global Jobs Network</p>

@@ -7,6 +7,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { getFirebaseAuth, isFirebaseAvailable } from "@/lib/firebaseClient";
 import { apiUrl, readApiJson } from "@/lib/api";
 import { RecruitGuard } from "@/components/RecruitGuard";
+import { RoleboltLogo } from "@/components/RoleboltLogo";
 
 // ─── Confetti ────────────────────────────────────────────────────────────────
 
@@ -261,7 +262,7 @@ function VerificationContent() {
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-2xl px-4 py-4 sm:px-6 flex items-center justify-between">
           <Link href="/recruit" className="flex items-center gap-2.5">
-            <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-[#0a66c2] text-sm font-black text-white">R</span>
+            <RoleboltLogo size="sm" />
             <span className="text-sm font-bold text-slate-900">Rolebolt</span>
           </Link>
           <Link

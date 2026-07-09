@@ -7,6 +7,7 @@ import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, sendEm
 import { getFirebaseAuth } from "@/lib/firebaseClient";
 import { apiUrl } from "@/lib/api";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
+import { RoleboltLogo } from "@/components/RoleboltLogo";
 
 function RecruitLoginForm() {
   const router = useRouter();
@@ -95,7 +96,7 @@ function RecruitLoginForm() {
       <div className="border-b border-slate-200 bg-white px-4 py-3">
         <div className="mx-auto max-w-7xl flex items-center justify-between">
           <Link href="/recruit" className="flex items-center gap-2 group">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#0a66c2] text-white font-black text-xs shadow-[0_2px_8px_rgba(10,102,194,0.28)] group-hover:shadow-[0_3px_12px_rgba(10,102,194,0.36)] transition-all">R</div>
+            <RoleboltLogo size="sm" className="group-hover:shadow-[0_3px_12px_rgba(10,102,194,0.36)] group-hover:scale-105 transition-all" />
             <span className="text-sm font-bold text-slate-900">Rolebolt</span>
           </Link>
           <p className="text-xs text-slate-400">New here? <Link href="/recruit/signup" className="font-semibold text-[#0a66c2] hover:underline">Create account</Link></p>
