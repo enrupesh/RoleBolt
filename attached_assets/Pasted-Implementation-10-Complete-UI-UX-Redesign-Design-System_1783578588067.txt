@@ -1,0 +1,77 @@
+Implementation 10: Complete UI/UX Redesign & Design System Polish
+
+I want the entire application to have the same level of polish, consistency, and premium feel as the reference websites I shared. The goal is not to copy the design, but to match their design quality, visual hierarchy, spacing, colors, and overall user experience.
+
+Currently, many parts of the application feel unfinished and unpolished. The UI/UX is inconsistent, and many elements blend into the background, making the interface feel flat and difficult to distinguish.
+
+Overall Design Requirements
+Redesign every page in the application with a consistent and premium design system.
+No page should be skipped. Every screen should follow the same design language.
+Improve the overall visual hierarchy, spacing, typography, colors, borders, shadows, and component styling.
+Make the interface feel modern, clean, and professional while maintaining the existing functionality.
+White Theme Should Be the Primary Theme
+
+Currently, many pages are not optimized for the white theme.
+
+Problems include:
+
+Text is difficult to read in the white theme.
+Some text almost disappears because of poor contrast.
+In several places (for example, the Create Job page), the white theme looks incomplete and elements are not clearly visible.
+Because of these issues, users are forced to switch to the dark theme.
+
+This should be fixed.
+
+The white theme must become the primary experience, and every page should look complete and perfectly readable without requiring the dark theme.
+
+Improve Visual Hierarchy
+
+Many UI elements currently blend into the background.
+
+For example:
+
+Cards don't feel like actual cards.
+Text and boxes merge with the background.
+Borders and shadows are too subtle.
+The interface looks too flat.
+Typography lacks proper emphasis.
+
+Please improve:
+
+Card elevation
+Shadows
+Borders
+Typography hierarchy
+Spacing
+Contrast
+Button styling
+Component consistency
+
+The goal is for every element to stand out naturally while keeping the interface clean and minimal.
+
+Animations
+
+Animations are currently used in very few places.
+
+Please add subtle and meaningful animations throughout the application where appropriate, such as:
+
+Hover effects
+Button interactions
+Page transitions
+Loading states
+Success animations
+Card interactions
+
+The animations should feel smooth and modern—not excessive or distracting.
+
+Important
+
+I may not be explaining this perfectly, but I hope you understand the overall vision.
+
+I want every page in the application to feel polished and consistent, with no unfinished or inconsistent screens.
+
+Before you begin, please explain your implementation plan and answer this question:
+
+Will you redesign all pages together, or will you redesign them one by one?
+
+I trust your judgment, but I want to understand your approach before you start.
