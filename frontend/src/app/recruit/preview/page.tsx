@@ -187,10 +187,20 @@ export default function ProductPreviewPage() {
           <div className="flex items-center gap-2">
             <Link
               href="/recruit"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3.5 py-2 text-[13px] font-medium text-slate-600 hover:bg-slate-50 transition-all"
+              className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3.5 py-2 text-[13px] font-medium text-slate-600 hover:bg-slate-50 transition-all"
             >
               <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
               Back to Home
+            </Link>
+            <Link
+              href="/recruit/mesh-api-status"
+              className="relative inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3.5 py-2 text-[13px] font-bold text-emerald-700 shadow-[0_0_0_0_rgba(16,185,129,0.5)] hover:bg-emerald-100 hover:-translate-y-px transition-all animate-[rb-pulse-glow_2.2s_ease-in-out_infinite]"
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+              </span>
+              Mesh API Status
             </Link>
             <Link
               href="/recruit/signup"
