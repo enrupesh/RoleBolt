@@ -2762,7 +2762,7 @@ recruitPublicRouter.get("/job-alerts", async (req, res) => {
   }
 });
 
-recruitPublicRouter.get("/job-alerts/:alertId/jobs", async (req, res) => {
+recruitPublicRouter.get("/job-alerts/:alertId/jobs", async (req: express.Request, res: express.Response) => {
   try {
     await connectMongo();
     const email = String(req.query.email ?? "").trim().toLowerCase();
@@ -2793,7 +2793,7 @@ recruitPublicRouter.get("/job-alerts/:alertId/jobs", async (req, res) => {
   }
 });
 
-recruitPublicRouter.delete("/job-alerts/:alertId", async (req, res) => {
+recruitPublicRouter.delete("/job-alerts/:alertId", async (req: express.Request, res: express.Response) => {
   try {
     await connectMongo();
     const email = String(req.query.email ?? "").trim().toLowerCase();
@@ -2808,7 +2808,7 @@ recruitPublicRouter.delete("/job-alerts/:alertId", async (req, res) => {
 
 // ─── Recommended Jobs (based on profile or manual prefs) ─────────────────────
 
-recruitPublicRouter.get("/recommended-jobs", async (req, res) => {
+recruitPublicRouter.get("/recommended-jobs", async (req: express.Request, res: express.Response) => {
   try {
     await connectMongo();
     const niche = String(req.query.niche ?? "").trim();
@@ -2843,7 +2843,7 @@ recruitPublicRouter.get("/recommended-jobs", async (req, res) => {
 
 // ─── Recruiter: new applicants count since last check ────────────────────────
 
-recruitRouter.get("/jobs/:jobId/new-applicants-count", async (req, res) => {
+recruitRouter.get("/jobs/:jobId/new-applicants-count", async (req: express.Request, res: express.Response) => {
   try {
     await connectMongo();
     const uid = getUid(req);
@@ -2861,7 +2861,7 @@ recruitRouter.get("/jobs/:jobId/new-applicants-count", async (req, res) => {
 // ─── Pipeline summary for dashboard ─────────────────────────────────────────
 
 // GET /recruit/smtp-verify — auth-protected SMTP connectivity check for the diagnostics page.
-recruitRouter.get("/smtp-verify", async (_req, res) => {
+recruitRouter.get("/smtp-verify", async (_req: express.Request, res: express.Response) => {
   try {
     const result = await verifySMTP();
     return res.status(result.ok ? 200 : 502).json(result);
@@ -2870,7 +2870,7 @@ recruitRouter.get("/smtp-verify", async (_req, res) => {
   }
 });
 
-recruitRouter.get("/pipeline-summary", async (req, res) => {
+recruitRouter.get("/pipeline-summary", async (req: express.Request, res: express.Response) => {
   try {
     await connectMongo();
     const uid = getUid(req);
