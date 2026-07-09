@@ -23,6 +23,7 @@ function buildTransporter(): nodemailer.Transporter {
     connectionTimeout: NM_CONNECTION_TIMEOUT,
     greetingTimeout:   NM_GREETING_TIMEOUT,
     socketTimeout:     NM_SOCKET_TIMEOUT,
+    family: 4,          // force IPv4 — Render blocks IPv6 SMTP
   });
 }
 
