@@ -191,6 +191,7 @@ export default function RecruitLandingPage() {
             <a href="#features" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">Features</a>
             <a href="#why-rolebolt" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">Why Rolebolt</a>
             <a href="#team" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">Team</a>
+            <Link href="/recruit/judges" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">Judges</Link>
             {!isLoggedIn && <Link href="/recruit/signup" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">For Recruiters</Link>}
             {isLoggedIn && role === "creator" && <>
               <Link href="/recruit/dashboard" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">Dashboard</Link>
@@ -221,6 +222,7 @@ export default function RecruitLandingPage() {
               <a href="#features" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Features</a>
               <a href="#why-rolebolt" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Why Rolebolt</a>
               <a href="#team" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Team</a>
+              <Link href="/recruit/judges" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Judges</Link>
               {isLoggedIn ? <>
                 <Link href="/recruit/dashboard" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Dashboard</Link>
                 <button onClick={() => { setMobileMenuOpen(false); handleSignOut(); }} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-500 hover:bg-slate-50 text-left">Sign out</button>
@@ -696,6 +698,14 @@ export default function RecruitLandingPage() {
                 <p className="mt-1 text-[12px] font-medium text-slate-400 uppercase tracking-widest">{member.role}</p>
               </div>
             ))}
+          </div>
+
+          <div className="mt-10 max-w-2xl mx-auto rounded-2xl border border-slate-200 bg-white px-6 py-5 text-center shadow-sm">
+            <p className="text-[13px] text-slate-500 leading-relaxed">
+              Built by a two-person team. Development was accelerated using Replit AI and Cursor AI as
+              coding assistants, while all product architecture, design decisions, feature implementation,
+              testing, and integration were completed by our team.
+            </p>
           </div>
         </div>
       </section>
