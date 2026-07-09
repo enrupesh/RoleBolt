@@ -1,69 +1,15 @@
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
-const SMTP_HOST       = process.env.SMTP_HOST       || "smtp.gmail.com";
-const SMTP_PORT       = Number(process.env.SMTP_PORT || 587);
-const SMTP_USER       = process.env.SMTP_USER       || "";
-const SMTP_PASS       = process.env.SMTP_PASS       || "";
-const SMTP_FROM_NAME  = process.env.SMTP_FROM_NAME  || "ForJob Hiring";
-const SMTP_FROM_EMAIL = process.env.SMTP_FROM_EMAIL || SMTP_USER;
+const RESEND_API_KEY   = process.env.RESEND_API_KEY   || "";
+const SMTP_FROM_NAME   = process.env.SMTP_FROM_NAME   || "ForJob Hiring";
+const SMTP_FROM_EMAIL  = process.env.SMTP_FROM_EMAIL  || "onboarding@resend.dev";
 
-// Per-call send timeout (ms). The transporter-level timeouts must all be
-// shorter than this so nodemailer always rejects before the Promise.race fires.
-const SEND_TIMEOUT_MS = 30_000;
+let _client: Resend | null = null;
 
-// Nodemailer connection/socket timeouts — kept well under SEND_TIMEOUT_MS
-// so we get a descriptive nodemailer error rather than a generic timeout.
-const NM_CONNECTION_TIMEOUT = 20_000; // TCP connect
-const NM_GREETING_TIMEOUT   = 15_000; // SMTP greeting
-const NM_SOCKET_TIMEOUT     = 25_000; // idle socket
-
-// Singleton transporter — reset on connection/auth errors so the next call
-// gets a fresh attempt instead of reusing a broken connection.
-let _transporter: nodemailer.Transporter | null = null;
-
-function buildTransporter(): nodemailer.Transporter {
-  return nodemailer.createTransport({
-    host: SMTP_HOST,
-    port: SMTP_PORT,
-    secure: SMTP_PORT === 465,
-    auth: { user: SMTP_USER, pass: SMTP_PASS },
-    connectionTimeout: NM_CONNECTION_TIMEOUT,
-    greetingTimeout:   NM_GREETING_TIMEOUT,
-    socketTimeout:     NM_SOCKET_TIMEOUT,
-    tls: {
-      // Render's egress IPs can trigger SNI/cert issues with some hosts;
-      // still validate in production but log the warning instead of crashing.
-      rejectUnauthorized: true,
-    },
-  });
-}
-
-function getTransporter(): nodemailer.Transporter | null {
-  if (!SMTP_USER || !SMTP_PASS) return null;
-  if (!_transporter) _transporter = buildTransporter();
-  return _transporter;
-}
-
-function resetTransporter() {
-  // Just null the reference — do NOT call .close() on the old transporter
-  // because in-flight sendMail calls on it must be allowed to complete.
-  _transporter = null;
-}
-
-// Returns true for errors that mean the transporter itself is broken and
-// should be recreated on the next call (connection refused, auth failure, etc.)
-function isTransientConnectionError(msg: string): boolean {
-  const lower = msg.toLowerCase();
-  return (
-    lower.includes("timeout") ||
-    lower.includes("econnrefused") ||
-    lower.includes("enotfound") ||
-    lower.includes("econnreset") ||
-    lower.includes("ssl") ||
-    lower.includes("tls") ||
-    lower.includes("auth") ||
-    lower.includes("greeting")
-  );
+function getClient(): Resend | null {
+  if (!RESEND_API_KEY) return null;
+  if (!_client) _client = new Resend(RESEND_API_KEY);
+  return _client;
 }
 
 export async function sendEmail(opts: {
@@ -77,69 +23,58 @@ export async function sendEmail(opts: {
     return { ok: false, error: "no_recipient" };
   }
 
-  const t = getTransporter();
-  if (!t) {
-    console.warn("[mailer] SMTP not configured — skipped (to:", opts.to, ")");
-    return { ok: false, error: "smtp_not_configured" };
+  const client = getClient();
+  if (!client) {
+    console.warn("[mailer] RESEND_API_KEY not set — skipped (to:", opts.to, ")");
+    return { ok: false, error: "email_not_configured" };
   }
 
-  const sendPromise = t.sendMail({
-    from: `"${SMTP_FROM_NAME}" <${SMTP_FROM_EMAIL}>`,
-    to: opts.to.trim(),
-    subject: opts.subject,
-    html: opts.html,
-    text: opts.text,
-  });
-
-  const timeoutPromise = new Promise<never>((_, reject) =>
-    setTimeout(
-      () => reject(new Error(`SMTP send timed out after ${SEND_TIMEOUT_MS / 1000}s`)),
-      SEND_TIMEOUT_MS
-    )
-  );
-
   try {
-    await Promise.race([sendPromise, timeoutPromise]);
+    const { error } = await client.emails.send({
+      from: `${SMTP_FROM_NAME} <${SMTP_FROM_EMAIL}>`,
+      to: opts.to.trim(),
+      subject: opts.subject,
+      html: opts.html,
+      text: opts.text,
+    });
+
+    if (error) {
+      console.error("[mailer] Resend error:", error.message);
+      return { ok: false, error: error.message };
+    }
+
     console.log("[mailer] Sent:", opts.subject, "→", opts.to);
     return { ok: true };
   } catch (err: any) {
     const msg: string = err?.message || String(err);
-    console.error("[mailer] sendMail failed:", msg);
-
-    // Reset the singleton so the next call gets a fresh connection attempt.
-    if (isTransientConnectionError(msg)) {
-      console.warn("[mailer] Resetting transporter due to connection/auth error.");
-      resetTransporter();
-    }
-
+    console.error("[mailer] sendEmail failed:", msg);
     return { ok: false, error: msg };
   }
 }
 
 export function isConfigured(): boolean {
-  return Boolean(SMTP_USER && SMTP_PASS);
+  return Boolean(RESEND_API_KEY);
 }
 
 /**
- * Diagnostic: verifies SMTP credentials by opening a connection and running
- * a NOOP command. Returns a summary string for the /health or /diagnostics route.
+ * Diagnostic: verifies Resend API key is valid by fetching account domains.
+ * Does NOT send any email.
  */
 export async function verifySMTP(): Promise<{ ok: boolean; message: string }> {
-  if (!SMTP_USER || !SMTP_PASS) {
-    return { ok: false, message: "SMTP not configured (SMTP_USER / SMTP_PASS missing)." };
+  if (!RESEND_API_KEY) {
+    return { ok: false, message: "RESEND_API_KEY not set — email is not configured." };
   }
-  const t = buildTransporter(); // always fresh for verify
+
+  const client = new Resend(RESEND_API_KEY);
   try {
-    await Promise.race([
-      t.verify(),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("SMTP verify timed out after 20s")), 20_000)
-      ),
-    ]);
-    return { ok: true, message: `SMTP OK — credentials verified and connection accepted.` };
+    const { data, error } = await client.domains.list();
+    if (error) return { ok: false, message: `Resend API key invalid: ${error.message}` };
+    const domainCount = data?.data?.length ?? 0;
+    return {
+      ok: true,
+      message: `Resend API key is valid. ${domainCount} domain(s) configured.`,
+    };
   } catch (err: any) {
-    return { ok: false, message: `SMTP verify failed: ${err?.message || err}` };
-  } finally {
-    try { (t as any).close?.(); } catch {}
+    return { ok: false, message: `Resend verify failed: ${err?.message || err}` };
   }
 }
