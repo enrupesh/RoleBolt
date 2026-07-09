@@ -81,13 +81,13 @@ type Job = {
 };
 
 const STAGES: { id: CandidateStage; label: string; color: string; bg: string }[] = [
-  { id: "applied", label: "Applied", color: "text-gray-600", bg: "bg-zinc-500/15 border-zinc-500/20" },
-  { id: "screened", label: "Screened", color: "text-blue-600", bg: "bg-blue-500/15 border-blue-500/20" },
-  { id: "assessed", label: "Assessed", color: "text-violet-600", bg: "bg-violet-500/15 border-violet-500/20" },
-  { id: "interview", label: "Interview", color: "text-amber-700", bg: "bg-amber-500/15 border-amber-500/20" },
-  { id: "offer", label: "Offer", color: "text-sky-600", bg: "bg-sky-500/15 border-sky-500/20" },
-  { id: "hired", label: "Hired", color: "text-emerald-600", bg: "bg-emerald-500/15 border-emerald-500/20" },
-  { id: "rejected", label: "Rejected", color: "text-rose-600", bg: "bg-rose-500/15 border-rose-500/20" },
+  { id: "applied", label: "Applied", color: "text-slate-700", bg: "bg-slate-200/70 border-slate-400/40" },
+  { id: "screened", label: "Screened", color: "text-blue-700", bg: "bg-blue-100 border-blue-400/40" },
+  { id: "assessed", label: "Assessed", color: "text-violet-700", bg: "bg-violet-100 border-violet-400/40" },
+  { id: "interview", label: "Interview", color: "text-amber-800", bg: "bg-amber-100 border-amber-400/40" },
+  { id: "offer", label: "Offer", color: "text-sky-700", bg: "bg-sky-100 border-sky-400/40" },
+  { id: "hired", label: "Hired", color: "text-emerald-700", bg: "bg-emerald-100 border-emerald-400/40" },
+  { id: "rejected", label: "Rejected", color: "text-rose-700", bg: "bg-rose-100 border-rose-400/40" },
 ];
 
 function getStageStyle(stage: CandidateStage) {
@@ -435,7 +435,7 @@ function OfferLetterModal({ candidate, job, token, onClose, onSent }: {
               <div>
                 <label className="block text-[11px] font-semibold uppercase tracking-[0.15em] text-gray-400 mb-1.5">Start Date *</label>
                 <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
-                  className="w-full rounded-xl border border-white/[0.08] bg-white px-3 py-2 text-sm text-white outline-none focus:border-indigo-500/50" />
+                  className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white outline-none focus:border-indigo-500/50" />
               </div>
               <div>
                 <label className="block text-[11px] font-semibold uppercase tracking-[0.15em] text-gray-400 mb-1.5">Currency</label>
@@ -448,29 +448,29 @@ function OfferLetterModal({ candidate, job, token, onClose, onSent }: {
             <div>
               <label className="block text-[11px] font-semibold uppercase tracking-[0.15em] text-gray-400 mb-1.5">Annual Salary *</label>
               <input type="text" value={salary} onChange={e => setSalary(e.target.value)} placeholder="e.g. 12,00,000 or 1,200,000"
-                className="w-full rounded-xl border border-white/[0.08] bg-white px-3 py-2 text-sm text-white placeholder-zinc-600 outline-none focus:border-indigo-500/50" />
+                className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white placeholder-zinc-600 outline-none focus:border-indigo-500/50" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-[11px] font-semibold uppercase tracking-[0.15em] text-gray-400 mb-1.5">Signing Bonus <span className="text-zinc-700 normal-case tracking-normal">(optional)</span></label>
                 <input type="text" value={signingBonus} onChange={e => setSigningBonus(e.target.value)} placeholder="e.g. 50,000"
-                  className="w-full rounded-xl border border-white/[0.08] bg-white px-3 py-2 text-sm text-white placeholder-zinc-600 outline-none focus:border-indigo-500/50" />
+                  className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white placeholder-zinc-600 outline-none focus:border-indigo-500/50" />
               </div>
               <div>
                 <label className="block text-[11px] font-semibold uppercase tracking-[0.15em] text-gray-400 mb-1.5">Company Name <span className="text-zinc-700 normal-case tracking-normal">(optional)</span></label>
                 <input type="text" value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder="Your company name"
-                  className="w-full rounded-xl border border-white/[0.08] bg-white px-3 py-2 text-sm text-white placeholder-zinc-600 outline-none focus:border-indigo-500/50" />
+                  className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white placeholder-zinc-600 outline-none focus:border-indigo-500/50" />
               </div>
             </div>
             <div>
               <label className="block text-[11px] font-semibold uppercase tracking-[0.15em] text-gray-400 mb-1.5">Key Benefits <span className="text-zinc-700 normal-case tracking-normal">(optional)</span></label>
               <input type="text" value={benefits} onChange={e => setBenefits(e.target.value)} placeholder="e.g. Health insurance, 25 days PTO, flexible hours"
-                className="w-full rounded-xl border border-white/[0.08] bg-white px-3 py-2 text-sm text-white placeholder-zinc-600 outline-none focus:border-indigo-500/50" />
+                className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white placeholder-zinc-600 outline-none focus:border-indigo-500/50" />
             </div>
             <div>
               <label className="block text-[11px] font-semibold uppercase tracking-[0.15em] text-gray-400 mb-1.5">Hiring Manager Name <span className="text-zinc-700 normal-case tracking-normal">(optional)</span></label>
               <input type="text" value={hiringManagerName} onChange={e => setHiringManagerName(e.target.value)} placeholder="Name that will sign the letter"
-                className="w-full rounded-xl border border-white/[0.08] bg-white px-3 py-2 text-sm text-white placeholder-zinc-600 outline-none focus:border-indigo-500/50" />
+                className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white placeholder-zinc-600 outline-none focus:border-indigo-500/50" />
             </div>
             {error && <p className="text-xs text-rose-400">{error}</p>}
           </div>
@@ -1193,7 +1193,7 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete }: {
         />
       )}
 
-      <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
+      <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-card)] transition hover:shadow-[var(--shadow-card-hover)] overflow-hidden">
         <div className="p-5">
           <div className="flex items-start justify-between gap-3 mb-3">
             <div className="flex-1 min-w-0">
@@ -1752,110 +1752,53 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
               </div>
             ) : (
               <>
-                {/* Stage filter */}
+                {/* Stage filter — single dropdown, no duplicated pills/sections */}
                 <div className="mb-6 flex items-center gap-3 flex-wrap">
-                  <span className="text-[11px] font-semibold uppercase tracking-widest text-[var(--text-muted)]">Filter</span>
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <button
-                      onClick={() => setStageFilter("all")}
-                      className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
-                        stageFilter === "all"
-                          ? "border-indigo-500/40 bg-indigo-500/15 text-indigo-500"
-                          : "border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-                      }`}
+                  <span className="text-[11px] font-bold uppercase tracking-widest text-[var(--text-secondary)]">Stage</span>
+                  <div className="relative">
+                    <select
+                      value={stageFilter}
+                      onChange={e => setStageFilter(e.target.value as CandidateStage | "all")}
+                      className="appearance-none rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] pl-4 pr-9 py-2 text-[12px] font-semibold text-[var(--foreground)] shadow-[var(--shadow-xs)] outline-none cursor-pointer transition hover:border-[var(--accent)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-light)]"
                     >
-                      All <span className="opacity-70">({candidates.length})</span>
-                    </button>
-                    {STAGES.map(stage => {
-                      const count = byStage[stage.id].length;
-                      const active = stageFilter === stage.id;
-                      return (
-                        <button
-                          key={stage.id}
-                          onClick={() => setStageFilter(stage.id)}
-                          className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
-                            active
-                              ? `${stage.bg} ${stage.color} border-current/40`
-                              : "border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-                          }`}
-                        >
-                          {stage.label} <span className="opacity-70">({count})</span>
-                        </button>
-                      );
-                    })}
+                      <option value="all">All stages ({candidates.length})</option>
+                      {STAGES.map(stage => (
+                        <option key={stage.id} value={stage.id}>
+                          {stage.label} ({byStage[stage.id].length})
+                        </option>
+                      ))}
+                    </select>
+                    <svg className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
                   </div>
                 </div>
 
-                {/* Filtered single-stage view */}
-                {stageFilter !== "all" ? (() => {
-                  const stage = STAGES.find(s => s.id === stageFilter)!;
-                  const stageCandidates = byStage[stageFilter];
+                {(() => {
+                  const stage = stageFilter !== "all" ? STAGES.find(s => s.id === stageFilter)! : null;
+                  const visibleCandidates = stage ? byStage[stageFilter as CandidateStage] : candidates;
                   return (
                     <div>
-                      <div className="flex items-center gap-3 mb-4">
-                        <span className={`rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-wide ${stage.bg} ${stage.color}`}>
-                          {stage.label}
-                        </span>
-                        <span className="text-xs text-[var(--text-muted)]">{stageCandidates.length} candidate{stageCandidates.length !== 1 ? "s" : ""}</span>
-                      </div>
-                      {stageCandidates.length === 0 ? (
-                        <div className="rounded-2xl border border-dashed border-[var(--border)] px-4 py-8 text-center text-xs text-[var(--text-muted)]">
-                          No candidates at the {stage.label} stage
+                      {stage && (
+                        <div className="flex items-center gap-3 mb-4">
+                          <span className={`rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-wide ${stage.bg} ${stage.color}`}>
+                            {stage.label}
+                          </span>
+                          <span className="text-xs font-medium text-[var(--text-secondary)]">{visibleCandidates.length} candidate{visibleCandidates.length !== 1 ? "s" : ""}</span>
+                        </div>
+                      )}
+                      {visibleCandidates.length === 0 ? (
+                        <div className="rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-muted)] px-4 py-10 text-center text-xs font-medium text-[var(--text-secondary)]">
+                          No candidates {stage ? `at the ${stage.label} stage` : "yet"}
                         </div>
                       ) : (
                         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                          {stageCandidates.map(c => (
+                          {visibleCandidates.map(c => (
                             <CandidateCard key={c._id} c={c} jobId={id} job={job} token={token!} onUpdate={handleUpdate} onDelete={handleDelete} />
                           ))}
                         </div>
                       )}
                     </div>
                   );
-                })() : (
-                  /* All-stages grouped view */
-                  <div className="space-y-10">
-                    {STAGES.filter(s => s.id !== "rejected").map(stage => {
-                      const stageCandidates = byStage[stage.id];
-                      if (stageCandidates.length === 0 && stage.id !== "applied") return null;
-                      return (
-                        <div key={stage.id}>
-                          <div className="flex items-center gap-3 mb-4">
-                            <span className={`rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-wide ${stage.bg} ${stage.color}`}>
-                              {stage.label}
-                            </span>
-                            <span className="text-xs text-[var(--text-muted)]">{stageCandidates.length} candidate{stageCandidates.length !== 1 ? "s" : ""}</span>
-                          </div>
-                          {stageCandidates.length === 0 ? (
-                            <div className="rounded-2xl border border-dashed border-[var(--border)] px-4 py-5 text-center text-xs text-[var(--text-muted)]">
-                              No candidates at this stage
-                            </div>
-                          ) : (
-                            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                              {stageCandidates.map(c => (
-                                <CandidateCard key={c._id} c={c} jobId={id} job={job} token={token!} onUpdate={handleUpdate} onDelete={handleDelete} />
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                    {byStage.rejected.length > 0 && (
-                      <div>
-                        <div className="flex items-center gap-3 mb-4">
-                          <span className="rounded-full border border-rose-500/20 bg-rose-500/15 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-rose-600">
-                            Rejected
-                          </span>
-                          <span className="text-xs text-[var(--text-muted)]">{byStage.rejected.length}</span>
-                        </div>
-                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                          {byStage.rejected.map(c => (
-                            <CandidateCard key={c._id} c={c} jobId={id} job={job} token={token!} onUpdate={handleUpdate} onDelete={handleDelete} />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
+                })()}
               </>
             )}
           </div>
