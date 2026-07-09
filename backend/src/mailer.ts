@@ -1,15 +1,18 @@
-import { Resend } from "resend";
+import * as Brevo from "@getbrevo/brevo";
 
-const RESEND_API_KEY   = process.env.RESEND_API_KEY   || "";
-const SMTP_FROM_NAME   = process.env.SMTP_FROM_NAME   || "ForJob Hiring";
-const SMTP_FROM_EMAIL  = process.env.SMTP_FROM_EMAIL  || "onboarding@resend.dev";
+const BREVO_API_KEY   = process.env.BREVO_API_KEY   || "";
+const SMTP_FROM_NAME  = process.env.SMTP_FROM_NAME  || "ForJob Hiring";
+const SMTP_FROM_EMAIL = process.env.SMTP_FROM_EMAIL || "";
 
-let _client: Resend | null = null;
+let _api: Brevo.TransactionalEmailsApi | null = null;
 
-function getClient(): Resend | null {
-  if (!RESEND_API_KEY) return null;
-  if (!_client) _client = new Resend(RESEND_API_KEY);
-  return _client;
+function getApi(): Brevo.TransactionalEmailsApi | null {
+  if (!BREVO_API_KEY) return null;
+  if (!_api) {
+    _api = new Brevo.TransactionalEmailsApi();
+    _api.setApiKey(Brevo.TransactionalEmailsApiApiKeys.apiKey, BREVO_API_KEY);
+  }
+  return _api;
 }
 
 export async function sendEmail(opts: {
@@ -23,58 +26,61 @@ export async function sendEmail(opts: {
     return { ok: false, error: "no_recipient" };
   }
 
-  const client = getClient();
-  if (!client) {
-    console.warn("[mailer] RESEND_API_KEY not set — skipped (to:", opts.to, ")");
+  if (!SMTP_FROM_EMAIL) {
+    console.warn("[mailer] SMTP_FROM_EMAIL not set — skipping email");
+    return { ok: false, error: "email_not_configured" };
+  }
+
+  const api = getApi();
+  if (!api) {
+    console.warn("[mailer] BREVO_API_KEY not set — skipped (to:", opts.to, ")");
     return { ok: false, error: "email_not_configured" };
   }
 
   try {
-    const { error } = await client.emails.send({
-      from: `${SMTP_FROM_NAME} <${SMTP_FROM_EMAIL}>`,
-      to: opts.to.trim(),
-      subject: opts.subject,
-      html: opts.html,
-      text: opts.text,
-    });
+    const mail = new Brevo.SendSmtpEmail();
+    mail.sender      = { name: SMTP_FROM_NAME, email: SMTP_FROM_EMAIL };
+    mail.to          = [{ email: opts.to.trim() }];
+    mail.subject     = opts.subject;
+    mail.htmlContent = opts.html;
+    if (opts.text) mail.textContent = opts.text;
 
-    if (error) {
-      console.error("[mailer] Resend error:", error.message);
-      return { ok: false, error: error.message };
-    }
-
+    await api.sendTransacEmail(mail);
     console.log("[mailer] Sent:", opts.subject, "→", opts.to);
     return { ok: true };
   } catch (err: any) {
-    const msg: string = err?.message || String(err);
+    const msg: string = err?.response?.text || err?.message || String(err);
     console.error("[mailer] sendEmail failed:", msg);
     return { ok: false, error: msg };
   }
 }
 
 export function isConfigured(): boolean {
-  return Boolean(RESEND_API_KEY);
+  return Boolean(BREVO_API_KEY && SMTP_FROM_EMAIL);
 }
 
 /**
- * Diagnostic: verifies Resend API key is valid by fetching account domains.
+ * Diagnostic: checks if Brevo API key is valid by fetching account info.
  * Does NOT send any email.
  */
 export async function verifySMTP(): Promise<{ ok: boolean; message: string }> {
-  if (!RESEND_API_KEY) {
-    return { ok: false, message: "RESEND_API_KEY not set — email is not configured." };
+  if (!BREVO_API_KEY) {
+    return { ok: false, message: "BREVO_API_KEY not set — email is not configured." };
+  }
+  if (!SMTP_FROM_EMAIL) {
+    return { ok: false, message: "SMTP_FROM_EMAIL not set — set this to your verified Brevo sender email." };
   }
 
-  const client = new Resend(RESEND_API_KEY);
   try {
-    const { data, error } = await client.domains.list();
-    if (error) return { ok: false, message: `Resend API key invalid: ${error.message}` };
-    const domainCount = data?.data?.length ?? 0;
+    const accountApi = new Brevo.AccountApi();
+    accountApi.setApiKey(Brevo.AccountApiApiKeys.apiKey, BREVO_API_KEY);
+    const { body } = await accountApi.getAccount();
     return {
       ok: true,
-      message: `Resend API key is valid. ${domainCount} domain(s) configured.`,
+      message: `Brevo API key valid. Account: ${(body as any).email || "connected"}. Emails will be sent from ${SMTP_FROM_EMAIL}.`,
     };
   } catch (err: any) {
-    return { ok: false, message: `Resend verify failed: ${err?.message || err}` };
+    const msg: string = err?.response?.text || err?.message || String(err);
+    return { ok: false, message: `Brevo verify failed: ${msg}` };
   }
 }
