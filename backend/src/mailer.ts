@@ -43,7 +43,7 @@ export async function sendEmail(opts: {
       return { ok: false, error: error.message };
     }
 
-    console.log("[mailer] Sent:", opts.subject, "→", opts.to);
+    console.log("[mailer] Sent:", opts.subject);
     return { ok: true };
   } catch (err: any) {
     const msg = err?.message || String(err);
