@@ -352,44 +352,23 @@ export default function RecruitLandingPage() {
         </div>
       </section>
 
-      {/* ── Problem ─────────────────────────────────────────────────────────── */}
-      <section className="py-20 bg-white">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="max-w-2xl mx-auto text-center mb-14">
-            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#0a66c2] mb-3">The problem</p>
-            <h2 className="text-3xl font-black text-slate-950 tracking-tight sm:text-4xl leading-tight">
-              Traditional hiring is<br />broken by design.
-            </h2>
-            <p className="mt-4 text-slate-500 leading-relaxed">Every recruiter knows the pain. It didn't have to be this way.</p>
-          </div>
-          <div className="grid gap-6 sm:grid-cols-3 max-w-5xl mx-auto">
-            {PAINS.map(p => (
-              <div key={p.title} className="rounded-2xl border border-slate-100 bg-slate-50 p-7">
-                <div className="text-3xl mb-4">{p.icon}</div>
-                <h3 className="text-base font-bold text-slate-900 mb-2">{p.title}</h3>
-                <p className="text-sm text-slate-500 leading-relaxed">{p.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* ── How it works ────────────────────────────────────────────────────── */}
-      <section className="py-20 bg-[#f8fafc] border-t border-slate-100">
+      <section className="py-20 bg-white">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="max-w-2xl mx-auto text-center mb-14">
             <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#0a66c2] mb-3">How it works</p>
             <h2 className="text-3xl font-black text-slate-950 tracking-tight sm:text-4xl leading-tight">
               From job post to<br />hire in 3 steps.
             </h2>
+            <p className="mt-4 text-slate-500 leading-relaxed">No training required. No complex setup. Just post, let AI do the screening, and hire.</p>
           </div>
           <div className="relative max-w-4xl mx-auto">
             {/* Connector line */}
             <div className="hidden sm:block absolute top-[2.25rem] left-[calc(16.67%+1.5rem)] right-[calc(16.67%+1.5rem)] h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
             <div className="grid gap-8 sm:grid-cols-3">
-              {STEPS.map((step, i) => (
+              {STEPS.map((step) => (
                 <div key={step.n} className="relative flex flex-col items-start sm:items-center sm:text-center">
-                  <div className="flex h-[4.5rem] w-[4.5rem] shrink-0 items-center justify-center rounded-2xl bg-white border-2 border-[#0a66c2]/20 shadow-[0_2px_12px_rgba(10,102,194,0.12)] mb-5">
+                  <div className="flex h-[4.5rem] w-[4.5rem] shrink-0 items-center justify-center rounded-2xl bg-blue-50 border-2 border-[#0a66c2]/20 shadow-[0_2px_12px_rgba(10,102,194,0.12)] mb-5">
                     <span className="text-2xl font-black text-[#0a66c2]">{step.n}</span>
                   </div>
                   <h3 className="text-base font-bold text-slate-950 mb-2">{step.title}</h3>
@@ -408,7 +387,7 @@ export default function RecruitLandingPage() {
       </section>
 
       {/* ── Features ────────────────────────────────────────────────────────── */}
-      <section className="py-20 bg-white border-t border-slate-100">
+      <section className="py-20 bg-[#f8fafc] border-t border-slate-100">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="max-w-2xl mx-auto text-center mb-14">
             <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#0a66c2] mb-3">Features</p>
@@ -426,6 +405,62 @@ export default function RecruitLandingPage() {
                 <span className="inline-block mb-2 rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-500">{f.tag}</span>
                 <h3 className="text-base font-bold text-slate-950 mb-2">{f.title}</h3>
                 <p className="text-sm text-slate-500 leading-relaxed">{f.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Why Rolebolt ────────────────────────────────────────────────────── */}
+      <section className="py-20 bg-white border-t border-slate-100">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="max-w-2xl mx-auto text-center mb-14">
+            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#0a66c2] mb-3">Why Rolebolt</p>
+            <h2 className="text-3xl font-black text-slate-950 tracking-tight sm:text-4xl leading-tight">
+              Not another ATS.<br />A smarter one.
+            </h2>
+            <p className="mt-4 text-slate-500 leading-relaxed">Traditional ATS tools were built before AI existed. Rolebolt was built for it.</p>
+          </div>
+          <div className="mx-auto max-w-2xl rounded-2xl border border-slate-200 bg-white shadow-[0_4px_24px_rgba(0,0,0,0.06)] overflow-hidden">
+            <div className="grid grid-cols-3 border-b border-slate-100 bg-slate-50">
+              <div className="col-span-1 py-3 px-5 text-xs font-bold text-slate-500 uppercase tracking-wider">Capability</div>
+              <div className="py-3 px-4 text-center text-xs font-bold text-[#0a66c2] uppercase tracking-wider">Rolebolt</div>
+              <div className="py-3 px-4 text-center text-xs font-bold text-slate-400 uppercase tracking-wider">Others</div>
+            </div>
+            {WHY.map((row, i) => (
+              <div key={row.label} className={`grid grid-cols-3 ${i < WHY.length - 1 ? "border-b border-slate-100" : ""}`}>
+                <div className="col-span-1 py-3.5 px-5 text-sm text-slate-700 font-medium">{row.label}</div>
+                <div className="py-3.5 px-4 flex items-center justify-center">
+                  <svg width="16" height="16" fill="none" stroke="#22c55e" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+                <div className="py-3.5 px-4 flex items-center justify-center">
+                  {row.others
+                    ? <svg width="16" height="16" fill="none" stroke="#94a3b8" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                    : <svg width="16" height="16" fill="none" stroke="#ef4444" strokeWidth="2.5" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  }
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Problem ─────────────────────────────────────────────────────────── */}
+      <section className="py-20 bg-[#f8fafc] border-t border-slate-100">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="max-w-2xl mx-auto text-center mb-14">
+            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#0a66c2] mb-3">The problem</p>
+            <h2 className="text-3xl font-black text-slate-950 tracking-tight sm:text-4xl leading-tight">
+              Traditional hiring is<br />broken by design.
+            </h2>
+            <p className="mt-4 text-slate-500 leading-relaxed">Every recruiter knows the pain. It didn't have to be this way.</p>
+          </div>
+          <div className="grid gap-6 sm:grid-cols-3 max-w-5xl mx-auto">
+            {PAINS.map(p => (
+              <div key={p.title} className="rounded-2xl border border-slate-100 bg-white p-7 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+                <div className="text-3xl mb-4">{p.icon}</div>
+                <h3 className="text-base font-bold text-slate-900 mb-2">{p.title}</h3>
+                <p className="text-sm text-slate-500 leading-relaxed">{p.desc}</p>
               </div>
             ))}
           </div>
@@ -531,40 +566,6 @@ export default function RecruitLandingPage() {
                 <p className="mt-1 text-xs text-slate-500 leading-relaxed">{desc}</p>
                 <p className="mt-3 text-xs font-bold text-[#0a66c2] group-hover:underline">Browse jobs →</p>
               </Link>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Why Rolebolt ────────────────────────────────────────────────────── */}
-      <section className="py-20 bg-[#f8fafc] border-t border-slate-100">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="max-w-2xl mx-auto text-center mb-14">
-            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#0a66c2] mb-3">Why Rolebolt</p>
-            <h2 className="text-3xl font-black text-slate-950 tracking-tight sm:text-4xl leading-tight">
-              Not another ATS.<br />A smarter one.
-            </h2>
-            <p className="mt-4 text-slate-500 leading-relaxed">Traditional ATS tools were built before AI existed. Rolebolt was built for it.</p>
-          </div>
-          <div className="mx-auto max-w-2xl rounded-2xl border border-slate-200 bg-white shadow-[0_4px_24px_rgba(0,0,0,0.06)] overflow-hidden">
-            <div className="grid grid-cols-3 border-b border-slate-100 bg-slate-50">
-              <div className="col-span-1 py-3 px-5 text-xs font-bold text-slate-500 uppercase tracking-wider">Capability</div>
-              <div className="py-3 px-4 text-center text-xs font-bold text-[#0a66c2] uppercase tracking-wider">Rolebolt</div>
-              <div className="py-3 px-4 text-center text-xs font-bold text-slate-400 uppercase tracking-wider">Others</div>
-            </div>
-            {WHY.map((row, i) => (
-              <div key={row.label} className={`grid grid-cols-3 ${i < WHY.length - 1 ? "border-b border-slate-100" : ""}`}>
-                <div className="col-span-1 py-3.5 px-5 text-sm text-slate-700 font-medium">{row.label}</div>
-                <div className="py-3.5 px-4 flex items-center justify-center">
-                  <svg width="16" height="16" fill="none" stroke="#22c55e" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-                </div>
-                <div className="py-3.5 px-4 flex items-center justify-center">
-                  {row.others
-                    ? <svg width="16" height="16" fill="none" stroke="#94a3b8" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-                    : <svg width="16" height="16" fill="none" stroke="#ef4444" strokeWidth="2.5" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                  }
-                </div>
-              </div>
             ))}
           </div>
         </div>
