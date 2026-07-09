@@ -2008,6 +2008,15 @@ recruitRouter.get("/analytics", async (req, res) => {
 
 // ─── Talent Pool ─────────────────────────────────────────────────────────────
 
+// Single source of truth for "silver-medal" auto-eligibility, mirrored in the
+// Mongo $expr filter below. Exposed on API responses as `autoEligible` so the
+// frontend never has to re-derive (and risk drifting from) this rule.
+const TALENT_POOL_AUTO_THRESHOLD = 0.55;
+function isAutoEligibleForTalentPool(c: { stage?: string; totalScore?: number; maxScore?: number }): boolean {
+  const pct = (c.totalScore ?? 0) / Math.max(c.maxScore ?? 0, 1);
+  return c.stage === "rejected" && pct >= TALENT_POOL_AUTO_THRESHOLD;
+}
+
 recruitRouter.get("/talent-pool", async (req, res) => {
   try {
     await connectMongo();
@@ -2020,7 +2029,7 @@ recruitRouter.get("/talent-pool", async (req, res) => {
         { inTalentPool: true },
         {
           stage: "rejected",
-          $expr: { $gte: [{ $divide: ["$totalScore", { $max: ["$maxScore", 1] }] }, 0.55] },
+          $expr: { $gte: [{ $divide: ["$totalScore", { $max: ["$maxScore", 1] }] }, TALENT_POOL_AUTO_THRESHOLD] },
         },
       ],
     })
@@ -2028,7 +2037,9 @@ recruitRouter.get("/talent-pool", async (req, res) => {
       .sort({ totalScore: -1 })
       .lean();
 
-    return res.json({ candidates });
+    const withEligibility = candidates.map((c: any) => ({ ...c, autoEligible: isAutoEligibleForTalentPool(c) }));
+
+    return res.json({ candidates: withEligibility });
   } catch (err: any) {
     console.error("[recruit] GET /talent-pool", err);
     return res.status(500).json({ error: err.message });
@@ -2049,7 +2060,7 @@ recruitRouter.patch("/talent-pool/:candidateId", async (req, res) => {
       { new: true }
     ).lean();
     if (!candidate) return res.status(404).json({ error: "Candidate not found." });
-    return res.json({ candidate });
+    return res.json({ candidate: { ...candidate, autoEligible: isAutoEligibleForTalentPool(candidate) } });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
