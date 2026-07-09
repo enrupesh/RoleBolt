@@ -38,6 +38,16 @@ export interface IAssessmentImpact {
   reasoning: string;
 }
 
+export interface IEmailLogEntry {
+  type: string;
+  to: string;
+  subject: string;
+  body: string;
+  sentAt: Date;
+  status: "sent" | "failed" | "skipped";
+  error?: string;
+}
+
 export interface IRecruitCandidate extends Document {
   jobId: mongoose.Types.ObjectId;
   uid: string;
@@ -71,6 +81,7 @@ export interface IRecruitCandidate extends Document {
   inTalentPool?: boolean;
   talentPoolNote?: string;
   stageMovedAt?: Date;
+  emailLog: IEmailLogEntry[];
   offerLetter?: string;
   location?: string;
   currentStatus?: string;
@@ -166,6 +177,23 @@ const RecruitCandidateSchema = new Schema<IRecruitCandidate>(
     inTalentPool: { type: Boolean, default: false },
     talentPoolNote: { type: String, default: "" },
     stageMovedAt: { type: Date },
+    emailLog: {
+      type: [
+        new Schema(
+          {
+            type:    { type: String, default: "custom" },
+            to:      { type: String, default: "" },
+            subject: { type: String, default: "" },
+            body:    { type: String, default: "" },
+            sentAt:  { type: Date,   default: Date.now },
+            status:  { type: String, enum: ["sent", "failed", "skipped"], default: "sent" },
+            error:   { type: String },
+          },
+          { _id: true }
+        ),
+      ],
+      default: [],
+    },
     offerLetter: { type: String, default: "" },
     location: { type: String, default: "" },
     currentStatus: { type: String, default: "" },
