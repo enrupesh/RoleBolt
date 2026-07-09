@@ -4,6 +4,7 @@ import express from "express";
 import admin from "firebase-admin";
 import cookieParser from "cookie-parser";
 import { recruitRouter, recruitPublicRouter } from "./recruit";
+import { formRouter, formPublicRouter } from "./recruitForms";
 import { connectMongo } from "./db";
 
 dotenv.config();
@@ -133,7 +134,9 @@ app.use(
 app.use(express.json({ limit: "6mb" }));
 
 app.use("/recruit-public", recruitPublicRouter);
+app.use("/recruit-public/forms", formPublicRouter);
 app.use("/recruit", requireFirebaseAuth, recruitRouter);
+app.use("/recruit/forms", requireFirebaseAuth, formRouter);
 
 app.get("/health", (_req, res) => {
   res.json({ ok: true, service: "recruit-backend" });
