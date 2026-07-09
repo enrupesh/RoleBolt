@@ -162,6 +162,7 @@ export default function RecruitLandingPage() {
               <Link href="/recruit/dashboard" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">Dashboard</Link>
               <Link href="/recruit/analytics" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">Analytics</Link>
             </>}
+            <a href="#team" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">Team</a>
           </nav>
 
           <div className="flex items-center gap-2 shrink-0">
@@ -183,6 +184,7 @@ export default function RecruitLandingPage() {
           <div className="md:hidden border-t border-slate-100 bg-white px-4 pb-5 pt-3">
             <nav className="flex flex-col gap-1">
               <Link href="/recruit/opportunities" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Find Jobs</Link>
+              <a href="#team" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Team</a>
               {isLoggedIn ? <>
                 <Link href="/recruit/dashboard" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Dashboard</Link>
                 <button onClick={() => { setMobileMenuOpen(false); handleSignOut(); }} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-500 hover:bg-slate-50 text-left">Sign out</button>
@@ -566,6 +568,62 @@ export default function RecruitLandingPage() {
                 <p className="mt-1 text-xs text-slate-500 leading-relaxed">{desc}</p>
                 <p className="mt-3 text-xs font-bold text-[#0a66c2] group-hover:underline">Browse jobs →</p>
               </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Team ────────────────────────────────────────────────────────────── */}
+      <section id="team" className="py-20 bg-[#f8fafc] border-t border-slate-100">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="max-w-2xl mx-auto text-center mb-14">
+            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#0a66c2] mb-3">The team</p>
+            <h2 className="text-3xl font-black text-slate-950 tracking-tight sm:text-4xl leading-tight">
+              Built by people who<br />care about hiring.
+            </h2>
+            <p className="mt-4 text-slate-500 leading-relaxed">We're builders who believe hiring should be faster, fairer, and smarter for everyone.</p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row justify-center gap-8 max-w-2xl mx-auto">
+            {[
+              {
+                name: "Rupesh Gupta",
+                role: "Founder",
+                initials: "RG",
+                gradient: "from-[#0a66c2] to-indigo-600",
+                desc: "Passionate about using AI to solve real-world hiring challenges.",
+              },
+              {
+                name: "Lorik Kumar",
+                role: "Co-Founder",
+                initials: "LK",
+                gradient: "from-indigo-500 to-violet-600",
+                desc: "Building the infrastructure for next-generation recruitment platforms.",
+              },
+            ].map((member) => (
+              <div
+                key={member.name}
+                className="group flex-1 flex flex-col items-center rounded-2xl border border-slate-100 bg-white p-8 shadow-[0_2px_12px_rgba(0,0,0,0.04)] hover:shadow-[0_12px_32px_rgba(0,0,0,0.09)] hover:border-[#0a66c2]/20 hover:-translate-y-1.5 transition-all duration-300"
+              >
+                {/* Avatar */}
+                <div className={`relative h-24 w-24 rounded-2xl bg-gradient-to-br ${member.gradient} flex items-center justify-center shadow-[0_8px_24px_rgba(10,102,194,0.25)] mb-6 group-hover:scale-105 transition-transform duration-300`}>
+                  <span className="text-2xl font-black text-white tracking-tight">{member.initials}</span>
+                  {/* Shine overlay */}
+                  <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-white/20 to-transparent pointer-events-none" />
+                </div>
+
+                {/* Name + role */}
+                <h3 className="text-xl font-black text-slate-950 tracking-tight">{member.name}</h3>
+                <span className="mt-1.5 inline-flex items-center rounded-full bg-[#0a66c2]/8 border border-[#0a66c2]/15 px-3 py-1 text-[11px] font-bold text-[#0a66c2] uppercase tracking-wider">
+                  {member.role}
+                </span>
+
+                {/* Divider */}
+                <div className="my-5 h-px w-12 bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
+
+                {/* Desc */}
+                <p className="text-sm text-slate-500 leading-relaxed text-center">{member.desc}</p>
+              </div>
             ))}
           </div>
         </div>
