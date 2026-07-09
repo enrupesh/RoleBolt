@@ -154,6 +154,9 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [globalError, setGlobalError] = useState("");
 
+  type ResumeParseState = { parsing: boolean; text: string; error: string; mode: "preview" | "edit"; fileName: string };
+  const [resumeParseState, setResumeParseState] = useState<Record<string, ResumeParseState>>({});
+
   useEffect(() => {
     fetch(apiUrl(`/recruit-public/forms/${slug}`))
       .then(r => readApiJson(r))
@@ -164,6 +167,36 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
   }, [slug]);
+
+  function updateResume(qid: string, patch: Partial<ResumeParseState>) {
+    const defaults: ResumeParseState = { parsing: false, text: "", error: "", mode: "preview", fileName: "" };
+    setResumeParseState(prev => ({
+      ...prev,
+      [qid]: { ...defaults, ...(prev[qid] ?? defaults), ...patch },
+    }));
+  }
+
+  async function handleFileChange(qid: string, file: File | null) {
+    setFiles(prev => ({ ...prev, [qid]: file }));
+    if (!file) {
+      updateResume(qid, { text: "", error: "", mode: "preview", fileName: "", parsing: false });
+      return;
+    }
+    updateResume(qid, { parsing: true, error: "", fileName: file.name, text: "", mode: "preview" });
+    try {
+      const fd = new FormData();
+      fd.append("resume", file);
+      const res = await fetch(apiUrl("/recruit-public/parse-resume"), { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to parse resume.");
+      updateResume(qid, { parsing: false, text: data.text || "", mode: "preview" });
+    } catch (e: unknown) {
+      updateResume(qid, {
+        parsing: false,
+        error: e instanceof Error ? e.message : "Failed to read file. Try a different format.",
+      });
+    }
+  }
 
   function validate(): boolean {
     if (!form) return false;
@@ -183,6 +216,14 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form) return;
+
+    // Block submission if any resume is still being parsed
+    const anyParsing = form.questions.filter(q => q.type === "file").some(q => resumeParseState[q.id]?.parsing);
+    if (anyParsing) {
+      setGlobalError("Please wait for the resume to finish processing.");
+      return;
+    }
+
     if (!validate()) return;
 
     setSubmitting(true);
@@ -205,6 +246,13 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
       const fileQ = form.questions.find(q => q.type === "file");
       if (fileQ && files[fileQ.id]) {
         fd.append("resume", files[fileQ.id]!);
+      }
+
+      // Send the extracted (and possibly edited) resume text so the backend
+      // uses the reviewed version instead of re-parsing the file.
+      const editedText = fileQ ? resumeParseState[fileQ.id]?.text?.trim() : "";
+      if (editedText) {
+        fd.append("resumeText", editedText);
       }
 
       const res = await fetch(apiUrl(`/recruit-public/forms/${slug}/submit`), {
@@ -297,27 +345,86 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6" noValidate>
-          {form!.questions.map(q => (
-            <div key={q.id}>
-              <label className="block text-sm font-semibold text-slate-800 mb-2">
-                {q.label}
-                {q.required && <span className="ml-1 text-rose-500">*</span>}
-              </label>
-              <QuestionField
-                q={q}
-                value={answers[q.id] || ""}
-                onChange={v => setAnswers(prev => ({ ...prev, [q.id]: v }))}
-                onFileChange={f => setFiles(prev => ({ ...prev, [q.id]: f }))}
-                fileValue={files[q.id]}
-              />
-              {errors[q.id] && (
-                <p className="mt-1.5 text-xs text-rose-500 flex items-center gap-1">
-                  <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>
-                  {errors[q.id]}
-                </p>
-              )}
-            </div>
-          ))}
+          {form!.questions.map(q => {
+            const rs = q.type === "file" ? resumeParseState[q.id] : undefined;
+            return (
+              <div key={q.id}>
+                <label className="block text-sm font-semibold text-slate-800 mb-2">
+                  {q.label}
+                  {q.required && <span className="ml-1 text-rose-500">*</span>}
+                </label>
+                <QuestionField
+                  q={q}
+                  value={answers[q.id] || ""}
+                  onChange={v => setAnswers(prev => ({ ...prev, [q.id]: v }))}
+                  onFileChange={f => handleFileChange(q.id, f)}
+                  fileValue={files[q.id]}
+                />
+                {errors[q.id] && (
+                  <p className="mt-1.5 text-xs text-rose-500 flex items-center gap-1">
+                    <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>
+                    {errors[q.id]}
+                  </p>
+                )}
+
+                {/* Resume extraction preview / edit — only for file questions */}
+                {q.type === "file" && rs?.parsing && (
+                  <div className="mt-3 flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-700">
+                    <svg className="animate-spin h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                    </svg>
+                    Extracting text from your resume…
+                  </div>
+                )}
+
+                {q.type === "file" && rs?.error && !rs.parsing && (
+                  <div className="mt-3 flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2 text-xs text-rose-700">
+                    <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>
+                    {rs.error}
+                  </div>
+                )}
+
+                {q.type === "file" && rs?.text && !rs.parsing && rs.mode === "preview" && (
+                  <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">Extracted text preview</p>
+                    <p className="text-xs text-slate-600 leading-relaxed line-clamp-4">
+                      {rs.text.slice(0, 300)}{rs.text.length > 300 ? "…" : ""}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => updateResume(q.id, { mode: "edit" })}
+                      className="mt-2 text-[11px] font-bold text-violet-600 hover:underline"
+                    >
+                      Edit extracted text →
+                    </button>
+                  </div>
+                )}
+
+                {q.type === "file" && rs?.text && !rs.parsing && rs.mode === "edit" && (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                      Resume text — review and edit before submitting
+                    </p>
+                    <textarea
+                      value={rs.text}
+                      onChange={e => updateResume(q.id, { text: e.target.value })}
+                      rows={8}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-violet-400 focus:ring-1 focus:ring-violet-300 transition resize-none leading-relaxed"
+                      placeholder="Your extracted resume text…"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => updateResume(q.id, { mode: "preview" })}
+                      className="text-[11px] font-bold text-violet-600 hover:underline"
+                    >
+                      ← Back to preview
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
 
           <button
             type="submit"
