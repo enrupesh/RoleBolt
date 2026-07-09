@@ -159,7 +159,7 @@ function FieldLabel({ children, required }: { children: React.ReactNode; require
 
 function FieldErr({ msg }: { msg?: string }) {
   if (!msg) return null;
-  return <p className="mt-1 text-xs text-red-600 font-medium flex items-center gap-1"><span>⚠</span>{msg}</p>;
+  return <p className="mt-1 text-xs text-red-600 font-medium flex items-center gap-1"><svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="m10.29 3.86-8.58 14.86A1 1 0 0 0 2.57 20h18.86a1 1 0 0 0 .86-1.5L13.71 3.86a1 1 0 0 0-1.74 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>{msg}</p>;
 }
 
 function Input({
@@ -497,7 +497,7 @@ function RecruiterProfileContent() {
         {/* Validation summary banner (shown after first save attempt) */}
         {hasErrors && (
           <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 flex items-start gap-3">
-            <span className="text-red-500 text-base mt-0.5">⚠</span>
+            <svg className="text-red-500 shrink-0 mt-0.5" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="m10.29 3.86-8.58 14.86A1 1 0 0 0 2.57 20h18.86a1 1 0 0 0 .86-1.5L13.71 3.86a1 1 0 0 0-1.74 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
             <div>
               <p className="text-sm font-semibold text-red-700">Please fill in the required fields</p>
               <p className="text-xs text-red-600 mt-0.5">
@@ -826,7 +826,7 @@ function RecruiterProfileContent() {
             </div>
           ) : verificationStatus === "requested" ? (
             <div className="p-5 flex items-center gap-4">
-              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 text-lg">⏳</div>
+              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700"><svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
               <div>
                 <p className="text-sm font-bold text-amber-800">Verification Under Review</p>
                 <p className="text-xs text-amber-700 mt-0.5">Your verification request has been submitted. Our team will review within 2–3 business days.</p>
