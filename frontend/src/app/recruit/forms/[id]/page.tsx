@@ -474,11 +474,13 @@ function ShareModal({ slug, title, onClose }: { slug: string; title: string; onC
 
   const shareText = encodeURIComponent(`Apply for: ${title}\n${link}`);
   const socials = [
-    { name: "WhatsApp", href: `https://wa.me/?text=${shareText}`, color: "bg-green-500 hover:bg-green-600", icon: "💬" },
-    { name: "LinkedIn", href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(link)}`, color: "bg-blue-700 hover:bg-blue-800", icon: "in" },
-    { name: "Twitter", href: `https://twitter.com/intent/tweet?text=${shareText}`, color: "bg-slate-800 hover:bg-slate-900", icon: "𝕏" },
-    { name: "Telegram", href: `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(title)}`, color: "bg-sky-500 hover:bg-sky-600", icon: "✈" },
-    { name: "Email", href: `mailto:?subject=${encodeURIComponent(`Apply: ${title}`)}&body=${shareText}`, color: "bg-slate-500 hover:bg-slate-600", icon: "✉" },
+    { name: "WhatsApp", href: `https://wa.me/?text=${shareText}`, color: "bg-[#25d366] hover:opacity-90", icon: "💬" },
+    { name: "Facebook", href: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(link)}`, color: "bg-[#1877f2] hover:opacity-90", icon: "f" },
+    { name: "Telegram", href: `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(title)}`, color: "bg-[#2aabee] hover:opacity-90", icon: "✈" },
+    { name: "X / Twitter", href: `https://twitter.com/intent/tweet?text=${shareText}`, color: "bg-[#000000] hover:opacity-90", icon: "𝕏" },
+    { name: "LinkedIn", href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(link)}`, color: "bg-[#0a66c2] hover:opacity-90", icon: "in" },
+    { name: "Email", href: `mailto:?subject=${encodeURIComponent(`Apply: ${title}`)}&body=${shareText}`, color: "bg-[#6366f1] hover:opacity-90", icon: "✉" },
+    { name: "SMS", href: `sms:?&body=${shareText}`, color: "bg-[#10b981] hover:opacity-90", icon: "📱" },
   ];
 
   return (
@@ -505,10 +507,10 @@ function ShareModal({ slug, title, onClose }: { slug: string; title: string; onC
           </div>
           <div>
             <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-2.5">Share on</p>
-            <div className="grid grid-cols-5 gap-2">
+            <div className="grid grid-cols-4 gap-2">
               {socials.map(s => (
                 <a key={s.name} href={s.href} target="_blank" rel="noopener noreferrer"
-                  className={`flex flex-col items-center gap-1 rounded-xl p-2.5 text-white transition ${s.color}`} title={s.name}>
+                  className={`flex flex-col items-center gap-1 rounded-xl p-2.5 text-white transition active:scale-95 ${s.color}`} title={s.name}>
                   <span className="text-base leading-none">{s.icon}</span>
                   <span className="text-[9px] font-bold leading-none">{s.name.split(" ")[0]}</span>
                 </a>

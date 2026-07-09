@@ -245,18 +245,20 @@ function CopyShareModal({ form, onClose }: { form: Form; onClose: () => void }) 
               {copied ? "✓ Copied!" : "Copy"}
             </button>
           </div>
-          <div className="grid grid-cols-5 gap-2">
+          <div className="grid grid-cols-4 gap-2">
             {[
-              { name: "WhatsApp", href: `https://wa.me/?text=${encodeURIComponent(`Apply: ${form.title}\n${link}`)}`, color: "bg-green-500", icon: "💬" },
-              { name: "LinkedIn", href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(link)}`, color: "bg-blue-700", icon: "in" },
-              { name: "Twitter", href: `https://twitter.com/intent/tweet?text=${encodeURIComponent(`Apply: ${form.title}\n${link}`)}`, color: "bg-slate-800", icon: "𝕏" },
-              { name: "Telegram", href: `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(form.title)}`, color: "bg-sky-500", icon: "✈" },
-              { name: "Email", href: `mailto:?subject=${encodeURIComponent(`Apply: ${form.title}`)}&body=${encodeURIComponent(`${form.title}\n${link}`)}`, color: "bg-slate-500", icon: "✉" },
+              { name: "WhatsApp", href: `https://wa.me/?text=${encodeURIComponent(`Apply: ${form.title}\n${link}`)}`, color: "bg-[#25d366]", icon: "💬" },
+              { name: "Facebook", href: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(link)}`, color: "bg-[#1877f2]", icon: "f" },
+              { name: "Telegram", href: `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(form.title)}`, color: "bg-[#2aabee]", icon: "✈" },
+              { name: "X / Twitter", href: `https://twitter.com/intent/tweet?text=${encodeURIComponent(`Apply: ${form.title}\n${link}`)}`, color: "bg-[#000000]", icon: "𝕏" },
+              { name: "LinkedIn", href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(link)}`, color: "bg-[#0a66c2]", icon: "in" },
+              { name: "Email", href: `mailto:?subject=${encodeURIComponent(`Apply: ${form.title}`)}&body=${encodeURIComponent(`${form.title}\n${link}`)}`, color: "bg-[#6366f1]", icon: "✉" },
+              { name: "SMS", href: `sms:?&body=${encodeURIComponent(`Apply: ${form.title}\n${link}`)}`, color: "bg-[#10b981]", icon: "📱" },
             ].map(s => (
               <a key={s.name} href={s.href} target="_blank" rel="noopener noreferrer"
-                className={`flex flex-col items-center gap-1 rounded-xl p-2.5 text-white ${s.color}`} title={s.name}>
-                <span className="text-base">{s.icon}</span>
-                <span className="text-[9px] font-bold">{s.name.split(" ")[0]}</span>
+                className={`flex flex-col items-center gap-1 rounded-xl p-2.5 text-white transition hover:opacity-90 active:scale-95 ${s.color}`} title={s.name}>
+                <span className="text-base leading-none">{s.icon}</span>
+                <span className="text-[9px] font-bold leading-none">{s.name.split(" ")[0]}</span>
               </a>
             ))}
           </div>
