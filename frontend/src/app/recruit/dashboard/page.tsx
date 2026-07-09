@@ -509,6 +509,20 @@ function RecruitDashboardContent() {
         {/* Standard Jobs tab */}
         {activeTab === "jobs" && (
           <>
+            {/* ── Premium tag ── */}
+            <div className="mb-5 flex flex-wrap items-center gap-2.5">
+              <div className="relative inline-flex shrink-0 items-center gap-1.5 overflow-hidden rounded-full border border-amber-300/90 bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 px-3 py-1.5 shadow-sm">
+                <div className="animate-gold-shimmer absolute inset-0 w-1/2 bg-gradient-to-r from-transparent via-white/55 to-transparent" />
+                <span className="relative text-[11px] leading-none">✦</span>
+                <span className="relative whitespace-nowrap text-[11px] font-extrabold tracking-tight text-amber-900">Made for Big Business</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {["Large Companies", "Corporate Hiring", "Enterprise Recruitment", "Structured Teams"].map(ex => (
+                  <span key={ex} className="rounded-full border border-amber-200/80 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">{ex}</span>
+                ))}
+              </div>
+            </div>
+
             <div className="mb-5 flex flex-wrap items-center gap-2">
               {(["all", "active", "paused", "closed"] as const).map(f => (
                 <button
@@ -650,6 +664,20 @@ function RecruitDashboardContent() {
         {/* Form Jobs tab */}
         {activeTab === "forms" && (
           <>
+            {/* ── Premium tag ── */}
+            <div className="mb-5 flex flex-wrap items-center gap-2.5">
+              <div className="relative inline-flex shrink-0 items-center gap-1.5 overflow-hidden rounded-full border border-amber-300/90 bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 px-3 py-1.5 shadow-sm">
+                <div className="animate-gold-shimmer absolute inset-0 w-1/2 bg-gradient-to-r from-transparent via-white/55 to-transparent" />
+                <span className="relative text-[11px] leading-none">✦</span>
+                <span className="relative whitespace-nowrap text-[11px] font-extrabold tracking-tight text-amber-900">Made for Small Business</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {["Script Writer", "Video Editor", "Content Creator", "Graphic Designer"].map(ex => (
+                  <span key={ex} className="rounded-full border border-amber-200/80 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">{ex}</span>
+                ))}
+              </div>
+            </div>
+
             <div className="mb-5 flex flex-wrap items-center gap-2">
               {(["all", "active", "closed"] as const).map(f => (
                 <button
