@@ -11,6 +11,8 @@ import { RecruitJobAlert } from "./models/RecruitJobAlert";
 import { UsageEvent } from "./models/UsageEvent";
 import { RecruitProfile } from "./models/RecruitProfile";
 import { RecruitImage } from "./models/RecruitImage";
+import { sendEmail } from "./mailer";
+import * as emailTemplates from "./emailTemplates";
 
 // ─── Resume parser (in-memory only, no disk storage) ──────────────────────────
 const RESUME_ALLOWED_TYPES = [
@@ -1462,6 +1464,39 @@ recruitRouter.patch("/jobs/:jobId/candidates/:candidateId", async (req, res) => 
     if (update.stage) {
       trackEvent("recruiter_stage_changed", uid, { jobId: req.params.jobId, stage: update.stage });
     }
+
+    // Auto-send stage-change emails for screened / interview / hired.
+    // Fire-and-forget: never block the API response on email delivery.
+    const AUTO_EMAIL_STAGES = ["screened", "interview", "hired"];
+    if (update.stage && AUTO_EMAIL_STAGES.includes(update.stage) && (candidate as any).email) {
+      const candId    = (candidate as any)._id;
+      const candName  = (candidate as any).name  as string;
+      const candEmail = (candidate as any).email as string;
+      const jobId     = req.params.jobId;
+      const stage     = update.stage as string;
+      setImmediate(async () => {
+        try {
+          const job = await RecruitJob.findById(jobId).lean();
+          const jobTitle   = (job as any)?.title       || "";
+          const companyName = (job as any)?.companyName || "";
+          let payload: emailTemplates.EmailPayload | null = null;
+          if (stage === "screened")  payload = emailTemplates.screened(candName,  jobTitle, companyName);
+          if (stage === "interview") payload = emailTemplates.interview(candName, jobTitle, companyName);
+          if (stage === "hired")     payload = emailTemplates.hired(candName,     jobTitle, companyName);
+          if (!payload) return;
+          const result = await sendEmail({ to: candEmail, subject: payload.subject, html: payload.html, text: payload.text });
+          await RecruitCandidate.findByIdAndUpdate(candId, {
+            $push: {
+              emailLog: {
+                type: stage, to: candEmail, subject: payload.subject, body: payload.text,
+                sentAt: new Date(), status: result.ok ? "sent" : "failed", error: result.error,
+              },
+            },
+          });
+        } catch (err) { console.error("[mailer] stage-change email failed:", err); }
+      });
+    }
+
     return res.json({ candidate });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
@@ -1584,12 +1619,35 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/assessment/send", async
 
     const assessmentUrl = `${FRONTEND_URL}/recruit/assessment/${token}`;
 
+    // Auto-send assessment email (fire-and-forget)
+    if (candidate.email) {
+      const candId    = candidate._id;
+      const candName  = candidate.name;
+      const candEmail = candidate.email;
+      const companyName = (job as any)?.companyName || "";
+      setImmediate(async () => {
+        try {
+          const payload = emailTemplates.assessment(candName, job.title, companyName, assessmentUrl);
+          const result  = await sendEmail({ to: candEmail, subject: payload.subject, html: payload.html, text: payload.text });
+          await RecruitCandidate.findByIdAndUpdate(candId, {
+            $push: {
+              emailLog: {
+                type: "assessment", to: candEmail, subject: payload.subject, body: payload.text,
+                sentAt: new Date(), status: result.ok ? "sent" : "failed", error: result.error,
+              },
+            },
+          });
+        } catch (err) { console.error("[mailer] assessment email failed:", err); }
+      });
+    }
+
     return res.json({
       ok: true,
       assessmentUrl,
       questions,
       candidateName: candidate.name,
       candidateEmail: candidate.email,
+      emailSent: Boolean(candidate.email),
     });
   } catch (err: any) {
     console.error("[recruit] POST /assessment/send", err);
@@ -1620,6 +1678,60 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/reject-email", async (r
   }
 });
 
+// ── Send any recruiter-composed email to a candidate & log it ─────────────────
+// Used by frontend for rejection/offer one-click-send (recruiter can edit first).
+recruitRouter.post("/jobs/:jobId/candidates/:candidateId/send-email", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const { type, subject, body } = req.body as { type?: string; subject?: string; body?: string };
+
+    if (!subject?.trim() || !body?.trim()) {
+      return res.status(400).json({ error: "Subject and body are required." });
+    }
+
+    const candidate = await RecruitCandidate.findOne({ _id: req.params.candidateId, jobId: req.params.jobId, uid });
+    if (!candidate) return res.status(404).json({ error: "Candidate not found." });
+    if (!candidate.email?.trim()) return res.status(400).json({ error: "This candidate has no email address on file." });
+
+    const job = await RecruitJob.findOne({ _id: req.params.jobId, uid }).lean();
+    const jobTitle    = (job as any)?.title       || "";
+    const companyName = (job as any)?.companyName || "";
+
+    // Build branded HTML from body text based on email type
+    let html: string;
+    if (type === "rejected") {
+      html = emailTemplates.rejectionEmailHtml(candidate.name, jobTitle, companyName, body).html;
+    } else if (type === "offer") {
+      html = emailTemplates.offerEmail(candidate.name, jobTitle, companyName, body).html;
+    } else {
+      html = emailTemplates.genericEmail(candidate.name, subject.trim(), body);
+    }
+
+    const result = await sendEmail({ to: candidate.email, subject: subject.trim(), html, text: body });
+
+    const logEntry = {
+      type: type || "custom",
+      to: candidate.email,
+      subject: subject.trim(),
+      body,
+      sentAt: new Date(),
+      status: (result.ok ? "sent" : "failed") as "sent" | "failed",
+      error: result.error,
+    };
+    candidate.emailLog.push(logEntry as any);
+    await candidate.save();
+
+    if (!result.ok) {
+      return res.status(502).json({ error: `Email delivery failed: ${result.error}. The log entry has been saved.`, logEntry });
+    }
+    return res.json({ ok: true, sentAt: logEntry.sentAt, logEntry });
+  } catch (err: any) {
+    console.error("[recruit] POST /send-email", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 recruitRouter.post("/jobs/:jobId/candidates/:candidateId/reminder", async (req, res) => {
   try {
     await connectMongo();
@@ -1635,7 +1747,33 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/reminder", async (req, 
     await candidate.save();
 
     const assessmentUrl = `${FRONTEND_URL}/recruit/assessment/${candidate.assessmentToken}`;
-    return res.json({ ok: true, assessmentUrl, candidateEmail: candidate.email });
+
+    // Auto-send reminder email (fire-and-forget)
+    if (candidate.email) {
+      const candId    = candidate._id;
+      const candName  = candidate.name;
+      const candEmail = candidate.email;
+      const reminderUrl = assessmentUrl;
+      setImmediate(async () => {
+        try {
+          const job     = await RecruitJob.findById(req.params.jobId).lean();
+          const jobTitle     = (job as any)?.title       || "";
+          const companyName  = (job as any)?.companyName || "";
+          const payload = emailTemplates.assessmentReminder(candName, jobTitle, companyName, reminderUrl);
+          const result  = await sendEmail({ to: candEmail, subject: payload.subject, html: payload.html, text: payload.text });
+          await RecruitCandidate.findByIdAndUpdate(candId, {
+            $push: {
+              emailLog: {
+                type: "assessment_reminder", to: candEmail, subject: payload.subject, body: payload.text,
+                sentAt: new Date(), status: result.ok ? "sent" : "failed", error: result.error,
+              },
+            },
+          });
+        } catch (err) { console.error("[mailer] reminder email failed:", err); }
+      });
+    }
+
+    return res.json({ ok: true, assessmentUrl, candidateEmail: candidate.email, emailSent: Boolean(candidate.email) });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
