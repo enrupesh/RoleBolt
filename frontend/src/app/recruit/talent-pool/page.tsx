@@ -24,6 +24,8 @@ type PoolCandidate = {
   source: string;
   createdAt: string;
   jobId: { title: string; department: string; status: string } | string;
+  /** Server-computed: true if this candidate would appear here even without being manually starred. */
+  autoEligible?: boolean;
 };
 
 function BackIcon() {
@@ -68,15 +70,22 @@ function scoreBadgeClass(pct: number) {
 }
 
 function CandidateCard({
-  c, token, onUpdate,
+  c, token, onUpdate, onRemove,
 }: {
   c: PoolCandidate;
   token: string;
   onUpdate: (id: string, update: Partial<PoolCandidate>) => void;
+  onRemove: (id: string) => void;
 }) {
   const [editingNote, setEditingNote] = useState(false);
   const [note, setNote] = useState(c.talentPoolNote || "");
   const [savingNote, setSavingNote] = useState(false);
+
+  // Keep the draft in sync if the candidate's saved note changes elsewhere
+  // (e.g. re-fetched from the server) while not actively editing it.
+  useEffect(() => {
+    if (!editingNote) setNote(c.talentPoolNote || "");
+  }, [c.talentPoolNote, editingNote]);
   const [togglingPool, setTogglingPool] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
@@ -87,13 +96,27 @@ function CandidateCard({
   async function togglePool() {
     setTogglingPool(true);
     try {
+      const nextValue = !c.inTalentPool;
       const res = await fetch(apiUrl(`/recruit/talent-pool/${c._id}`), {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ inTalentPool: !c.inTalentPool }),
+        body: JSON.stringify({ inTalentPool: nextValue }),
       });
       const data = await readApiJson(res);
-      if (res.ok) onUpdate(c._id, { inTalentPool: data.candidate.inTalentPool });
+      if (res.ok) {
+        const updatedValue: boolean = data.candidate.inTalentPool;
+        // If unstarring a candidate who only appears here because they were manually
+        // added (i.e. they don't meet the server's auto-eligibility rule — see
+        // `autoEligible`, computed server-side so this never drifts from the API),
+        // remove them from the list — a fresh fetch would no longer return them, so
+        // keep local state consistent instead of leaving a stale card behind.
+        const autoEligible: boolean = data.candidate.autoEligible ?? c.autoEligible ?? false;
+        if (!updatedValue && !autoEligible) {
+          onRemove(c._id);
+        } else {
+          onUpdate(c._id, { inTalentPool: updatedValue, autoEligible });
+        }
+      }
     } finally {
       setTogglingPool(false);
     }
@@ -225,7 +248,11 @@ function TalentPoolContent() {
   const [search, setSearch] = useState("");
 
   useEffect(() => {
-    if (!isFirebaseAvailable()) return;
+    if (!isFirebaseAvailable()) {
+      // No auth configured in this environment — don't spin forever.
+      setLoading(false);
+      return;
+    }
     const auth = getFirebaseAuth();
     const unsub = onAuthStateChanged(auth, async (u) => {
       if (u) { const t = await u.getIdToken(); setToken(t); }
@@ -251,6 +278,10 @@ function TalentPoolContent() {
 
   function handleUpdate(id: string, update: Partial<PoolCandidate>) {
     setCandidates(prev => prev.map(c => c._id === id ? { ...c, ...update } : c));
+  }
+
+  function handleRemove(id: string) {
+    setCandidates(prev => prev.filter(c => c._id !== id));
   }
 
   const pinned = useMemo(() => candidates.filter(c => c.inTalentPool), [candidates]);
@@ -431,7 +462,7 @@ function TalentPoolContent() {
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {filtered.map(c => (
-              <CandidateCard key={c._id} c={c} token={token!} onUpdate={handleUpdate} />
+              <CandidateCard key={c._id} c={c} token={token!} onUpdate={handleUpdate} onRemove={handleRemove} />
             ))}
           </div>
         )}
