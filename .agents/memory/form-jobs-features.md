@@ -25,6 +25,12 @@ Purely client-side — derives score dimensions from `form.questions` (labels + 
 
 **Why:** The form questions are already loaded on the page; generating criteria from them avoids a round-trip and is always in sync with the form definition.
 
+## Interview Questions endpoint
+
+`POST /recruit/forms/:formId/responses/:responseId/interview-questions` — auth + uid ownership on both form and response. Returns cached `interviewQuestions[]` if already non-empty (no re-call). AI empty-list is treated as a hard error (500), so we never cache `[]`. Frontend guards: only sets `showQuestions(true)` after confirming length > 0; error surfaces inline.
+
+**Why:** Caching via DB field means repeated clicks are instant; rejecting empty lists prevents the silent no-op UX trap where the panel renders nothing but shows no error.
+
 ## SignalBadge behavior
 
 `signal === "ok"` renders `null` (no badge) to keep the UI uncluttered. Only "strong" (green) and "thin" (amber) show visible badges. Tooltip shows the AI's `note`. The note is also shown as italic text below the answer in the card view for "strong" and "thin" (not "ok").
