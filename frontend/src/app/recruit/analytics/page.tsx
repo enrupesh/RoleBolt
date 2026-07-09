@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { RecruitGuard } from "@/components/RecruitGuard";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
-import { getFirebaseAuth } from "@/lib/firebaseClient";
+import { getFirebaseAuth, isFirebaseAvailable } from "@/lib/firebaseClient";
 import Link from "next/link";
 import { apiUrl, readApiJson } from "@/lib/api";
 
@@ -85,10 +85,11 @@ function RecruitAnalyticsContent() {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    if (!isFirebaseAvailable()) return;
     const auth = getFirebaseAuth();
     const unsub = onAuthStateChanged(auth, async (u) => {
       if (u) { const t = await u.getIdToken(); setToken(t); }
-      else router.push("/login");
+      else router.push("/recruit/login");
     });
     return () => unsub();
   }, [router]);

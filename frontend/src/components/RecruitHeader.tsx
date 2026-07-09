@@ -5,66 +5,15 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { signOut } from "firebase/auth";
-import { getFirebaseAuth } from "@/lib/firebaseClient";
-import { useTheme } from "@/components/ThemeProvider";
+import { getFirebaseAuth, isFirebaseAvailable } from "@/lib/firebaseClient";
 
-type NavLink = { href: string; label: string };
-
-const CREATOR_NAV: NavLink[] = [
+const CREATOR_NAV = [
   { href: "/recruit/dashboard", label: "Dashboard" },
   { href: "/recruit/opportunities", label: "Find Jobs" },
   { href: "/recruit/analytics", label: "Analytics" },
   { href: "/recruit/talent-pool", label: "Talent Pool" },
-  { href: "/recruit/recruiter-profile", label: "Recruiter Profile" },
+  { href: "/recruit/recruiter-profile", label: "Profile" },
 ];
-
-function MenuIcon() {
-  return (
-    <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-      <path d="M4 6h16M4 12h16M4 18h16" />
-    </svg>
-  );
-}
-
-function XIcon() {
-  return (
-    <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-      <path d="M18 6 6 18M6 6l12 12" />
-    </svg>
-  );
-}
-
-function SunIcon() {
-  return (
-    <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-      <circle cx="12" cy="12" r="4" />
-      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
-    </svg>
-  );
-}
-
-function MoonIcon() {
-  return (
-    <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-    </svg>
-  );
-}
-
-function ThemeToggle() {
-  const { theme, setTheme } = useTheme();
-  const isDark = theme === "dark";
-
-  return (
-    <button
-      onClick={() => setTheme(isDark ? "white" : "dark")}
-      title={isDark ? "Switch to Light mode" : "Switch to Dark mode"}
-      className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--border)] text-[var(--text-secondary)] transition hover:bg-[var(--surface-muted)] hover:text-[var(--foreground)]"
-    >
-      {isDark ? <SunIcon /> : <MoonIcon />}
-    </button>
-  );
-}
 
 export default function RecruitHeader() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -81,34 +30,43 @@ export default function RecruitHeader() {
   }
 
   async function handleSignOut() {
-    const auth = getFirebaseAuth();
-    await signOutFromRecruit();
-    await signOut(auth);
+    try {
+      await signOutFromRecruit();
+      if (isFirebaseAvailable()) {
+        const auth = getFirebaseAuth();
+        await signOut(auth);
+      }
+    } catch {}
     router.replace("/recruit/login");
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--surface)]/95 backdrop-blur">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-        <Link href="/recruit" className="flex items-center gap-2.5 shrink-0">
-          <img src="/rolebolt-icon.png" alt="Rolebolt" className="h-7 w-7 rounded-lg object-cover shrink-0" />
-          <span className="hidden sm:block">
-            <span className="block text-sm font-bold leading-tight text-[var(--foreground)]">Rolebolt</span>
-            <span className="block text-[11px] text-[var(--text-muted)] leading-tight">India Jobs Network</span>
-          </span>
-          <span className="block sm:hidden text-sm font-bold text-[var(--foreground)]">Rolebolt</span>
+    <header className="sticky top-0 z-50 bg-white/96 backdrop-blur-xl border-b border-slate-200/80 shadow-[0_1px_0_rgba(0,0,0,0.04),0_2px_12px_rgba(0,0,0,0.04)]">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8 gap-4">
+
+        {/* Logo */}
+        <Link href="/recruit" className="flex items-center gap-2.5 shrink-0 group">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0a66c2] text-white font-black text-sm shadow-[0_2px_8px_rgba(10,102,194,0.3)] transition group-hover:shadow-[0_4px_14px_rgba(10,102,194,0.4)] group-hover:scale-105">
+            R
+          </div>
+          <div className="hidden sm:block">
+            <p className="text-sm font-bold text-slate-900 leading-none tracking-tight">Rolebolt</p>
+            <p className="text-[10.5px] text-slate-400 leading-none mt-0.5 font-medium">India Jobs Network</p>
+          </div>
+          <p className="block sm:hidden text-sm font-bold text-slate-900 leading-none">Rolebolt</p>
         </Link>
 
+        {/* Nav links */}
         {isLoggedIn && navLinks.length > 0 && (
-          <nav className="hidden md:flex items-center gap-0.5">
+          <nav className="hidden md:flex items-center gap-0.5 flex-1 justify-center">
             {navLinks.map(link => (
               <Link
                 key={link.href}
                 href={link.href}
-                className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
+                className={`flex items-center px-3 py-1.5 rounded-lg text-[13px] font-medium transition-all duration-150 ${
                   isActive(link.href)
-                    ? "bg-blue-500/10 text-[#0a66c2]"
-                    : "text-[var(--text-secondary)] hover:bg-[var(--surface-muted)] hover:text-[var(--foreground)]"
+                    ? "bg-blue-50 text-[#0a66c2] font-semibold"
+                    : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
                 }`}
               >
                 {link.label}
@@ -117,23 +75,33 @@ export default function RecruitHeader() {
           </nav>
         )}
 
+        {!isLoggedIn && (
+          <nav className="hidden md:flex items-center gap-0.5 flex-1 justify-center">
+            <Link href="/recruit/opportunities" className="flex items-center px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all duration-150">
+              Find Jobs
+            </Link>
+            <Link href="/recruit/signup" className="flex items-center px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all duration-150">
+              For Recruiters
+            </Link>
+          </nav>
+        )}
 
-        <div className="flex items-center gap-2">
-          <ThemeToggle />
-
+        {/* Actions */}
+        <div className="flex items-center gap-2 shrink-0">
           {isLoggedIn ? (
             <>
               {role === "creator" && (
                 <Link
                   href="/recruit/jobs/new"
-                  className="hidden sm:inline-flex rounded-full bg-[#0a66c2] px-3.5 py-2 text-xs font-bold text-white hover:bg-[#004182] transition"
+                  className="hidden sm:inline-flex items-center gap-1.5 rounded-lg bg-[#0a66c2] px-3.5 py-2 text-[13px] font-semibold text-white shadow-[0_2px_8px_rgba(10,102,194,0.28)] hover:bg-[#004182] hover:shadow-[0_4px_14px_rgba(10,102,194,0.36)] hover:-translate-y-px transition-all duration-150"
                 >
-                  Post a job
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                  Post a Job
                 </Link>
               )}
               <button
                 onClick={handleSignOut}
-                className="hidden sm:inline-flex rounded-full border border-[var(--border)] px-3.5 py-2 text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--surface-muted)] transition"
+                className="hidden sm:inline-flex rounded-lg border border-slate-200 px-3.5 py-2 text-[13px] font-medium text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all duration-150"
               >
                 Sign out
               </button>
@@ -142,72 +110,74 @@ export default function RecruitHeader() {
             <>
               <Link
                 href="/recruit/login"
-                className="hidden sm:inline-flex rounded-full border border-[var(--border)] px-4 py-2 text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--surface-muted)] transition"
+                className="hidden sm:inline-flex rounded-lg border border-slate-200 px-3.5 py-2 text-[13px] font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-all duration-150"
               >
                 Sign in
               </Link>
               <Link
                 href="/recruit/signup"
-                className="rounded-full bg-[#0a66c2] px-3.5 py-2 text-xs font-bold text-white hover:bg-[#004182] transition"
+                className="inline-flex items-center rounded-lg bg-[#0a66c2] px-3.5 py-2 text-[13px] font-semibold text-white shadow-[0_2px_8px_rgba(10,102,194,0.28)] hover:bg-[#004182] hover:shadow-[0_4px_14px_rgba(10,102,194,0.36)] hover:-translate-y-px transition-all duration-150"
               >
                 Get started
               </Link>
             </>
           )}
+
+          {/* Mobile hamburger */}
           <button
             onClick={() => setMobileOpen(o => !o)}
-            className="md:hidden flex h-6 w-6 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--surface-muted)] transition"
+            aria-label="Toggle menu"
+            className="md:hidden flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition"
           >
-            {mobileOpen ? <XIcon /> : <MenuIcon />}
+            {mobileOpen ? (
+              <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            ) : (
+              <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+            )}
           </button>
         </div>
       </div>
 
+      {/* Mobile menu */}
       {mobileOpen && (
-        <div className="md:hidden border-t border-[var(--border)] bg-[var(--surface)] px-4 pb-4 pt-2">
+        <div className="md:hidden border-t border-slate-100 bg-white px-4 pb-5 pt-3 shadow-lg">
           <nav className="flex flex-col gap-1">
             {isLoggedIn && navLinks.map(link => (
               <Link
                 key={link.href}
                 href={link.href}
                 onClick={() => setMobileOpen(false)}
-                className={`rounded-xl px-4 py-3 text-sm font-semibold transition ${
+                className={`rounded-xl px-4 py-2.5 text-sm font-medium transition ${
                   isActive(link.href)
-                    ? "bg-blue-500/10 text-[#0a66c2]"
-                    : "text-[var(--text-secondary)] hover:bg-[var(--surface-muted)]"
+                    ? "bg-blue-50 text-[#0a66c2] font-semibold"
+                    : "text-slate-700 hover:bg-slate-50"
                 }`}
               >
                 {link.label}
               </Link>
             ))}
-            <div className="mt-2 border-t border-[var(--border)] pt-2 flex flex-col gap-1">
+            {!isLoggedIn && (
+              <>
+                <Link href="/recruit/opportunities" onClick={() => setMobileOpen(false)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Find Jobs</Link>
+                <Link href="/recruit/login" onClick={() => setMobileOpen(false)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Sign in</Link>
+              </>
+            )}
+            <div className="mt-2 pt-2 border-t border-slate-100 flex flex-col gap-2">
               {isLoggedIn ? (
                 <>
                   {role === "creator" && (
-                    <Link
-                      href="/recruit/jobs/new"
-                      onClick={() => setMobileOpen(false)}
-                      className="rounded-xl bg-[#0a66c2] px-4 py-3 text-center text-sm font-bold text-white hover:bg-[#004182] transition"
-                    >
-                      Post a job →
+                    <Link href="/recruit/jobs/new" onClick={() => setMobileOpen(false)} className="rounded-xl bg-[#0a66c2] px-4 py-3 text-center text-sm font-bold text-white">
+                      Post a Job →
                     </Link>
                   )}
-                  <button
-                    onClick={() => { setMobileOpen(false); handleSignOut(); }}
-                    className="rounded-xl px-4 py-3 text-sm font-semibold text-[var(--text-secondary)] hover:bg-[var(--surface-muted)] transition text-left"
-                  >
+                  <button onClick={() => { setMobileOpen(false); handleSignOut(); }} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 text-left">
                     Sign out
                   </button>
                 </>
               ) : (
-                <>
-                  <Link href="/recruit/login" onClick={() => setMobileOpen(false)} className="rounded-xl px-4 py-3 text-sm font-semibold text-[var(--text-secondary)] hover:bg-[var(--surface-muted)] transition">
-                    Sign in
-                  </Link>
-                  <Link href="/recruit/signup" onClick={() => setMobileOpen(false)} className="rounded-xl bg-[#0a66c2] px-4 py-3 text-center text-sm font-bold text-white hover:bg-[#004182] transition">
-                    Get started →
-                  </Link>
-                </>
+                <Link href="/recruit/signup" onClick={() => setMobileOpen(false)} className="rounded-xl bg-[#0a66c2] px-4 py-3 text-center text-sm font-bold text-white">
+                  Get started free →
+                </Link>
               )}
             </div>
           </nav>
