@@ -401,16 +401,16 @@ function RecruitDashboardContent() {
   const activeJobs = jobs.filter(j => j.status === "active").length;
 
   const stats = [
-    { label: "Active Roles", value: activeJobs, accent: "text-emerald-600", sub: "hiring now" },
-    { label: "Total Candidates", value: pipeline?.total ?? jobs.reduce((s, j) => s + (j.candidateCount || 0), 0), accent: "text-blue-700", sub: "in pipeline" },
-    { label: "Shortlisted", value: pipeline?.shortlisted ?? 0, accent: "text-violet-600", sub: "screened + assessed" },
-    { label: "Interview", value: pipeline?.interview ?? 0, accent: "text-amber-600", sub: "at interview stage" },
-    { label: "Hired", value: pipeline?.hired ?? 0, accent: "text-emerald-700", sub: "all time" },
-    { label: "Form Responses", value: forms.reduce((s, f) => s + (f.responseCount || 0), 0), accent: "text-violet-500", sub: "via custom forms" },
+    { label: "Active Roles",      value: activeJobs,                                                                              accent: "text-emerald-600", bar: "from-emerald-400 to-emerald-500", sub: "hiring now"          },
+    { label: "Total Candidates",  value: pipeline?.total ?? jobs.reduce((s, j) => s + (j.candidateCount || 0), 0),                accent: "text-blue-600",   bar: "from-blue-400 to-blue-600",     sub: "in pipeline"         },
+    { label: "Shortlisted",       value: pipeline?.shortlisted ?? 0,                                                              accent: "text-violet-600", bar: "from-violet-400 to-violet-600", sub: "screened + assessed"  },
+    { label: "Interview",         value: pipeline?.interview ?? 0,                                                                 accent: "text-amber-600",  bar: "from-amber-400 to-amber-500",   sub: "at interview stage"  },
+    { label: "Hired",             value: pipeline?.hired ?? 0,                                                                    accent: "text-teal-600",   bar: "from-teal-400 to-teal-500",     sub: "all time"            },
+    { label: "Form Responses",    value: forms.reduce((s, f) => s + (f.responseCount || 0), 0),                                   accent: "text-violet-500", bar: "from-purple-400 to-violet-500", sub: "via custom forms"    },
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-[#f0f2f5]">
       {shareForm && <CopyShareModal form={shareForm} onClose={() => setShareForm(null)} />}
       {jobToDelete && token && (
         <DeleteJobModal
@@ -429,87 +429,104 @@ function RecruitDashboardContent() {
         />
       )}
 
-      <header className="sticky top-0 z-20 bg-white border-b border-slate-200 shadow-sm">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3.5 sm:px-6 lg:px-8">
-          <Link href="/recruit" className="flex items-center gap-2.5">
-            <img src="/rolebolt-icon.png" alt="Rolebolt" className="h-9 w-9 rounded-xl object-cover shrink-0 shadow-sm" />
+      {/* ── Header ────────────────────────────────────────────────────────── */}
+      <header className="sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-black/[0.07] shadow-[0_1px_0_rgba(0,0,0,0.04),0_4px_20px_rgba(0,0,0,0.05)]">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
+          <Link href="/recruit" className="flex items-center gap-3">
+            <img src="/plyndrox-icon.png" alt="Rolebolt" className="h-9 w-9 rounded-xl object-cover shrink-0 shadow-[0_2px_8px_rgba(0,0,0,0.12)]" />
             <span>
-              <span className="block text-sm font-bold text-slate-900 leading-none">Rolebolt</span>
-              <span className="block text-[10px] text-slate-400 mt-0.5">Dashboard</span>
+              <span className="block text-[15px] font-bold text-slate-900 leading-none tracking-tight">Rolebolt</span>
+              <span className="block text-[10px] font-semibold text-slate-400 mt-0.5 tracking-widest uppercase">Dashboard</span>
             </span>
           </Link>
 
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className="hidden md:flex items-center gap-0.5">
             <Link href="/recruit/talent-pool"
-              className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition">
+              className="flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition">
               <UsersIcon /> Talent Pool
             </Link>
             <Link href="/recruit/analytics"
-              className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition">
+              className="flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition">
               <BarChartIcon /> Analytics
             </Link>
             <Link href="/recruit/recruiter-profile"
-              className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition">
-              Recruiter Profile
+              className="flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition">
+              Profile
             </Link>
           </nav>
 
           <Link href="/recruit/new"
-            className="flex items-center gap-1.5 rounded-xl bg-[#0a66c2] px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700 transition">
+            className="flex items-center gap-1.5 rounded-xl bg-[#0a66c2] px-4 py-2.5 text-[13px] font-semibold text-white transition
+              shadow-[0_2px_8px_rgba(10,102,194,0.30)]
+              hover:bg-blue-700 hover:shadow-[0_4px_16px_rgba(10,102,194,0.40)] hover:-translate-y-px">
             <PlusIcon /> Create New
           </Link>
         </div>
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+
+        {/* ── Page title ────────────────────────────────────────────────── */}
         <div className="mb-8">
-          <h1 className="text-2xl font-bold text-slate-900">Recruitment Pipeline</h1>
-          <p className="mt-1 text-sm text-slate-500">Manage all your open roles and candidate pipelines from one place.</p>
+          <h1 className="text-[28px] font-bold tracking-tight text-slate-900 leading-tight">Recruitment Pipeline</h1>
+          <p className="mt-1.5 text-[13px] text-slate-500 leading-relaxed">Manage all your open roles and candidate pipelines from one place.</p>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6 mb-8">
+        {/* ── Stats ─────────────────────────────────────────────────────── */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6 mb-8">
           {stats.map(s => (
-            <div key={s.label} className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
-              <p className={`text-2xl font-bold ${s.accent}`}>{s.value}</p>
-              <p className="mt-0.5 text-xs font-semibold text-slate-700">{s.label}</p>
-              <p className="text-[11px] text-slate-400 mt-0.5">{s.sub}</p>
+            <div key={s.label} className="relative overflow-hidden rounded-2xl bg-white border border-black/[0.06] p-4
+              shadow-[0_1px_3px_rgba(0,0,0,0.05),0_4px_16px_rgba(0,0,0,0.04)]">
+              {/* colored top accent strip */}
+              <div className={`absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r ${s.bar}`} />
+              <p className={`text-[26px] font-bold leading-none tabular-nums mt-1 ${s.accent}`}>{s.value}</p>
+              <p className="mt-2 text-[11px] font-semibold text-slate-800 leading-snug">{s.label}</p>
+              <p className="text-[10px] text-slate-400 mt-0.5 leading-none">{s.sub}</p>
             </div>
           ))}
         </div>
 
-        {/* Tabs */}
-        <div className="flex items-center gap-1 mb-5 border-b border-slate-200">
+        {/* ── Tab bar ───────────────────────────────────────────────────── */}
+        <div className="flex items-center gap-1.5 mb-6 bg-white rounded-2xl p-1.5
+          border border-black/[0.06] shadow-[0_1px_3px_rgba(0,0,0,0.05),0_4px_12px_rgba(0,0,0,0.04)]">
           <button
             onClick={() => setActiveTab("jobs")}
-            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold border-b-2 transition -mb-px ${activeTab === "jobs" ? "border-blue-600 text-blue-700" : "border-transparent text-slate-500 hover:text-slate-800"}`}
+            className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-[13px] font-semibold transition-all ${
+              activeTab === "jobs"
+                ? "bg-[#0a66c2] text-white shadow-[0_2px_8px_rgba(10,102,194,0.35)]"
+                : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
+            }`}
           >
             <BriefcaseIcon size={14} />
             Standard Jobs
             {jobs.length > 0 && (
-              <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${activeTab === "jobs" ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-500"}`}>
+              <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none ${activeTab === "jobs" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"}`}>
                 {jobs.length}
               </span>
             )}
           </button>
           <button
             onClick={() => setActiveTab("forms")}
-            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold border-b-2 transition -mb-px ${activeTab === "forms" ? "border-violet-600 text-violet-700" : "border-transparent text-slate-500 hover:text-slate-800"}`}
+            className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-[13px] font-semibold transition-all ${
+              activeTab === "forms"
+                ? "bg-violet-600 text-white shadow-[0_2px_8px_rgba(124,58,237,0.35)]"
+                : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
+            }`}
           >
             <FormIcon size={14} />
             Form Jobs
             {forms.length > 0 && (
-              <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${activeTab === "forms" ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-500"}`}>
+              <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none ${activeTab === "forms" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"}`}>
                 {forms.length}
               </span>
             )}
           </button>
         </div>
 
-        {/* Standard Jobs tab */}
+        {/* ── Standard Jobs tab ─────────────────────────────────────────── */}
         {activeTab === "jobs" && (
           <>
-            {/* ── Premium tag ── */}
+            {/* Premium tag */}
             <div className="mb-5 flex flex-wrap items-center gap-2.5">
               <div className="relative inline-flex shrink-0 items-center gap-1.5 overflow-hidden rounded-full border border-amber-300/90 bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 px-3 py-1.5 shadow-sm">
                 <div className="animate-gold-shimmer absolute inset-0 w-1/2 bg-gradient-to-r from-transparent via-white/55 to-transparent" />
@@ -523,21 +540,22 @@ function RecruitDashboardContent() {
               </div>
             </div>
 
+            {/* Filter row */}
             <div className="mb-5 flex flex-wrap items-center gap-2">
               {(["all", "active", "paused", "closed"] as const).map(f => (
                 <button
                   key={f}
                   onClick={() => setFilter(f)}
-                  className={`rounded-full px-4 py-1.5 text-xs font-semibold capitalize transition ${
+                  className={`rounded-full px-4 py-1.5 text-[12px] font-semibold capitalize transition ${
                     filter === f
-                      ? "bg-blue-700 text-white shadow"
-                      : "bg-white text-slate-600 border border-slate-200 hover:border-slate-300 hover:text-slate-900"
+                      ? "bg-[#0a66c2] text-white shadow-[0_2px_8px_rgba(10,102,194,0.30)]"
+                      : "bg-white text-slate-600 border border-slate-200 hover:border-slate-300 hover:text-slate-900 shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
                   }`}
                 >
                   {f === "all" ? "All Jobs" : f}
                 </button>
               ))}
-              <span className="ml-auto text-xs text-slate-400">{filteredJobs.length} role{filteredJobs.length !== 1 ? "s" : ""}</span>
+              <span className="ml-auto text-[12px] font-medium text-slate-400">{filteredJobs.length} role{filteredJobs.length !== 1 ? "s" : ""}</span>
             </div>
 
             {loading ? (
@@ -547,25 +565,27 @@ function RecruitDashboardContent() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
-                  Loading jobs...
+                  Loading jobs…
                 </div>
               </div>
             ) : filteredJobs.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-24 text-center">
-                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 border border-slate-200 text-slate-400 mb-5">
-                  <BriefcaseIcon size={28} />
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white border border-slate-200 text-slate-300 mb-5
+                  shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
+                  <BriefcaseIcon size={30} />
                 </div>
                 <h2 className="text-base font-semibold text-slate-800">
                   {filter === "all" ? "No jobs yet" : `No ${filter} jobs`}
                 </h2>
-                <p className="mt-2 text-sm text-slate-500 max-w-xs">
+                <p className="mt-2 text-[13px] text-slate-500 max-w-xs leading-relaxed">
                   {filter === "all"
-                    ? "Post your first job and let AI generate the full job description and scoring rubric in 30 seconds."
+                    ? "Post your first job and let AI generate the full description and scoring rubric in 30 seconds."
                     : `You don't have any ${filter} jobs right now.`}
                 </p>
                 {filter === "all" && (
                   <Link href="/recruit/jobs/new"
-                    className="mt-6 flex items-center gap-2 rounded-xl bg-[#0a66c2] px-6 py-2.5 text-sm font-semibold text-white shadow hover:bg-blue-700 transition">
+                    className="mt-6 flex items-center gap-2 rounded-xl bg-[#0a66c2] px-6 py-2.5 text-sm font-semibold text-white
+                      shadow-[0_2px_8px_rgba(10,102,194,0.30)] hover:bg-blue-700 hover:shadow-[0_4px_16px_rgba(10,102,194,0.40)] hover:-translate-y-px transition">
                     <PlusIcon /> Post First Job
                   </Link>
                 )}
@@ -581,15 +601,21 @@ function RecruitDashboardContent() {
                   return (
                     <div
                       key={job._id}
-                      className="group relative flex flex-col rounded-2xl bg-white border border-slate-200 p-5 shadow-sm hover:shadow-md hover:border-blue-300 transition-all"
+                      className="group relative flex flex-col rounded-2xl bg-white border border-black/[0.06] p-5 transition-all duration-200
+                        shadow-[0_1px_3px_rgba(0,0,0,0.05),0_4px_16px_rgba(0,0,0,0.04)]
+                        hover:shadow-[0_8px_28px_rgba(0,0,0,0.11),0_1px_4px_rgba(0,0,0,0.06)]
+                        hover:-translate-y-0.5"
                     >
+                      {/* Blue top-accent on hover */}
+                      <div className="absolute inset-x-0 top-0 h-[3px] rounded-t-2xl bg-gradient-to-r from-blue-500 to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+
                       <div className="flex items-start justify-between gap-3 mb-4">
-                        <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 text-blue-600 border border-blue-100/80">
                           <BriefcaseIcon size={18} />
                         </div>
                         <div className="flex items-center gap-2 flex-wrap justify-end">
                           {hasNew && (
-                            <span className="rounded-full bg-blue-700 px-2 py-0.5 text-[10px] font-bold text-white">
+                            <span className="rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-bold text-white shadow-[0_1px_4px_rgba(10,102,194,0.35)]">
                               +{newCount} new
                             </span>
                           )}
@@ -612,31 +638,31 @@ function RecruitDashboardContent() {
                         onClick={() => markJobSeen(job._id, job.candidateCount || 0)}
                         className="block"
                       >
-                        <h3 className="text-sm font-semibold text-slate-900 group-hover:text-blue-700 transition line-clamp-1 mb-0.5">
+                        <h3 className="text-[15px] font-semibold text-slate-900 group-hover:text-blue-700 transition line-clamp-1 mb-0.5 leading-snug">
                           {job.title}
                         </h3>
-                        <p className="text-xs text-slate-500">
+                        <p className="text-[12px] text-slate-400 font-medium">
                           {job.seniority}{job.department ? ` · ${job.department}` : ""}
                         </p>
 
-                        <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-400">
+                        <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-slate-400">
                           <span className="flex items-center gap-1"><MapPinIcon /> {job.location}</span>
                           <span>{WORK_MODE_LABELS[job.workMode] ?? job.workMode}</span>
                         </div>
                       </Link>
 
-                      <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
+                      <div className="mt-4 pt-3.5 border-t border-slate-100 flex items-center justify-between">
                         <Link
                           href={`/recruit/jobs/${job._id}`}
                           onClick={() => markJobSeen(job._id, job.candidateCount || 0)}
-                          className={`flex items-center gap-1.5 text-xs font-medium ${hasNew ? "text-blue-700" : "text-slate-500"} hover:text-blue-700 transition`}
+                          className={`flex items-center gap-1.5 text-[12px] font-semibold ${hasNew ? "text-blue-600" : "text-slate-500"} hover:text-blue-600 transition`}
                         >
                           <UsersIcon /> {job.candidateCount || 0} candidate{job.candidateCount !== 1 ? "s" : ""}
                         </Link>
                         <Link
                           href={`/recruit/jobs/${job._id}`}
                           onClick={() => markJobSeen(job._id, job.candidateCount || 0)}
-                          className="flex items-center gap-1 text-xs text-slate-400 hover:text-blue-600 transition"
+                          className="flex items-center gap-0.5 text-[12px] text-slate-400 hover:text-blue-600 transition"
                         >
                           {timeAgo(job.createdAt)}
                           <ChevronRightIcon />
@@ -646,25 +672,28 @@ function RecruitDashboardContent() {
                   );
                 })}
 
+                {/* Add new job card */}
                 <Link
                   href="/recruit/jobs/new"
-                  className="group flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 p-8 text-center hover:border-blue-300 hover:bg-blue-50/40 transition-all"
+                  className="group flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200/80 bg-white/40 p-8 text-center
+                    hover:border-blue-300 hover:bg-blue-50/30 transition-all duration-200
+                    shadow-[0_1px_3px_rgba(0,0,0,0.03)]"
                 >
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border-2 border-dashed border-slate-300 text-slate-400 group-hover:border-blue-400 group-hover:text-blue-600 transition mb-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl border-2 border-dashed border-slate-300 text-slate-400 group-hover:border-blue-400 group-hover:text-blue-500 group-hover:bg-blue-50 transition-all mb-3">
                     <PlusIcon />
                   </div>
-                  <p className="text-sm font-semibold text-slate-500 group-hover:text-blue-700 transition">New Job Posting</p>
-                  <p className="mt-1 text-xs text-slate-400">AI generates the JD in 30 seconds</p>
+                  <p className="text-[13px] font-semibold text-slate-500 group-hover:text-blue-700 transition">New Job Posting</p>
+                  <p className="mt-1 text-[11px] text-slate-400">AI generates the JD in 30 seconds</p>
                 </Link>
               </div>
             )}
           </>
         )}
 
-        {/* Form Jobs tab */}
+        {/* ── Form Jobs tab ──────────────────────────────────────────────── */}
         {activeTab === "forms" && (
           <>
-            {/* ── Premium tag ── */}
+            {/* Premium tag */}
             <div className="mb-5 flex flex-wrap items-center gap-2.5">
               <div className="relative inline-flex shrink-0 items-center gap-1.5 overflow-hidden rounded-full border border-amber-300/90 bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 px-3 py-1.5 shadow-sm">
                 <div className="animate-gold-shimmer absolute inset-0 w-1/2 bg-gradient-to-r from-transparent via-white/55 to-transparent" />
@@ -678,21 +707,22 @@ function RecruitDashboardContent() {
               </div>
             </div>
 
+            {/* Filter row */}
             <div className="mb-5 flex flex-wrap items-center gap-2">
               {(["all", "active", "closed"] as const).map(f => (
                 <button
                   key={f}
                   onClick={() => setFormFilter(f)}
-                  className={`rounded-full px-4 py-1.5 text-xs font-semibold capitalize transition ${
+                  className={`rounded-full px-4 py-1.5 text-[12px] font-semibold capitalize transition ${
                     formFilter === f
-                      ? "bg-violet-600 text-white shadow"
-                      : "bg-white text-slate-600 border border-slate-200 hover:border-slate-300"
+                      ? "bg-violet-600 text-white shadow-[0_2px_8px_rgba(124,58,237,0.30)]"
+                      : "bg-white text-slate-600 border border-slate-200 hover:border-slate-300 hover:text-slate-900 shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
                   }`}
                 >
                   {f === "all" ? "All Forms" : f}
                 </button>
               ))}
-              <span className="ml-auto text-xs text-slate-400">{filteredForms.length} form{filteredForms.length !== 1 ? "s" : ""}</span>
+              <span className="ml-auto text-[12px] font-medium text-slate-400">{filteredForms.length} form{filteredForms.length !== 1 ? "s" : ""}</span>
             </div>
 
             {loading ? (
@@ -702,25 +732,27 @@ function RecruitDashboardContent() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
-                  Loading forms...
+                  Loading forms…
                 </div>
               </div>
             ) : filteredForms.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-24 text-center">
-                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-violet-50 border border-violet-200 text-violet-400 mb-5">
-                  <FormIcon size={28} />
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white border border-slate-200 text-slate-300 mb-5
+                  shadow-[0_2px_8px_rgba(0,0,0,0.06)]">
+                  <FormIcon size={30} />
                 </div>
                 <h2 className="text-base font-semibold text-slate-800">
                   {formFilter === "all" ? "No forms yet" : `No ${formFilter} forms`}
                 </h2>
-                <p className="mt-2 text-sm text-slate-500 max-w-xs">
+                <p className="mt-2 text-[13px] text-slate-500 max-w-xs leading-relaxed">
                   {formFilter === "all"
-                    ? "Build a custom application form, share the link, and AI will score every response automatically."
+                    ? "Build a custom application form, share the link, and AI scores every response automatically."
                     : `No ${formFilter} forms right now.`}
                 </p>
                 {formFilter === "all" && (
                   <Link href="/recruit/forms/new"
-                    className="mt-6 flex items-center gap-2 rounded-xl bg-violet-600 px-6 py-2.5 text-sm font-semibold text-white shadow hover:bg-violet-700 transition">
+                    className="mt-6 flex items-center gap-2 rounded-xl bg-violet-600 px-6 py-2.5 text-sm font-semibold text-white
+                      shadow-[0_2px_8px_rgba(124,58,237,0.30)] hover:bg-violet-700 hover:shadow-[0_4px_16px_rgba(124,58,237,0.40)] hover:-translate-y-px transition">
                     <PlusIcon /> Build First Form
                   </Link>
                 )}
@@ -730,9 +762,15 @@ function RecruitDashboardContent() {
                 {filteredForms.map(form => {
                   const isActive = form.status === "active";
                   return (
-                    <div key={form._id} className="group flex flex-col rounded-2xl bg-white border border-slate-200 p-5 shadow-sm hover:shadow-md hover:border-violet-300 transition-all">
+                    <div key={form._id} className="group relative flex flex-col rounded-2xl bg-white border border-black/[0.06] p-5 transition-all duration-200
+                      shadow-[0_1px_3px_rgba(0,0,0,0.05),0_4px_16px_rgba(0,0,0,0.04)]
+                      hover:shadow-[0_8px_28px_rgba(0,0,0,0.11),0_1px_4px_rgba(0,0,0,0.06)]
+                      hover:-translate-y-0.5">
+                      {/* Violet top-accent on hover */}
+                      <div className="absolute inset-x-0 top-0 h-[3px] rounded-t-2xl bg-gradient-to-r from-violet-500 to-purple-500 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+
                       <div className="flex items-start justify-between gap-3 mb-4">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-50 to-violet-100 text-violet-600 border border-violet-100/80">
                           <FormIcon size={18} />
                         </div>
                         <div className="flex items-center gap-2">
@@ -751,24 +789,25 @@ function RecruitDashboardContent() {
                       </div>
 
                       <Link href={`/recruit/forms/${form._id}`}>
-                        <h3 className="text-sm font-semibold text-slate-900 group-hover:text-violet-700 transition line-clamp-2 mb-1">
+                        <h3 className="text-[15px] font-semibold text-slate-900 group-hover:text-violet-700 transition line-clamp-2 mb-1 leading-snug">
                           {form.title}
                         </h3>
                       </Link>
                       {form.description && (
-                        <p className="text-xs text-slate-400 line-clamp-1 mb-2">{form.description}</p>
+                        <p className="text-[12px] text-slate-400 line-clamp-1 mb-2 leading-relaxed">{form.description}</p>
                       )}
 
-                      <div className="mt-auto pt-4 border-t border-slate-100 flex items-center justify-between">
-                        <Link href={`/recruit/forms/${form._id}`} className="flex items-center gap-1.5 text-xs font-semibold text-violet-600 hover:text-violet-800 transition">
+                      <div className="mt-auto pt-3.5 border-t border-slate-100 flex items-center justify-between">
+                        <Link href={`/recruit/forms/${form._id}`} className="flex items-center gap-1.5 text-[12px] font-semibold text-violet-600 hover:text-violet-800 transition">
                           <UsersIcon size={12} />
                           {form.responseCount || 0} response{form.responseCount !== 1 ? "s" : ""}
                         </Link>
                         <div className="flex items-center gap-1.5">
-                          <span className="text-xs text-slate-400">{timeAgo(form.createdAt)}</span>
+                          <span className="text-[12px] text-slate-400">{timeAgo(form.createdAt)}</span>
                           <button
                             onClick={e => { e.stopPropagation(); setShareForm(form); }}
-                            className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-semibold text-slate-600 hover:bg-violet-50 hover:border-violet-200 hover:text-violet-600 transition"
+                            className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-semibold text-slate-600
+                              hover:bg-violet-50 hover:border-violet-200 hover:text-violet-600 transition"
                             title="Share form"
                           >
                             <ShareIcon size={10} /> Share
@@ -779,33 +818,40 @@ function RecruitDashboardContent() {
                   );
                 })}
 
+                {/* Add new form card */}
                 <Link
                   href="/recruit/forms/new"
-                  className="group flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 p-8 text-center hover:border-violet-300 hover:bg-violet-50/40 transition-all"
+                  className="group flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200/80 bg-white/40 p-8 text-center
+                    hover:border-violet-300 hover:bg-violet-50/30 transition-all duration-200
+                    shadow-[0_1px_3px_rgba(0,0,0,0.03)]"
                 >
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border-2 border-dashed border-slate-300 text-slate-400 group-hover:border-violet-400 group-hover:text-violet-600 transition mb-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl border-2 border-dashed border-slate-300 text-slate-400 group-hover:border-violet-400 group-hover:text-violet-500 group-hover:bg-violet-50 transition-all mb-3">
                     <PlusIcon />
                   </div>
-                  <p className="text-sm font-semibold text-slate-500 group-hover:text-violet-700 transition">New Form</p>
-                  <p className="mt-1 text-xs text-slate-400">Share & let AI score responses</p>
+                  <p className="text-[13px] font-semibold text-slate-500 group-hover:text-violet-700 transition">New Form</p>
+                  <p className="mt-1 text-[11px] text-slate-400">Share & let AI score responses</p>
                 </Link>
               </div>
             )}
           </>
         )}
 
+        {/* ── Mobile quick-nav ──────────────────────────────────────────── */}
         <div className="mt-8 md:hidden flex flex-wrap gap-2">
           <Link href="/recruit/talent-pool"
-            className="flex items-center gap-1.5 rounded-xl bg-white border border-slate-200 px-4 py-2.5 text-xs font-medium text-slate-700 shadow-sm">
+            className="flex items-center gap-1.5 rounded-xl bg-white border border-black/[0.06] px-4 py-2.5 text-[12px] font-medium text-slate-700
+              shadow-[0_1px_3px_rgba(0,0,0,0.05)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:-translate-y-px transition">
             <UsersIcon /> Talent Pool
           </Link>
           <Link href="/recruit/analytics"
-            className="flex items-center gap-1.5 rounded-xl bg-white border border-slate-200 px-4 py-2.5 text-xs font-medium text-slate-700 shadow-sm">
+            className="flex items-center gap-1.5 rounded-xl bg-white border border-black/[0.06] px-4 py-2.5 text-[12px] font-medium text-slate-700
+              shadow-[0_1px_3px_rgba(0,0,0,0.05)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:-translate-y-px transition">
             <BarChartIcon /> Analytics
           </Link>
           <Link href="/recruit/recruiter-profile"
-            className="flex items-center gap-1.5 rounded-xl bg-white border border-slate-200 px-4 py-2.5 text-xs font-medium text-slate-700 shadow-sm">
-            Recruiter Profile
+            className="flex items-center gap-1.5 rounded-xl bg-white border border-black/[0.06] px-4 py-2.5 text-[12px] font-medium text-slate-700
+              shadow-[0_1px_3px_rgba(0,0,0,0.05)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:-translate-y-px transition">
+            Profile
           </Link>
         </div>
       </main>
