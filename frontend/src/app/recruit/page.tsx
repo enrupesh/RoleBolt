@@ -61,9 +61,7 @@ export default function RecruitLandingPage() {
       <header className="sticky top-0 z-50 bg-white/96 backdrop-blur-xl border-b border-slate-200/80 shadow-[0_1px_0_rgba(0,0,0,0.04),0_2px_12px_rgba(0,0,0,0.04)]">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
           <Link href="/recruit" className="flex items-center gap-2.5 shrink-0 group">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0a66c2] text-white font-black text-sm shadow-[0_2px_8px_rgba(10,102,194,0.3)] group-hover:shadow-[0_4px_14px_rgba(10,102,194,0.4)] group-hover:scale-105 transition-all">
-              R
-            </div>
+            <img src="/rolebolt-logo.png" alt="Rolebolt" className="h-8 w-8 rounded-lg object-cover shadow-[0_2px_8px_rgba(10,102,194,0.3)] group-hover:shadow-[0_4px_14px_rgba(10,102,194,0.4)] group-hover:scale-105 transition-all" />
             <div>
               <p className="text-sm font-bold text-slate-900 leading-none tracking-tight">Rolebolt</p>
               <p className="text-[10.5px] text-slate-400 leading-none mt-0.5 font-medium">Global Jobs Network</p>
