@@ -574,6 +574,19 @@ h1, h2, h3, h4, h5, h6, li, td, th {
 /* ── Misc legacy utils ──────────────────────────────────────────────────── */
 .animate-gold-shimmer { animation: rb-shimmer 2.4s ease-in-out infinite; }
 
+/* Text shimmer — animates background-position for gradient text sweep */
+@keyframes shimmer {
+  0%   { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}
+
+/* Hide scrollbar while keeping scroll functionality */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-none::-webkit-scrollbar { display: none; }
+
 .bihar-sidebar { background: #ffffff; border-right: 1px solid #e2e8f0; }
 .bihar-chat-bg { background: #ffffff; }
 .inbox-reading-pane { background: var(--background); }

@@ -191,6 +191,13 @@ export default function RecruitLandingPage() {
             <a href="#features" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">Features</a>
             <a href="#why-rolebolt" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">Why Rolebolt</a>
             <a href="#team" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">Team</a>
+            <Link href="/recruit/preview" className="relative px-3 py-1.5 rounded-lg text-[13px] font-medium transition-all group overflow-hidden">
+              <span className="relative z-10 bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 bg-clip-text text-transparent font-bold animate-[shimmer_2.5s_linear_infinite] bg-[length:200%_100%]">
+                Product Preview
+              </span>
+              <span className="absolute inset-0 rounded-lg bg-amber-400/8 group-hover:bg-amber-400/15 transition-colors" />
+              <span className="absolute bottom-0.5 left-3 right-3 h-px bg-gradient-to-r from-transparent via-amber-400/60 to-transparent" />
+            </Link>
             {!isLoggedIn && <Link href="/recruit/signup" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">For Recruiters</Link>}
             {isLoggedIn && role === "creator" && <>
               <Link href="/recruit/dashboard" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">Dashboard</Link>
@@ -221,6 +228,11 @@ export default function RecruitLandingPage() {
               <a href="#features" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Features</a>
               <a href="#why-rolebolt" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Why Rolebolt</a>
               <a href="#team" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Team</a>
+              <Link href="/recruit/preview" onClick={() => setMobileMenuOpen(false)} className="relative rounded-xl px-4 py-2.5 text-sm font-bold bg-amber-400/8 border border-amber-400/20 overflow-hidden">
+                <span className="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 bg-clip-text text-transparent">
+                  Product Preview
+                </span>
+              </Link>
               {isLoggedIn ? <>
                 <Link href="/recruit/dashboard" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Dashboard</Link>
                 <button onClick={() => { setMobileMenuOpen(false); handleSignOut(); }} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-500 hover:bg-slate-50 text-left">Sign out</button>
