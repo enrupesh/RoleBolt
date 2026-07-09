@@ -11,7 +11,7 @@ import { RecruitJobAlert } from "./models/RecruitJobAlert";
 import { UsageEvent } from "./models/UsageEvent";
 import { RecruitProfile } from "./models/RecruitProfile";
 import { RecruitImage } from "./models/RecruitImage";
-import { sendEmail } from "./mailer";
+import { sendEmail, verifySMTP } from "./mailer";
 import * as emailTemplates from "./emailTemplates";
 
 // ─── Resume parser (in-memory only, no disk storage) ──────────────────────────
@@ -2848,6 +2848,16 @@ recruitRouter.get("/jobs/:jobId/new-applicants-count", async (req, res) => {
 });
 
 // ─── Pipeline summary for dashboard ─────────────────────────────────────────
+
+// GET /recruit/smtp-verify — auth-protected SMTP connectivity check for the diagnostics page.
+recruitRouter.get("/smtp-verify", async (_req, res) => {
+  try {
+    const result = await verifySMTP();
+    return res.status(result.ok ? 200 : 502).json(result);
+  } catch (err: any) {
+    return res.status(500).json({ ok: false, message: err?.message || String(err) });
+  }
+});
 
 recruitRouter.get("/pipeline-summary", async (req, res) => {
   try {
