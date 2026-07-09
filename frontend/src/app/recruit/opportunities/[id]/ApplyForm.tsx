@@ -173,7 +173,7 @@ function ErrorMsg({ msg }: { msg: string }) {
   if (!msg) return null;
   return (
     <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-700">
-      <span className="shrink-0 mt-0.5">⚠️</span>
+      <svg className="shrink-0 mt-0.5" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="m10.29 3.86-8.58 14.86A1 1 0 0 0 2.57 20h18.86a1 1 0 0 0 .86-1.5L13.71 3.86a1 1 0 0 0-1.74 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       <span>{msg}</span>
     </div>
   );
@@ -268,7 +268,7 @@ function ResumeUploadZone({
           </>
         ) : uploadedFile ? (
           <>
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-2xl">✅</div>
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-green-600"><svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
             <div className="text-center">
               <p className="text-sm font-bold text-green-700">Resume uploaded!</p>
               <p className="text-xs text-slate-500 mt-0.5 truncate max-w-[220px]">{uploadedFile}</p>
@@ -300,7 +300,8 @@ function ResumeUploadZone({
 
       {uploadError && (
         <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2 text-xs text-red-700">
-          ⚠️ {uploadError}
+          <svg className="shrink-0" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="m10.29 3.86-8.58 14.86A1 1 0 0 0 2.57 20h18.86a1 1 0 0 0 .86-1.5L13.71 3.86a1 1 0 0 0-1.74 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          {uploadError}
         </div>
       )}
     </div>
@@ -330,7 +331,7 @@ function SuccessScreen({ jobTitle, companyName }: { jobTitle?: string; companyNa
             <path d="M20 6 9 17l-5-5" />
           </svg>
         </div>
-        <div className="absolute -top-1 -right-1 h-8 w-8 rounded-full bg-yellow-400 flex items-center justify-center text-sm shadow">🎉</div>
+        <div className="absolute -top-1 -right-1 h-8 w-8 rounded-full bg-yellow-400 flex items-center justify-center shadow text-yellow-900"><svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
       </div>
 
       <h2 className="text-2xl font-black text-slate-900 leading-tight">
@@ -732,7 +733,8 @@ export default function ApplyForm({
                 {linkedinSuggestion && (
                   <div className="mt-2 flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3.5 py-2 text-xs">
                     <span className="text-blue-700 flex-1">
-                      💡 Name detected: <strong>{linkedinSuggestion}</strong>
+                      <svg className="shrink-0 text-blue-500" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                      Name detected: <strong>{linkedinSuggestion}</strong>
                     </span>
                     <button
                       type="button"

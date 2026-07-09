@@ -113,7 +113,7 @@ export default function RecruiterProfilePage({ params }: { params: Promise<{ job
       <div className="min-h-screen bg-[#f0f2f5]">
         <RecruitHeader />
         <div className="flex flex-col items-center justify-center py-32 text-center px-4">
-          <div className="text-5xl mb-5">🔍</div>
+          <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-2xl bg-slate-100 text-slate-400 mx-auto"><svg width="36" height="36" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></div>
           <h1 className="text-2xl font-extrabold text-slate-900">Recruiter profile not found</h1>
           <p className="mt-2 text-sm text-slate-500">This job or recruiter may no longer be available.</p>
           <Link href="/recruit/opportunities"

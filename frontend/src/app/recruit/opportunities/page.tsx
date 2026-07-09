@@ -215,7 +215,7 @@ export default async function RecruitOpportunitiesPage({ searchParams }: { searc
         <section className="space-y-3">
           {jobs.length === 0 ? (
             <div className="rounded-3xl border border-slate-200 bg-white p-10 text-center shadow-sm">
-              <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-2xl">🔍</div>
+              <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-[#0a66c2]"><svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></div>
               <h3 className="text-lg font-bold text-slate-900">No jobs match this search yet</h3>
               <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">
                 Try fewer filters or search a nearby city — new roles are added regularly.
