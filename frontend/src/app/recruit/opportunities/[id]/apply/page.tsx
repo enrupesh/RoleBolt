@@ -98,7 +98,7 @@ export default async function ApplyPage({
                 <p className="font-bold text-slate-900 truncate">{job.title}</p>
                 <p className="text-xs text-slate-500 truncate">
                   {job.companyName && <span className="font-medium text-slate-700">{job.companyName} · </span>}
-                  {job.location || "India"}
+                  {job.location || "Remote"}
                   {job.workMode ? ` · ${job.workMode}` : ""}
                 </p>
               </div>

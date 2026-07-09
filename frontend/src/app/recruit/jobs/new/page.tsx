@@ -872,7 +872,7 @@ function NewJobContent() {
                     <>Location <span className="text-slate-400 normal-case font-medium">(optional for this niche/work mode)</span></>
                   )}
                 </FieldLabel>
-                <Input value={form.location} onChange={update("location")} placeholder={locationRequired ? "e.g. Bangalore, India" : "e.g. Anywhere / Remote-friendly (optional)"} />
+                <Input value={form.location} onChange={update("location")} placeholder={locationRequired ? "e.g. New York, Remote" : "e.g. Anywhere / Remote-friendly (optional)"} />
                 <FieldError message={locationRequired ? getTextQualityError(form.location, "location", 1, 2) : null} />
               </div>
               <div className="grid grid-cols-2 gap-4">

@@ -32,7 +32,7 @@ const STATS = [
   { value: "6", label: "Industry niches" },
   { value: "AI", label: "Powered scoring" },
   { value: "Free", label: "No hidden fees" },
-  { value: "India", label: "First platform" },
+  { value: "Global", label: "Global reach" },
 ];
 
 export default function RecruitLandingPage() {
@@ -66,7 +66,7 @@ export default function RecruitLandingPage() {
             </div>
             <div>
               <p className="text-sm font-bold text-slate-900 leading-none tracking-tight">Rolebolt</p>
-              <p className="text-[10.5px] text-slate-400 leading-none mt-0.5 font-medium">India Jobs Network</p>
+              <p className="text-[10.5px] text-slate-400 leading-none mt-0.5 font-medium">Global Jobs Network</p>
             </div>
           </Link>
 
@@ -138,7 +138,7 @@ export default function RecruitLandingPage() {
           <div className="rb-animate-fade-up">
             <div className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-1.5 text-xs font-bold text-[#0a66c2] mb-6">
               <span className="h-1.5 w-1.5 rounded-full bg-[#0a66c2] animate-pulse" />
-              India-first AI hiring platform
+              AI-powered hiring platform
             </div>
 
             <h1 className="text-[2.75rem] font-extrabold tracking-tight text-slate-950 sm:text-5xl lg:text-[3.5rem] leading-[1.08]">
@@ -147,7 +147,7 @@ export default function RecruitLandingPage() {
             </h1>
 
             <p className="mt-5 text-lg text-slate-500 leading-relaxed max-w-lg">
-              AI-powered ATS for Indian recruiters — score resumes, run async assessments, and manage your full hiring pipeline. Completely free.
+              AI-powered ATS for recruiters worldwide — score resumes, run async assessments, and manage your full hiring pipeline. Completely free.
             </p>
 
             {isLoggedIn ? (
@@ -183,7 +183,7 @@ export default function RecruitLandingPage() {
 
             {/* Trust indicators */}
             <div className="mt-8 flex flex-wrap items-center gap-3">
-              {["No credit card", "Free forever", "AI-powered", "India-first"].map(t => (
+              {["No credit card", "Free forever", "AI-powered", "Global"].map(t => (
                 <span key={t} className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
                   <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" className="text-emerald-500"><polyline points="20 6 9 17 4 12"/></svg>
                   {t}
@@ -336,7 +336,7 @@ export default function RecruitLandingPage() {
           <p className="text-blue-200 text-[11px] font-bold uppercase tracking-[0.12em] mb-3">Get started today</p>
           <h2 className="text-3xl font-extrabold text-white sm:text-4xl tracking-tight">Hire smarter, not harder.</h2>
           <p className="mt-4 text-blue-100 text-base leading-relaxed">
-            AI-powered hiring for Indian recruiters — completely free, no limits.
+            AI-powered hiring for recruiters worldwide — completely free, no limits.
           </p>
           <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
             {isLoggedIn ? (
