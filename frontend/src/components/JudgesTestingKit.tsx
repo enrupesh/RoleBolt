@@ -373,16 +373,12 @@ function ResumeCard({
   type,
   filename,
   content,
-  score,
-  scoreLabel,
   dark,
   candidate,
 }: {
   type: "high" | "low";
   filename: string;
   content: string;
-  score: string;
-  scoreLabel: string;
   dark?: boolean;
   candidate: { name: string; email: string };
 }) {
@@ -400,19 +396,12 @@ function ResumeCard({
             <p className={`text-[10px] truncate ${dark ? "text-slate-500" : "text-slate-400"}`}>{candidate.email}</p>
           </div>
         </div>
-        <div className={`shrink-0 text-right`}>
-          <p className={`text-[18px] font-black leading-none ${isHigh ? "text-emerald-500" : "text-red-400"}`}>{score}</p>
-          <p className={`text-[9px] font-bold uppercase tracking-wider ${isHigh ? "text-emerald-500/70" : "text-red-400/70"}`}>AI Score</p>
-        </div>
+        <span className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${isHigh ? dark ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-400" : "border-emerald-200 bg-emerald-50 text-emerald-700" : dark ? "border-red-500/20 bg-red-500/8 text-red-400" : "border-red-100 bg-white text-red-500"}`}>
+          {isHigh ? "✓ High Match" : "✗ Low Match"}
+        </span>
       </div>
       {/* Body */}
       <div className="px-4 py-3 space-y-2">
-        <div className="flex items-center justify-between">
-          <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${isHigh ? dark ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-400" : "border-emerald-200 bg-emerald-50 text-emerald-700" : dark ? "border-red-500/20 bg-red-500/8 text-red-400" : "border-red-100 bg-white text-red-500"}`}>
-            {isHigh ? "✓ High Match" : "✗ Low Match"}
-          </span>
-          <span className={`text-[10px] font-medium ${dark ? "text-slate-500" : "text-slate-400"}`}>{scoreLabel}</span>
-        </div>
         {/* Resume preview (first 6 lines) */}
         <div className={`rounded-lg border p-3 ${dark ? "border-white/6 bg-black/20" : "border-slate-200 bg-white"}`}>
           <p className={`text-[10px] font-bold uppercase tracking-wider mb-1.5 ${dark ? "text-slate-500" : "text-slate-400"}`}>Resume preview</p>
@@ -475,7 +464,7 @@ export function JudgesTestingKit({ dark }: { dark?: boolean }) {
         </h2>
         <p className={`mt-4 leading-relaxed max-w-lg mx-auto text-[14px] ${subCls}`}>
           Everything you need to evaluate Rolebolt without creating test data from scratch.
-          Download sample resumes, copy job specs, and see how the AI scores different candidate profiles.
+          Download sample resumes, copy job specs, and see how the AI ranks different candidate profiles.
         </p>
       </div>
 
@@ -580,7 +569,7 @@ export function JudgesTestingKit({ dark }: { dark?: boolean }) {
                 <div className={`flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-black ${dark ? "bg-violet-600 text-white" : "bg-violet-600 text-white"}`}>2</div>
                 <div>
                   <p className={`text-[14px] font-bold ${headingCls}`}>Test Candidate Scoring</p>
-                  <p className={`text-[11px] ${subCls}`}>Download a resume → apply to the job → see the AI score it 0–100</p>
+                  <p className={`text-[11px] ${subCls}`}>Download a resume → apply to the job → see the AI match the candidate</p>
                 </div>
               </div>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`shrink-0 transition-transform ${stdOpen.candidates ? "rotate-180" : ""} ${dark ? "text-slate-500" : "text-slate-400"}`}><polyline points="6 9 12 15 18 9"/></svg>
@@ -592,7 +581,7 @@ export function JudgesTestingKit({ dark }: { dark?: boolean }) {
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#0a66c2] shrink-0 mt-0.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
                   <p className={`text-[11px] leading-relaxed ${dark ? "text-slate-400" : "text-slate-500"}`}>
                     <strong className={dark ? "text-slate-200" : "text-slate-700"}>How to test: </strong>
-                    Download a resume below → Go to your published job listing → Apply as a candidate → Upload the .txt file as the resume → Submit. The AI will score it instantly.
+                    Download a resume below → Go to your published job listing → Apply as a candidate → Upload the .txt file as the resume → Submit. The AI will match it instantly.
                   </p>
                 </div>
 
@@ -610,8 +599,6 @@ export function JudgesTestingKit({ dark }: { dark?: boolean }) {
                       type="high"
                       filename="high-match-resume-react-developer.txt"
                       content={STD_HIGH_RESUME}
-                      score="85–95"
-                      scoreLabel="Expected AI score range"
                       dark={dark}
                       candidate={{ name: STD_CANDIDATE_HIGH.name, email: STD_CANDIDATE_HIGH.email }}
                     />
@@ -628,8 +615,6 @@ export function JudgesTestingKit({ dark }: { dark?: boolean }) {
                       type="low"
                       filename="low-match-resume-marketing-executive.txt"
                       content={STD_LOW_RESUME}
-                      score="10–25"
-                      scoreLabel="Expected AI score range"
                       dark={dark}
                       candidate={{ name: STD_CANDIDATE_LOW.name, email: STD_CANDIDATE_LOW.email }}
                     />
@@ -701,7 +686,7 @@ export function JudgesTestingKit({ dark }: { dark?: boolean }) {
                 <div className="flex h-7 w-7 items-center justify-center rounded-full bg-violet-600 text-white text-[11px] font-black">2</div>
                 <div>
                   <p className={`text-[14px] font-bold ${headingCls}`}>Submit Test Applications</p>
-                  <p className={`text-[11px] ${subCls}`}>Use these pre-written answers to test how AI scores different applicants</p>
+                  <p className={`text-[11px] ${subCls}`}>Use these pre-written answers to test how AI matches different applicants</p>
                 </div>
               </div>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`shrink-0 transition-transform ${frmOpen.answers ? "rotate-180" : ""} ${dark ? "text-slate-500" : "text-slate-400"}`}><polyline points="6 9 12 15 18 9"/></svg>
@@ -712,7 +697,7 @@ export function JudgesTestingKit({ dark }: { dark?: boolean }) {
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#0a66c2] shrink-0 mt-0.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
                   <p className={`text-[11px] leading-relaxed ${dark ? "text-slate-400" : "text-slate-500"}`}>
                     <strong className={dark ? "text-slate-200" : "text-slate-700"}>How to test: </strong>
-                    Open your published form link → Fill in the answers below → Download a resume and upload it when prompted → Submit. The AI will score each answer automatically.
+                    Open your published form link → Fill in the answers below → Download a resume and upload it when prompted → Submit. The AI will evaluate each answer automatically.
                   </p>
                 </div>
 
@@ -730,8 +715,6 @@ export function JudgesTestingKit({ dark }: { dark?: boolean }) {
                       type="high"
                       filename="high-match-resume-customer-success.txt"
                       content={FORM_HIGH_RESUME}
-                      score="80–92"
-                      scoreLabel="Expected AI score range"
                       dark={dark}
                       candidate={{ name: "Riya Kapoor", email: "riya.kapoor@email.com" }}
                     />
@@ -749,8 +732,6 @@ export function JudgesTestingKit({ dark }: { dark?: boolean }) {
                       type="low"
                       filename="low-match-resume-mechanical-engineer.txt"
                       content={FORM_LOW_RESUME}
-                      score="5–20"
-                      scoreLabel="Expected AI score range"
                       dark={dark}
                       candidate={{ name: "Aditya Verma", email: "aditya.verma@email.com" }}
                     />
@@ -769,7 +750,7 @@ export function JudgesTestingKit({ dark }: { dark?: boolean }) {
         </div>
         <p className={`text-[12px] leading-relaxed ${dark ? "text-slate-500" : "text-slate-500"}`}>
           <strong className={dark ? "text-slate-300" : "text-slate-600"}>Tip for judges: </strong>
-          The expected score ranges are approximate. Exact scores depend on how Mesh API interprets the job requirements against the resume. Try both resumes on the same job to see the AI&apos;s comparative reasoning across the 5 scoring criteria.
+          Match results depend on how Mesh API interprets the job requirements against the resume. Try both resumes on the same job to see the AI&apos;s comparative reasoning across the 5 matching criteria.
         </p>
       </div>
     </div>
