@@ -3,7 +3,7 @@
 import { Suspense, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { createUserWithEmailAndPassword, updateProfile, GoogleAuthProvider, signInWithPopup, sendEmailVerification } from "firebase/auth";
+import { createUserWithEmailAndPassword, updateProfile, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { getFirebaseAuth } from "@/lib/firebaseClient";
 import { apiUrl } from "@/lib/api";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
@@ -46,9 +46,8 @@ function RecruitSignupForm() {
       const auth = getFirebaseAuth();
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       if (name.trim()) await updateProfile(cred.user, { displayName: name.trim() });
-      // Send verification email — profile setup happens after verification
-      await sendEmailVerification(cred.user);
-      router.replace("/recruit/verify-email");
+      // Email verification disabled for now — set up profile and sign in immediately
+      await setupRecruitProfile(name.trim() || undefined);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create account. Please try again.");
     } finally {
