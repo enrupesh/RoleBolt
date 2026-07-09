@@ -63,12 +63,7 @@ export function RecruitGuard({ requiredRole, children }: RecruitGuardProps) {
       router.replace("/recruit/login");
       return;
     }
-    // Block email/password users who haven't verified yet.
-    // (Google Sign-In users always have emailVerified = true.)
-    if (!firebaseUser.emailVerified) {
-      router.replace("/recruit/verify-email");
-      return;
-    }
+    // Email verification requirement disabled for now.
     if (!recruitProfile) {
       router.replace("/recruit/login");
       return;
@@ -87,10 +82,6 @@ export function RecruitGuard({ requiredRole, children }: RecruitGuardProps) {
   }
 
   if (!firebaseUser) {
-    return null;
-  }
-
-  if (!firebaseUser.emailVerified) {
     return null;
   }
 

@@ -3,7 +3,7 @@
 import { Suspense, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, sendEmailVerification } from "firebase/auth";
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { getFirebaseAuth } from "@/lib/firebaseClient";
 import { apiUrl } from "@/lib/api";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
@@ -17,9 +17,6 @@ function RecruitLoginForm() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [unverifiedUser, setUnverifiedUser] = useState<import("firebase/auth").User | null>(null);
-  const [resendingVerification, setResendingVerification] = useState(false);
-  const [resentVerification, setResentVerification] = useState(false);
 
   async function setupRecruitProfile() {
     const auth = getFirebaseAuth();
@@ -42,37 +39,15 @@ function RecruitLoginForm() {
   async function handleEmailLogin(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    setUnverifiedUser(null);
-    setResentVerification(false);
     setLoading(true);
     try {
       const auth = getFirebaseAuth();
-      const cred = await signInWithEmailAndPassword(auth, email, password);
-      if (!cred.user.emailVerified) {
-        // Keep user signed in but block access — show verify prompt
-        setUnverifiedUser(cred.user);
-        setError("Please verify your email before signing in. Check your inbox for the verification link.");
-        return;
-      }
+      await signInWithEmailAndPassword(auth, email, password);
       await setupRecruitProfile();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not sign in. Please try again.");
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function handleResendVerification() {
-    if (!unverifiedUser) return;
-    setResendingVerification(true);
-    setResentVerification(false);
-    try {
-      await sendEmailVerification(unverifiedUser);
-      setResentVerification(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not resend verification email.");
-    } finally {
-      setResendingVerification(false);
     }
   }
 
@@ -119,22 +94,6 @@ function RecruitLoginForm() {
                     <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" className="text-red-500 mt-0.5 shrink-0"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
                     <p className="text-xs text-red-700 leading-relaxed">{error}</p>
                   </div>
-                  {unverifiedUser && (
-                    <div className="mt-3 pt-3 border-t border-red-200">
-                      {resentVerification ? (
-                        <p className="text-xs text-emerald-700 font-medium">✓ Verification email sent! Check your inbox.</p>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={handleResendVerification}
-                          disabled={resendingVerification}
-                          className="text-xs font-semibold text-[#0a66c2] hover:underline disabled:opacity-60"
-                        >
-                          {resendingVerification ? "Sending…" : "Resend verification email"}
-                        </button>
-                      )}
-                    </div>
-                  )}
                 </div>
               )}
 
