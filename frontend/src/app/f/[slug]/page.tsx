@@ -304,7 +304,9 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
   if (notFound) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center px-4 text-center">
-        <div className="text-4xl mb-4">🔍</div>
+        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-400 mx-auto">
+          <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        </div>
         <h1 className="text-xl font-bold text-slate-900">Form not found</h1>
         <p className="mt-2 text-sm text-slate-500">This form may have been closed or removed.</p>
         <Link href="/" className="mt-6 rounded-xl bg-violet-600 px-6 py-2.5 text-sm font-bold text-white hover:bg-violet-700 transition">
@@ -318,8 +320,8 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center px-4 text-center">
         <div className="max-w-sm">
-          <div className="flex h-20 w-20 mx-auto mb-6 items-center justify-center rounded-full bg-emerald-100 text-4xl">
-            ✅
+          <div className="flex h-20 w-20 mx-auto mb-6 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+            <svg width="36" height="36" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
           </div>
           <h1 className="text-2xl font-bold text-slate-900">Application submitted!</h1>
           <p className="mt-3 text-sm text-slate-500 leading-relaxed">
@@ -330,7 +332,7 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
             <p className="text-sm font-bold text-slate-900">{form?.title}</p>
           </div>
           <Link href="/" className="mt-6 inline-block text-xs text-slate-400 hover:text-slate-600 transition">
-            Powered by Rolebolt ⚡
+            Powered by Rolebolt <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" className="inline -mt-0.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
           </Link>
         </div>
       </div>
@@ -463,7 +465,7 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
 
         <p className="mt-8 text-center text-xs text-slate-400">
           Powered by{" "}
-          <Link href="/" className="font-semibold text-violet-500 hover:text-violet-700 transition">Rolebolt ⚡</Link>
+          <Link href="/" className="inline-flex items-center gap-1 font-semibold text-violet-500 hover:text-violet-700 transition">Rolebolt <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></Link>
         </p>
       </main>
     </div>

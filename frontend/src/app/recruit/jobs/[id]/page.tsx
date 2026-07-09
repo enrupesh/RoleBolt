@@ -140,9 +140,9 @@ function overallConfidence(breakdown: ScoreBreakdown[]): Confidence {
 function decisionBadge(decision: HiringDecision) {
   if (!decision) return null;
   const map = {
-    strong_yes: { label: "Strong Yes", icon: "✅", cls: "bg-emerald-500/15 text-emerald-700 border-emerald-500/25" },
-    maybe: { label: "Maybe", icon: "🤔", cls: "bg-amber-500/15 text-amber-700 border-amber-500/25" },
-    no: { label: "No", icon: "❌", cls: "bg-rose-500/15 text-rose-600 border-rose-500/25" },
+    strong_yes: { label: "Strong Yes", icon: <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>, cls: "bg-emerald-500/15 text-emerald-700 border-emerald-500/25" },
+    maybe: { label: "Maybe", icon: <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>, cls: "bg-amber-500/15 text-amber-700 border-amber-500/25" },
+    no: { label: "No", icon: <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>, cls: "bg-rose-500/15 text-rose-600 border-rose-500/25" },
   };
   return map[decision] ?? null;
 }
@@ -299,14 +299,14 @@ function RejectionEmailModal({ email, candidateName, candidateEmail, jobId, cand
         <div className="flex items-center justify-between border-b border-white/[0.07] px-6 py-4 shrink-0">
           <div>
             <h2 className="text-sm font-semibold text-white">{deleteMode ? "Send Email & Remove" : "AI Rejection Email"}</h2>
-            <p className="text-xs text-gray-400 mt-0.5">To: {candidateName}{candidateEmail ? ` · ${candidateEmail}` : " · ⚠ no email on file"}</p>
+            <p className="text-xs text-gray-400 mt-0.5">To: {candidateName}{candidateEmail ? ` · ${candidateEmail}` : <span className="inline-flex items-center gap-1 text-amber-500"> · <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="m10.29 3.86-8.58 14.86A1 1 0 0 0 2.57 20h18.86a1 1 0 0 0 .86-1.5L13.71 3.86a1 1 0 0 0-1.74 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> no email on file</span>}</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-white transition"><XIcon /></button>
         </div>
         <div className="p-6 flex-1 overflow-y-auto space-y-3">
           {sent ? (
             <div className="flex flex-col items-center gap-3 py-6 text-center">
-              <span className="text-3xl">✅</span>
+              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400"><svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span>
               <p className="text-sm font-semibold text-emerald-400">Email sent to {candidateEmail}</p>
               <p className="text-xs text-gray-400">It will appear in the Email History panel below.</p>
             </div>
