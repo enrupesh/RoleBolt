@@ -464,14 +464,14 @@ export default function RecruitLandingPage() {
           <div className="mx-auto max-w-2xl rounded-2xl border border-white/8 bg-black/40 backdrop-blur-sm overflow-hidden">
             <div className="flex items-center gap-2 px-4 py-3 border-b border-white/6">
               <div className="flex gap-1.5"><div className="h-2.5 w-2.5 rounded-full bg-slate-700"/><div className="h-2.5 w-2.5 rounded-full bg-slate-700"/><div className="h-2.5 w-2.5 rounded-full bg-slate-700"/></div>
-              <span className="text-[11px] text-slate-600 font-mono ml-1">nvidiaClient.ts — Mesh API integration</span>
+              <span className="text-[11px] text-slate-600 font-mono ml-1">meshClient.ts — Mesh API integration</span>
             </div>
             <pre className="p-5 text-[12px] leading-relaxed font-mono overflow-x-auto">
               <span className="text-slate-500">{"// Route AI tasks through Mesh API — 1000+ models, one key\n"}</span>
               <span className="text-purple-400">{"const "}</span>
               <span className="text-blue-300">{"result"}</span>
               <span className="text-white">{" = await "}</span>
-              <span className="text-yellow-300">{"callNvidiaChatCompletions"}</span>
+              <span className="text-yellow-300">{"callMeshChatCompletions"}</span>
               <span className="text-white">{"({\n"}</span>
               <span className="text-white">{"  "}</span>
               <span className="text-orange-300">{"apiKey"}</span>
