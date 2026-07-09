@@ -381,9 +381,13 @@ formPublicRouter.post(
         if (lbl.includes("name") && !lbl.includes("company") && !lbl.includes("last")) submittedName = submittedName || val;
       }
 
-      // Parse resume if uploaded
+      // Use pre-extracted resume text if the client sent it (candidate reviewed/edited it),
+      // otherwise fall back to parsing the uploaded file server-side.
       let resumeText = "";
-      if (req.file) {
+      const clientResumeText = typeof req.body.resumeText === "string" ? req.body.resumeText.trim() : "";
+      if (clientResumeText) {
+        resumeText = clientResumeText;
+      } else if (req.file) {
         resumeText = await extractResumeText(req.file);
       }
 
