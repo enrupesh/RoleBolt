@@ -96,13 +96,9 @@ export async function requireFirebaseAuth(
   const token = authHeader.slice("Bearer ".length);
   try {
     const decoded = await admin.auth().verifyIdToken(token);
-    // Enforce email verification for email/password accounts.
-    // Google Sign-In tokens always carry email_verified=true, so this
-    // only blocks users who registered with email/password but haven't
-    // clicked their verification link yet.
-    if (!decoded.email_verified) {
-      return res.status(403).json({ error: "Email not verified. Please verify your email before continuing." });
-    }
+    // Email verification requirement disabled for now — allow both
+    // Google Sign-In and email/password accounts regardless of
+    // email_verified status.
     (req as any).user = { uid: decoded.uid, email: decoded.email };
     return next();
   } catch {
