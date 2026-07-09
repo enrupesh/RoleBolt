@@ -246,9 +246,26 @@ export default function RecruitLandingPage() {
           <div className="mx-auto max-w-4xl text-center">
 
             {/* Badge */}
-            <div className="inline-flex items-center gap-2.5 rounded-full border border-[#0a66c2]/40 bg-[#0a66c2]/10 px-4 py-2 text-xs font-bold text-[#60a5fa] mb-8 backdrop-blur-sm">
-              <span className="flex h-1.5 w-1.5 rounded-full bg-[#60a5fa] animate-pulse" />
-              Powered by Mesh API · 1,000+ AI Models · Mesh Hackathon 2026
+            <div className="inline-flex items-stretch rounded-lg border border-[#0a66c2]/35 bg-slate-950/70 text-[11px] font-bold mb-8 overflow-hidden">
+              {/* Left: Mesh API brand tab */}
+              <div className="flex items-center gap-1.5 bg-[#0a66c2]/18 px-3.5 py-2 border-r border-[#0a66c2]/25">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                <span className="text-[#60a5fa] tracking-wide">Powered by Mesh API</span>
+              </div>
+              {/* Right: stats + hackathon link */}
+              <div className="flex items-center gap-2.5 px-3.5 py-2 text-slate-400">
+                <span>1,000+ AI Models</span>
+                <span className="text-slate-600 font-normal">·</span>
+                <a
+                  href="https://hack.meshapi.ai/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-[#93c5fd] hover:text-white transition-colors"
+                >
+                  Mesh Hackathon 2026
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                </a>
+              </div>
             </div>
 
             {/* Headline */}
@@ -765,7 +782,8 @@ export default function RecruitLandingPage() {
             <div className="flex items-center gap-1.5 text-[11px] text-slate-600">
               Built with
               <svg width="11" height="11" viewBox="0 0 24 24" fill="#ef4444" className="inline"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-              for the Mesh API Hackathon 2026
+              for the{" "}
+              <a href="https://hack.meshapi.ai/" target="_blank" rel="noopener noreferrer" className="hover:text-slate-400 underline underline-offset-2 transition-colors">Mesh API Hackathon 2026</a>
             </div>
           </div>
         </div>
