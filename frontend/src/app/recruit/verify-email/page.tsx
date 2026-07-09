@@ -143,6 +143,16 @@ export default function VerifyEmailPage() {
                 <strong className="text-slate-600">Continue</strong>.
               </p>
 
+              {/* Spam folder notice */}
+              <div className="mt-4 flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-left">
+                <svg width="14" height="14" fill="none" stroke="#b45309" strokeWidth="2" viewBox="0 0 24 24" className="shrink-0 mt-0.5">
+                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                <p className="text-xs text-amber-800 leading-relaxed">
+                  Didn't receive the email? Check your <strong>Spam or Junk</strong> folder. If you still can't find it, use the resend button below.
+                </p>
+              </div>
+
               {error && (
                 <div className="mt-5 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-left">
                   <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" className="text-red-500 mt-0.5 shrink-0"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
