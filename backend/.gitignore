@@ -3,3 +3,4 @@
 .env
 .DS_Store
 *.pem
+package-lock.json
