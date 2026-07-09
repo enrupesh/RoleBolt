@@ -1328,6 +1328,46 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete }: {
 
             <button onClick={handleDelete} className="ml-auto text-[var(--text-muted)] hover:text-rose-500 transition"><XIcon /></button>
           </div>
+
+          {/* ── Email History ── */}
+          {localEmailLog.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-[var(--border)]">
+              <button
+                onClick={() => setShowEmailHistory(v => !v)}
+                className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--foreground)] transition mb-2"
+              >
+                <MailIcon />
+                Emails sent ({localEmailLog.length})
+                <span className="ml-1 text-[9px]">{showEmailHistory ? "▲" : "▼"}</span>
+              </button>
+              {showEmailHistory && (
+                <div className="space-y-2">
+                  {[...localEmailLog].reverse().map((entry, i) => (
+                    <div key={i} className="rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className={`h-1.5 w-1.5 shrink-0 rounded-full mt-0.5 ${entry.status === "sent" ? "bg-emerald-500" : "bg-rose-500"}`} />
+                          <div className="min-w-0">
+                            <span className="text-[11px] font-semibold text-[var(--foreground)] capitalize">{entry.type.replace(/_/g, " ")}</span>
+                            <span className="text-[10px] text-[var(--text-muted)] ml-1.5">→ {entry.to}</span>
+                            <p className="text-[10px] text-[var(--text-muted)] truncate">{entry.subject}</p>
+                          </div>
+                        </div>
+                        <span className="text-[10px] text-[var(--text-muted)] shrink-0 whitespace-nowrap">
+                          {new Date(entry.sentAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
+                          {" "}
+                          {new Date(entry.sentAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                      </div>
+                      {entry.status === "failed" && (
+                        <p className="text-[10px] text-rose-400 mt-1 pl-3">Failed: {entry.error}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {expanded && (
@@ -1441,47 +1481,6 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete }: {
               </div>
             )}
 
-            {/* ── Email History ── */}
-            <div>
-              <button
-                onClick={() => setShowEmailHistory(v => !v)}
-                className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--foreground)] transition mb-2"
-              >
-                <MailIcon />
-                Emails sent ({localEmailLog.length})
-                <span className="ml-1 text-[9px]">{showEmailHistory ? "▲" : "▼"}</span>
-              </button>
-              {showEmailHistory && (
-                localEmailLog.length === 0 ? (
-                  <p className="text-[11px] text-[var(--text-muted)] pl-1">No emails sent yet for this candidate.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {[...localEmailLog].reverse().map((entry, i) => (
-                      <div key={i} className="rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2.5">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <span className={`h-1.5 w-1.5 shrink-0 rounded-full mt-0.5 ${entry.status === "sent" ? "bg-emerald-500" : "bg-rose-500"}`} />
-                            <div className="min-w-0">
-                              <span className="text-[11px] font-semibold text-[var(--foreground)] capitalize">{entry.type.replace(/_/g, " ")}</span>
-                              <span className="text-[10px] text-[var(--text-muted)] ml-1.5">→ {entry.to}</span>
-                              <p className="text-[10px] text-[var(--text-muted)] truncate">{entry.subject}</p>
-                            </div>
-                          </div>
-                          <span className="text-[10px] text-[var(--text-muted)] shrink-0 whitespace-nowrap">
-                            {new Date(entry.sentAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
-                            {" "}
-                            {new Date(entry.sentAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
-                          </span>
-                        </div>
-                        {entry.status === "failed" && (
-                          <p className="text-[10px] text-rose-400 mt-1 pl-3">Failed: {entry.error}</p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )
-              )}
-            </div>
           </div>
         )}
       </div>
