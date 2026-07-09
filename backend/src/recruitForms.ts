@@ -5,6 +5,8 @@ import { connectMongo } from "./db";
 import { RecruitForm } from "./models/RecruitForm";
 import { RecruitFormResponse } from "./models/RecruitFormResponse";
 import { callNvidiaChatCompletions } from "./ai/nvidiaClient";
+import { sendEmail } from "./mailer";
+import * as emailTemplates from "./emailTemplates";
 
 export const formRouter = express.Router();       // protected — /recruit/forms
 export const formPublicRouter = express.Router(); // public    — /recruit-public/forms
@@ -190,6 +192,46 @@ Be specific and honest. If answers are very short or empty, note that in the sum
   };
 }
 
+// ─── AI rejection email generator ────────────────────────────────────────────
+
+async function generateRejectionEmailText(args: {
+  candidateName: string;
+  formTitle: string;
+  stage: string;
+}): Promise<string> {
+  const stageNote =
+    args.stage === "shortlisted"
+      ? "They had been shortlisted but unfortunately did not advance further."
+      : args.stage === "interview"
+      ? "They had reached the interview stage but we are moving forward with other candidates."
+      : "We carefully reviewed their application.";
+
+  const prompt = `Write a professional, empathetic rejection email body for a candidate named "${args.candidateName}" who applied via an application form for "${args.formTitle}". ${stageNote}
+
+Rules:
+- 3-4 sentences max, warm but professional tone
+- Acknowledge their effort, explain we are moving forward with other candidates
+- Encourage them to apply for future opportunities
+- Do NOT include subject line, salutation (Hi X), or sign-off — just the body paragraphs
+- Do NOT use placeholder text like [Company Name]
+
+Return only the plain text email body.`;
+
+  try {
+    const raw = await callNvidiaChatCompletions({
+      apiKey: MESHAPI_API_KEY,
+      retries: 2,
+      fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.5,
+      max_tokens: 300,
+    });
+    return raw.trim();
+  } catch {
+    return `Thank you for taking the time to apply for the "${args.formTitle}" role. After careful consideration, we have decided to move forward with other candidates whose backgrounds more closely match our current needs.\n\nWe truly appreciate your interest and encourage you to apply for future openings that may be a great fit.`;
+  }
+}
+
 // ─── Protected routes (/recruit/forms) ────────────────────────────────────────
 
 // POST /recruit/forms — create a form
@@ -356,6 +398,14 @@ formRouter.patch("/:formId/responses/:responseId", async (req, res) => {
     if (!uid) return res.status(401).json({ error: "Unauthorized" });
 
     const { stage } = req.body;
+
+    // Fetch current stage before update so we can detect actual transition
+    const existing = await RecruitFormResponse.findOne(
+      { _id: req.params.responseId, formId: req.params.formId, uid },
+      { stage: 1, submittedName: 1, submittedEmail: 1 }
+    ).lean();
+    if (!existing) return res.status(404).json({ error: "Response not found." });
+
     const response = await RecruitFormResponse.findOneAndUpdate(
       { _id: req.params.responseId, formId: req.params.formId, uid },
       { $set: { stage } },
@@ -363,9 +413,135 @@ formRouter.patch("/:formId/responses/:responseId", async (req, res) => {
     );
     if (!response) return res.status(404).json({ error: "Response not found." });
 
+    // Auto-send stage-change emails only on actual transition (prevent duplicates on re-save)
+    const AUTO_EMAIL_STAGES = ["shortlisted", "interview", "hired"];
+    const stageChanged = stage && stage !== (existing as any).stage;
+    if (stageChanged && AUTO_EMAIL_STAGES.includes(stage) && response.submittedEmail) {
+      const resId      = response._id;
+      const candName   = response.submittedName || "Applicant";
+      const candEmail  = response.submittedEmail;
+      const formId     = req.params.formId;
+      setImmediate(async () => {
+        try {
+          const form = await RecruitForm.findById(formId).lean();
+          const formTitle = (form as any)?.title || "";
+          let payload: emailTemplates.EmailPayload | null = null;
+          if (stage === "shortlisted") payload = emailTemplates.screened(candName, formTitle, "");
+          if (stage === "interview")   payload = emailTemplates.interview(candName, formTitle, "");
+          if (stage === "hired")       payload = emailTemplates.hired(candName, formTitle, "");
+          if (!payload) return;
+          const result = await sendEmail({ to: candEmail, subject: payload.subject, html: payload.html, text: payload.text });
+          await RecruitFormResponse.findByIdAndUpdate(resId, {
+            $push: {
+              emailLog: {
+                type: stage, to: candEmail, subject: payload.subject, body: payload.text,
+                sentAt: new Date(), status: result.ok ? "sent" : "failed", error: result.error,
+              },
+            },
+          });
+        } catch (err) { console.error("[forms] auto stage-change email failed:", err); }
+      });
+    }
+
     return res.json({ response });
   } catch (err: any) {
     console.error("[forms] PATCH response:", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /recruit/forms/:formId/responses/:responseId/reject-email
+// Generates an AI-powered rejection email draft for the recruiter to review & edit
+formRouter.post("/:formId/responses/:responseId/reject-email", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "Unauthorized" });
+
+    const form = await RecruitForm.findOne({ _id: req.params.formId, uid }).lean();
+    if (!form) return res.status(404).json({ error: "Form not found." });
+
+    const response = await RecruitFormResponse.findOne({
+      _id: req.params.responseId, formId: req.params.formId, uid,
+    }).lean();
+    if (!response) return res.status(404).json({ error: "Response not found." });
+
+    const candidateName = (response as any).submittedName || "Applicant";
+    const candidateEmail = (response as any).submittedEmail || "";
+    const email = await generateRejectionEmailText({
+      candidateName,
+      formTitle: (form as any).title,
+      stage: (response as any).stage,
+    });
+
+    return res.json({ email, candidateName, candidateEmail });
+  } catch (err: any) {
+    console.error("[forms] POST reject-email:", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /recruit/forms/:formId/responses/:responseId/send-email
+// Sends a recruiter-composed email to the applicant and logs it
+formRouter.post("/:formId/responses/:responseId/send-email", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "Unauthorized" });
+
+    const { type, subject, body } = req.body as { type?: string; subject?: string; body?: string };
+    if (!subject?.trim() || !body?.trim()) {
+      return res.status(400).json({ error: "Subject and body are required." });
+    }
+
+    const form = await RecruitForm.findOne({ _id: req.params.formId, uid }).lean();
+    if (!form) return res.status(404).json({ error: "Form not found." });
+
+    const response = await RecruitFormResponse.findOne({
+      _id: req.params.responseId, formId: req.params.formId, uid,
+    });
+    if (!response) return res.status(404).json({ error: "Response not found." });
+
+    const candEmail = response.submittedEmail?.trim();
+    if (!candEmail) return res.status(400).json({ error: "This applicant has no email address on file." });
+
+    const candName = response.submittedName || "Applicant";
+    const formTitle = (form as any).title || "";
+
+    // Build branded HTML based on email type
+    let html: string;
+    if (type === "rejected") {
+      html = emailTemplates.rejectionEmailHtml(candName, formTitle, "", body).html;
+    } else if (type === "offer") {
+      html = emailTemplates.offerEmail(candName, formTitle, "", body).html;
+    } else {
+      html = emailTemplates.genericEmail(candName, subject.trim(), body);
+    }
+
+    const result = await sendEmail({ to: candEmail, subject: subject.trim(), html, text: body });
+
+    const logEntry = {
+      type: type || "custom",
+      to: candEmail,
+      subject: subject.trim(),
+      body,
+      sentAt: new Date(),
+      status: (result.ok ? "sent" : "failed") as "sent" | "failed",
+      error: result.error,
+    };
+
+    response.emailLog.push(logEntry as any);
+    await response.save();
+
+    if (!result.ok) {
+      return res.status(502).json({
+        error: `Email delivery failed: ${result.error}. The log entry has been saved.`,
+        logEntry,
+      });
+    }
+    return res.json({ ok: true, sentAt: logEntry.sentAt, logEntry });
+  } catch (err: any) {
+    console.error("[forms] POST send-email:", err);
     return res.status(500).json({ error: err.message });
   }
 });

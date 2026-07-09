@@ -12,6 +12,16 @@ export interface IAnswerSignal {
   note: string;
 }
 
+export interface IEmailLogEntry {
+  type: string;
+  to: string;
+  subject: string;
+  body: string;
+  sentAt: Date;
+  status: "sent" | "failed";
+  error?: string;
+}
+
 export interface IRecruitFormResponse extends Document {
   formId: mongoose.Types.ObjectId;
   uid: string; // owner of the form (recruiter)
@@ -28,6 +38,7 @@ export interface IRecruitFormResponse extends Document {
   submittedName: string;
   submittedEmail: string;
   submittedPhone: string;
+  emailLog: IEmailLogEntry[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -46,6 +57,19 @@ const AnswerSignalSchema = new Schema<IAnswerSignal>(
     questionId: { type: String, required: true },
     signal: { type: String, enum: ["strong", "ok", "thin"], required: true },
     note: { type: String, default: "" },
+  },
+  { _id: false }
+);
+
+const EmailLogEntrySchema = new Schema<IEmailLogEntry>(
+  {
+    type: { type: String, required: true },
+    to: { type: String, required: true },
+    subject: { type: String, default: "" },
+    body: { type: String, default: "" },
+    sentAt: { type: Date, default: Date.now },
+    status: { type: String, enum: ["sent", "failed"], default: "sent" },
+    error: { type: String },
   },
   { _id: false }
 );
@@ -71,6 +95,7 @@ const RecruitFormResponseSchema = new Schema<IRecruitFormResponse>(
     submittedName: { type: String, default: "" },
     submittedEmail: { type: String, default: "" },
     submittedPhone: { type: String, default: "" },
+    emailLog: { type: [EmailLogEntrySchema], default: [] },
   },
   { timestamps: true }
 );
