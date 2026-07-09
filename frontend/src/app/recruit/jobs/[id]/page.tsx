@@ -1499,6 +1499,7 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [activeTab, setActiveTab] = useState<"pipeline" | "jd" | "rubric" | "post">("pipeline");
   const [linkCopied, setLinkCopied] = useState(false);
+  const [stageFilter, setStageFilter] = useState<CandidateStage | "all">("all");
 
   useEffect(() => {
     const auth = getFirebaseAuth();
@@ -1717,12 +1718,47 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
                 </button>
               </div>
             ) : (
-              <div className="space-y-10">
-                {STAGES.filter(s => s.id !== "rejected").map(stage => {
-                  const stageCandidates = byStage[stage.id];
-                  if (stageCandidates.length === 0 && stage.id !== "applied") return null;
+              <>
+                {/* Stage filter */}
+                <div className="mb-6 flex items-center gap-3 flex-wrap">
+                  <span className="text-[11px] font-semibold uppercase tracking-widest text-[var(--text-muted)]">Filter</span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <button
+                      onClick={() => setStageFilter("all")}
+                      className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
+                        stageFilter === "all"
+                          ? "border-indigo-500/40 bg-indigo-500/15 text-indigo-500"
+                          : "border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                      }`}
+                    >
+                      All <span className="opacity-70">({candidates.length})</span>
+                    </button>
+                    {STAGES.map(stage => {
+                      const count = byStage[stage.id].length;
+                      const active = stageFilter === stage.id;
+                      return (
+                        <button
+                          key={stage.id}
+                          onClick={() => setStageFilter(stage.id)}
+                          className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
+                            active
+                              ? `${stage.bg} ${stage.color} border-current/40`
+                              : "border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                          }`}
+                        >
+                          {stage.label} <span className="opacity-70">({count})</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Filtered single-stage view */}
+                {stageFilter !== "all" ? (() => {
+                  const stage = STAGES.find(s => s.id === stageFilter)!;
+                  const stageCandidates = byStage[stageFilter];
                   return (
-                    <div key={stage.id}>
+                    <div>
                       <div className="flex items-center gap-3 mb-4">
                         <span className={`rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-wide ${stage.bg} ${stage.color}`}>
                           {stage.label}
@@ -1730,8 +1766,8 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
                         <span className="text-xs text-[var(--text-muted)]">{stageCandidates.length} candidate{stageCandidates.length !== 1 ? "s" : ""}</span>
                       </div>
                       {stageCandidates.length === 0 ? (
-                        <div className="rounded-2xl border border-dashed border-[var(--border)] px-4 py-5 text-center text-xs text-[var(--text-muted)]">
-                          No candidates at this stage
+                        <div className="rounded-2xl border border-dashed border-[var(--border)] px-4 py-8 text-center text-xs text-[var(--text-muted)]">
+                          No candidates at the {stage.label} stage
                         </div>
                       ) : (
                         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -1742,23 +1778,52 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
                       )}
                     </div>
                   );
-                })}
-                {byStage.rejected.length > 0 && (
-                  <div>
-                    <div className="flex items-center gap-3 mb-4">
-                      <span className="rounded-full border border-rose-500/20 bg-rose-500/15 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-rose-600">
-                        Rejected
-                      </span>
-                      <span className="text-xs text-[var(--text-muted)]">{byStage.rejected.length}</span>
-                    </div>
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                      {byStage.rejected.map(c => (
-                        <CandidateCard key={c._id} c={c} jobId={id} job={job} token={token!} onUpdate={handleUpdate} onDelete={handleDelete} />
-                      ))}
-                    </div>
+                })() : (
+                  /* All-stages grouped view */
+                  <div className="space-y-10">
+                    {STAGES.filter(s => s.id !== "rejected").map(stage => {
+                      const stageCandidates = byStage[stage.id];
+                      if (stageCandidates.length === 0 && stage.id !== "applied") return null;
+                      return (
+                        <div key={stage.id}>
+                          <div className="flex items-center gap-3 mb-4">
+                            <span className={`rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-wide ${stage.bg} ${stage.color}`}>
+                              {stage.label}
+                            </span>
+                            <span className="text-xs text-[var(--text-muted)]">{stageCandidates.length} candidate{stageCandidates.length !== 1 ? "s" : ""}</span>
+                          </div>
+                          {stageCandidates.length === 0 ? (
+                            <div className="rounded-2xl border border-dashed border-[var(--border)] px-4 py-5 text-center text-xs text-[var(--text-muted)]">
+                              No candidates at this stage
+                            </div>
+                          ) : (
+                            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                              {stageCandidates.map(c => (
+                                <CandidateCard key={c._id} c={c} jobId={id} job={job} token={token!} onUpdate={handleUpdate} onDelete={handleDelete} />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {byStage.rejected.length > 0 && (
+                      <div>
+                        <div className="flex items-center gap-3 mb-4">
+                          <span className="rounded-full border border-rose-500/20 bg-rose-500/15 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-rose-600">
+                            Rejected
+                          </span>
+                          <span className="text-xs text-[var(--text-muted)]">{byStage.rejected.length}</span>
+                        </div>
+                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                          {byStage.rejected.map(c => (
+                            <CandidateCard key={c._id} c={c} jobId={id} job={job} token={token!} onUpdate={handleUpdate} onDelete={handleDelete} />
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
+              </>
             )}
           </div>
         )}
