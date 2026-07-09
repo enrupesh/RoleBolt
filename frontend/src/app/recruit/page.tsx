@@ -11,12 +11,30 @@ import { RoleboltLogo } from "@/components/RoleboltLogo";
 // ─── Data ────────────────────────────────────────────────────────────────────
 
 const NICHES = [
-  { label: "AI, Data & Software", emoji: "💻", desc: "Engineers, PMs, data scientists, ML researchers", full: "AI, Data, Software & Product Tech", accent: "from-blue-500/10 to-indigo-500/10 border-blue-500/20 hover:border-blue-400/40" },
-  { label: "Sales & Business Dev", emoji: "📈", desc: "AEs, SDRs, BDMs, revenue leaders", full: "Sales, Business Development & Revenue Roles", accent: "from-emerald-500/10 to-teal-500/10 border-emerald-500/20 hover:border-emerald-400/40" },
-  { label: "Finance & Fintech", emoji: "💰", desc: "Analysts, CFOs, bankers, fintech specialists", full: "Finance, Accounting, Banking & Fintech", accent: "from-amber-500/10 to-yellow-500/10 border-amber-500/20 hover:border-amber-400/40" },
-  { label: "Healthcare & Pharma", emoji: "🏥", desc: "Doctors, nurses, pharma, allied health", full: "Healthcare, Pharma & Allied Medical Workforce", accent: "from-rose-500/10 to-pink-500/10 border-rose-500/20 hover:border-rose-400/40" },
-  { label: "Blue-Collar & Logistics", emoji: "🔧", desc: "Drivers, technicians, warehouse, field ops", full: "Skilled Blue-Collar, Logistics & Industrial Workforce", accent: "from-orange-500/10 to-amber-500/10 border-orange-500/20 hover:border-orange-400/40" },
-  { label: "Creative & Marketing", emoji: "🎨", desc: "Designers, copywriters, brand, growth", full: "Creative, Marketing, Media & Design", accent: "from-violet-500/10 to-purple-500/10 border-violet-500/20 hover:border-violet-400/40" },
+  {
+    label: "AI, Data & Software", desc: "Engineers, PMs, data scientists, ML researchers", full: "AI, Data, Software & Product Tech", accent: "from-blue-500/10 to-indigo-500/10 border-blue-500/20 hover:border-blue-400/40", iconColor: "text-blue-500",
+    icon: <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="m9 8 2 2-2 2M13 12h2"/></svg>,
+  },
+  {
+    label: "Sales & Business Dev", desc: "AEs, SDRs, BDMs, revenue leaders", full: "Sales, Business Development & Revenue Roles", accent: "from-emerald-500/10 to-teal-500/10 border-emerald-500/20 hover:border-emerald-400/40", iconColor: "text-emerald-500",
+    icon: <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>,
+  },
+  {
+    label: "Finance & Fintech", desc: "Analysts, CFOs, bankers, fintech specialists", full: "Finance, Accounting, Banking & Fintech", accent: "from-amber-500/10 to-yellow-500/10 border-amber-500/20 hover:border-amber-400/40", iconColor: "text-amber-500",
+    icon: <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>,
+  },
+  {
+    label: "Healthcare & Pharma", desc: "Doctors, nurses, pharma, allied health", full: "Healthcare, Pharma & Allied Medical Workforce", accent: "from-rose-500/10 to-pink-500/10 border-rose-500/20 hover:border-rose-400/40", iconColor: "text-rose-500",
+    icon: <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>,
+  },
+  {
+    label: "Blue-Collar & Logistics", desc: "Drivers, technicians, warehouse, field ops", full: "Skilled Blue-Collar, Logistics & Industrial Workforce", accent: "from-orange-500/10 to-amber-500/10 border-orange-500/20 hover:border-orange-400/40", iconColor: "text-orange-500",
+    icon: <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>,
+  },
+  {
+    label: "Creative & Marketing", desc: "Designers, copywriters, brand, growth", full: "Creative, Marketing, Media & Design", accent: "from-violet-500/10 to-purple-500/10 border-violet-500/20 hover:border-violet-400/40", iconColor: "text-violet-500",
+    icon: <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>,
+  },
 ];
 
 const FEATURES = [
@@ -90,17 +108,17 @@ const STEPS = [
 
 const PAINS = [
   {
-    icon: "⏳",
+    icon: <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
     title: "Reading 200 resumes wastes weeks",
     desc: "Recruiters spend 80% of their time on manual screening — before a single qualified candidate is even contacted.",
   },
   {
-    icon: "🎯",
+    icon: <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>,
     title: "Keyword filters miss great candidates",
     desc: "Legacy ATS systems reject strong candidates who use different terminology. You're filtering by vocabulary, not capability.",
   },
   {
-    icon: "💸",
+    icon: <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>,
     title: "Hiring tools charge per seat, per job",
     desc: "Greenhouse, Lever, and LinkedIn Recruiter are built for enterprises. SMBs and startups pay for features they barely use.",
   },
@@ -118,10 +136,22 @@ const WHY = [
 ];
 
 const AI_CAPABILITIES = [
-  { title: "Multi-model routing", desc: "Powered by Mesh API — routes each task to the optimal model across GPT, Claude, Gemini, and 1000+ LLMs. Best output, every time.", icon: "⚡" },
-  { title: "Automatic fallbacks", desc: "If a provider goes down, requests reroute in under 100ms. Your hiring pipeline never stops because of an LLM outage.", icon: "🛡️" },
-  { title: "Structured AI output", desc: "All scoring, summaries, and JDs return validated JSON — not raw prose. Data you can trust, not just text you have to parse.", icon: "🔷" },
-  { title: "Model-agnostic prompts", desc: "Prompt logic is centralised and reused across features. Consistent, version-controlled AI behaviour across the entire platform.", icon: "🧠" },
+  {
+    title: "Multi-model routing", desc: "Powered by Mesh API — routes each task to the optimal model across GPT, Claude, Gemini, and 1000+ LLMs. Best output, every time.",
+    icon: <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>,
+  },
+  {
+    title: "Automatic fallbacks", desc: "If a provider goes down, requests reroute in under 100ms. Your hiring pipeline never stops because of an LLM outage.",
+    icon: <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>,
+  },
+  {
+    title: "Structured AI output", desc: "All scoring, summaries, and JDs return validated JSON — not raw prose. Data you can trust, not just text you have to parse.",
+    icon: <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>,
+  },
+  {
+    title: "Model-agnostic prompts", desc: "Prompt logic is centralised and reused across features. Consistent, version-controlled AI behaviour across the entire platform.",
+    icon: <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>,
+  },
 ];
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -466,7 +496,7 @@ export default function RecruitLandingPage() {
           <div className="grid gap-6 sm:grid-cols-3 max-w-5xl mx-auto">
             {PAINS.map(p => (
               <div key={p.title} className="rounded-2xl border border-slate-100 bg-white p-7 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-                <div className="text-3xl mb-4">{p.icon}</div>
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-600">{p.icon}</div>
                 <h3 className="text-base font-bold text-slate-900 mb-2">{p.title}</h3>
                 <p className="text-sm text-slate-500 leading-relaxed">{p.desc}</p>
               </div>
@@ -496,7 +526,7 @@ export default function RecruitLandingPage() {
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4 max-w-6xl mx-auto mb-10">
             {AI_CAPABILITIES.map(c => (
               <div key={c.title} className="rounded-2xl border border-white/8 bg-white/4 p-6 hover:border-[#0a66c2]/40 hover:bg-white/7 transition-all">
-                <div className="text-2xl mb-4">{c.icon}</div>
+                <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-white/8 text-[#60a5fa]">{c.icon}</div>
                 <h3 className="text-sm font-bold text-white mb-2">{c.title}</h3>
                 <p className="text-xs text-slate-400 leading-relaxed">{c.desc}</p>
               </div>
@@ -563,13 +593,13 @@ export default function RecruitLandingPage() {
             </Link>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {NICHES.map(({ label, emoji, desc, full, accent }) => (
+            {NICHES.map(({ label, icon, iconColor, desc, full, accent }) => (
               <Link
                 key={label}
                 href={`/recruit/opportunities?niche=${encodeURIComponent(full)}`}
                 className={`group rounded-2xl border bg-gradient-to-br ${accent} p-6 transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_12px_28px_rgba(0,0,0,0.08)]`}
               >
-                <span className="text-3xl">{emoji}</span>
+                <span className={iconColor}>{icon}</span>
                 <p className="mt-3 text-base font-bold text-slate-900 leading-snug">{label}</p>
                 <p className="mt-1 text-xs text-slate-500 leading-relaxed">{desc}</p>
                 <p className="mt-3 text-xs font-bold text-[#0a66c2] group-hover:underline">Browse jobs →</p>
