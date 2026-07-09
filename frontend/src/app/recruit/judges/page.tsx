@@ -58,14 +58,20 @@ export default function JudgesHackathonPage() {
         <JudgesTestingKit dark={false} />
 
         {/* ── Built by / disclosure note ──────────────────────────────────── */}
-        <div className="mt-16 max-w-3xl mx-auto rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm">
-          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#0a66c2] mb-3">Built by</p>
-          <h2 className="text-xl font-black text-slate-950 tracking-tight mb-3">A two-person team</h2>
-          <p className="text-sm text-slate-600 leading-relaxed">
-            Rolebolt was built by a two-person team. Development was accelerated using Replit AI and
-            Cursor AI as coding assistants, while all product architecture, design decisions, feature
-            implementation, testing, and integration were completed by our team.
-          </p>
+        <div className="mt-16 max-w-3xl mx-auto rounded-2xl border-2 border-amber-300 bg-amber-50 p-6 sm:p-8 shadow-sm">
+          <div className="flex items-start gap-3">
+            <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" className="text-amber-500 shrink-0 mt-0.5">
+              <path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L14.71 3.86a2 2 0 0 0-3.42 0Z"/>
+            </svg>
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-amber-700 mb-2">Built by</p>
+              <p className="text-sm font-semibold text-amber-900 leading-relaxed">
+                Rolebolt was built by a two-person team. Development was accelerated using Replit AI and
+                Cursor AI as coding assistants, while all product architecture, design decisions, feature
+                implementation, testing, and integration were completed by our team.
+              </p>
+            </div>
+          </div>
         </div>
       </main>
     </div>
