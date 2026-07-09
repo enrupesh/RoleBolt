@@ -1,3 +1,4 @@
+import fs from "fs";
 import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
@@ -6,7 +7,6 @@ import cookieParser from "cookie-parser";
 import { recruitRouter, recruitPublicRouter } from "./recruit";
 import { formRouter, formPublicRouter } from "./recruitForms";
 import { connectMongo } from "./db";
-import { verifySMTP } from "./mailer";
 
 dotenv.config();
 
@@ -56,8 +56,6 @@ function initFirebaseAdmin() {
   }
 
   if (serviceAccountPath) {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const fs = require("fs");
     const parsed = JSON.parse(fs.readFileSync(serviceAccountPath, "utf8"));
     admin.initializeApp({ credential: admin.credential.cert(parsed) });
     firebaseReady = true;
@@ -247,10 +245,6 @@ app.get("/mesh-api-status", async (_req, res) => {
     },
   });
 });
-
-// GET /recruit/smtp-verify — auth-protected SMTP connectivity check.
-// Verifies credentials by opening a connection without sending a real email.
-// Only accessible to authenticated recruiters (requireFirebaseAuth applied via the /recruit mount below).
 
 const PORT = Number(process.env.PORT) || 8080;
 
