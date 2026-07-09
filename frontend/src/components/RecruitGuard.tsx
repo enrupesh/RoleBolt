@@ -59,7 +59,17 @@ export function RecruitGuard({ requiredRole, children }: RecruitGuardProps) {
 
   useEffect(() => {
     if (loading) return;
-    if (!firebaseUser || !recruitProfile) {
+    if (!firebaseUser) {
+      router.replace("/recruit/login");
+      return;
+    }
+    // Block email/password users who haven't verified yet.
+    // (Google Sign-In users always have emailVerified = true.)
+    if (!firebaseUser.emailVerified) {
+      router.replace("/recruit/verify-email");
+      return;
+    }
+    if (!recruitProfile) {
       router.replace("/recruit/login");
       return;
     }
@@ -76,7 +86,15 @@ export function RecruitGuard({ requiredRole, children }: RecruitGuardProps) {
     return <GuardSkeleton />;
   }
 
-  if (!firebaseUser || !recruitProfile) {
+  if (!firebaseUser) {
+    return null;
+  }
+
+  if (!firebaseUser.emailVerified) {
+    return null;
+  }
+
+  if (!recruitProfile) {
     return null;
   }
 
