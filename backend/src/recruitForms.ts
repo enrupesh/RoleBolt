@@ -4,7 +4,7 @@ import multer from "multer";
 import { connectMongo } from "./db";
 import { RecruitForm } from "./models/RecruitForm";
 import { RecruitFormResponse } from "./models/RecruitFormResponse";
-import { callNvidiaChatCompletions } from "./ai/nvidiaClient";
+import { callMeshChatCompletions } from "./ai/meshClient";
 import { sendEmail } from "./mailer";
 import * as emailTemplates from "./emailTemplates";
 
@@ -145,7 +145,7 @@ Be specific and honest. If answers are very short or empty, note that in the sum
 
   let raw: string;
   try {
-    raw = await callNvidiaChatCompletions({
+    raw = await callMeshChatCompletions({
       apiKey: MESHAPI_API_KEY,
       retries: 2,
       fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
@@ -218,7 +218,7 @@ Rules:
 Return only the plain text email body.`;
 
   try {
-    const raw = await callNvidiaChatCompletions({
+    const raw = await callMeshChatCompletions({
       apiKey: MESHAPI_API_KEY,
       retries: 2,
       fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
@@ -622,7 +622,7 @@ Return ONLY this JSON (no markdown):
 
     let raw: string;
     try {
-      raw = await callNvidiaChatCompletions({
+      raw = await callMeshChatCompletions({
         apiKey: MESHAPI_API_KEY,
         retries: 2,
         fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
