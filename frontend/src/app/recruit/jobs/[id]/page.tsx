@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, use } from "react";
+import { useState, useEffect, useCallback, useRef, use } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { RecruitGuard } from "@/components/RecruitGuard";
@@ -950,8 +950,8 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete }: {
 
   // Keep local email log in sync when parent refreshes the candidate (e.g. after re-fetch)
   // Using c._id as the key so we only reset when the candidate identity changes, not on every render
-  const prevCandidateId = React.useRef(c._id);
-  React.useEffect(() => {
+  const prevCandidateId = useRef(c._id);
+  useEffect(() => {
     if (prevCandidateId.current !== c._id) {
       prevCandidateId.current = c._id;
       setLocalEmailLog(c.emailLog || []);
