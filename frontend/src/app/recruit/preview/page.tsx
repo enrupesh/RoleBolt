@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { RoleboltLogo } from "@/components/RoleboltLogo";
+import { JudgesTestingKit } from "@/components/JudgesTestingKit";
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 
@@ -296,6 +297,11 @@ export default function ProductPreviewPage() {
               </div>
             </article>
           ))}
+        </div>
+
+        {/* ── Judges Testing Kit ───────────────────────────────────────────── */}
+        <div className="mt-20">
+          <JudgesTestingKit dark={false} />
         </div>
 
         {/* ── How Mesh API Powers Rolebolt ─────────────────────────────────── */}
