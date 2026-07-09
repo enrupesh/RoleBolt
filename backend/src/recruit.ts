@@ -2035,6 +2035,7 @@ recruitRouter.get("/jobs/:jobId/candidates/:candidateId/seeker-profile", async (
         availability: candidate.availability,
         coverLetter: candidate.coverLetter,
         linkedinUrl: candidate.linkedinUrl,
+        resumeText: candidate.resumeText || "",
       },
       seekerProfile: seekerProfile ?? null,
     });
