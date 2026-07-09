@@ -250,6 +250,91 @@ export default function ProductPreviewPage() {
           ))}
         </div>
 
+        {/* ── Roadmap ───────────────────────────────────────────────────────── */}
+        <div className="mt-20">
+          {/* Header */}
+          <div className="max-w-2xl mx-auto text-center mb-12">
+            <div className="inline-flex items-center gap-2 rounded-full border border-violet-400/30 bg-violet-400/8 px-4 py-1.5 text-[11px] font-bold text-violet-400 mb-5">
+              <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              What&apos;s Next
+            </div>
+            <h2 className="text-3xl font-black text-slate-900 tracking-tight sm:text-4xl leading-tight">
+              Built today.<br />Evolving tomorrow.
+            </h2>
+            <p className="mt-4 text-slate-500 leading-relaxed max-w-lg mx-auto">
+              Rolebolt is actively evolving. Here&apos;s what&apos;s already in our pipeline — shipping soon.
+            </p>
+          </div>
+
+          {/* Cards */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              {
+                icon: <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>,
+                title: "AI Voice Interview",
+                desc: "Candidates complete spoken interviews with an AI agent. Tone, clarity, and answers scored automatically.",
+                color: "text-violet-500", bg: "bg-violet-50 border-violet-100",
+              },
+              {
+                icon: <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
+                title: "AI Ranking",
+                desc: "Beyond scoring — AI ranks every candidate against each other and surfaces the definitive shortlist.",
+                color: "text-amber-500", bg: "bg-amber-50 border-amber-100",
+              },
+              {
+                icon: <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><path d="M11 18H8a2 2 0 0 1-2-2V9"/></svg>,
+                title: "AI Recommendation",
+                desc: "Rolebolt proactively suggests the best-fit candidates from the talent pool the moment a new role is posted.",
+                color: "text-[#0a66c2]", bg: "bg-blue-50 border-blue-100",
+              },
+              {
+                icon: <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>,
+                title: "Mobile App",
+                desc: "Review candidates, approve shortlists, and send offers from your phone — fully native iOS & Android.",
+                color: "text-emerald-500", bg: "bg-emerald-50 border-emerald-100",
+              },
+              {
+                icon: <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M21 2H3v16h5l3 3 3-3h7V2z"/><path d="M7.5 7.5h9"/><path d="M7.5 12h6"/></svg>,
+                title: "WhatsApp Outreach",
+                desc: "Send assessments, share updates, and keep candidates engaged directly on WhatsApp — no email needed.",
+                color: "text-[#25d366]", bg: "bg-green-50 border-green-100",
+              },
+              {
+                icon: <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+                title: "Team Collaboration",
+                desc: "Invite hiring managers, assign stages, leave comments, and make decisions together in real time.",
+                color: "text-indigo-500", bg: "bg-indigo-50 border-indigo-100",
+              },
+              {
+                icon: <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>,
+                title: "ATS Integrations",
+                desc: "Connect Rolebolt to Greenhouse, Lever, Workday, and more — sync candidates both ways automatically.",
+                color: "text-rose-500", bg: "bg-rose-50 border-rose-100",
+              },
+              {
+                icon: <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>,
+                title: "LinkedIn Chrome Extension",
+                desc: "Source candidates directly from LinkedIn and push them into your Rolebolt pipeline in one click.",
+                color: "text-[#0a66c2]", bg: "bg-sky-50 border-sky-100",
+              },
+            ].map((item) => (
+              <div key={item.title} className="relative rounded-2xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
+                <div className="absolute top-4 right-4">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 border border-slate-200 px-2 py-0.5 text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                    <span className="h-1 w-1 rounded-full bg-amber-400 animate-pulse" />
+                    Coming Soon
+                  </span>
+                </div>
+                <div className={`mb-4 inline-flex h-10 w-10 items-center justify-center rounded-xl border ${item.bg} ${item.color}`}>
+                  {item.icon}
+                </div>
+                <h3 className="text-[14px] font-bold text-slate-900 leading-snug mb-1.5 pr-16">{item.title}</h3>
+                <p className="text-[12px] text-slate-500 leading-relaxed">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* ── CTA strip ─────────────────────────────────────────────────────── */}
         <div className="mt-16 rounded-2xl bg-slate-950 px-8 py-10 text-center relative overflow-hidden">
           <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none" />
