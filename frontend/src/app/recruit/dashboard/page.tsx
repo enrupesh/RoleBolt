@@ -401,14 +401,22 @@ function RecruitDashboardContent() {
   const filteredForms = forms.filter(f => formFilter === "all" || f.status === formFilter);
   const activeJobs = jobs.filter(j => j.status === "active").length;
 
-  const stats = [
+  // Standard Jobs-only stats (pipeline, roles, hiring funnel)
+  const jobStats = [
     { label: "Active Roles",      value: activeJobs,                                                                              accent: "text-emerald-600", bar: "from-emerald-400 to-emerald-500", sub: "hiring now"          },
     { label: "Total Candidates",  value: pipeline?.total ?? jobs.reduce((s, j) => s + (j.candidateCount || 0), 0),                accent: "text-blue-600",   bar: "from-blue-400 to-blue-600",     sub: "in pipeline"         },
     { label: "Shortlisted",       value: pipeline?.shortlisted ?? 0,                                                              accent: "text-violet-600", bar: "from-violet-400 to-violet-600", sub: "screened + assessed"  },
     { label: "Interview",         value: pipeline?.interview ?? 0,                                                                 accent: "text-amber-600",  bar: "from-amber-400 to-amber-500",   sub: "at interview stage"  },
     { label: "Hired",             value: pipeline?.hired ?? 0,                                                                    accent: "text-teal-600",   bar: "from-teal-400 to-teal-500",     sub: "all time"            },
+  ];
+
+  // Form Jobs-only stats
+  const formStats = [
+    { label: "Active Forms",      value: forms.filter(f => f.status === "active").length,                                        accent: "text-emerald-600", bar: "from-emerald-400 to-emerald-500", sub: "collecting now"      },
     { label: "Form Responses",    value: forms.reduce((s, f) => s + (f.responseCount || 0), 0),                                   accent: "text-violet-500", bar: "from-purple-400 to-violet-500", sub: "via custom forms"    },
   ];
+
+  const stats = activeTab === "jobs" ? jobStats : formStats;
 
   return (
     <div className="min-h-screen bg-[#f0f2f5]">
@@ -442,14 +450,18 @@ function RecruitDashboardContent() {
           </Link>
 
           <nav className="hidden md:flex items-center gap-0.5">
-            <Link href="/recruit/talent-pool"
-              className="flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition">
-              <UsersIcon /> Talent Pool
-            </Link>
-            <Link href="/recruit/analytics"
-              className="flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition">
-              <BarChartIcon /> Analytics
-            </Link>
+            {activeTab === "jobs" && (
+              <>
+                <Link href="/recruit/talent-pool"
+                  className="flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition">
+                  <UsersIcon /> Talent Pool
+                </Link>
+                <Link href="/recruit/analytics"
+                  className="flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition">
+                  <BarChartIcon /> Analytics
+                </Link>
+              </>
+            )}
             <Link href="/recruit/recruiter-profile"
               className="flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition">
               Profile
@@ -469,12 +481,18 @@ function RecruitDashboardContent() {
 
         {/* ── Page title ────────────────────────────────────────────────── */}
         <div className="mb-8">
-          <h1 className="text-[28px] font-bold tracking-tight text-slate-900 leading-tight">Recruitment Pipeline</h1>
-          <p className="mt-1.5 text-[13px] text-slate-500 leading-relaxed">Manage all your open roles and candidate pipelines from one place.</p>
+          <h1 className="text-[28px] font-bold tracking-tight text-slate-900 leading-tight">
+            {activeTab === "jobs" ? "Recruitment Pipeline" : "Form Jobs"}
+          </h1>
+          <p className="mt-1.5 text-[13px] text-slate-500 leading-relaxed">
+            {activeTab === "jobs"
+              ? "Manage all your open roles and candidate pipelines from one place."
+              : "Collect and screen applicants through custom forms, without a full pipeline."}
+          </p>
         </div>
 
         {/* ── Stats ─────────────────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6 mb-8">
+        <div className={`grid grid-cols-2 gap-3 mb-8 ${activeTab === "jobs" ? "sm:grid-cols-3 lg:grid-cols-5" : "sm:grid-cols-2 lg:grid-cols-2 max-w-md"}`}>
           {stats.map(s => (
             <div key={s.label} className="relative overflow-hidden rounded-2xl bg-white border border-black/[0.06] p-4
               shadow-[0_1px_3px_rgba(0,0,0,0.05),0_4px_16px_rgba(0,0,0,0.04)]">
@@ -839,16 +857,20 @@ function RecruitDashboardContent() {
 
         {/* ── Mobile quick-nav ──────────────────────────────────────────── */}
         <div className="mt-8 md:hidden flex flex-wrap gap-2">
-          <Link href="/recruit/talent-pool"
-            className="flex items-center gap-1.5 rounded-xl bg-white border border-black/[0.06] px-4 py-2.5 text-[12px] font-medium text-slate-700
-              shadow-[0_1px_3px_rgba(0,0,0,0.05)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:-translate-y-px transition">
-            <UsersIcon /> Talent Pool
-          </Link>
-          <Link href="/recruit/analytics"
-            className="flex items-center gap-1.5 rounded-xl bg-white border border-black/[0.06] px-4 py-2.5 text-[12px] font-medium text-slate-700
-              shadow-[0_1px_3px_rgba(0,0,0,0.05)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:-translate-y-px transition">
-            <BarChartIcon /> Analytics
-          </Link>
+          {activeTab === "jobs" && (
+            <>
+              <Link href="/recruit/talent-pool"
+                className="flex items-center gap-1.5 rounded-xl bg-white border border-black/[0.06] px-4 py-2.5 text-[12px] font-medium text-slate-700
+                  shadow-[0_1px_3px_rgba(0,0,0,0.05)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:-translate-y-px transition">
+                <UsersIcon /> Talent Pool
+              </Link>
+              <Link href="/recruit/analytics"
+                className="flex items-center gap-1.5 rounded-xl bg-white border border-black/[0.06] px-4 py-2.5 text-[12px] font-medium text-slate-700
+                  shadow-[0_1px_3px_rgba(0,0,0,0.05)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:-translate-y-px transition">
+                <BarChartIcon /> Analytics
+              </Link>
+            </>
+          )}
           <Link href="/recruit/recruiter-profile"
             className="flex items-center gap-1.5 rounded-xl bg-white border border-black/[0.06] px-4 py-2.5 text-[12px] font-medium text-slate-700
               shadow-[0_1px_3px_rgba(0,0,0,0.05)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:-translate-y-px transition">
