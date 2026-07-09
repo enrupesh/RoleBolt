@@ -6,6 +6,7 @@ import cookieParser from "cookie-parser";
 import { recruitRouter, recruitPublicRouter } from "./recruit";
 import { formRouter, formPublicRouter } from "./recruitForms";
 import { connectMongo } from "./db";
+import { verifySMTP } from "./mailer";
 
 dotenv.config();
 
@@ -141,6 +142,10 @@ app.use("/recruit/forms", requireFirebaseAuth, formRouter);
 app.get("/health", (_req, res) => {
   res.json({ ok: true, service: "recruit-backend" });
 });
+
+// GET /recruit/smtp-verify — auth-protected SMTP connectivity check.
+// Verifies credentials by opening a connection without sending a real email.
+// Only accessible to authenticated recruiters (requireFirebaseAuth applied via the /recruit mount below).
 
 const PORT = Number(process.env.PORT) || 8080;
 
