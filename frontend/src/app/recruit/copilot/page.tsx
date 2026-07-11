@@ -25,6 +25,8 @@ interface CopilotSource {
   label: string;
   candidateId?: string;
   candidateName?: string;
+  /** Looked up server-side from the database — never invented by the AI */
+  candidateEmail?: string;
   jobId?: string;
   jobTitle?: string;
   page?: number;
@@ -185,6 +187,48 @@ const IcGlobe = () => (
     <circle cx="12" cy="12" r="10" /><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
   </svg>
 );
+const IcMail = () => (
+  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+  </svg>
+);
+
+// ─── Candidate Identity ────────────────────────────────────────────────────────
+//
+// Reusable name + email pairing shown whenever the Copilot references a
+// specific candidate. Email always comes from the database (attached
+// server-side) — never from the AI — and is simply omitted if unknown.
+
+function CandidateIdentity({ name, email, onNavigate }: {
+  name: string; email?: string; onNavigate?: () => void;
+}) {
+  return (
+    <div className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-white/[0.04] border border-white/[0.07]">
+      <div className="w-5 h-5 rounded-full bg-gradient-to-br from-sky-500 to-indigo-600 flex items-center justify-center text-[9px] font-bold text-white shrink-0">
+        {name.charAt(0).toUpperCase()}
+      </div>
+      <div className="flex flex-col leading-tight min-w-0">
+        {onNavigate ? (
+          <button type="button" onClick={onNavigate} className="text-left text-[12.5px] font-semibold text-white hover:text-sky-300 transition-colors truncate">
+            {name}
+          </button>
+        ) : (
+          <span className="text-[12.5px] font-semibold text-white truncate">{name}</span>
+        )}
+        {email && (
+          <a
+            href={`mailto:${email}`}
+            className="text-[11px] text-sky-300/80 hover:text-sky-300 inline-flex items-center gap-1 truncate"
+            title={`Email ${name}`}
+          >
+            <IcMail />
+            {email}
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // ─── Source chip ──────────────────────────────────────────────────────────────
 
@@ -250,6 +294,20 @@ function RecommendationCard({ recommendation, confidence, reasoning }: {
 
 // ─── Message bubble ───────────────────────────────────────────────────────────
 
+/** Unique candidates referenced anywhere in a message's sources, in first-seen order. */
+function uniqueCandidatesFromSources(sources?: CopilotSource[]): CopilotSource[] {
+  if (!sources || sources.length === 0) return [];
+  const seen = new Set<string>();
+  const result: CopilotSource[] = [];
+  for (const src of sources) {
+    if (!src.candidateId || !src.candidateName) continue;
+    if (seen.has(src.candidateId)) continue;
+    seen.add(src.candidateId);
+    result.push(src);
+  }
+  return result;
+}
+
 function MessageBubble({ msg, onQuickAction, onSourceNavigate }: {
   msg: UIMessage; onQuickAction: (text: string) => void; onSourceNavigate?: (src: CopilotSource) => void;
 }) {
@@ -283,6 +341,23 @@ function MessageBubble({ msg, onQuickAction, onSourceNavigate }: {
         <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
         {msg.isStreaming && <span className="inline-block w-0.5 h-4 bg-indigo-400 align-middle ml-0.5 animate-pulse" />}
       </div>
+
+      {!msg.isStreaming && (() => {
+        const mentioned = uniqueCandidatesFromSources(msg.sources);
+        if (mentioned.length === 0) return null;
+        return (
+          <div className="ml-8 mt-3 flex flex-wrap gap-2">
+            {mentioned.map((src) => (
+              <CandidateIdentity
+                key={src.candidateId}
+                name={src.candidateName!}
+                email={src.candidateEmail}
+                onNavigate={onSourceNavigate ? () => onSourceNavigate(src) : undefined}
+              />
+            ))}
+          </div>
+        );
+      })()}
 
       {!msg.isStreaming && msg.recommendation && (
         <div className="ml-8">
