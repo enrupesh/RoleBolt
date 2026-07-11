@@ -1020,9 +1020,16 @@ function CopilotPageContent() {
   const handleSourceNavigate = useCallback((src: CopilotSource) => {
     if (src.candidateId) {
       const targetJobId = src.jobId;
+      // Resolve the job context this candidate lives under. If the source
+      // didn't carry a jobId (older messages, or the AI omitted it) we can
+      // only navigate when we're already sitting inside that job/candidate's
+      // context — otherwise there's nothing to fetch the candidate from.
       if (targetJobId && targetJobId !== selectedJob?._id) {
         const job = jobs.find(j => j._id === targetJobId);
-        if (job) setSelectedJob(job);
+        if (!job) return; // job not in the loaded list (e.g. archived) — can't resolve
+        setSelectedJob(job);
+      } else if (!targetJobId && !selectedJob) {
+        return; // no job context to resolve the candidate against
       }
       setContextMode("candidate");
       setSelectedCandidateId(src.candidateId);
@@ -1292,7 +1299,7 @@ function CopilotPageContent() {
         {/* Job selector */}
         <div className="px-3 pb-2 relative">
           <button
-            onClick={() => setJobDropdownOpen(o => !o)}
+            onClick={() => { setJobDropdownOpen(o => !o); setCandidateDropdownOpen(false); }}
             className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-[13px] border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06] transition-all"
           >
             <div className="flex items-center gap-2 min-w-0">
@@ -1353,7 +1360,7 @@ function CopilotPageContent() {
         {selectedJob && (
           <div className="px-3 pb-2 relative">
             <button
-              onClick={() => setCandidateDropdownOpen(o => !o)}
+              onClick={() => { setCandidateDropdownOpen(o => !o); setJobDropdownOpen(false); }}
               className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-[13px] border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06] transition-all"
             >
               <div className="flex items-center gap-2 min-w-0">
