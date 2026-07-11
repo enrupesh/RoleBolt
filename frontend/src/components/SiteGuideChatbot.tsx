@@ -10,9 +10,10 @@ type GuideMessage = { role: "user" | "assistant"; content: string };
 const STORAGE_KEY = "rolebolt_site_guide_messages";
 
 const WELCOME_MESSAGE =
-  'Hi, welcome to the [MeshAPI.ai](https://meshapi.ai) team! 👋 I\'m the Rolebolt guide — ask me anything about ' +
-  "this site (what it does, how to use it, where to find things) or just chat. If you're judging the " +
-  "hackathon, [the Judges Testing Kit](/recruit/judges) is the fastest way to try everything hands-on.";
+  'Hi, welcome — great to have you here as a judge for [MeshAPI.ai](https://meshapi.ai)! 👋 I\'m the Rolebolt ' +
+  "guide, and I'm here to help you explore everything we built for the hackathon. Ask me anything about " +
+  "this site — what it does, how to use it, where to find things — or just chat. [The Judges Testing Kit]" +
+  "(/recruit/judges) is the fastest way to try everything hands-on.";
 
 const SUGGESTED_PROMPTS = [
   "What is Rolebolt?",
