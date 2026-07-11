@@ -25,6 +25,8 @@ interface CopilotSource {
   label: string;
   candidateId?: string;
   candidateName?: string;
+  jobId?: string;
+  jobTitle?: string;
   page?: number;
   sectionId?: string;
   detail?: string;
@@ -195,21 +197,25 @@ const SOURCE_COLORS: Record<string, string> = {
   job_description: "bg-rose-500/15 text-rose-300 border-rose-500/20",
 };
 
-function SourceChip({ src }: { src: CopilotSource }) {
+function SourceChip({ src, onNavigate }: { src: CopilotSource; onNavigate?: (src: CopilotSource) => void }) {
   const color = SOURCE_COLORS[src.type] ?? "bg-white/10 text-white/60 border-white/10";
+  const navigable = !!onNavigate && (!!src.candidateId || (!!src.jobId && src.type === "job_description"));
   const inner = (
     <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border cursor-pointer hover:opacity-80 transition-opacity ${color}`}
-      title={src.detail ?? src.label}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-opacity ${color} ${navigable ? "cursor-pointer hover:opacity-80" : ""}`}
+      title={navigable ? "Jump to this candidate's context" : (src.detail ?? src.label)}
     >
       <IcDoc />
       {src.label}
       {src.detail && <span className="opacity-60">· {src.detail}</span>}
     </span>
   );
-  return src.candidateId
-    ? <Link href={`/recruit/jobs`}>{inner}</Link>
-    : inner;
+  if (!navigable) return inner;
+  return (
+    <button type="button" onClick={() => onNavigate!(src)} className="inline-flex">
+      {inner}
+    </button>
+  );
 }
 
 // ─── Recommendation card ──────────────────────────────────────────────────────
@@ -244,8 +250,8 @@ function RecommendationCard({ recommendation, confidence, reasoning }: {
 
 // ─── Message bubble ───────────────────────────────────────────────────────────
 
-function MessageBubble({ msg, onQuickAction }: {
-  msg: UIMessage; onQuickAction: (text: string) => void;
+function MessageBubble({ msg, onQuickAction, onSourceNavigate }: {
+  msg: UIMessage; onQuickAction: (text: string) => void; onSourceNavigate?: (src: CopilotSource) => void;
 }) {
   if (msg.role === "user") {
     return (
@@ -290,7 +296,7 @@ function MessageBubble({ msg, onQuickAction }: {
 
       {!msg.isStreaming && msg.sources && msg.sources.length > 0 && (
         <div className="ml-8 mt-3 flex flex-wrap gap-1.5">
-          {msg.sources.map((src, i) => <SourceChip key={i} src={src} />)}
+          {msg.sources.map((src, i) => <SourceChip key={i} src={src} onNavigate={onSourceNavigate} />)}
         </div>
       )}
 
@@ -761,6 +767,8 @@ function CopilotPageContent() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [jobDropdownOpen, setJobDropdownOpen] = useState(false);
+  const [candidateDropdownOpen, setCandidateDropdownOpen] = useState(false);
+  const [candidateSearch, setCandidateSearch] = useState("");
 
   // Context mode: "global" (no job/candidate selected — Organization Intelligence),
   // "job" = talking about one job, "candidate" = focused on one candidate.
@@ -931,7 +939,7 @@ function CopilotPageContent() {
         if (!res.ok) return;
         const data = await res.json();
         const list: CandidateStat[] = data.candidates ?? [];
-        setCandidates(list.slice(0, 20));
+        setCandidates(list);
 
         // Apply pending candidateId from URL once candidates are loaded
         if (pendingCandidateId) {
@@ -1002,6 +1010,33 @@ function CopilotPageContent() {
       }
     } catch {}
   }, [getToken, jobs]);
+
+  // ── Deep-link navigation from an AI source citation ────────────────────────
+  // Clicking a candidate/job source chip switches the whole Copilot UI into
+  // that candidate's (or job's) context in place — no page reload, no lost
+  // conversation. If the source belongs to a different job than the one
+  // currently selected, we switch jobs first via the same pendingCandidateId
+  // flow already used for URL deep links.
+  const handleSourceNavigate = useCallback((src: CopilotSource) => {
+    if (src.candidateId) {
+      const targetJobId = src.jobId;
+      if (targetJobId && targetJobId !== selectedJob?._id) {
+        const job = jobs.find(j => j._id === targetJobId);
+        if (job) setSelectedJob(job);
+      }
+      setContextMode("candidate");
+      setSelectedCandidateId(src.candidateId);
+      setPendingCandidateId(src.candidateId);
+    } else if (src.type === "job_description" && src.jobId) {
+      const job = jobs.find(j => j._id === src.jobId);
+      if (job) {
+        setSelectedJob(job);
+        setContextMode("job");
+        setSelectedCandidateId(null);
+        setSelectedCandidate(null);
+      }
+    }
+  }, [jobs, selectedJob]);
 
   // ── Auto-scroll ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -1314,6 +1349,92 @@ function CopilotPageContent() {
           )}
         </div>
 
+        {/* Candidate selector — becomes active once a job is selected */}
+        {selectedJob && (
+          <div className="px-3 pb-2 relative">
+            <button
+              onClick={() => setCandidateDropdownOpen(o => !o)}
+              className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-[13px] border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06] transition-all"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                {contextMode === "candidate" ? <IcPerson /> : <IcUsers />}
+                <span className="truncate text-white/70">
+                  {contextMode === "candidate" && selectedCandidate ? selectedCandidate.name : "All Candidates"}
+                </span>
+              </div>
+              <IcChevronDown />
+            </button>
+
+            {candidateDropdownOpen && (
+              <div
+                className="absolute left-3 right-3 top-full mt-1 z-10 rounded-xl border overflow-hidden shadow-2xl flex flex-col"
+                style={{ background: "#222", borderColor: "rgba(255,255,255,0.1)", maxHeight: "22rem" }}
+              >
+                <div className="p-2 border-b" style={{ borderColor: "rgba(255,255,255,0.07)" }}>
+                  <input
+                    autoFocus
+                    value={candidateSearch}
+                    onChange={e => setCandidateSearch(e.target.value)}
+                    placeholder="Search candidates…"
+                    className="w-full px-3 py-2 rounded-lg text-[12px] bg-white/[0.05] border border-white/[0.08] text-white/80 placeholder-white/25 outline-none focus:border-violet-500/40"
+                  />
+                </div>
+                <div className="overflow-y-auto">
+                  <button
+                    onClick={() => {
+                      setCandidateDropdownOpen(false);
+                      setCandidateSearch("");
+                      setContextMode("job");
+                      setSelectedCandidateId(null);
+                      setSelectedCandidate(null);
+                      newChat(false);
+                    }}
+                    className={`w-full text-left px-4 py-2.5 text-[13px] hover:bg-white/[0.07] transition-colors flex items-center gap-2 border-b ${contextMode === "job" ? "text-indigo-400 font-semibold" : "text-white/60"}`}
+                    style={{ borderColor: "rgba(255,255,255,0.07)" }}
+                  >
+                    <IcUsers />
+                    All Candidates
+                    <span className="ml-auto text-[11px] text-white/25">Job context</span>
+                  </button>
+                  {(() => {
+                    const filtered = candidates.filter(c =>
+                      c.name.toLowerCase().includes(candidateSearch.trim().toLowerCase())
+                    );
+                    if (candidates.length === 0) {
+                      return <div className="px-4 py-3 text-[12px] text-white/30">No candidates yet</div>;
+                    }
+                    if (filtered.length === 0) {
+                      return <div className="px-4 py-3 text-[12px] text-white/30">No matches for "{candidateSearch}"</div>;
+                    }
+                    return filtered.map(c => {
+                      const pct = c.maxScore > 0 ? Math.round((c.totalScore / c.maxScore) * 100) : null;
+                      return (
+                        <button
+                          key={c._id}
+                          onClick={() => {
+                            setContextMode("candidate");
+                            setSelectedCandidateId(c._id);
+                            setSelectedCandidate(c);
+                            setCandidateDropdownOpen(false);
+                            setCandidateSearch("");
+                            newChat(false);
+                          }}
+                          className={`w-full text-left px-4 py-2.5 text-[13px] hover:bg-white/[0.07] transition-colors flex items-center justify-between gap-2 ${selectedCandidateId === c._id ? "text-violet-400 font-semibold" : "text-white/60"}`}
+                        >
+                          <span className="truncate">{c.name}</span>
+                          {pct !== null && (
+                            <span className="text-[11px] font-bold shrink-0" style={{ color: confColor(pct) }}>{pct}%</span>
+                          )}
+                        </button>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Conversation history */}
         <div className="flex-1 overflow-y-auto scrollbar-none px-3 pb-4 space-y-4 mt-1">
           {groupOrder.filter(g => grouped[g]?.length).map(group => (
@@ -1383,26 +1504,59 @@ function CopilotPageContent() {
               <span className="text-[13px] font-semibold text-white/60">Ask Rolebolt</span>
             </div>
 
-            {/* Context breadcrumb */}
-            {contextMode === "candidate" && selectedCandidate ? (
-              <div className="hidden sm:flex items-center gap-1.5">
-                <span className="text-white/20 text-xs">·</span>
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-violet-500/10 border border-violet-500/20">
-                  <IcPerson />
-                  <span className="text-[11px] font-medium text-violet-300">{selectedCandidate.name}</span>
-                </div>
-              </div>
-            ) : selectedJob ? (
-              <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.05] border border-white/[0.07]">
-                <IcBriefcase />
-                <span className="text-[11px] font-medium text-white/50">{selectedJob.title}</span>
-              </div>
-            ) : contextMode === "global" ? (
-              <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-sky-500/10 border border-sky-500/20">
+            {/* Context breadcrumb: Global → Job → Candidate, each earlier crumb clickable */}
+            <div className="hidden sm:flex items-center gap-1">
+              <span className="text-white/20 text-xs mr-0.5">·</span>
+              <button
+                onClick={() => {
+                  setContextMode("global");
+                  setSelectedJob(null);
+                  setSelectedCandidateId(null);
+                  setSelectedCandidate(null);
+                  newChat(false);
+                }}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-colors ${
+                  contextMode === "global"
+                    ? "bg-sky-500/10 border-sky-500/20 text-sky-300"
+                    : "bg-white/[0.03] border-white/[0.07] text-white/40 hover:text-white/70 hover:bg-white/[0.06]"
+                }`}
+              >
                 <IcGlobe />
-                <span className="text-[11px] font-medium text-sky-300">Organization</span>
-              </div>
-            ) : null}
+                <span className="text-[11px] font-medium">Organization</span>
+              </button>
+
+              {selectedJob && (
+                <>
+                  <span className="text-white/15 text-xs">/</span>
+                  <button
+                    onClick={() => {
+                      setContextMode("job");
+                      setSelectedCandidateId(null);
+                      setSelectedCandidate(null);
+                      newChat(false);
+                    }}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-colors max-w-[10rem] ${
+                      contextMode === "job"
+                        ? "bg-indigo-500/10 border-indigo-500/20 text-indigo-300"
+                        : "bg-white/[0.03] border-white/[0.07] text-white/40 hover:text-white/70 hover:bg-white/[0.06]"
+                    }`}
+                  >
+                    <IcBriefcase />
+                    <span className="text-[11px] font-medium truncate">{selectedJob.title}</span>
+                  </button>
+                </>
+              )}
+
+              {contextMode === "candidate" && selectedCandidate && (
+                <>
+                  <span className="text-white/15 text-xs">/</span>
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-violet-500/10 border border-violet-500/20 max-w-[10rem]">
+                    <IcPerson />
+                    <span className="text-[11px] font-medium text-violet-300 truncate">{selectedCandidate.name}</span>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
           <button
             onClick={() => setContextOpen(o => !o)}
@@ -1426,7 +1580,7 @@ function CopilotPageContent() {
           ) : (
             <div className="max-w-2xl mx-auto px-4 py-8">
               {messages.map(msg => (
-                <MessageBubble key={msg.id} msg={msg} onQuickAction={sendMessage} />
+                <MessageBubble key={msg.id} msg={msg} onQuickAction={sendMessage} onSourceNavigate={handleSourceNavigate} />
               ))}
               <div ref={bottomRef} />
             </div>

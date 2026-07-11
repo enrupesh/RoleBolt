@@ -23,6 +23,10 @@ export interface ICopilotSource {
   candidateId?: string;
   /** Display name of the candidate */
   candidateName?: string;
+  /** MongoDB _id of the job this source's candidate belongs to (needed for deep-links from Global context) */
+  jobId?: string;
+  /** Display title of the job */
+  jobTitle?: string;
   /** MongoDB _id of the resume document (for future deep-link) */
   resumeId?: string;
   /** MongoDB _id of the assessment record */
@@ -95,6 +99,8 @@ const CopilotSourceSchema = new Schema<ICopilotSource>(
     label: { type: String, required: true },
     candidateId: { type: String },
     candidateName: { type: String },
+    jobId: { type: String },
+    jobTitle: { type: String },
     resumeId: { type: String },
     assessmentId: { type: String },
     page: { type: Number },
