@@ -4,7 +4,7 @@ services:
     runtime: node
     rootDir: backend
     plan: starter
-    buildCommand: npm install -g npm@11 && npm ci --no-audit --no-fund && npm run build
+    buildCommand: rm -rf node_modules .cache && npm install --no-audit --no-fund && npm run build
     startCommand: npm start
     envVars:
       - key: NODE_VERSION
@@ -27,7 +27,7 @@ services:
     runtime: node
     rootDir: frontend
     plan: starter
-    buildCommand: npm install -g npm@11 && npm ci --no-audit --no-fund && npm run build
+    buildCommand: rm -rf node_modules .next .cache && npm install --no-audit --no-fund && npm run build
     startCommand: npm start
     envVars:
       - key: NODE_VERSION
