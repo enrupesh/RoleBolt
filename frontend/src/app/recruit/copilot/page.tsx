@@ -1924,8 +1924,8 @@ function CopilotPageContent() {
                 placeholder={inputPlaceholder}
                 disabled={textDisabled}
                 rows={1}
-                className="flex-1 bg-transparent text-[0.925rem] resize-none outline-none leading-relaxed tracking-[-0.01em] disabled:opacity-40 py-0.5"
-                style={{ maxHeight: "160px", color: T.text }}
+                className="flex-1 bg-transparent text-[0.925rem] resize-none appearance-none border-none outline-none focus:outline-none focus:ring-0 focus:border-none leading-relaxed tracking-[-0.01em] disabled:opacity-40 py-0.5"
+                style={{ maxHeight: "160px", color: T.text, boxShadow: "none" }}
               />
               <button
                 onClick={() => sendMessage(input)}
