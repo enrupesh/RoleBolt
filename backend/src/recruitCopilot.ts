@@ -220,7 +220,7 @@ interface ContextData {
  * (resumeText, assessmentQuestions/Answers, interviewBrief) to keep the
  * global prompt within a sane token budget across potentially many candidates. */
 const GLOBAL_CANDIDATE_SELECT =
-  "name jobId totalScore maxScore stage hiringDecision assessmentStatus strengths redFlags scoreBreakdown location availability createdAt stageMovedAt";
+  "name email jobId totalScore maxScore stage hiringDecision assessmentStatus strengths redFlags scoreBreakdown location availability createdAt stageMovedAt";
 
 async function loadContextData(
   uid: string,
@@ -264,6 +264,7 @@ async function loadContextData(
   const allCandidates: GlobalCandidateSummary[] = rawCandidates.map((c: any) => ({
     _id: c._id,
     name: c.name,
+    email: c.email,
     jobId: c.jobId,
     jobTitle: jobTitleById.get(String(c.jobId)) || "Unknown role",
     totalScore: c.totalScore,
