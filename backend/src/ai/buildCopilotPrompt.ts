@@ -154,6 +154,145 @@ Return 2–4 natural follow-up actions the recruiter would actually want next.
 Personalise them: "Compare Rahul vs Aman", "Generate Interview Questions for Rahul", "Shortlist Top 3", "Show Missing Skills in Aman".`;
 }
 
+// ─── Candidate Context Prompt ─────────────────────────────────────────────────
+
+function buildCandidateContextPrompt(ctx: CopilotPromptContext): string {
+  const mode = ctx.mode ?? "json";
+  const c = ctx.candidate!;
+  const job = ctx.job;
+  const company = ctx.companyName || (job as any)?.companyName || "the company";
+  const recruiter = ctx.recruiterName || "the recruiter";
+  const candidateId = String(c._id);
+
+  const pct =
+    c.maxScore > 0 ? Math.round((c.totalScore / c.maxScore) * 100) : null;
+  const scoreStr =
+    pct !== null
+      ? `${c.totalScore}/${c.maxScore} (${pct}%)`
+      : "Not scored yet";
+
+  const breakdownLines = (c.scoreBreakdown || [])
+    .map((b: any) => {
+      const bPct = b.maxScore ? Math.round((b.score / b.maxScore) * 100) : 0;
+      return `  • ${b.criterion}: ${b.score}/${b.maxScore} (${bPct}%) [${b.confidence ?? "medium"} confidence] — ${b.reasoning}`;
+    })
+    .join("\n");
+
+  const strengths = (c.strengths || []).join(", ") || "—";
+  const redFlags = (c.redFlags || []).join(", ") || "None";
+
+  // Assessment Q&A
+  const questions: Array<{ id: string; text: string }> =
+    c.assessmentQuestions || [];
+  const answers: Array<{ questionId: string; answer: string; timeTakenSeconds?: number }> =
+    c.assessmentAnswers || [];
+  const qaBlock = questions
+    .map((q, i) => {
+      const ans = answers.find((a) => a.questionId === q.id);
+      const time = ans?.timeTakenSeconds
+        ? ` (${Math.round(ans.timeTakenSeconds / 60)}m taken)`
+        : "";
+      return `  Q${i + 1}: ${q.text}\n  A${time}: ${ans?.answer || "(no answer)"}`;
+    })
+    .join("\n\n");
+
+  const impact: any = c.assessmentImpact;
+  const impactBlock = impact
+    ? `Assessment Strengths: ${(impact.strengths || []).join(", ") || "—"}\nAssessment Weaknesses: ${(impact.weaknesses || []).join(", ") || "—"}\nReasoning: ${impact.reasoning || "—"}`
+    : null;
+
+  const decisionLabel =
+    c.hiringDecision === "strong_yes"
+      ? "Strong Yes"
+      : c.hiringDecision === "maybe"
+      ? "Maybe"
+      : c.hiringDecision === "no"
+      ? "No"
+      : "Undecided";
+
+  // Job context block
+  const jobBlock = job
+    ? `## Job Being Applied For
+Title: ${(job as any).title}
+Department: ${(job as any).department || "—"} | Seniority: ${(job as any).seniority || "—"} | Type: ${(job as any).jobType || "—"}
+Work Mode: ${(job as any).workMode || "—"} | Location: ${(job as any).location || "—"}
+Must-Have Skills: ${(job as any).mustHaveSkills || "—"}
+Nice-to-Have Skills: ${(job as any).niceToHaveSkills || "—"}
+
+## Job Description
+${safeText((job as any).generatedJD || (job as any).responsibilities, 1200)}
+
+## Scoring Rubric
+${
+  ((job as any).rubric || [])
+    .map((r: any) => `  • ${r.name} (weight: ${r.weight}): ${r.description}`)
+    .join("\n") || "(no rubric defined)"
+}`
+    : "## Job Context\n(no job data — answer based on candidate profile only)";
+
+  return `You are Rolebolt AI — an expert AI Hiring Copilot. You are assisting ${recruiter} at ${company}.
+
+## Your Role
+You are a senior talent advisor deeply focused on a SINGLE candidate. Analyse their profile, score, resume, and assessment thoroughly. Back every claim with specific evidence. Always end with a concrete hiring recommendation: **Interview**, **Hold**, or **Reject**.
+
+## Current Context
+Level: CANDIDATE
+candidateId (include in every source): ${candidateId}
+Candidate Name: ${c.name}
+
+## Candidate Profile
+Stage: ${c.stage} | Current Hiring Decision: ${decisionLabel}
+Score: ${scoreStr}
+Strengths: ${strengths}
+Red Flags: ${redFlags}
+Location: ${(c as any).location || "Not specified"}
+Availability / Notice Period: ${(c as any).availability || "Not specified"}
+Current Status: ${(c as any).currentStatus || "Not specified"}
+Education: ${(c as any).educationLevel || "Not specified"}${(c as any).currentClassYear ? ` (${(c as any).currentClassYear})` : ""}
+
+## AI Summary
+${safeText(c.aiSummary, 500)}
+
+## Score Breakdown (by rubric criterion)
+${breakdownLines || "(not scored yet)"}
+
+## Resume
+${safeText(c.resumeText, 3500)}
+
+## Assessment
+Status: ${c.assessmentStatus}
+${
+  c.assessmentStatus === "completed" && qaBlock
+    ? `\nQuestions & Answers:\n${qaBlock}\n\n${impactBlock || ""}`
+    : "(assessment not completed or no data available)"
+}
+
+## Interview Brief
+${safeText(c.interviewBrief, 1000)}
+
+---
+
+${jobBlock}
+
+---
+
+${mode === "stream" ? streamResponseFormat() : jsonResponseFormat()}
+
+${sharedBehaviourRules()}
+
+## Candidate-Specific Rules
+- Every response MUST end with one of three recommendations: **Interview**, **Hold**, or **Reject**. No ambiguity.
+- Reference the candidate by first name (${c.name.split(" ")[0]}) to feel personal.
+- When citing resume content, use source type "resume" with the correct sectionId (experience, skills, education, projects, certifications).
+- When citing assessment Q&A, use type "assessment" and set detail to "Question N".
+- When citing score breakdown, use type "score_breakdown".
+- When citing the interview brief, use type "interview_brief".
+- When citing profile fields (stage, availability, location), use type "candidate_profile".
+- When comparing to JD or rubric criteria, use type "job_description".
+- The candidateId for ALL sources in this conversation is: ${candidateId}
+`;
+}
+
 // ─── Job Context Prompt ───────────────────────────────────────────────────────
 
 function buildJobContextPrompt(ctx: CopilotPromptContext): string {
@@ -245,6 +384,7 @@ export function buildCopilotPrompt(ctx: CopilotPromptContext): string {
     case "global":
       return buildGlobalContextPrompt(ctx);
     case "candidate":
+      if (ctx.candidate) return buildCandidateContextPrompt(ctx);
       if (ctx.job) return buildJobContextPrompt(ctx);
       return buildGlobalContextPrompt(ctx);
     default:

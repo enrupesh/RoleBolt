@@ -160,13 +160,14 @@ async function generateTitle(firstMessage: string): Promise<string> {
 interface ContextData {
   job: any | null;
   candidates: any[];
+  candidate: any | null;
   recruiterName: string | undefined;
   companyName: string | undefined;
 }
 
 async function loadContextData(
   uid: string,
-  context: { level: string; jobId?: string }
+  context: { level: string; jobId?: string; candidateId?: string }
 ): Promise<ContextData> {
   const [profile, companyProfile] = await Promise.all([
     RecruitProfile.findOne({ uid }).lean(),
@@ -176,6 +177,16 @@ async function loadContextData(
   const recruiterName = (profile as any)?.name as string | undefined;
   const companyName = (companyProfile as any)?.name as string | undefined;
 
+  if (context.level === "candidate" && context.candidateId) {
+    const [candidate, job] = await Promise.all([
+      RecruitCandidate.findOne({ _id: context.candidateId, uid }).lean(),
+      context.jobId
+        ? RecruitJob.findOne({ _id: context.jobId, uid }).lean()
+        : Promise.resolve(null),
+    ]);
+    return { job, candidates: [], candidate, recruiterName, companyName };
+  }
+
   if (context.level === "job" && context.jobId) {
     const [job, candidates] = await Promise.all([
       RecruitJob.findOne({ _id: context.jobId, uid }).lean(),
@@ -183,10 +194,10 @@ async function loadContextData(
         .sort({ totalScore: -1 })
         .lean(),
     ]);
-    return { job, candidates: candidates ?? [], recruiterName, companyName };
+    return { job, candidates: candidates ?? [], candidate: null, recruiterName, companyName };
   }
 
-  return { job: null, candidates: [], recruiterName, companyName };
+  return { job: null, candidates: [], candidate: null, recruiterName, companyName };
 }
 
 // ─── Starter actions ──────────────────────────────────────────────────────────
@@ -236,7 +247,8 @@ async function persistExchange(
   userMessage: string,
   parsed: ParsedAiResponse,
   isNew: boolean,
-  job: any | null
+  job: any | null,
+  candidate: any | null = null
 ): Promise<void> {
   const now = new Date();
 
@@ -266,6 +278,11 @@ async function persistExchange(
   if (job) {
     conversation.selectedJobId = String(job._id);
     conversation.selectedJobTitle = job.title;
+  }
+
+  if (candidate) {
+    conversation.selectedCandidateId = String(candidate._id);
+    conversation.selectedCandidateName = candidate.name;
   }
 
   await conversation.save();
@@ -323,9 +340,12 @@ copilotRouter.post("/chat", async (req, res) => {
     }
 
     // ── 2. Load context data ─────────────────────────────────────────────────
-    const { job, candidates, recruiterName, companyName } = await loadContextData(uid, context);
+    const { job, candidates, candidate, recruiterName, companyName } = await loadContextData(uid, context);
     if (context.level === "job" && context.jobId && !job) {
       return res.status(404).json({ error: "Job not found" });
+    }
+    if (context.level === "candidate" && context.candidateId && !candidate) {
+      return res.status(404).json({ error: "Candidate not found" });
     }
 
     // ── 3. Build prompt + message history ────────────────────────────────────
@@ -336,6 +356,7 @@ copilotRouter.post("/chat", async (req, res) => {
       companyName,
       job: job ?? undefined,
       candidates: candidates ?? undefined,
+      candidate: candidate ?? undefined,
     });
 
     const aiMessages = buildMessageHistory(systemPrompt, conversation, message.trim());
@@ -355,7 +376,7 @@ copilotRouter.post("/chat", async (req, res) => {
     const parsed = parseAiResponse(rawAi);
 
     // ── 5. Persist + respond ──────────────────────────────────────────────────
-    await persistExchange(conversation, message.trim(), parsed, isNew, job);
+    await persistExchange(conversation, message.trim(), parsed, isNew, job, candidate);
 
     return res.status(200).json({
       conversationId: String(conversation._id),
@@ -435,9 +456,13 @@ copilotRouter.post("/chat/stream", async (req, res) => {
     }
 
     // ── 2. Load context data ─────────────────────────────────────────────────
-    const { job, candidates, recruiterName, companyName } = await loadContextData(uid, context);
+    const { job, candidates, candidate, recruiterName, companyName } = await loadContextData(uid, context);
     if (context.level === "job" && context.jobId && !job) {
       sendEvent({ type: "error", error: "Job not found" });
+      return res.end();
+    }
+    if (context.level === "candidate" && context.candidateId && !candidate) {
+      sendEvent({ type: "error", error: "Candidate not found" });
       return res.end();
     }
 
@@ -449,6 +474,7 @@ copilotRouter.post("/chat/stream", async (req, res) => {
       companyName,
       job: job ?? undefined,
       candidates: candidates ?? undefined,
+      candidate: candidate ?? undefined,
     });
 
     const aiMessages = buildMessageHistory(systemPrompt, conversation, message.trim());
@@ -509,7 +535,7 @@ copilotRouter.post("/chat/stream", async (req, res) => {
     const parsed: ParsedAiResponse = { reply: replyText, ...meta };
 
     // ── 6. Persist ────────────────────────────────────────────────────────────
-    await persistExchange(conversation, message.trim(), parsed, isNew, job);
+    await persistExchange(conversation, message.trim(), parsed, isNew, job, candidate);
 
     // ── 7. Send done event ────────────────────────────────────────────────────
     sendEvent({
@@ -541,7 +567,7 @@ copilotRouter.get("/conversations", async (req, res) => {
     const conversations = await RecruitCopilotConversation.find({ uid })
       .sort({ lastActiveAt: -1 })
       .limit(50)
-      .select("title context selectedJobId selectedJobTitle lastActiveAt totalMessages messages createdAt updatedAt")
+      .select("title context selectedJobId selectedJobTitle selectedCandidateId selectedCandidateName lastActiveAt totalMessages messages createdAt updatedAt")
       .lean();
 
     const result = conversations.map((c) => {
@@ -552,6 +578,8 @@ copilotRouter.get("/conversations", async (req, res) => {
         context: c.context,
         selectedJobId: c.selectedJobId,
         selectedJobTitle: c.selectedJobTitle,
+        selectedCandidateId: (c as any).selectedCandidateId,
+        selectedCandidateName: (c as any).selectedCandidateName,
         lastActiveAt: c.lastActiveAt,
         totalMessages: c.totalMessages ?? c.messages.length,
         lastMessage: lastMsg
@@ -589,6 +617,8 @@ copilotRouter.get("/conversations/:id", async (req, res) => {
       context: conversation.context,
       selectedJobId: conversation.selectedJobId,
       selectedJobTitle: conversation.selectedJobTitle,
+      selectedCandidateId: (conversation as any).selectedCandidateId,
+      selectedCandidateName: (conversation as any).selectedCandidateName,
       lastActiveAt: conversation.lastActiveAt,
       totalMessages: conversation.totalMessages ?? conversation.messages.length,
       messages: conversation.messages,

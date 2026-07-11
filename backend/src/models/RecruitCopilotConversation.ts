@@ -57,6 +57,9 @@ export interface IRecruitCopilotConversation extends Document {
   /** Denormalised for fast sidebar rendering */
   selectedJobId?: string;
   selectedJobTitle?: string;
+  /** Candidate context — set when level === "candidate" */
+  selectedCandidateId?: string;
+  selectedCandidateName?: string;
   lastActiveAt: Date;
   totalMessages: number;
   messages: ICopilotMessage[];
@@ -124,6 +127,8 @@ const RecruitCopilotConversationSchema = new Schema<IRecruitCopilotConversation>
     title: { type: String, default: "New conversation" },
     selectedJobId: { type: String },
     selectedJobTitle: { type: String },
+    selectedCandidateId: { type: String },
+    selectedCandidateName: { type: String },
     lastActiveAt: { type: Date, default: () => new Date() },
     totalMessages: { type: Number, default: 0 },
     messages: { type: [CopilotMessageSchema], default: [] },

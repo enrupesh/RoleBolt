@@ -10,6 +10,8 @@ import { apiUrl } from "@/lib/api";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+type ContextMode = "job" | "candidate";
+
 interface Job {
   _id: string;
   title: string;
@@ -43,8 +45,11 @@ interface UIMessage {
 interface ConversationSummary {
   id: string;
   title: string;
+  context?: { level: string };
   selectedJobId?: string;
   selectedJobTitle?: string;
+  selectedCandidateId?: string;
+  selectedCandidateName?: string;
   lastActiveAt: string;
   totalMessages: number;
 }
@@ -54,6 +59,16 @@ interface CandidateStat {
   name: string;
   totalScore: number;
   maxScore: number;
+  strengths?: string[];
+  redFlags?: string[];
+  stage?: string;
+  assessmentStatus?: string;
+  assessmentImpact?: { strengths: string[]; weaknesses: string[]; reasoning: string };
+  hiringDecision?: string | null;
+  availability?: string;
+  currentStatus?: string;
+  educationLevel?: string;
+  scoreBreakdown?: Array<{ criterion: string; score: number; maxScore: number }>;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -78,6 +93,13 @@ function groupConvos(list: ConversationSummary[]) {
     (groups[label] ??= []).push(c);
   }
   return groups;
+}
+
+function hiringDecisionLabel(d?: string | null) {
+  if (d === "strong_yes") return { text: "Strong Yes", color: "#4ade80" };
+  if (d === "maybe") return { text: "Maybe", color: "#fbbf24" };
+  if (d === "no") return { text: "No", color: "#f87171" };
+  return null;
 }
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
@@ -123,6 +145,11 @@ const IcUsers = () => (
     <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
   </svg>
 );
+const IcPerson = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="8" r="4" /><path d="M20 21a8 8 0 1 0-16 0" />
+  </svg>
+);
 const IcDoc = () => (
   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
@@ -142,12 +169,6 @@ const SOURCE_COLORS: Record<string, string> = {
 
 function SourceChip({ src }: { src: CopilotSource }) {
   const color = SOURCE_COLORS[src.type] ?? "bg-white/10 text-white/60 border-white/10";
-  const href = src.candidateId
-    ? src.type === "assessment"
-      ? `/recruit/recruiter/${src.candidateId}`
-      : `/recruit/recruiter/${src.candidateId}`
-    : undefined;
-
   const inner = (
     <span
       className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border cursor-pointer hover:opacity-80 transition-opacity ${color}`}
@@ -158,15 +179,14 @@ function SourceChip({ src }: { src: CopilotSource }) {
       {src.detail && <span className="opacity-60">· {src.detail}</span>}
     </span>
   );
-
-  return href ? <Link href={href}>{inner}</Link> : inner;
+  return src.candidateId
+    ? <Link href={`/recruit/jobs`}>{inner}</Link>
+    : inner;
 }
 
 // ─── Recommendation card ──────────────────────────────────────────────────────
 
-function RecommendationCard({
-  recommendation, confidence, reasoning,
-}: {
+function RecommendationCard({ recommendation, confidence, reasoning }: {
   recommendation: string; confidence: number; reasoning: string;
 }) {
   const color = confColor(confidence);
@@ -196,14 +216,10 @@ function RecommendationCard({
 
 // ─── Message bubble ───────────────────────────────────────────────────────────
 
-function MessageBubble({
-  msg, onQuickAction,
-}: {
+function MessageBubble({ msg, onQuickAction }: {
   msg: UIMessage; onQuickAction: (text: string) => void;
 }) {
-  const isUser = msg.role === "user";
-
-  if (isUser) {
+  if (msg.role === "user") {
     return (
       <div className="flex justify-end mb-6">
         <div className="max-w-[75%] bg-[#1e1e2e] border border-white/[0.07] rounded-2xl rounded-tr-md px-4 py-3 text-[0.875rem] text-[#e5e5e5] leading-relaxed">
@@ -214,8 +230,7 @@ function MessageBubble({
   }
 
   return (
-    <div className="mb-8 rb-animate-fade-up">
-      {/* AI logo */}
+    <div className="mb-8">
       <div className="flex items-center gap-2 mb-3">
         <div className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shrink-0">
           <IcSparkle />
@@ -230,13 +245,11 @@ function MessageBubble({
         )}
       </div>
 
-      {/* Markdown content */}
       <div className="text-[0.875rem] leading-relaxed text-[#d4d4d4] copilot-markdown ml-8">
         <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
         {msg.isStreaming && <span className="inline-block w-0.5 h-4 bg-indigo-400 align-middle ml-0.5 animate-pulse" />}
       </div>
 
-      {/* Recommendation card */}
       {!msg.isStreaming && msg.recommendation && (
         <div className="ml-8">
           <RecommendationCard
@@ -247,14 +260,12 @@ function MessageBubble({
         </div>
       )}
 
-      {/* Sources */}
       {!msg.isStreaming && msg.sources && msg.sources.length > 0 && (
         <div className="ml-8 mt-3 flex flex-wrap gap-1.5">
           {msg.sources.map((src, i) => <SourceChip key={i} src={src} />)}
         </div>
       )}
 
-      {/* Quick actions */}
       {!msg.isStreaming && msg.quickActions && msg.quickActions.length > 0 && (
         <div className="ml-8 mt-3 flex flex-wrap gap-2">
           {msg.quickActions.map((action, i) => (
@@ -274,65 +285,88 @@ function MessageBubble({
 
 // ─── Welcome screen ───────────────────────────────────────────────────────────
 
-const STARTER_PROMPTS = [
+const JOB_PROMPTS = [
   { icon: "🎯", text: "Who should I interview first?" },
   { icon: "⚖️", text: "Compare my top candidates" },
-  { icon: "🔍", text: "Which candidates are missing Docker?" },
-  { icon: "📋", text: "Generate interview questions" },
+  { icon: "🔍", text: "Which candidates are missing required skills?" },
+  { icon: "📋", text: "Generate interview questions for the top candidate" },
   { icon: "⚡", text: "Show candidates ready to join immediately" },
   { icon: "📊", text: "Why is the top candidate ranked #1?" },
 ];
 
-function WelcomeScreen({
-  recruiterName, jobSelected, onPrompt,
-}: {
-  recruiterName?: string; jobSelected: boolean; onPrompt: (t: string) => void;
+const CANDIDATE_PROMPTS = [
+  { icon: "📋", text: "Summarize this candidate" },
+  { icon: "🔢", text: "Explain the AI score" },
+  { icon: "❓", text: "Generate interview questions" },
+  { icon: "🔍", text: "Show missing skills" },
+  { icon: "🤔", text: "Should I hire this candidate?" },
+  { icon: "📄", text: "Compare against the job description" },
+];
+
+function WelcomeScreen({ recruiterName, jobSelected, contextMode, candidateName, onPrompt }: {
+  recruiterName?: string;
+  jobSelected: boolean;
+  contextMode: ContextMode;
+  candidateName?: string;
+  onPrompt: (t: string) => void;
 }) {
   const firstName = recruiterName?.split(" ")[0] ?? "there";
+  const prompts = contextMode === "candidate" ? CANDIDATE_PROMPTS : JOB_PROMPTS;
+  const canChat = contextMode === "candidate" ? !!candidateName : jobSelected;
+
   return (
-    <div className="flex flex-col items-center justify-center h-full text-center px-6 pb-24 rb-animate-fade-up">
+    <div className="flex flex-col items-center justify-center h-full text-center px-6 pb-24">
       <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center mb-6 shadow-[0_0_40px_rgba(124,58,237,0.3)]">
         <IcSparkle />
       </div>
       <h1 className="text-2xl font-bold text-white mb-2">
         {hourGreeting()}, {firstName} 👋
       </h1>
-      <p className="text-[#8b8b8b] text-[0.9rem] max-w-sm leading-relaxed mb-2">
-        I'm Rolebolt AI. I can help you compare candidates, explain scores, generate interview questions, and recommend who to interview next.
-      </p>
-      {!jobSelected && (
-        <p className="text-amber-400/70 text-xs font-medium mb-6 flex items-center gap-1.5">
-          <span>↑</span> Select a job from the left sidebar to get started
-        </p>
-      )}
-      {jobSelected && (
+
+      {contextMode === "candidate" && candidateName ? (
         <>
+          <p className="text-[#8b8b8b] text-[0.9rem] max-w-sm leading-relaxed mb-2">
+            I'm focused on <span className="text-white font-semibold">{candidateName}</span>. Ask me anything about this candidate.
+          </p>
           <p className="text-[#5a5a5a] text-xs mb-8">Select a prompt or type your own question below</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-lg">
-            {STARTER_PROMPTS.map((p, i) => (
-              <button
-                key={i}
-                onClick={() => onPrompt(p.text)}
-                className="flex items-center gap-3 text-left px-4 py-3 rounded-2xl border border-white/[0.07] bg-white/[0.03] hover:bg-white/[0.07] hover:border-white/[0.12] transition-all group"
-              >
-                <span className="text-lg shrink-0">{p.icon}</span>
-                <span className="text-[13px] text-[#a3a3a3] group-hover:text-[#e5e5e5] transition-colors">{p.text}</span>
-              </button>
-            ))}
-          </div>
         </>
+      ) : (
+        <>
+          <p className="text-[#8b8b8b] text-[0.9rem] max-w-sm leading-relaxed mb-2">
+            I'm Rolebolt AI. I can help you compare candidates, explain scores, generate interview questions, and recommend who to interview next.
+          </p>
+          {!jobSelected && (
+            <p className="text-amber-400/70 text-xs font-medium mb-6 flex items-center gap-1.5">
+              <span>↑</span> Select a job from the left sidebar to get started
+            </p>
+          )}
+          {jobSelected && (
+            <p className="text-[#5a5a5a] text-xs mb-8">Select a prompt or type your own question below</p>
+          )}
+        </>
+      )}
+
+      {canChat && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-lg">
+          {prompts.map((p, i) => (
+            <button
+              key={i}
+              onClick={() => onPrompt(p.text)}
+              className="flex items-center gap-3 text-left px-4 py-3 rounded-2xl border border-white/[0.07] bg-white/[0.03] hover:bg-white/[0.07] hover:border-white/[0.12] transition-all group"
+            >
+              <span className="text-lg shrink-0">{p.icon}</span>
+              <span className="text-[13px] text-[#a3a3a3] group-hover:text-[#e5e5e5] transition-colors">{p.text}</span>
+            </button>
+          ))}
+        </div>
       )}
     </div>
   );
 }
 
-// ─── Context panel (right sidebar) ───────────────────────────────────────────
+// ─── Job context panel (right sidebar) ───────────────────────────────────────
 
-function ContextPanel({
-  job, candidates,
-}: {
-  job: Job | null; candidates: CandidateStat[];
-}) {
+function JobContextPanel({ job, candidates }: { job: Job | null; candidates: CandidateStat[] }) {
   if (!job) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center px-4">
@@ -386,7 +420,7 @@ function ContextPanel({
             {top3.map((c, i) => {
               const pct = c.maxScore ? Math.round((c.totalScore / c.maxScore) * 100) : 0;
               return (
-                <div key={c._id} className="flex items-center gap-2.5 p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.05] hover:bg-white/[0.05] transition-colors">
+                <div key={c._id} className="flex items-center gap-2.5 p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.05]">
                   <span className="text-[10px] font-bold text-white/20 w-3 shrink-0">#{i + 1}</span>
                   <span className="flex-1 text-[12px] text-[#d4d4d4] truncate font-medium">{c.name}</span>
                   <span className="text-[11px] font-bold tabular-nums shrink-0" style={{ color: confColor(pct) }}>{pct}%</span>
@@ -400,7 +434,150 @@ function ContextPanel({
       {job && (
         <div className="pt-1">
           <Link
-            href={`/recruit/recruiter/${job._id}`}
+            href={`/recruit/jobs/${job._id}`}
+            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-white/[0.07] text-[12px] font-medium text-white/40 hover:text-white/70 hover:border-white/15 hover:bg-white/[0.04] transition-all"
+          >
+            <IcUsers />
+            View all candidates
+          </Link>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Candidate context panel (right sidebar) ──────────────────────────────────
+
+function CandidateContextPanel({ candidate, job, onSwitchToJob }: {
+  candidate: CandidateStat | null;
+  job: Job | null;
+  onSwitchToJob: () => void;
+}) {
+  if (!candidate) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-center px-4">
+        <div className="w-10 h-10 rounded-2xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center mb-3">
+          <IcPerson />
+        </div>
+        <p className="text-[12px] text-white/20">No candidate selected</p>
+      </div>
+    );
+  }
+
+  const pct = candidate.maxScore > 0 ? Math.round((candidate.totalScore / candidate.maxScore) * 100) : null;
+  const decision = hiringDecisionLabel(candidate.hiringDecision);
+  const assessmentPct = candidate.assessmentImpact
+    ? null // We don't have a numeric assessment score here, just impact
+    : null;
+
+  return (
+    <div className="px-4 py-5 space-y-4 overflow-y-auto h-full scrollbar-none">
+      <div>
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-3">Candidate Focus</p>
+
+        {/* Name + score */}
+        <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-violet-400 shrink-0" />
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-white/30">Candidate</p>
+              </div>
+              <p className="text-[0.875rem] font-semibold text-white leading-snug">{candidate.name}</p>
+              {candidate.stage && (
+                <p className="text-[11px] text-white/30 mt-0.5 capitalize">{candidate.stage}</p>
+              )}
+            </div>
+            {pct !== null && (
+              <div className="text-right shrink-0">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-1">Fit Score</p>
+                <p className="text-xl font-bold tabular-nums" style={{ color: confColor(pct) }}>{pct}%</p>
+              </div>
+            )}
+          </div>
+
+          {pct !== null && (
+            <div className="mt-2.5">
+              <div className="h-1 rounded-full bg-white/10 overflow-hidden">
+                <div className="h-full rounded-full" style={{ width: `${pct}%`, background: confColor(pct) }} />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Decision badge */}
+      {decision && (
+        <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-1.5">Current Recommendation</p>
+          <span className="text-sm font-bold" style={{ color: decision.color }}>{decision.text}</span>
+        </div>
+      )}
+
+      {/* Assessment status */}
+      {candidate.assessmentStatus && (
+        <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-1.5">Assessment</p>
+          <span className={`text-[12px] font-semibold capitalize ${
+            candidate.assessmentStatus === "completed" ? "text-emerald-400" :
+            candidate.assessmentStatus === "sent" ? "text-amber-400" :
+            "text-white/30"
+          }`}>
+            {candidate.assessmentStatus === "not_sent" ? "Not sent" : candidate.assessmentStatus}
+          </span>
+        </div>
+      )}
+
+      {/* Top strengths */}
+      {candidate.strengths && candidate.strengths.length > 0 && (
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-2">Top Strengths</p>
+          <div className="space-y-1">
+            {candidate.strengths.slice(0, 3).map((s, i) => (
+              <div key={i} className="flex items-start gap-2 text-[12px] text-[#a3a3a3]">
+                <span className="text-emerald-400 mt-0.5 shrink-0">✓</span>
+                <span>{s}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Red flags */}
+      {candidate.redFlags && candidate.redFlags.length > 0 && (
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-2">Red Flags</p>
+          <div className="space-y-1">
+            {candidate.redFlags.slice(0, 3).map((f, i) => (
+              <div key={i} className="flex items-start gap-2 text-[12px] text-[#a3a3a3]">
+                <span className="text-rose-400 mt-0.5 shrink-0">⚠</span>
+                <span>{f}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Availability */}
+      {candidate.availability && (
+        <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-1">Notice Period / Availability</p>
+          <p className="text-[12px] text-[#d4d4d4]">{candidate.availability}</p>
+        </div>
+      )}
+
+      {/* Switch to job view */}
+      {job && (
+        <div className="pt-1 space-y-2">
+          <button
+            onClick={onSwitchToJob}
+            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-white/[0.07] text-[12px] font-medium text-white/40 hover:text-white/70 hover:border-white/15 hover:bg-white/[0.04] transition-all"
+          >
+            <IcBriefcase />
+            Switch to Job View
+          </button>
+          <Link
+            href={`/recruit/jobs/${job._id}`}
             className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-white/[0.07] text-[12px] font-medium text-white/40 hover:text-white/70 hover:border-white/15 hover:bg-white/[0.04] transition-all"
           >
             <IcUsers />
@@ -422,6 +599,15 @@ function CopilotPageContent() {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [jobDropdownOpen, setJobDropdownOpen] = useState(false);
 
+  // Context mode: "job" = talking about the whole job, "candidate" = focused on one candidate
+  const [contextMode, setContextMode] = useState<ContextMode>("job");
+  const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
+  const [selectedCandidate, setSelectedCandidate] = useState<CandidateStat | null>(null);
+
+  // Pending URL params (applied after data loads)
+  const [pendingJobId, setPendingJobId] = useState<string | null>(null);
+  const [pendingCandidateId, setPendingCandidateId] = useState<string | null>(null);
+
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
 
@@ -430,7 +616,6 @@ function CopilotPageContent() {
   const [isStreaming, setIsStreaming] = useState(false);
 
   const [candidates, setCandidates] = useState<CandidateStat[]>([]);
-  const [loadingCandidates, setLoadingCandidates] = useState(false);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [contextOpen, setContextOpen] = useState(false);
@@ -446,6 +631,19 @@ function CopilotPageContent() {
     return firebaseUser.getIdToken();
   }, [firebaseUser]);
 
+  // ── Read URL params on mount ───────────────────────────────────────────────
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const urlJobId = params.get("jobId");
+    const urlCandidateId = params.get("candidateId");
+    if (urlJobId) setPendingJobId(urlJobId);
+    if (urlCandidateId) {
+      setPendingCandidateId(urlCandidateId);
+      setContextMode("candidate");
+    }
+  }, []);
+
   // ── Load jobs ──────────────────────────────────────────────────────────────
   useEffect(() => {
     async function load() {
@@ -457,13 +655,26 @@ function CopilotPageContent() {
         });
         if (!res.ok) return;
         const data = await res.json();
-        const active = (data.jobs ?? []).filter((j: Job) => j.status === "active");
-        setJobs(active);
-        if (active.length > 0) setSelectedJob(active[0]);
+        const all = data.jobs ?? [];
+        setJobs(all);
+        // Default to first active job only if no pending job from URL
+        if (!pendingJobId) {
+          const active = all.find((j: Job) => j.status === "active");
+          if (active) setSelectedJob(active);
+        }
       } catch {}
     }
     load();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [getToken]);
+
+  // ── Apply pending job ID after jobs load ───────────────────────────────────
+  useEffect(() => {
+    if (!pendingJobId || jobs.length === 0) return;
+    const job = jobs.find(j => j._id === pendingJobId);
+    if (job) setSelectedJob(job);
+    setPendingJobId(null);
+  }, [pendingJobId, jobs]);
 
   // ── Load conversations ─────────────────────────────────────────────────────
   const loadConversations = useCallback(async () => {
@@ -481,26 +692,41 @@ function CopilotPageContent() {
 
   useEffect(() => { loadConversations(); }, [loadConversations]);
 
-  // ── Load candidates for context panel ─────────────────────────────────────
+  // ── Load candidates for context panel + apply pending candidateId ──────────
   useEffect(() => {
     if (!selectedJob) { setCandidates([]); return; }
     async function load() {
       const token = await getToken();
       if (!token) return;
-      setLoadingCandidates(true);
       try {
         const res = await fetch(apiUrl(`/recruit/jobs/${selectedJob!._id}/candidates`), {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) return;
         const data = await res.json();
-        setCandidates((data.candidates ?? []).slice(0, 10));
-      } catch {} finally {
-        setLoadingCandidates(false);
-      }
+        const list: CandidateStat[] = data.candidates ?? [];
+        setCandidates(list.slice(0, 20));
+
+        // Apply pending candidateId from URL once candidates are loaded
+        if (pendingCandidateId) {
+          const c = list.find(c => c._id === pendingCandidateId);
+          if (c) {
+            setSelectedCandidate(c);
+            setSelectedCandidateId(c._id);
+          }
+          setPendingCandidateId(null);
+        }
+      } catch {}
     }
     load();
-  }, [selectedJob, getToken]);
+  }, [selectedJob, getToken, pendingCandidateId]);
+
+  // ── Keep selectedCandidate in sync when candidates list refreshes ──────────
+  useEffect(() => {
+    if (!selectedCandidateId || candidates.length === 0) return;
+    const c = candidates.find(c => c._id === selectedCandidateId);
+    if (c) setSelectedCandidate(c);
+  }, [selectedCandidateId, candidates]);
 
   // ── Load a conversation ────────────────────────────────────────────────────
   const openConversation = useCallback(async (id: string) => {
@@ -525,10 +751,23 @@ function CopilotPageContent() {
           quickActions: m.quickActions ?? [],
         }))
       );
-      // Restore selected job from conversation context
-      if (data.context?.jobId) {
-        const matchJob = jobs.find(j => j._id === data.context.jobId);
+
+      // Restore job
+      if (data.selectedJobId || data.context?.jobId) {
+        const jobId = data.selectedJobId || data.context?.jobId;
+        const matchJob = jobs.find(j => j._id === jobId);
         if (matchJob) setSelectedJob(matchJob);
+      }
+
+      // Restore candidate context
+      if (data.selectedCandidateId && data.context?.level === "candidate") {
+        setContextMode("candidate");
+        setSelectedCandidateId(data.selectedCandidateId);
+        // The candidate will be found once candidates load for the job
+      } else {
+        setContextMode("job");
+        setSelectedCandidateId(null);
+        setSelectedCandidate(null);
       }
     } catch {}
   }, [getToken, jobs]);
@@ -547,15 +786,18 @@ function CopilotPageContent() {
   }
 
   // ── New chat ───────────────────────────────────────────────────────────────
-  function newChat() {
+  function newChat(resetCandidateContext = true) {
     if (abortRef.current) abortRef.current.abort();
     setActiveConvId(null);
     setMessages([]);
     setInput("");
     setSidebarOpen(false);
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
+    if (resetCandidateContext) {
+      setContextMode("job");
+      setSelectedCandidateId(null);
+      setSelectedCandidate(null);
     }
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
   }
 
   // ── Delete conversation ────────────────────────────────────────────────────
@@ -582,10 +824,12 @@ function CopilotPageContent() {
     if (!trimmed || isStreaming) return;
     if (!selectedJob) return;
 
+    // In candidate mode, we need a selected candidate
+    const isCandidateMode = contextMode === "candidate" && !!selectedCandidateId;
+
     const token = await getToken();
     if (!token) return;
 
-    // Append user message
     const userMsgId = `user-${Date.now()}`;
     const aiMsgId = `ai-${Date.now()}`;
     setMessages(prev => [
@@ -600,6 +844,10 @@ function CopilotPageContent() {
     const controller = new AbortController();
     abortRef.current = controller;
 
+    const chatContext = isCandidateMode
+      ? { level: "candidate" as const, jobId: selectedJob._id, candidateId: selectedCandidateId! }
+      : { level: "job" as const, jobId: selectedJob._id };
+
     try {
       const res = await fetch(apiUrl("/recruit/copilot/chat/stream"), {
         method: "POST",
@@ -609,7 +857,7 @@ function CopilotPageContent() {
         },
         body: JSON.stringify({
           message: trimmed,
-          context: { level: "job", jobId: selectedJob._id },
+          context: chatContext,
           conversationId: activeConvId,
         }),
         signal: controller.signal,
@@ -655,7 +903,8 @@ function CopilotPageContent() {
               } else if (evt.type === "error") {
                 setMessages(prev =>
                   prev.map(m => m.id === aiMsgId ? {
-                    ...m, isStreaming: false, content: evt.error || "Something went wrong. Please try again.",
+                    ...m, isStreaming: false,
+                    content: evt.error || "Something went wrong. Please try again.",
                   } : m)
                 );
               }
@@ -674,7 +923,7 @@ function CopilotPageContent() {
     } finally {
       setIsStreaming(false);
     }
-  }, [isStreaming, selectedJob, getToken, activeConvId, loadConversations]);
+  }, [isStreaming, selectedJob, selectedCandidateId, contextMode, getToken, activeConvId, loadConversations]);
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -683,15 +932,46 @@ function CopilotPageContent() {
     }
   }
 
+  // ── Input placeholder text ─────────────────────────────────────────────────
+  const inputPlaceholder = (() => {
+    if (!selectedJob) return "Select a job first…";
+    if (contextMode === "candidate") {
+      if (!selectedCandidate) return "Loading candidate…";
+      return `Ask about ${selectedCandidate.name.split(" ")[0]}…`;
+    }
+    return `Ask about ${selectedJob.title}…`;
+  })();
+
+  const inputDisabled = !selectedJob || isStreaming ||
+    (contextMode === "candidate" && !selectedCandidate);
+
   // ── Grouped conversations ──────────────────────────────────────────────────
   const grouped = groupConvos(conversations);
   const groupOrder = ["Today", "Yesterday", "This week", "Older"];
+
+  // ── Context panel ─────────────────────────────────────────────────────────
+  const contextPanel = contextMode === "candidate"
+    ? (
+      <CandidateContextPanel
+        candidate={selectedCandidate}
+        job={selectedJob}
+        onSwitchToJob={() => {
+          setContextMode("job");
+          setSelectedCandidateId(null);
+          setSelectedCandidate(null);
+          newChat(false);
+        }}
+      />
+    )
+    : (
+      <JobContextPanel job={selectedJob} candidates={candidates} />
+    );
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: "#0f0f0f", color: "#e5e5e5" }}>
 
-      {/* ── Mobile overlay ─────────────────────────────────────────────── */}
+      {/* Mobile overlays */}
       {sidebarOpen && (
         <div className="fixed inset-0 z-20 bg-black/60 lg:hidden" onClick={() => setSidebarOpen(false)} />
       )}
@@ -703,8 +983,8 @@ function CopilotPageContent() {
       <aside
         className={`
           fixed lg:relative inset-y-0 left-0 z-30 lg:z-auto
-          flex flex-col w-64 shrink-0
-          border-r transition-transform duration-300 ease-in-out
+          flex flex-col w-64 shrink-0 border-r
+          transition-transform duration-300 ease-in-out
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
         `}
         style={{ background: "#171717", borderColor: "rgba(255,255,255,0.06)" }}
@@ -723,7 +1003,7 @@ function CopilotPageContent() {
         {/* New chat */}
         <div className="px-3 pt-3 pb-2">
           <button
-            onClick={newChat}
+            onClick={() => newChat(true)}
             className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all border border-white/[0.08] text-white/50 hover:text-white hover:bg-white/[0.06] hover:border-white/[0.14]"
           >
             <IcPlus />
@@ -750,12 +1030,19 @@ function CopilotPageContent() {
               style={{ background: "#222", borderColor: "rgba(255,255,255,0.1)" }}
             >
               {jobs.length === 0 ? (
-                <div className="px-4 py-3 text-[12px] text-white/30">No active jobs</div>
+                <div className="px-4 py-3 text-[12px] text-white/30">No jobs found</div>
               ) : (
                 jobs.map(job => (
                   <button
                     key={job._id}
-                    onClick={() => { setSelectedJob(job); setJobDropdownOpen(false); newChat(); }}
+                    onClick={() => {
+                      setSelectedJob(job);
+                      setJobDropdownOpen(false);
+                      setContextMode("job");
+                      setSelectedCandidateId(null);
+                      setSelectedCandidate(null);
+                      newChat(false);
+                    }}
                     className={`w-full text-left px-4 py-2.5 text-[13px] hover:bg-white/[0.07] transition-colors ${selectedJob?._id === job._id ? "text-indigo-400 font-semibold" : "text-white/60"}`}
                   >
                     {job.title}
@@ -785,9 +1072,14 @@ function CopilotPageContent() {
                   >
                     <div className="flex-1 min-w-0">
                       <p className="text-[12px] font-medium truncate leading-snug">{c.title}</p>
-                      {c.selectedJobTitle && (
+                      {/* Show candidate name for candidate-context conversations, job for job-context */}
+                      {c.selectedCandidateName ? (
+                        <p className="text-[10px] text-violet-400/50 truncate mt-0.5 flex items-center gap-1">
+                          <IcPerson /> {c.selectedCandidateName}
+                        </p>
+                      ) : c.selectedJobTitle ? (
                         <p className="text-[10px] text-white/25 truncate mt-0.5">{c.selectedJobTitle}</p>
-                      )}
+                      ) : null}
                     </div>
                     <button
                       onClick={(e) => deleteConversation(c.id, e)}
@@ -816,7 +1108,6 @@ function CopilotPageContent() {
           style={{ borderColor: "rgba(255,255,255,0.06)", background: "#0f0f0f" }}
         >
           <div className="flex items-center gap-3">
-            {/* Mobile sidebar toggle */}
             <button
               onClick={() => setSidebarOpen(o => !o)}
               className="lg:hidden p-1.5 rounded-lg text-white/30 hover:text-white/70 hover:bg-white/[0.06] transition"
@@ -831,19 +1122,28 @@ function CopilotPageContent() {
               </div>
               <span className="text-[13px] font-semibold text-white/60">Ask Rolebolt</span>
             </div>
-            {selectedJob && (
+
+            {/* Context breadcrumb */}
+            {contextMode === "candidate" && selectedCandidate ? (
+              <div className="hidden sm:flex items-center gap-1.5">
+                <span className="text-white/20 text-xs">·</span>
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-violet-500/10 border border-violet-500/20">
+                  <IcPerson />
+                  <span className="text-[11px] font-medium text-violet-300">{selectedCandidate.name}</span>
+                </div>
+              </div>
+            ) : selectedJob ? (
               <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.05] border border-white/[0.07]">
                 <IcBriefcase />
                 <span className="text-[11px] font-medium text-white/50">{selectedJob.title}</span>
               </div>
-            )}
+            ) : null}
           </div>
-          {/* Mobile context toggle */}
           <button
             onClick={() => setContextOpen(o => !o)}
             className="lg:hidden p-1.5 rounded-lg text-white/30 hover:text-white/70 hover:bg-white/[0.06] transition"
           >
-            <IcUsers />
+            {contextMode === "candidate" ? <IcPerson /> : <IcUsers />}
           </button>
         </div>
 
@@ -853,6 +1153,8 @@ function CopilotPageContent() {
             <WelcomeScreen
               recruiterName={recruitProfile?.name}
               jobSelected={!!selectedJob}
+              contextMode={contextMode}
+              candidateName={selectedCandidate?.name}
               onPrompt={sendMessage}
             />
           ) : (
@@ -874,6 +1176,9 @@ function CopilotPageContent() {
             {!selectedJob && (
               <p className="text-center text-[12px] text-amber-400/50 mb-2">Select a job from the sidebar to start chatting</p>
             )}
+            {selectedJob && contextMode === "candidate" && !selectedCandidate && (
+              <p className="text-center text-[12px] text-violet-400/50 mb-2">Loading candidate context…</p>
+            )}
             <div
               className="flex items-end gap-3 rounded-2xl border px-4 py-3 transition-all"
               style={{
@@ -887,19 +1192,19 @@ function CopilotPageContent() {
                 value={input}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
-                placeholder={selectedJob ? `Ask about ${selectedJob.title}…` : "Select a job first…"}
-                disabled={!selectedJob || isStreaming}
+                placeholder={inputPlaceholder}
+                disabled={inputDisabled}
                 rows={1}
                 className="flex-1 bg-transparent text-[0.875rem] text-[#e5e5e5] placeholder-white/20 resize-none outline-none leading-relaxed disabled:opacity-40"
                 style={{ maxHeight: "160px" }}
               />
               <button
                 onClick={() => sendMessage(input)}
-                disabled={!input.trim() || !selectedJob || isStreaming}
+                disabled={!input.trim() || inputDisabled}
                 className="shrink-0 w-8 h-8 rounded-xl flex items-center justify-center transition-all disabled:opacity-25 disabled:cursor-not-allowed"
                 style={{
-                  background: input.trim() && selectedJob && !isStreaming ? "linear-gradient(135deg,#7c3aed,#4338ca)" : "rgba(255,255,255,0.07)",
-                  color: input.trim() && selectedJob && !isStreaming ? "#fff" : "rgba(255,255,255,0.3)",
+                  background: input.trim() && !inputDisabled ? "linear-gradient(135deg,#7c3aed,#4338ca)" : "rgba(255,255,255,0.07)",
+                  color: input.trim() && !inputDisabled ? "#fff" : "rgba(255,255,255,0.3)",
                 }}
               >
                 {isStreaming ? (
@@ -927,14 +1232,16 @@ function CopilotPageContent() {
         style={{ background: "#171717", borderColor: "rgba(255,255,255,0.06)" }}
       >
         <div className="flex items-center justify-between px-4 py-4 border-b shrink-0" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-white/30">Hiring Context</p>
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-white/30">
+            {contextMode === "candidate" ? "Candidate Context" : "Hiring Context"}
+          </p>
           <button onClick={() => setContextOpen(false)} className="lg:hidden text-white/30 hover:text-white/60 transition">
             <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" viewBox="0 0 24 24">
               <path d="M18 6 6 18M6 6l12 12" />
             </svg>
           </button>
         </div>
-        <ContextPanel job={selectedJob} candidates={candidates} />
+        {contextPanel}
       </aside>
     </div>
   );
