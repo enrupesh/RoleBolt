@@ -148,6 +148,10 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true, service: "recruit-backend" });
 });
 
+app.get("/", (_req, res) => {
+  res.send("hi");
+});
+
 // ── GET /mesh-api-status ─────────────────────────────────────────────────────
 // Public endpoint: pings Mesh API with a 1-token completion to verify
 // connectivity, then returns a structured health payload.
