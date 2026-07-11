@@ -25,6 +25,8 @@ export interface ICopilotSource {
   candidateName?: string;
   /** Candidate's email, looked up from the database server-side — never AI-generated */
   candidateEmail?: string;
+  /** Candidate's fit score %, looked up from the database server-side — never AI-generated */
+  candidateFitScorePct?: number;
   /** MongoDB _id of the job this source's candidate belongs to (needed for deep-links from Global context) */
   jobId?: string;
   /** Display title of the job */
@@ -102,6 +104,7 @@ const CopilotSourceSchema = new Schema<ICopilotSource>(
     candidateId: { type: String },
     candidateName: { type: String },
     candidateEmail: { type: String },
+    candidateFitScorePct: { type: Number },
     jobId: { type: String },
     jobTitle: { type: String },
     resumeId: { type: String },
