@@ -76,9 +76,11 @@ h1, h2, h3, h4, h5, h6, li, td, th {
 }
 
 /* Focus styles */
-:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
 }
 
 /* ── Scrollbar ─────────────────────────────────────────────────────────── */
