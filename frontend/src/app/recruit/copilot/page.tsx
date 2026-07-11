@@ -29,21 +29,24 @@ import {
   Target,
   Award,
   ClipboardCheck,
+  Moon,
+  SunMedium,
 } from "lucide-react";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { RecruitGuard } from "@/components/RecruitGuard";
 import { apiUrl } from "@/lib/api";
+import { useTheme } from "@/components/ThemeProvider";
 
 // ─── Theme ──────────────────────────────────────────────────────────────────
 // Soft light "premium AI product" theme — see UI/UX polish brief.
 
 const T = {
-  bg: "#FBFBFB",
-  card: "#FFFFFF",
-  border: "#E5E7EB",
-  accent: "#6D5DF6",
-  text: "#111827",
-  textSecondary: "#6B7280",
+  bg: "var(--rb-bg)",
+  card: "var(--rb-card)",
+  border: "var(--rb-border)",
+  accent: "var(--rb-accent)",
+  text: "var(--rb-text)",
+  textSecondary: "var(--rb-text-secondary)",
 };
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -146,9 +149,9 @@ function hourGreeting() {
 }
 
 function confColor(c: number) {
-  if (c >= 80) return "#16a34a";
-  if (c >= 60) return "#d97706";
-  return "#dc2626";
+  if (c >= 80) return "var(--rb-success)";
+  if (c >= 60) return "var(--rb-warning)";
+  return "var(--rb-danger)";
 }
 
 function groupConvos(list: ConversationSummary[]) {
@@ -163,9 +166,9 @@ function groupConvos(list: ConversationSummary[]) {
 }
 
 function hiringDecisionLabel(d?: string | null) {
-  if (d === "strong_yes") return { text: "Strong Yes", color: "#16a34a" };
-  if (d === "maybe") return { text: "Maybe", color: "#d97706" };
-  if (d === "no") return { text: "No", color: "#dc2626" };
+  if (d === "strong_yes") return { text: "Strong Yes", color: "var(--rb-success)" };
+  if (d === "maybe") return { text: "Maybe", color: "var(--rb-warning)" };
+  if (d === "no") return { text: "No", color: "var(--rb-danger)" };
   return null;
 }
 
@@ -210,11 +213,11 @@ function CandidateIdentity({ name, email, fitScorePct, onNavigate }: {
   return (
     <div
       className="inline-flex items-center gap-2.5 px-3 py-2 rounded-xl border transition-all hover:shadow-sm"
-      style={{ background: "#F9FAFB", borderColor: T.border }}
+      style={{ background: "var(--rb-subtle)", borderColor: T.border }}
     >
       <div
         className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white shrink-0"
-        style={{ background: `linear-gradient(135deg, ${T.accent}, #4C3FD8)` }}
+        style={{ background: `linear-gradient(135deg, ${T.accent}, var(--rb-accent-dark))` }}
       >
         {name.charAt(0).toUpperCase()}
       </div>
@@ -272,16 +275,16 @@ function uniqueCandidatesFromSources(sources?: CopilotSource[]): CopilotSource[]
 // ─── Source chip ──────────────────────────────────────────────────────────────
 
 const SOURCE_COLORS: Record<string, { bg: string; text: string; border: string }> = {
-  resume: { bg: "#F5F3FF", text: "#6D28D9", border: "#E9D5FF" },
-  assessment: { bg: "#EFF6FF", text: "#1D4ED8", border: "#DBEAFE" },
-  interview_brief: { bg: "#ECFDF5", text: "#047857", border: "#D1FAE5" },
-  score_breakdown: { bg: "#FFFBEB", text: "#B45309", border: "#FDE68A" },
-  candidate_profile: { bg: "#F0F9FF", text: "#0369A1", border: "#BAE6FD" },
-  job_description: { bg: "#FFF1F2", text: "#BE123C", border: "#FECDD3" },
+  resume: { bg: "var(--rb-src-resume-bg)", text: "var(--rb-src-resume-text)", border: "var(--rb-src-resume-border)" },
+  assessment: { bg: "var(--rb-src-assessment-bg)", text: "var(--rb-src-assessment-text)", border: "var(--rb-src-assessment-border)" },
+  interview_brief: { bg: "var(--rb-src-interview-bg)", text: "var(--rb-src-interview-text)", border: "var(--rb-src-interview-border)" },
+  score_breakdown: { bg: "var(--rb-warning-soft-bg)", text: "var(--rb-warning-soft-text)", border: "var(--rb-warning-soft-border)" },
+  candidate_profile: { bg: "var(--rb-src-profile-bg)", text: "var(--rb-src-profile-text)", border: "var(--rb-src-profile-border)" },
+  job_description: { bg: "var(--rb-src-job-bg)", text: "var(--rb-src-job-text)", border: "var(--rb-src-job-border)" },
 };
 
 function SourceChip({ src, onNavigate }: { src: CopilotSource; onNavigate?: (src: CopilotSource) => void }) {
-  const c = SOURCE_COLORS[src.type] ?? { bg: "#F3F4F6", text: T.textSecondary, border: T.border };
+  const c = SOURCE_COLORS[src.type] ?? { bg: "var(--rb-disabled-bg)", text: T.textSecondary, border: T.border };
   const navigable = !!onNavigate && (!!src.candidateId || (!!src.jobId && src.type === "job_description"));
   const inner = (
     <span
@@ -309,7 +312,7 @@ function RecommendationCard({ recommendation, confidence, reasoning }: {
 }) {
   const color = confColor(confidence);
   return (
-    <div className="mt-4 rounded-2xl border p-4 space-y-3" style={{ background: "#F9FAFB", borderColor: T.border }}>
+    <div className="mt-4 rounded-2xl border p-4 space-y-3" style={{ background: "var(--rb-subtle)", borderColor: T.border }}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-2">
           <Target size={14} strokeWidth={2.2} className="mt-0.5 shrink-0" style={{ color: T.accent }} />
@@ -345,7 +348,7 @@ function MessageBubble({ msg, onQuickAction, onSourceNavigate }: {
       <div className="flex justify-end mb-6 rb-animate-fade-in">
         <div
           className="max-w-[75%] rounded-2xl rounded-tr-md px-4 py-3 text-[0.9rem] leading-relaxed"
-          style={{ background: "rgba(109,93,246,0.08)", border: `1px solid rgba(109,93,246,0.18)`, color: T.text }}
+          style={{ background: "var(--rb-accent-soft-bg)", border: `1px solid var(--rb-accent-soft-border)`, color: T.text }}
         >
           {msg.content}
         </div>
@@ -360,12 +363,12 @@ function MessageBubble({ msg, onQuickAction, onSourceNavigate }: {
     <div className="mb-6 rb-animate-fade-in">
       <div
         className="rounded-[20px] px-5 py-4 transition-shadow hover:shadow-md"
-        style={{ background: T.card, border: `1px solid ${T.border}`, boxShadow: "0 1px 2px rgba(17,24,39,0.03)" }}
+        style={{ background: T.card, border: `1px solid ${T.border}`, boxShadow: "0 1px 2px var(--rb-shadow-color)" }}
       >
         <div className="flex items-center gap-2 mb-3">
           <div
             className="w-6 h-6 rounded-full flex items-center justify-center shrink-0"
-            style={{ background: `linear-gradient(135deg, ${T.accent}, #4C3FD8)` }}
+            style={{ background: `linear-gradient(135deg, ${T.accent}, var(--rb-accent-dark))` }}
           >
             <Sparkles size={12} strokeWidth={2.4} color="#fff" />
           </div>
@@ -418,8 +421,8 @@ function MessageBubble({ msg, onQuickAction, onSourceNavigate }: {
                 key={i}
                 onClick={() => onQuickAction(action)}
                 className="text-[12px] font-medium px-3 py-1.5 rounded-full border transition-all hover:shadow-sm"
-                style={{ borderColor: T.border, color: T.textSecondary, background: "#F9FAFB" }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = T.accent; e.currentTarget.style.borderColor = "rgba(109,93,246,0.3)"; }}
+                style={{ borderColor: T.border, color: T.textSecondary, background: "var(--rb-subtle)" }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = T.accent; e.currentTarget.style.borderColor = "var(--rb-accent-hover-border)"; }}
                 onMouseLeave={(e) => { e.currentTarget.style.color = T.textSecondary; e.currentTarget.style.borderColor = T.border; }}
               >
                 {action}
@@ -478,7 +481,7 @@ function WelcomeScreen({ recruiterName, jobSelected, contextMode, candidateName,
       <div className="flex flex-col items-center justify-center h-full text-center px-6 pb-24">
         <div
           className="w-12 h-12 rounded-2xl flex items-center justify-center mb-6 animate-pulse"
-          style={{ background: `linear-gradient(135deg, ${T.accent}, #4C3FD8)`, boxShadow: "0 0 40px rgba(109,93,246,0.18)" }}
+          style={{ background: `linear-gradient(135deg, ${T.accent}, var(--rb-accent-dark))`, boxShadow: "0 0 40px var(--rb-accent-soft-border)" }}
         >
           <Sparkles size={20} color="#fff" />
         </div>
@@ -492,7 +495,7 @@ function WelcomeScreen({ recruiterName, jobSelected, contextMode, candidateName,
     <div className="flex flex-col items-center justify-center h-full text-center px-6 pb-24">
       <div
         className="w-12 h-12 rounded-2xl flex items-center justify-center mb-6"
-        style={{ background: `linear-gradient(135deg, ${T.accent}, #4C3FD8)`, boxShadow: "0 0 40px rgba(109,93,246,0.18)" }}
+        style={{ background: `linear-gradient(135deg, ${T.accent}, var(--rb-accent-dark))`, boxShadow: "0 0 40px var(--rb-accent-soft-border)" }}
       >
         <Sparkles size={20} color="#fff" />
       </div>
@@ -505,14 +508,14 @@ function WelcomeScreen({ recruiterName, jobSelected, contextMode, candidateName,
           <p className="text-[0.9rem] max-w-sm leading-relaxed mb-2" style={{ color: T.textSecondary }}>
             I'm focused on <span className="font-semibold" style={{ color: T.text }}>{candidateName}</span>. Ask me anything about this candidate.
           </p>
-          <p className="text-xs mb-8" style={{ color: "#9CA3AF" }}>Select a prompt or type your own question below</p>
+          <p className="text-xs mb-8" style={{ color: "var(--rb-muted)" }}>Select a prompt or type your own question below</p>
         </>
       ) : contextMode === "global" ? (
         <>
           <p className="text-[0.9rem] max-w-sm leading-relaxed mb-2" style={{ color: T.textSecondary }}>
             I'm looking across your entire hiring organization — every job, every candidate, every pipeline. Ask me anything, no filtering needed.
           </p>
-          <p className="text-xs mb-8" style={{ color: "#9CA3AF" }}>Select a prompt or type your own question below</p>
+          <p className="text-xs mb-8" style={{ color: "var(--rb-muted)" }}>Select a prompt or type your own question below</p>
         </>
       ) : (
         <>
@@ -520,12 +523,12 @@ function WelcomeScreen({ recruiterName, jobSelected, contextMode, candidateName,
             I'm Rolebolt AI. I can help you compare candidates, explain scores, generate interview questions, and recommend who to interview next.
           </p>
           {!jobSelected && (
-            <p className="text-xs font-medium mb-6 flex items-center gap-1.5" style={{ color: "#D97706" }}>
+            <p className="text-xs font-medium mb-6 flex items-center gap-1.5" style={{ color: "var(--rb-warning)" }}>
               <span>↑</span> Select a job from the left sidebar to get started
             </p>
           )}
           {jobSelected && (
-            <p className="text-xs mb-8" style={{ color: "#9CA3AF" }}>Select a prompt or type your own question below</p>
+            <p className="text-xs mb-8" style={{ color: "var(--rb-muted)" }}>Select a prompt or type your own question below</p>
           )}
         </>
       )}
@@ -541,7 +544,7 @@ function WelcomeScreen({ recruiterName, jobSelected, contextMode, candidateName,
             >
               <span
                 className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
-                style={{ background: "rgba(109,93,246,0.08)", color: T.accent }}
+                style={{ background: "var(--rb-accent-soft-bg)", color: T.accent }}
               >
                 <p.Icon size={15} strokeWidth={2.2} />
               </span>
@@ -571,7 +574,7 @@ function MetricCard({ label, value, color, icon: Icon }: {
 }
 
 function PanelSectionLabel({ children }: { children: React.ReactNode }) {
-  return <p className="text-[10px] font-semibold uppercase tracking-widest mb-3" style={{ color: "#9CA3AF" }}>{children}</p>;
+  return <p className="text-[10px] font-semibold uppercase tracking-widest mb-3" style={{ color: "var(--rb-muted)" }}>{children}</p>;
 }
 
 // ─── Job context panel (right sidebar) ───────────────────────────────────────
@@ -581,9 +584,9 @@ function JobContextPanel({ job, candidates }: { job: Job | null; candidates: Can
     return (
       <div className="flex flex-col items-center justify-center h-full text-center px-4">
         <div className="w-10 h-10 rounded-2xl border flex items-center justify-center mb-3" style={{ background: T.card, borderColor: T.border }}>
-          <Briefcase size={16} strokeWidth={2} style={{ color: "#D1D5DB" }} />
+          <Briefcase size={16} strokeWidth={2} style={{ color: "var(--rb-faint)" }} />
         </div>
-        <p className="text-[12px]" style={{ color: "#9CA3AF" }}>Select a job to see context</p>
+        <p className="text-[12px]" style={{ color: "var(--rb-muted)" }}>Select a job to see context</p>
       </div>
     );
   }
@@ -602,7 +605,7 @@ function JobContextPanel({ job, candidates }: { job: Job | null; candidates: Can
         <PanelSectionLabel>Current Context</PanelSectionLabel>
         <div className="p-3.5 rounded-2xl border" style={{ background: T.card, borderColor: T.border }}>
           <div className="flex items-center gap-2 mb-1">
-            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "#16a34a" }} />
+            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "var(--rb-success)" }} />
             <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: T.textSecondary }}>Job</p>
           </div>
           <p className="text-[0.9rem] font-semibold leading-snug" style={{ color: T.text }}>{job.title}</p>
@@ -622,8 +625,8 @@ function JobContextPanel({ job, candidates }: { job: Job | null; candidates: Can
             {top3.map((c, i) => {
               const pct = c.maxScore ? Math.round((c.totalScore / c.maxScore) * 100) : 0;
               return (
-                <div key={c._id} className="flex items-center gap-2.5 p-2.5 rounded-xl border" style={{ background: "#F9FAFB", borderColor: T.border }}>
-                  <span className="text-[10px] font-bold w-3 shrink-0" style={{ color: "#9CA3AF" }}>#{i + 1}</span>
+                <div key={c._id} className="flex items-center gap-2.5 p-2.5 rounded-xl border" style={{ background: "var(--rb-subtle)", borderColor: T.border }}>
+                  <span className="text-[10px] font-bold w-3 shrink-0" style={{ color: "var(--rb-muted)" }}>#{i + 1}</span>
                   <span className="flex-1 text-[12px] truncate font-medium" style={{ color: T.text }}>{c.name}</span>
                   <span className="text-[11px] font-bold tabular-nums shrink-0" style={{ color: confColor(pct) }}>{pct}%</span>
                 </div>
@@ -656,9 +659,9 @@ function GlobalContextPanel({ stats, loading }: { stats: GlobalStats | null; loa
     return (
       <div className="flex flex-col items-center justify-center h-full text-center px-4">
         <div className="w-10 h-10 rounded-2xl border flex items-center justify-center mb-3 animate-pulse" style={{ background: T.card, borderColor: T.border }}>
-          <Globe size={16} strokeWidth={2} style={{ color: "#D1D5DB" }} />
+          <Globe size={16} strokeWidth={2} style={{ color: "var(--rb-faint)" }} />
         </div>
-        <p className="text-[12px]" style={{ color: "#9CA3AF" }}>Loading organization data…</p>
+        <p className="text-[12px]" style={{ color: "var(--rb-muted)" }}>Loading organization data…</p>
       </div>
     );
   }
@@ -667,9 +670,9 @@ function GlobalContextPanel({ stats, loading }: { stats: GlobalStats | null; loa
     return (
       <div className="flex flex-col items-center justify-center h-full text-center px-4">
         <div className="w-10 h-10 rounded-2xl border flex items-center justify-center mb-3" style={{ background: T.card, borderColor: T.border }}>
-          <Globe size={16} strokeWidth={2} style={{ color: "#D1D5DB" }} />
+          <Globe size={16} strokeWidth={2} style={{ color: "var(--rb-faint)" }} />
         </div>
-        <p className="text-[12px]" style={{ color: "#9CA3AF" }}>No organization data yet</p>
+        <p className="text-[12px]" style={{ color: "var(--rb-muted)" }}>No organization data yet</p>
       </div>
     );
   }
@@ -680,7 +683,7 @@ function GlobalContextPanel({ stats, loading }: { stats: GlobalStats | null; loa
         <PanelSectionLabel>Organization Context</PanelSectionLabel>
         <div className="p-3.5 rounded-2xl border" style={{ background: T.card, borderColor: T.border }}>
           <div className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "#0EA5E9" }} />
+            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "var(--rb-info)" }} />
             <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: T.textSecondary }}>Global</p>
           </div>
           <p className="text-[0.9rem] font-semibold leading-snug mt-1" style={{ color: T.text }}>Every job, every candidate</p>
@@ -723,7 +726,7 @@ function GlobalContextPanel({ stats, loading }: { stats: GlobalStats | null; loa
           <PanelSectionLabel>Commonly Missing Skills</PanelSectionLabel>
           <div className="flex flex-wrap gap-1.5">
             {stats.mostCommonMissingSkills.map((s, i) => (
-              <span key={i} className="text-[11px] px-2.5 py-1 rounded-full border" style={{ background: "#FFFBEB", color: "#B45309", borderColor: "#FDE68A" }}>{s}</span>
+              <span key={i} className="text-[11px] px-2.5 py-1 rounded-full border" style={{ background: "var(--rb-warning-soft-bg)", color: "var(--rb-warning-soft-text)", borderColor: "var(--rb-warning-soft-border)" }}>{s}</span>
             ))}
           </div>
         </div>
@@ -734,18 +737,18 @@ function GlobalContextPanel({ stats, loading }: { stats: GlobalStats | null; loa
           <PanelSectionLabel>Recent Activity</PanelSectionLabel>
           <div className="space-y-1.5">
             {stats.recentActivity.map((a, i) => (
-              <div key={i} className="text-[12px] p-2.5 rounded-xl border" style={{ background: "#F9FAFB", borderColor: T.border, color: T.textSecondary }}>{a}</div>
+              <div key={i} className="text-[12px] p-2.5 rounded-xl border" style={{ background: "var(--rb-subtle)", borderColor: T.border, color: T.textSecondary }}>{a}</div>
             ))}
           </div>
         </div>
       )}
 
-      <div className="p-3.5 rounded-2xl border" style={{ background: "rgba(109,93,246,0.06)", borderColor: "rgba(109,93,246,0.18)" }}>
+      <div className="p-3.5 rounded-2xl border" style={{ background: "var(--rb-accent-softer-bg)", borderColor: "var(--rb-accent-soft-border)" }}>
         <div className="flex items-center gap-1.5 mb-1">
           <Sparkles size={12} strokeWidth={2.2} style={{ color: T.accent }} />
           <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: T.accent }}>AI Recommendation</p>
         </div>
-        <p className="text-[12px] leading-relaxed" style={{ color: "#4C3FD8" }}>{stats.recommendation}</p>
+        <p className="text-[12px] leading-relaxed" style={{ color: "var(--rb-accent-dark)" }}>{stats.recommendation}</p>
       </div>
     </div>
   );
@@ -762,9 +765,9 @@ function CandidateContextPanel({ candidate, job, onSwitchToJob }: {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center px-4">
         <div className="w-10 h-10 rounded-2xl border flex items-center justify-center mb-3" style={{ background: T.card, borderColor: T.border }}>
-          <User size={16} strokeWidth={2} style={{ color: "#D1D5DB" }} />
+          <User size={16} strokeWidth={2} style={{ color: "var(--rb-faint)" }} />
         </div>
-        <p className="text-[12px]" style={{ color: "#9CA3AF" }}>No candidate selected</p>
+        <p className="text-[12px]" style={{ color: "var(--rb-muted)" }}>No candidate selected</p>
       </div>
     );
   }
@@ -818,8 +821,8 @@ function CandidateContextPanel({ candidate, job, onSwitchToJob }: {
         <div className="p-3.5 rounded-2xl border" style={{ background: T.card, borderColor: T.border }}>
           <PanelSectionLabel>Assessment</PanelSectionLabel>
           <span className="text-[12px] font-semibold capitalize" style={{
-            color: candidate.assessmentStatus === "completed" ? "#16a34a" :
-              candidate.assessmentStatus === "sent" ? "#d97706" : T.textSecondary
+            color: candidate.assessmentStatus === "completed" ? "var(--rb-success)" :
+              candidate.assessmentStatus === "sent" ? "var(--rb-warning)" : T.textSecondary
           }}>
             {candidate.assessmentStatus === "not_sent" ? "Not sent" : candidate.assessmentStatus}
           </span>
@@ -832,7 +835,7 @@ function CandidateContextPanel({ candidate, job, onSwitchToJob }: {
           <div className="space-y-1.5">
             {candidate.strengths.slice(0, 3).map((s, i) => (
               <div key={i} className="flex items-start gap-2 text-[12px]" style={{ color: T.textSecondary }}>
-                <CheckCircle2 size={13} strokeWidth={2.2} className="mt-0.5 shrink-0" style={{ color: "#16a34a" }} />
+                <CheckCircle2 size={13} strokeWidth={2.2} className="mt-0.5 shrink-0" style={{ color: "var(--rb-success)" }} />
                 <span>{s}</span>
               </div>
             ))}
@@ -846,7 +849,7 @@ function CandidateContextPanel({ candidate, job, onSwitchToJob }: {
           <div className="space-y-1.5">
             {candidate.redFlags.slice(0, 3).map((f, i) => (
               <div key={i} className="flex items-start gap-2 text-[12px]" style={{ color: T.textSecondary }}>
-                <AlertTriangle size={13} strokeWidth={2.2} className="mt-0.5 shrink-0" style={{ color: "#dc2626" }} />
+                <AlertTriangle size={13} strokeWidth={2.2} className="mt-0.5 shrink-0" style={{ color: "var(--rb-danger)" }} />
                 <span>{f}</span>
               </div>
             ))}
@@ -924,6 +927,11 @@ function CopilotPageContent() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [contextOpen, setContextOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [inputFocused, setInputFocused] = useState(false);
+
+  const { theme, setTheme } = useTheme();
+  const isDark = theme === "dark";
+  const toggleTheme = useCallback(() => setTheme(isDark ? "white" : "dark"), [isDark, setTheme]);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -1424,7 +1432,7 @@ function CopilotPageContent() {
             <Home size={14} strokeWidth={2.2} />
             Dashboard
           </Link>
-          <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${T.accent}, #4C3FD8)` }}>
+          <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${T.accent}, var(--rb-accent-dark))` }}>
             <Sparkles size={12} strokeWidth={2.4} color="#fff" />
           </div>
         </div>
@@ -1446,7 +1454,7 @@ function CopilotPageContent() {
           <button
             onClick={() => { setJobDropdownOpen(o => !o); setCandidateDropdownOpen(false); }}
             className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-[13px] border transition-all hover:shadow-sm"
-            style={{ borderColor: T.border, background: "#F9FAFB" }}
+            style={{ borderColor: T.border, background: "var(--rb-subtle)" }}
           >
             <div className="flex items-center gap-2 min-w-0">
               {contextMode === "global" ? <Globe size={14} strokeWidth={2.2} style={{ color: T.textSecondary }} /> : <Briefcase size={14} strokeWidth={2.2} style={{ color: T.textSecondary }} />}
@@ -1471,14 +1479,14 @@ function CopilotPageContent() {
                   setSelectedCandidate(null);
                   newChat(false);
                 }}
-                className="w-full text-left px-4 py-2.5 text-[13px] transition-colors flex items-center gap-2 border-b hover:bg-[#F9FAFB]"
+                className="w-full text-left px-4 py-2.5 text-[13px] transition-colors flex items-center gap-2 border-b hover:bg-[var(--rb-subtle)]"
                 style={{ borderColor: T.border, color: contextMode === "global" ? T.accent : T.textSecondary, fontWeight: contextMode === "global" ? 600 : 400 }}
               >
                 <Globe size={14} strokeWidth={2.2} />
                 Organization (all jobs)
               </button>
               {jobs.length === 0 ? (
-                <div className="px-4 py-3 text-[12px]" style={{ color: "#9CA3AF" }}>No jobs found</div>
+                <div className="px-4 py-3 text-[12px]" style={{ color: "var(--rb-muted)" }}>No jobs found</div>
               ) : (
                 jobs.map(job => (
                   <button
@@ -1491,11 +1499,11 @@ function CopilotPageContent() {
                       setSelectedCandidate(null);
                       newChat(false);
                     }}
-                    className="w-full text-left px-4 py-2.5 text-[13px] transition-colors hover:bg-[#F9FAFB]"
+                    className="w-full text-left px-4 py-2.5 text-[13px] transition-colors hover:bg-[var(--rb-subtle)]"
                     style={{ color: selectedJob?._id === job._id ? T.accent : T.textSecondary, fontWeight: selectedJob?._id === job._id ? 600 : 400 }}
                   >
                     {job.title}
-                    <span className="ml-2 text-[11px]" style={{ color: "#9CA3AF" }}>{job.candidateCount} candidates</span>
+                    <span className="ml-2 text-[11px]" style={{ color: "var(--rb-muted)" }}>{job.candidateCount} candidates</span>
                   </button>
                 ))
               )}
@@ -1509,7 +1517,7 @@ function CopilotPageContent() {
             <button
               onClick={() => { setCandidateDropdownOpen(o => !o); setJobDropdownOpen(false); }}
               className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-[13px] border transition-all hover:shadow-sm"
-              style={{ borderColor: T.border, background: "#F9FAFB" }}
+              style={{ borderColor: T.border, background: "var(--rb-subtle)" }}
             >
               <div className="flex items-center gap-2 min-w-0">
                 {contextMode === "candidate" ? <User size={14} strokeWidth={2.2} style={{ color: T.textSecondary }} /> : <Users size={14} strokeWidth={2.2} style={{ color: T.textSecondary }} />}
@@ -1527,14 +1535,14 @@ function CopilotPageContent() {
               >
                 <div className="p-2 border-b" style={{ borderColor: T.border }}>
                   <div className="relative">
-                    <Search size={13} strokeWidth={2.2} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: "#9CA3AF" }} />
+                    <Search size={13} strokeWidth={2.2} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: "var(--rb-muted)" }} />
                     <input
                       autoFocus
                       value={candidateSearch}
                       onChange={e => setCandidateSearch(e.target.value)}
                       placeholder="Search candidates…"
                       className="w-full pl-8 pr-3 py-2 rounded-lg text-[12px] border outline-none"
-                      style={{ background: "#F9FAFB", borderColor: T.border, color: T.text }}
+                      style={{ background: "var(--rb-subtle)", borderColor: T.border, color: T.text }}
                     />
                   </div>
                 </div>
@@ -1548,22 +1556,22 @@ function CopilotPageContent() {
                       setSelectedCandidate(null);
                       newChat(false);
                     }}
-                    className="w-full text-left px-4 py-2.5 text-[13px] transition-colors flex items-center gap-2 border-b hover:bg-[#F9FAFB]"
+                    className="w-full text-left px-4 py-2.5 text-[13px] transition-colors flex items-center gap-2 border-b hover:bg-[var(--rb-subtle)]"
                     style={{ borderColor: T.border, color: contextMode === "job" ? T.accent : T.textSecondary, fontWeight: contextMode === "job" ? 600 : 400 }}
                   >
                     <Users size={14} strokeWidth={2.2} />
                     All Candidates
-                    <span className="ml-auto text-[11px]" style={{ color: "#9CA3AF" }}>Job context</span>
+                    <span className="ml-auto text-[11px]" style={{ color: "var(--rb-muted)" }}>Job context</span>
                   </button>
                   {(() => {
                     const filtered = candidates.filter(c =>
                       c.name.toLowerCase().includes(candidateSearch.trim().toLowerCase())
                     );
                     if (candidates.length === 0) {
-                      return <div className="px-4 py-3 text-[12px]" style={{ color: "#9CA3AF" }}>No candidates yet</div>;
+                      return <div className="px-4 py-3 text-[12px]" style={{ color: "var(--rb-muted)" }}>No candidates yet</div>;
                     }
                     if (filtered.length === 0) {
-                      return <div className="px-4 py-3 text-[12px]" style={{ color: "#9CA3AF" }}>No matches for "{candidateSearch}"</div>;
+                      return <div className="px-4 py-3 text-[12px]" style={{ color: "var(--rb-muted)" }}>No matches for "{candidateSearch}"</div>;
                     }
                     return filtered.map(c => {
                       const pct = c.maxScore > 0 ? Math.round((c.totalScore / c.maxScore) * 100) : null;
@@ -1578,7 +1586,7 @@ function CopilotPageContent() {
                             setCandidateSearch("");
                             newChat(false);
                           }}
-                          className="w-full text-left px-4 py-2.5 text-[13px] transition-colors flex items-center justify-between gap-2 hover:bg-[#F9FAFB]"
+                          className="w-full text-left px-4 py-2.5 text-[13px] transition-colors flex items-center justify-between gap-2 hover:bg-[var(--rb-subtle)]"
                           style={{ color: selectedCandidateId === c._id ? T.accent : T.textSecondary, fontWeight: selectedCandidateId === c._id ? 600 : 400 }}
                         >
                           <span className="truncate">{c.name}</span>
@@ -1599,7 +1607,7 @@ function CopilotPageContent() {
         <div className="flex-1 overflow-y-auto scrollbar-none px-3 pb-4 space-y-4 mt-1">
           {groupOrder.filter(g => grouped[g]?.length).map(group => (
             <div key={group}>
-              <p className="text-[10px] font-semibold uppercase tracking-widest px-2 mb-1.5 flex items-center gap-1.5" style={{ color: "#9CA3AF" }}>
+              <p className="text-[10px] font-semibold uppercase tracking-widest px-2 mb-1.5 flex items-center gap-1.5" style={{ color: "var(--rb-muted)" }}>
                 <MessageSquare size={10} strokeWidth={2.2} />
                 {group}
               </p>
@@ -1610,30 +1618,30 @@ function CopilotPageContent() {
                     onClick={() => { openConversation(c.id); setSidebarOpen(false); }}
                     className="group relative flex items-center gap-2 px-3 py-2.5 rounded-xl cursor-pointer transition-all border"
                     style={{
-                      background: activeConvId === c.id ? "#F5F3FF" : T.card,
-                      borderColor: activeConvId === c.id ? "rgba(109,93,246,0.25)" : "transparent",
+                      background: activeConvId === c.id ? "var(--rb-src-resume-bg)" : T.card,
+                      borderColor: activeConvId === c.id ? "var(--rb-accent-active-border)" : "transparent",
                     }}
-                    onMouseEnter={(e) => { if (activeConvId !== c.id) e.currentTarget.style.background = "#F9FAFB"; }}
+                    onMouseEnter={(e) => { if (activeConvId !== c.id) e.currentTarget.style.background = "var(--rb-subtle)"; }}
                     onMouseLeave={(e) => { if (activeConvId !== c.id) e.currentTarget.style.background = T.card; }}
                   >
                     <div className="flex-1 min-w-0">
                       <p className="text-[12.5px] font-medium truncate leading-snug" style={{ color: activeConvId === c.id ? T.accent : T.text }}>{c.title}</p>
                       {/* Show candidate name for candidate-context conversations, job for job-context */}
                       {c.selectedCandidateName ? (
-                        <p className="text-[10.5px] truncate mt-0.5 flex items-center gap-1" style={{ color: "#9CA3AF" }}>
+                        <p className="text-[10.5px] truncate mt-0.5 flex items-center gap-1" style={{ color: "var(--rb-muted)" }}>
                           <User size={9} strokeWidth={2.2} /> {c.selectedCandidateName}
                         </p>
                       ) : c.selectedJobTitle ? (
-                        <p className="text-[10.5px] truncate mt-0.5" style={{ color: "#9CA3AF" }}>{c.selectedJobTitle}</p>
+                        <p className="text-[10.5px] truncate mt-0.5" style={{ color: "var(--rb-muted)" }}>{c.selectedJobTitle}</p>
                       ) : null}
                     </div>
                     <button
                       onClick={(e) => deleteConversation(c.id, e)}
                       disabled={deletingId === c.id}
                       className="shrink-0 opacity-0 group-hover:opacity-100 transition-all"
-                      style={{ color: "#D1D5DB" }}
-                      onMouseEnter={(e) => { e.currentTarget.style.color = "#dc2626"; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.color = "#D1D5DB"; }}
+                      style={{ color: "var(--rb-faint)" }}
+                      onMouseEnter={(e) => { e.currentTarget.style.color = "var(--rb-danger)"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.color = "var(--rb-faint)"; }}
                     >
                       <Trash2 size={13} strokeWidth={2} />
                     </button>
@@ -1643,7 +1651,7 @@ function CopilotPageContent() {
             </div>
           ))}
           {conversations.length === 0 && (
-            <p className="text-[11px] text-center pt-4 px-2" style={{ color: "#D1D5DB" }}>Your conversations will appear here</p>
+            <p className="text-[11px] text-center pt-4 px-2" style={{ color: "var(--rb-faint)" }}>Your conversations will appear here</p>
           )}
         </div>
       </aside>
@@ -1665,7 +1673,7 @@ function CopilotPageContent() {
               <Menu size={16} strokeWidth={2.2} />
             </button>
             <div className="flex items-center gap-2">
-              <div className="w-5 h-5 rounded-md flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${T.accent}, #4C3FD8)` }}>
+              <div className="w-5 h-5 rounded-md flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${T.accent}, var(--rb-accent-dark))` }}>
                 <Sparkles size={11} strokeWidth={2.4} color="#fff" />
               </div>
               <span className="text-[13px] font-semibold" style={{ color: T.text }}>Ask Rolebolt</span>
@@ -1673,7 +1681,7 @@ function CopilotPageContent() {
 
             {/* Context breadcrumb: Global → Job → Candidate, each earlier crumb clickable */}
             <div className="hidden sm:flex items-center gap-1">
-              <span className="text-xs mr-0.5" style={{ color: "#D1D5DB" }}>·</span>
+              <span className="text-xs mr-0.5" style={{ color: "var(--rb-faint)" }}>·</span>
               <button
                 onClick={() => {
                   setContextMode("global");
@@ -1684,8 +1692,8 @@ function CopilotPageContent() {
                 }}
                 className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-colors"
                 style={contextMode === "global"
-                  ? { background: "#F0F9FF", borderColor: "#BAE6FD", color: "#0369A1" }
-                  : { background: "#F9FAFB", borderColor: T.border, color: T.textSecondary }}
+                  ? { background: "var(--rb-src-profile-bg)", borderColor: "var(--rb-src-profile-border)", color: "var(--rb-src-profile-text)" }
+                  : { background: "var(--rb-subtle)", borderColor: T.border, color: T.textSecondary }}
               >
                 <Globe size={11} strokeWidth={2.2} />
                 <span className="text-[11px] font-medium">Organization</span>
@@ -1693,7 +1701,7 @@ function CopilotPageContent() {
 
               {selectedJob && (
                 <>
-                  <span className="text-xs" style={{ color: "#E5E7EB" }}>/</span>
+                  <span className="text-xs" style={{ color: "var(--rb-border)" }}>/</span>
                   <button
                     onClick={() => {
                       setContextMode("job");
@@ -1703,8 +1711,8 @@ function CopilotPageContent() {
                     }}
                     className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-colors max-w-[10rem]"
                     style={contextMode === "job"
-                      ? { background: "#F5F3FF", borderColor: "#E9D5FF", color: "#6D28D9" }
-                      : { background: "#F9FAFB", borderColor: T.border, color: T.textSecondary }}
+                      ? { background: "var(--rb-src-resume-bg)", borderColor: "var(--rb-src-resume-border)", color: "var(--rb-src-resume-text)" }
+                      : { background: "var(--rb-subtle)", borderColor: T.border, color: T.textSecondary }}
                   >
                     <Briefcase size={11} strokeWidth={2.2} />
                     <span className="text-[11px] font-medium truncate">{selectedJob.title}</span>
@@ -1714,8 +1722,8 @@ function CopilotPageContent() {
 
               {contextMode === "candidate" && selectedCandidate && (
                 <>
-                  <span className="text-xs" style={{ color: "#E5E7EB" }}>/</span>
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full max-w-[10rem]" style={{ background: "rgba(109,93,246,0.08)", border: "1px solid rgba(109,93,246,0.2)" }}>
+                  <span className="text-xs" style={{ color: "var(--rb-border)" }}>/</span>
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full max-w-[10rem]" style={{ background: "var(--rb-accent-soft-bg)", border: "1px solid var(--rb-accent-chip-border)" }}>
                     <User size={11} strokeWidth={2.2} style={{ color: T.accent }} />
                     <span className="text-[11px] font-medium truncate" style={{ color: T.accent }}>{selectedCandidate.name}</span>
                   </div>
@@ -1723,13 +1731,24 @@ function CopilotPageContent() {
               )}
             </div>
           </div>
-          <button
-            onClick={() => setContextOpen(o => !o)}
-            className="lg:hidden p-1.5 rounded-lg transition"
-            style={{ color: T.textSecondary }}
-          >
-            {contextMode === "candidate" ? <User size={16} strokeWidth={2.2} /> : contextMode === "global" ? <Globe size={16} strokeWidth={2.2} /> : <Users size={16} strokeWidth={2.2} />}
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={toggleTheme}
+              title={isDark ? "Switch to light theme" : "Switch to dark theme"}
+              aria-label="Toggle color theme"
+              className="p-1.5 rounded-lg border transition-all hover:scale-105 active:scale-95"
+              style={{ borderColor: T.border, background: T.card, color: T.textSecondary }}
+            >
+              {isDark ? <SunMedium size={15} strokeWidth={2.2} /> : <Moon size={15} strokeWidth={2.2} />}
+            </button>
+            <button
+              onClick={() => setContextOpen(o => !o)}
+              className="lg:hidden p-1.5 rounded-lg transition"
+              style={{ color: T.textSecondary }}
+            >
+              {contextMode === "candidate" ? <User size={16} strokeWidth={2.2} /> : contextMode === "global" ? <Globe size={16} strokeWidth={2.2} /> : <Users size={16} strokeWidth={2.2} />}
+            </button>
+          </div>
         </div>
 
         {/* Messages */}
@@ -1760,17 +1779,26 @@ function CopilotPageContent() {
         >
           <div className="max-w-2xl mx-auto">
             {!selectedJob && contextMode !== "global" && (
-              <p className="text-center text-[12px] mb-2" style={{ color: "#D97706" }}>Select a job from the sidebar to start chatting</p>
+              <p className="text-center text-[12px] mb-2" style={{ color: "var(--rb-warning)" }}>Select a job from the sidebar to start chatting</p>
             )}
             {selectedJob && contextMode === "candidate" && !selectedCandidate && (
               <p className="text-center text-[12px] mb-2" style={{ color: T.accent }}>Loading candidate context…</p>
             )}
             <div
-              className="flex items-end gap-3 rounded-2xl border px-4 py-3 transition-all"
+              className="flex items-end gap-2.5 rounded-[26px] border px-5 py-3.5 transition-all duration-200 ease-out"
               style={{
                 background: T.card,
-                borderColor: isStreaming ? "rgba(109,93,246,0.35)" : T.border,
-                boxShadow: isStreaming ? "0 0 0 3px rgba(109,93,246,0.08)" : "0 1px 2px rgba(17,24,39,0.03)",
+                borderColor: isStreaming
+                  ? "var(--rb-accent-streaming-border)"
+                  : inputFocused
+                  ? "var(--rb-accent-hover-border)"
+                  : T.border,
+                boxShadow: isStreaming
+                  ? "0 0 0 3px var(--rb-accent-soft-bg), 0 8px 24px -8px var(--rb-shadow-color)"
+                  : inputFocused
+                  ? "0 0 0 3px var(--rb-accent-soft-bg), 0 10px 28px -10px var(--rb-shadow-color)"
+                  : "0 1px 2px var(--rb-shadow-color)",
+                transform: inputFocused || input.trim() ? "translateY(-10px)" : "translateY(0)",
               }}
             >
               <textarea
@@ -1778,29 +1806,32 @@ function CopilotPageContent() {
                 value={input}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
+                onFocus={() => setInputFocused(true)}
+                onBlur={() => setInputFocused(false)}
                 placeholder={inputPlaceholder}
                 disabled={textDisabled}
                 rows={1}
-                className="flex-1 bg-transparent text-[0.9rem] resize-none outline-none leading-relaxed disabled:opacity-40"
+                className="flex-1 bg-transparent text-[0.925rem] resize-none outline-none leading-relaxed tracking-[-0.01em] disabled:opacity-40 py-0.5"
                 style={{ maxHeight: "160px", color: T.text }}
               />
               <button
                 onClick={() => sendMessage(input)}
                 disabled={!input.trim() || sendDisabled}
-                className="shrink-0 w-8 h-8 rounded-xl flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                className="shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-150 ease-out disabled:opacity-30 disabled:cursor-not-allowed hover:enabled:scale-105 active:enabled:scale-90"
                 style={{
-                  background: input.trim() && !sendDisabled ? `linear-gradient(135deg, ${T.accent}, #4C3FD8)` : "#F3F4F6",
-                  color: input.trim() && !sendDisabled ? "#fff" : "#9CA3AF",
+                  background: input.trim() && !sendDisabled ? `linear-gradient(135deg, ${T.accent}, var(--rb-accent-dark))` : "var(--rb-disabled-bg)",
+                  color: input.trim() && !sendDisabled ? "#fff" : "var(--rb-muted)",
+                  boxShadow: input.trim() && !sendDisabled ? "0 4px 14px -4px var(--rb-accent-hover-border)" : "none",
                 }}
               >
                 {isStreaming ? (
-                  <span className="w-3 h-3 rounded-sm" style={{ background: "rgba(255,255,255,0.5)" }} />
+                  <span className="w-3 h-3 rounded-[3px]" style={{ background: "rgba(255,255,255,0.5)" }} />
                 ) : (
-                  <Send size={14} strokeWidth={2.4} />
+                  <Send size={16} strokeWidth={2.3} className="-translate-x-px translate-y-px" />
                 )}
               </button>
             </div>
-            <p className="text-center text-[10px] mt-2" style={{ color: "#D1D5DB" }}>
+            <p className="text-center text-[10px] mt-2" style={{ color: "var(--rb-faint)" }}>
               Rolebolt AI can make mistakes. Always verify important decisions.
             </p>
           </div>
@@ -1818,10 +1849,10 @@ function CopilotPageContent() {
         style={{ background: T.card, borderColor: T.border }}
       >
         <div className="flex items-center justify-between px-4 py-4 border-b shrink-0" style={{ borderColor: T.border }}>
-          <p className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: "#9CA3AF" }}>
+          <p className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: "var(--rb-muted)" }}>
             {contextMode === "candidate" ? "Candidate Context" : "Hiring Context"}
           </p>
-          <button onClick={() => setContextOpen(false)} className="lg:hidden transition" style={{ color: "#9CA3AF" }}>
+          <button onClick={() => setContextOpen(false)} className="lg:hidden transition" style={{ color: "var(--rb-muted)" }}>
             <X size={14} strokeWidth={2.2} />
           </button>
         </div>

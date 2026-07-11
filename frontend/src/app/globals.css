@@ -596,6 +596,98 @@ h1, h2, h3, h4, h5, h6, li, td, th {
 }
 .scrollbar-none::-webkit-scrollbar { display: none; }
 
+/* ── Copilot theme tokens (light default / dark override) ────────────────── */
+:root {
+  --rb-bg: #FBFBFB;
+  --rb-card: #FFFFFF;
+  --rb-border: #E5E7EB;
+  --rb-accent: #6D5DF6;
+  --rb-accent-dark: #4C3FD8;
+  --rb-text: #111827;
+  --rb-text-secondary: #6B7280;
+  --rb-subtle: #F9FAFB;
+  --rb-muted: #9CA3AF;
+  --rb-faint: #D1D5DB;
+  --rb-disabled-bg: #F3F4F6;
+  --rb-success: #16a34a;
+  --rb-warning: #d97706;
+  --rb-danger: #dc2626;
+  --rb-info: #0EA5E9;
+  --rb-shadow-color: rgba(17,24,39,0.03);
+  --rb-accent-softer-bg: rgba(109,93,246,0.06);
+  --rb-accent-soft-bg: rgba(109,93,246,0.08);
+  --rb-accent-soft-border: rgba(109,93,246,0.18);
+  --rb-accent-chip-border: rgba(109,93,246,0.2);
+  --rb-accent-active-border: rgba(109,93,246,0.25);
+  --rb-accent-hover-border: rgba(109,93,246,0.3);
+  --rb-accent-streaming-border: rgba(109,93,246,0.35);
+  --rb-warning-soft-bg: #FFFBEB;
+  --rb-warning-soft-text: #B45309;
+  --rb-warning-soft-border: #FDE68A;
+  --rb-src-resume-bg: #F5F3FF;
+  --rb-src-resume-text: #6D28D9;
+  --rb-src-resume-border: #E9D5FF;
+  --rb-src-assessment-bg: #EFF6FF;
+  --rb-src-assessment-text: #1D4ED8;
+  --rb-src-assessment-border: #DBEAFE;
+  --rb-src-interview-bg: #ECFDF5;
+  --rb-src-interview-text: #047857;
+  --rb-src-interview-border: #D1FAE5;
+  --rb-src-profile-bg: #F0F9FF;
+  --rb-src-profile-text: #0369A1;
+  --rb-src-profile-border: #BAE6FD;
+  --rb-src-job-bg: #FFF1F2;
+  --rb-src-job-text: #BE123C;
+  --rb-src-job-border: #FECDD3;
+  --rb-overlay: rgba(0,0,0,0.3);
+}
+
+[data-theme="dark"] {
+  --rb-bg: #0F0F13;
+  --rb-card: #17171D;
+  --rb-border: #2A2A33;
+  --rb-accent: #8B7CF8;
+  --rb-accent-dark: #6D5DF6;
+  --rb-text: #F3F4F6;
+  --rb-text-secondary: #A1A1AA;
+  --rb-subtle: #1C1C24;
+  --rb-muted: #71717A;
+  --rb-faint: #3F3F49;
+  --rb-disabled-bg: #26262F;
+  --rb-success: #34D399;
+  --rb-warning: #FBBF24;
+  --rb-danger: #F87171;
+  --rb-info: #38BDF8;
+  --rb-shadow-color: rgba(0,0,0,0.45);
+  --rb-accent-softer-bg: rgba(139,124,248,0.1);
+  --rb-accent-soft-bg: rgba(139,124,248,0.14);
+  --rb-accent-soft-border: rgba(139,124,248,0.3);
+  --rb-accent-chip-border: rgba(139,124,248,0.32);
+  --rb-accent-active-border: rgba(139,124,248,0.35);
+  --rb-accent-hover-border: rgba(139,124,248,0.4);
+  --rb-accent-streaming-border: rgba(139,124,248,0.45);
+  --rb-warning-soft-bg: rgba(251,191,36,0.12);
+  --rb-warning-soft-text: #FBBF24;
+  --rb-warning-soft-border: rgba(251,191,36,0.3);
+  --rb-src-resume-bg: rgba(167,139,250,0.14);
+  --rb-src-resume-text: #C4B5FD;
+  --rb-src-resume-border: rgba(167,139,250,0.3);
+  --rb-src-assessment-bg: rgba(96,165,250,0.14);
+  --rb-src-assessment-text: #93C5FD;
+  --rb-src-assessment-border: rgba(96,165,250,0.3);
+  --rb-src-interview-bg: rgba(52,211,153,0.14);
+  --rb-src-interview-text: #6EE7B7;
+  --rb-src-interview-border: rgba(52,211,153,0.3);
+  --rb-src-score-bg: rgba(251,191,36,0.14);
+  --rb-src-profile-bg: rgba(56,189,248,0.14);
+  --rb-src-profile-text: #7DD3FC;
+  --rb-src-profile-border: rgba(56,189,248,0.3);
+  --rb-src-job-bg: rgba(251,113,133,0.14);
+  --rb-src-job-text: #FDA4AF;
+  --rb-src-job-border: rgba(251,113,133,0.3);
+  --rb-overlay: rgba(0,0,0,0.55);
+}
+
 /* ── Copilot light markdown (premium AI-product theme) ──────────────────── */
 .copilot-markdown { color: #374151; line-height: 1.7; font-size: 0.9rem; }
 .copilot-markdown p { margin: 0.5rem 0; }
@@ -645,6 +737,32 @@ h1, h2, h3, h4, h5, h6, li, td, th {
 .copilot-markdown th { background: #F9FAFB; color: #1f2937; font-weight: 600; text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid #E5E7EB; }
 .copilot-markdown td { padding: 0.45rem 0.75rem; border-bottom: 1px solid #F3F4F6; color: #374151; }
 .copilot-markdown tr:last-child td { border-bottom: none; }
+
+/* Dark theme overrides for the copilot markdown body */
+[data-theme="dark"] .copilot-markdown { color: #D4D4D8; }
+[data-theme="dark"] .copilot-markdown h1,
+[data-theme="dark"] .copilot-markdown h2 { color: #F4F4F5; }
+[data-theme="dark"] .copilot-markdown h3 { color: #E4E4E7; }
+[data-theme="dark"] .copilot-markdown strong { color: #F4F4F5; }
+[data-theme="dark"] .copilot-markdown em { color: #C4B5FD; }
+[data-theme="dark"] .copilot-markdown code {
+  background: rgba(167,139,250,0.12);
+  border-color: rgba(167,139,250,0.25);
+  color: #C4B5FD;
+}
+[data-theme="dark"] .copilot-markdown pre {
+  background: #1C1C24;
+  border-color: #2A2A33;
+}
+[data-theme="dark"] .copilot-markdown pre code { color: #D4D4D8; }
+[data-theme="dark"] .copilot-markdown blockquote {
+  border-left-color: rgba(167,139,250,0.4);
+  color: #A1A1AA;
+}
+[data-theme="dark"] .copilot-markdown hr { border-top-color: #2A2A33; }
+[data-theme="dark"] .copilot-markdown a { color: #C4B5FD; }
+[data-theme="dark"] .copilot-markdown th { background: #1C1C24; color: #E4E4E7; border-bottom-color: #2A2A33; }
+[data-theme="dark"] .copilot-markdown td { border-bottom-color: #26262F; color: #D4D4D8; }
 
 /* ── Copilot loading shimmer (streaming placeholder) ─────────────────────── */
 @keyframes copilotDotPulse {
