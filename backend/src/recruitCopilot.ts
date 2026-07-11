@@ -288,6 +288,8 @@ const STARTER_ACTIONS: Record<string, string[]> = {
     "Generate interview questions",
     "Show missing skills",
     "Who can join immediately?",
+    "Which candidates have red flags?",
+    "Draft a shortlist email",
   ],
   candidate: [
     "Summarize this candidate",
@@ -295,6 +297,8 @@ const STARTER_ACTIONS: Record<string, string[]> = {
     "Should I hire this candidate?",
     "Generate interview questions",
     "What skills are missing compared to the JD?",
+    "Compare with another candidate",
+    "Draft an interview invite",
   ],
   global: [
     "What should I prioritize today?",
@@ -303,6 +307,8 @@ const STARTER_ACTIONS: Record<string, string[]> = {
     "Show hiring bottlenecks",
     "Compare all active jobs",
     "Search my talent pool",
+    "Which candidates are stuck in a stage?",
+    "Where should I focus my time this week?",
   ],
 };
 
