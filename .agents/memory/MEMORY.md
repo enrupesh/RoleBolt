@@ -3,3 +3,4 @@
 - [Form submission non-blocking pattern](form-submit-pattern.md) — persist record first, return 201 immediately, then score via setImmediate; never await AI inside a candidate-facing route.
 - [Form Jobs feature parity](form-jobs-features.md) — answerSignals added to RecruitFormResponse; scoreFormResponse uses 1-based idx mapping; retry-score endpoint added; ScoringCriteriaCard is client-side only.
 - [Python script seo.ts edit risk](seo-trim-lesson.md) — Python script used to trim productKeywords left a duplicate "} as const;" — always verify output line counts and spot-check boundaries after programmatic large-file edits.
+- [Copilot input focus loss during streaming](copilot-input-focus.md) — disabling a textarea while awaiting a response blurs it in every browser; guard sends in the handler instead.

@@ -4,9 +4,47 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import {
+  Sparkles,
+  Plus,
+  ChevronDown,
+  ArrowLeft,
+  Trash2,
+  Briefcase,
+  Users,
+  User,
+  FileText,
+  Globe,
+  Send,
+  Mail,
+  Star,
+  Search,
+  X,
+  Menu,
+  MessageSquare,
+  Home,
+  CheckCircle2,
+  AlertTriangle,
+  TrendingUp,
+  Target,
+  Award,
+  ClipboardCheck,
+} from "lucide-react";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { RecruitGuard } from "@/components/RecruitGuard";
 import { apiUrl } from "@/lib/api";
+
+// ─── Theme ──────────────────────────────────────────────────────────────────
+// Soft light "premium AI product" theme — see UI/UX polish brief.
+
+const T = {
+  bg: "#FBFBFB",
+  card: "#FFFFFF",
+  border: "#E5E7EB",
+  accent: "#6D5DF6",
+  text: "#111827",
+  textSecondary: "#6B7280",
+};
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -27,6 +65,8 @@ interface CopilotSource {
   candidateName?: string;
   /** Looked up server-side from the database — never invented by the AI */
   candidateEmail?: string;
+  /** Fit score % looked up server-side — never invented by the AI */
+  candidateFitScorePct?: number;
   jobId?: string;
   jobTitle?: string;
   page?: number;
@@ -106,9 +146,9 @@ function hourGreeting() {
 }
 
 function confColor(c: number) {
-  if (c >= 80) return "#4ade80";
-  if (c >= 60) return "#fbbf24";
-  return "#f87171";
+  if (c >= 80) return "#16a34a";
+  if (c >= 60) return "#d97706";
+  return "#dc2626";
 }
 
 function groupConvos(list: ConversationSummary[]) {
@@ -123,133 +163,133 @@ function groupConvos(list: ConversationSummary[]) {
 }
 
 function hiringDecisionLabel(d?: string | null) {
-  if (d === "strong_yes") return { text: "Strong Yes", color: "#4ade80" };
-  if (d === "maybe") return { text: "Maybe", color: "#fbbf24" };
-  if (d === "no") return { text: "No", color: "#f87171" };
+  if (d === "strong_yes") return { text: "Strong Yes", color: "#16a34a" };
+  if (d === "maybe") return { text: "Maybe", color: "#d97706" };
+  if (d === "no") return { text: "No", color: "#dc2626" };
   return null;
 }
 
-// ─── Icons ────────────────────────────────────────────────────────────────────
+// ─── Streaming placeholder (premium loading experience) ───────────────────────
 
-const IcSend = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M22 2L11 13" /><path d="M22 2L15 22l-4-9-9-4 20-7z" />
-  </svg>
-);
-const IcPlus = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M5 12h14M12 5v14" />
-  </svg>
-);
-const IcChevronDown = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M6 9l6 6 6-6" />
-  </svg>
-);
-const IcBack = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M19 12H5M12 19l-7-7 7-7" />
-  </svg>
-);
-const IcTrash = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
-  </svg>
-);
-const IcSparkle = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-    <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z" />
-  </svg>
-);
-const IcBriefcase = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
-  </svg>
-);
-const IcUsers = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
-    <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
-  </svg>
-);
-const IcPerson = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="8" r="4" /><path d="M20 21a8 8 0 1 0-16 0" />
-  </svg>
-);
-const IcDoc = () => (
-  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
-  </svg>
-);
-const IcGlobe = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10" /><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-  </svg>
-);
-const IcMail = () => (
-  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-  </svg>
-);
+const LOADING_PHRASES = ["Analyzing resumes…", "Comparing candidates…", "Generating recommendation…"];
+
+function StreamingPlaceholder() {
+  const [idx, setIdx] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setIdx((i) => (i + 1) % LOADING_PHRASES.length), 1800);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <div className="flex items-center gap-2.5">
+      <span className="flex gap-1 items-center">
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            className="copilot-dot w-1.5 h-1.5 rounded-full"
+            style={{ background: T.accent, animationDelay: `${i * 0.15}s` }}
+          />
+        ))}
+      </span>
+      <span key={idx} className="copilot-loading-text text-[13px] font-medium" style={{ color: T.textSecondary }}>
+        {LOADING_PHRASES[idx]}
+      </span>
+    </div>
+  );
+}
 
 // ─── Candidate Identity ────────────────────────────────────────────────────────
 //
-// Reusable name + email pairing shown whenever the Copilot references a
-// specific candidate. Email always comes from the database (attached
-// server-side) — never from the AI — and is simply omitted if unknown.
+// Reusable name + email + fit score pairing shown whenever the Copilot
+// references a specific candidate. Email and score always come from the
+// database (attached server-side) — never from the AI — and are simply
+// omitted if unknown. Visually separated from the response body.
 
-function CandidateIdentity({ name, email, onNavigate }: {
-  name: string; email?: string; onNavigate?: () => void;
+function CandidateIdentity({ name, email, fitScorePct, onNavigate }: {
+  name: string; email?: string; fitScorePct?: number; onNavigate?: () => void;
 }) {
   return (
-    <div className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-white/[0.04] border border-white/[0.07]">
-      <div className="w-5 h-5 rounded-full bg-gradient-to-br from-sky-500 to-indigo-600 flex items-center justify-center text-[9px] font-bold text-white shrink-0">
+    <div
+      className="inline-flex items-center gap-2.5 px-3 py-2 rounded-xl border transition-all hover:shadow-sm"
+      style={{ background: "#F9FAFB", borderColor: T.border }}
+    >
+      <div
+        className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white shrink-0"
+        style={{ background: `linear-gradient(135deg, ${T.accent}, #4C3FD8)` }}
+      >
         {name.charAt(0).toUpperCase()}
       </div>
-      <div className="flex flex-col leading-tight min-w-0">
+      <div className="flex flex-col leading-tight min-w-0 gap-0.5">
         {onNavigate ? (
-          <button type="button" onClick={onNavigate} className="text-left text-[12.5px] font-semibold text-white hover:text-sky-300 transition-colors truncate">
+          <button
+            type="button"
+            onClick={onNavigate}
+            className="text-left text-[13px] font-semibold truncate hover:underline"
+            style={{ color: T.text }}
+          >
             {name}
           </button>
         ) : (
-          <span className="text-[12.5px] font-semibold text-white truncate">{name}</span>
+          <span className="text-[13px] font-semibold truncate" style={{ color: T.text }}>{name}</span>
         )}
-        {email && (
-          <a
-            href={`mailto:${email}`}
-            className="text-[11px] text-sky-300/80 hover:text-sky-300 inline-flex items-center gap-1 truncate"
-            title={`Email ${name}`}
-          >
-            <IcMail />
-            {email}
-          </a>
-        )}
+        <div className="flex items-center gap-2.5">
+          {email && (
+            <a
+              href={`mailto:${email}`}
+              className="text-[11.5px] inline-flex items-center gap-1 truncate hover:underline"
+              style={{ color: T.accent }}
+              title={`Email ${name}`}
+            >
+              <Mail size={11} strokeWidth={2.2} />
+              {email}
+            </a>
+          )}
+          {typeof fitScorePct === "number" && (
+            <span className="text-[11.5px] font-semibold inline-flex items-center gap-1 shrink-0" style={{ color: confColor(fitScorePct) }}>
+              <Star size={11} strokeWidth={2.2} fill={confColor(fitScorePct)} />
+              {fitScorePct}% Fit
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
+/** Unique candidates referenced anywhere in a message's sources, in first-seen order. */
+function uniqueCandidatesFromSources(sources?: CopilotSource[]): CopilotSource[] {
+  if (!sources || sources.length === 0) return [];
+  const seen = new Set<string>();
+  const result: CopilotSource[] = [];
+  for (const src of sources) {
+    if (!src.candidateId || !src.candidateName) continue;
+    if (seen.has(src.candidateId)) continue;
+    seen.add(src.candidateId);
+    result.push(src);
+  }
+  return result;
+}
+
 // ─── Source chip ──────────────────────────────────────────────────────────────
 
-const SOURCE_COLORS: Record<string, string> = {
-  resume: "bg-violet-500/15 text-violet-300 border-violet-500/20",
-  assessment: "bg-blue-500/15 text-blue-300 border-blue-500/20",
-  interview_brief: "bg-emerald-500/15 text-emerald-300 border-emerald-500/20",
-  score_breakdown: "bg-amber-500/15 text-amber-300 border-amber-500/20",
-  candidate_profile: "bg-sky-500/15 text-sky-300 border-sky-500/20",
-  job_description: "bg-rose-500/15 text-rose-300 border-rose-500/20",
+const SOURCE_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  resume: { bg: "#F5F3FF", text: "#6D28D9", border: "#E9D5FF" },
+  assessment: { bg: "#EFF6FF", text: "#1D4ED8", border: "#DBEAFE" },
+  interview_brief: { bg: "#ECFDF5", text: "#047857", border: "#D1FAE5" },
+  score_breakdown: { bg: "#FFFBEB", text: "#B45309", border: "#FDE68A" },
+  candidate_profile: { bg: "#F0F9FF", text: "#0369A1", border: "#BAE6FD" },
+  job_description: { bg: "#FFF1F2", text: "#BE123C", border: "#FECDD3" },
 };
 
 function SourceChip({ src, onNavigate }: { src: CopilotSource; onNavigate?: (src: CopilotSource) => void }) {
-  const color = SOURCE_COLORS[src.type] ?? "bg-white/10 text-white/60 border-white/10";
+  const c = SOURCE_COLORS[src.type] ?? { bg: "#F3F4F6", text: T.textSecondary, border: T.border };
   const navigable = !!onNavigate && (!!src.candidateId || (!!src.jobId && src.type === "job_description"));
   const inner = (
     <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-opacity ${color} ${navigable ? "cursor-pointer hover:opacity-80" : ""}`}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all ${navigable ? "cursor-pointer hover:shadow-sm" : ""}`}
+      style={{ background: c.bg, color: c.text, borderColor: c.border }}
       title={navigable ? "Jump to this candidate's context" : (src.detail ?? src.label)}
     >
-      <IcDoc />
+      <FileText size={10} strokeWidth={2.2} />
       {src.label}
       {src.detail && <span className="opacity-60">· {src.detail}</span>}
     </span>
@@ -269,16 +309,19 @@ function RecommendationCard({ recommendation, confidence, reasoning }: {
 }) {
   const color = confColor(confidence);
   return (
-    <div className="mt-4 rounded-2xl border border-white/[0.07] bg-white/[0.04] p-4 space-y-3">
+    <div className="mt-4 rounded-2xl border p-4 space-y-3" style={{ background: "#F9FAFB", borderColor: T.border }}>
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-white/30 mb-1">Recommendation</p>
-          <p className="text-[#e5e5e5] font-semibold text-[0.9rem] leading-snug">{recommendation}</p>
+        <div className="flex items-start gap-2">
+          <Target size={14} strokeWidth={2.2} className="mt-0.5 shrink-0" style={{ color: T.accent }} />
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-widest mb-1" style={{ color: T.textSecondary }}>Recommendation</p>
+            <p className="font-semibold text-[0.9rem] leading-snug" style={{ color: T.text }}>{recommendation}</p>
+          </div>
         </div>
         <div className="shrink-0 text-right">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-white/30 mb-1">Confidence</p>
+          <p className="text-[10px] font-semibold uppercase tracking-widest mb-1" style={{ color: T.textSecondary }}>Confidence</p>
           <div className="flex items-center gap-1.5 justify-end">
-            <div className="w-16 h-1.5 rounded-full bg-white/10 overflow-hidden">
+            <div className="w-16 h-1.5 rounded-full overflow-hidden" style={{ background: T.border }}>
               <div className="h-full rounded-full transition-all" style={{ width: `${confidence}%`, background: color }} />
             </div>
             <span className="text-sm font-bold tabular-nums" style={{ color }}>{confidence}%</span>
@@ -286,7 +329,7 @@ function RecommendationCard({ recommendation, confidence, reasoning }: {
         </div>
       </div>
       {reasoning && (
-        <p className="text-[0.8rem] text-white/40 leading-relaxed border-t border-white/[0.06] pt-2.5">{reasoning}</p>
+        <p className="text-[0.8rem] leading-relaxed border-t pt-2.5" style={{ color: T.textSecondary, borderColor: T.border }}>{reasoning}</p>
       )}
     </div>
   );
@@ -294,100 +337,97 @@ function RecommendationCard({ recommendation, confidence, reasoning }: {
 
 // ─── Message bubble ───────────────────────────────────────────────────────────
 
-/** Unique candidates referenced anywhere in a message's sources, in first-seen order. */
-function uniqueCandidatesFromSources(sources?: CopilotSource[]): CopilotSource[] {
-  if (!sources || sources.length === 0) return [];
-  const seen = new Set<string>();
-  const result: CopilotSource[] = [];
-  for (const src of sources) {
-    if (!src.candidateId || !src.candidateName) continue;
-    if (seen.has(src.candidateId)) continue;
-    seen.add(src.candidateId);
-    result.push(src);
-  }
-  return result;
-}
-
 function MessageBubble({ msg, onQuickAction, onSourceNavigate }: {
   msg: UIMessage; onQuickAction: (text: string) => void; onSourceNavigate?: (src: CopilotSource) => void;
 }) {
   if (msg.role === "user") {
     return (
-      <div className="flex justify-end mb-6">
-        <div className="max-w-[75%] bg-[#1e1e2e] border border-white/[0.07] rounded-2xl rounded-tr-md px-4 py-3 text-[0.875rem] text-[#e5e5e5] leading-relaxed">
+      <div className="flex justify-end mb-6 rb-animate-fade-in">
+        <div
+          className="max-w-[75%] rounded-2xl rounded-tr-md px-4 py-3 text-[0.9rem] leading-relaxed"
+          style={{ background: "rgba(109,93,246,0.08)", border: `1px solid rgba(109,93,246,0.18)`, color: T.text }}
+        >
           {msg.content}
         </div>
       </div>
     );
   }
 
+  const mentioned = uniqueCandidatesFromSources(msg.sources);
+  const showEmptyLoading = !!msg.isStreaming && !msg.content;
+
   return (
-    <div className="mb-8">
-      <div className="flex items-center gap-2 mb-3">
-        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shrink-0">
-          <IcSparkle />
+    <div className="mb-6 rb-animate-fade-in">
+      <div
+        className="rounded-[20px] px-5 py-4 transition-shadow hover:shadow-md"
+        style={{ background: T.card, border: `1px solid ${T.border}`, boxShadow: "0 1px 2px rgba(17,24,39,0.03)" }}
+      >
+        <div className="flex items-center gap-2 mb-3">
+          <div
+            className="w-6 h-6 rounded-full flex items-center justify-center shrink-0"
+            style={{ background: `linear-gradient(135deg, ${T.accent}, #4C3FD8)` }}
+          >
+            <Sparkles size={12} strokeWidth={2.4} color="#fff" />
+          </div>
+          <span className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: T.textSecondary }}>Rolebolt AI</span>
         </div>
-        <span className="text-[11px] font-semibold text-white/30 uppercase tracking-widest">Rolebolt AI</span>
-        {msg.isStreaming && (
-          <span className="flex gap-0.5 items-center ml-1">
-            {[0, 1, 2].map(i => (
-              <span key={i} className="w-1 h-1 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
-            ))}
-          </span>
+
+        {showEmptyLoading ? (
+          <StreamingPlaceholder />
+        ) : (
+          <div className="text-[0.9rem] leading-relaxed copilot-markdown">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+            {msg.isStreaming && (
+              <span className="inline-block w-0.5 h-4 align-middle ml-0.5 animate-pulse" style={{ background: T.accent }} />
+            )}
+          </div>
         )}
-      </div>
 
-      <div className="text-[0.875rem] leading-relaxed text-[#d4d4d4] copilot-markdown ml-8">
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
-        {msg.isStreaming && <span className="inline-block w-0.5 h-4 bg-indigo-400 align-middle ml-0.5 animate-pulse" />}
-      </div>
-
-      {!msg.isStreaming && (() => {
-        const mentioned = uniqueCandidatesFromSources(msg.sources);
-        if (mentioned.length === 0) return null;
-        return (
-          <div className="ml-8 mt-3 flex flex-wrap gap-2">
+        {!msg.isStreaming && mentioned.length > 0 && (
+          <div className="mt-4 pt-4 border-t flex flex-wrap gap-2" style={{ borderColor: T.border }}>
             {mentioned.map((src) => (
               <CandidateIdentity
                 key={src.candidateId}
                 name={src.candidateName!}
                 email={src.candidateEmail}
+                fitScorePct={src.candidateFitScorePct}
                 onNavigate={onSourceNavigate ? () => onSourceNavigate(src) : undefined}
               />
             ))}
           </div>
-        );
-      })()}
+        )}
 
-      {!msg.isStreaming && msg.recommendation && (
-        <div className="ml-8">
+        {!msg.isStreaming && msg.recommendation && (
           <RecommendationCard
             recommendation={msg.recommendation}
             confidence={msg.confidence ?? 0}
             reasoning={msg.reasoning ?? ""}
           />
-        </div>
-      )}
+        )}
 
-      {!msg.isStreaming && msg.sources && msg.sources.length > 0 && (
-        <div className="ml-8 mt-3 flex flex-wrap gap-1.5">
-          {msg.sources.map((src, i) => <SourceChip key={i} src={src} onNavigate={onSourceNavigate} />)}
-        </div>
-      )}
+        {!msg.isStreaming && msg.sources && msg.sources.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {msg.sources.map((src, i) => <SourceChip key={i} src={src} onNavigate={onSourceNavigate} />)}
+          </div>
+        )}
 
-      {!msg.isStreaming && msg.quickActions && msg.quickActions.length > 0 && (
-        <div className="ml-8 mt-3 flex flex-wrap gap-2">
-          {msg.quickActions.map((action, i) => (
-            <button
-              key={i}
-              onClick={() => onQuickAction(action)}
-              className="text-[12px] font-medium px-3 py-1.5 rounded-full border border-white/[0.1] text-white/50 bg-white/[0.03] hover:bg-white/[0.08] hover:text-white/80 hover:border-white/20 transition-all"
-            >
-              {action}
-            </button>
-          ))}
-        </div>
-      )}
+        {!msg.isStreaming && msg.quickActions && msg.quickActions.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {msg.quickActions.map((action, i) => (
+              <button
+                key={i}
+                onClick={() => onQuickAction(action)}
+                className="text-[12px] font-medium px-3 py-1.5 rounded-full border transition-all hover:shadow-sm"
+                style={{ borderColor: T.border, color: T.textSecondary, background: "#F9FAFB" }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = T.accent; e.currentTarget.style.borderColor = "rgba(109,93,246,0.3)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = T.textSecondary; e.currentTarget.style.borderColor = T.border; }}
+              >
+                {action}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -395,30 +435,30 @@ function MessageBubble({ msg, onQuickAction, onSourceNavigate }: {
 // ─── Welcome screen ───────────────────────────────────────────────────────────
 
 const JOB_PROMPTS = [
-  { icon: "🎯", text: "Who should I interview first?" },
-  { icon: "⚖️", text: "Compare my top candidates" },
-  { icon: "🔍", text: "Which candidates are missing required skills?" },
-  { icon: "📋", text: "Generate interview questions for the top candidate" },
-  { icon: "⚡", text: "Show candidates ready to join immediately" },
-  { icon: "📊", text: "Why is the top candidate ranked #1?" },
+  { Icon: Target, text: "Who should I interview first?" },
+  { Icon: TrendingUp, text: "Compare my top candidates" },
+  { Icon: Search, text: "Which candidates are missing required skills?" },
+  { Icon: ClipboardCheck, text: "Generate interview questions for the top candidate" },
+  { Icon: CheckCircle2, text: "Show candidates ready to join immediately" },
+  { Icon: Award, text: "Why is the top candidate ranked #1?" },
 ];
 
 const CANDIDATE_PROMPTS = [
-  { icon: "📋", text: "Summarize this candidate" },
-  { icon: "🔢", text: "Explain the AI score" },
-  { icon: "❓", text: "Generate interview questions" },
-  { icon: "🔍", text: "Show missing skills" },
-  { icon: "🤔", text: "Should I hire this candidate?" },
-  { icon: "📄", text: "Compare against the job description" },
+  { Icon: ClipboardCheck, text: "Summarize this candidate" },
+  { Icon: Target, text: "Explain the AI score" },
+  { Icon: FileText, text: "Generate interview questions" },
+  { Icon: Search, text: "Show missing skills" },
+  { Icon: CheckCircle2, text: "Should I hire this candidate?" },
+  { Icon: Briefcase, text: "Compare against the job description" },
 ];
 
 const GLOBAL_PROMPTS = [
-  { icon: "🧭", text: "What should I prioritize today?" },
-  { icon: "🏆", text: "Which job has the strongest candidates?" },
-  { icon: "🚧", text: "Which role is hardest to hire for?" },
-  { icon: "🔍", text: "Find candidates with React and Docker" },
-  { icon: "⚖️", text: "Compare all active jobs" },
-  { icon: "🕳️", text: "Where are candidates dropping off?" },
+  { Icon: Target, text: "What should I prioritize today?" },
+  { Icon: Award, text: "Which job has the strongest candidates?" },
+  { Icon: AlertTriangle, text: "Which role is hardest to hire for?" },
+  { Icon: Search, text: "Find candidates with React and Docker" },
+  { Icon: TrendingUp, text: "Compare all active jobs" },
+  { Icon: Users, text: "Where are candidates dropping off?" },
 ];
 
 function WelcomeScreen({ recruiterName, jobSelected, contextMode, candidateName, onPrompt, loadingInsights }: {
@@ -436,64 +476,76 @@ function WelcomeScreen({ recruiterName, jobSelected, contextMode, candidateName,
   if (contextMode === "global" && loadingInsights) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center px-6 pb-24">
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center mb-6 shadow-[0_0_40px_rgba(124,58,237,0.3)] animate-pulse">
-          <IcSparkle />
+        <div
+          className="w-12 h-12 rounded-2xl flex items-center justify-center mb-6 animate-pulse"
+          style={{ background: `linear-gradient(135deg, ${T.accent}, #4C3FD8)`, boxShadow: "0 0 40px rgba(109,93,246,0.18)" }}
+        >
+          <Sparkles size={20} color="#fff" />
         </div>
-        <h1 className="text-2xl font-bold text-white mb-2">{hourGreeting()}, {firstName} 👋</h1>
-        <p className="text-[#8b8b8b] text-[0.9rem]">Pulling together today's hiring overview…</p>
+        <h1 className="text-2xl font-bold mb-2" style={{ color: T.text }}>{hourGreeting()}, {firstName} 👋</h1>
+        <p className="text-[0.9rem]" style={{ color: T.textSecondary }}>Pulling together today's hiring overview…</p>
       </div>
     );
   }
 
   return (
     <div className="flex flex-col items-center justify-center h-full text-center px-6 pb-24">
-      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center mb-6 shadow-[0_0_40px_rgba(124,58,237,0.3)]">
-        <IcSparkle />
+      <div
+        className="w-12 h-12 rounded-2xl flex items-center justify-center mb-6"
+        style={{ background: `linear-gradient(135deg, ${T.accent}, #4C3FD8)`, boxShadow: "0 0 40px rgba(109,93,246,0.18)" }}
+      >
+        <Sparkles size={20} color="#fff" />
       </div>
-      <h1 className="text-2xl font-bold text-white mb-2">
+      <h1 className="text-2xl font-bold mb-2" style={{ color: T.text }}>
         {hourGreeting()}, {firstName} 👋
       </h1>
 
       {contextMode === "candidate" && candidateName ? (
         <>
-          <p className="text-[#8b8b8b] text-[0.9rem] max-w-sm leading-relaxed mb-2">
-            I'm focused on <span className="text-white font-semibold">{candidateName}</span>. Ask me anything about this candidate.
+          <p className="text-[0.9rem] max-w-sm leading-relaxed mb-2" style={{ color: T.textSecondary }}>
+            I'm focused on <span className="font-semibold" style={{ color: T.text }}>{candidateName}</span>. Ask me anything about this candidate.
           </p>
-          <p className="text-[#5a5a5a] text-xs mb-8">Select a prompt or type your own question below</p>
+          <p className="text-xs mb-8" style={{ color: "#9CA3AF" }}>Select a prompt or type your own question below</p>
         </>
       ) : contextMode === "global" ? (
         <>
-          <p className="text-[#8b8b8b] text-[0.9rem] max-w-sm leading-relaxed mb-2">
+          <p className="text-[0.9rem] max-w-sm leading-relaxed mb-2" style={{ color: T.textSecondary }}>
             I'm looking across your entire hiring organization — every job, every candidate, every pipeline. Ask me anything, no filtering needed.
           </p>
-          <p className="text-[#5a5a5a] text-xs mb-8">Select a prompt or type your own question below</p>
+          <p className="text-xs mb-8" style={{ color: "#9CA3AF" }}>Select a prompt or type your own question below</p>
         </>
       ) : (
         <>
-          <p className="text-[#8b8b8b] text-[0.9rem] max-w-sm leading-relaxed mb-2">
+          <p className="text-[0.9rem] max-w-sm leading-relaxed mb-2" style={{ color: T.textSecondary }}>
             I'm Rolebolt AI. I can help you compare candidates, explain scores, generate interview questions, and recommend who to interview next.
           </p>
           {!jobSelected && (
-            <p className="text-amber-400/70 text-xs font-medium mb-6 flex items-center gap-1.5">
+            <p className="text-xs font-medium mb-6 flex items-center gap-1.5" style={{ color: "#D97706" }}>
               <span>↑</span> Select a job from the left sidebar to get started
             </p>
           )}
           {jobSelected && (
-            <p className="text-[#5a5a5a] text-xs mb-8">Select a prompt or type your own question below</p>
+            <p className="text-xs mb-8" style={{ color: "#9CA3AF" }}>Select a prompt or type your own question below</p>
           )}
         </>
       )}
 
       {canChat && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-lg">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full max-w-lg">
           {prompts.map((p, i) => (
             <button
               key={i}
               onClick={() => onPrompt(p.text)}
-              className="flex items-center gap-3 text-left px-4 py-3 rounded-2xl border border-white/[0.07] bg-white/[0.03] hover:bg-white/[0.07] hover:border-white/[0.12] transition-all group"
+              className="flex items-center gap-3 text-left px-4 py-3.5 rounded-2xl border transition-all group hover:shadow-md hover:-translate-y-0.5"
+              style={{ background: T.card, borderColor: T.border }}
             >
-              <span className="text-lg shrink-0">{p.icon}</span>
-              <span className="text-[13px] text-[#a3a3a3] group-hover:text-[#e5e5e5] transition-colors">{p.text}</span>
+              <span
+                className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+                style={{ background: "rgba(109,93,246,0.08)", color: T.accent }}
+              >
+                <p.Icon size={15} strokeWidth={2.2} />
+              </span>
+              <span className="text-[13px] transition-colors" style={{ color: T.textSecondary }}>{p.text}</span>
             </button>
           ))}
         </div>
@@ -502,16 +554,36 @@ function WelcomeScreen({ recruiterName, jobSelected, contextMode, candidateName,
   );
 }
 
+// ─── Metric card (right context panels) ────────────────────────────────────────
+
+function MetricCard({ label, value, color, icon: Icon }: {
+  label: string; value: string | number; color?: string; icon?: React.ComponentType<{ size?: number; strokeWidth?: number }>;
+}) {
+  return (
+    <div className="p-3.5 rounded-2xl border" style={{ background: T.card, borderColor: T.border }}>
+      <div className="flex items-center gap-1.5 mb-1.5">
+        {Icon && <Icon size={12} strokeWidth={2.2} />}
+        <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: T.textSecondary }}>{label}</p>
+      </div>
+      <p className="text-xl font-bold tabular-nums" style={{ color: color ?? T.text }}>{value}</p>
+    </div>
+  );
+}
+
+function PanelSectionLabel({ children }: { children: React.ReactNode }) {
+  return <p className="text-[10px] font-semibold uppercase tracking-widest mb-3" style={{ color: "#9CA3AF" }}>{children}</p>;
+}
+
 // ─── Job context panel (right sidebar) ───────────────────────────────────────
 
 function JobContextPanel({ job, candidates }: { job: Job | null; candidates: CandidateStat[] }) {
   if (!job) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center px-4">
-        <div className="w-10 h-10 rounded-2xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center mb-3">
-          <IcBriefcase />
+        <div className="w-10 h-10 rounded-2xl border flex items-center justify-center mb-3" style={{ background: T.card, borderColor: T.border }}>
+          <Briefcase size={16} strokeWidth={2} style={{ color: "#D1D5DB" }} />
         </div>
-        <p className="text-[12px] text-white/20">Select a job to see context</p>
+        <p className="text-[12px]" style={{ color: "#9CA3AF" }}>Select a job to see context</p>
       </div>
     );
   }
@@ -527,40 +599,32 @@ function JobContextPanel({ job, candidates }: { job: Job | null; candidates: Can
   return (
     <div className="px-4 py-5 space-y-5 overflow-y-auto h-full scrollbar-none">
       <div>
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-3">Current Context</p>
-        <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+        <PanelSectionLabel>Current Context</PanelSectionLabel>
+        <div className="p-3.5 rounded-2xl border" style={{ background: T.card, borderColor: T.border }}>
           <div className="flex items-center gap-2 mb-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-white/30">Job</p>
+            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "#16a34a" }} />
+            <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: T.textSecondary }}>Job</p>
           </div>
-          <p className="text-[0.875rem] font-semibold text-white leading-snug">{job.title}</p>
-          {job.department && <p className="text-[11px] text-white/30 mt-0.5">{job.department}</p>}
+          <p className="text-[0.9rem] font-semibold leading-snug" style={{ color: T.text }}>{job.title}</p>
+          {job.department && <p className="text-[11px] mt-0.5" style={{ color: T.textSecondary }}>{job.department}</p>}
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
-        <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-1">Candidates</p>
-          <p className="text-xl font-bold text-white tabular-nums">{job.candidateCount}</p>
-        </div>
-        <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-1">Avg Score</p>
-          <p className="text-xl font-bold tabular-nums" style={{ color: avgScore ? confColor(avgScore) : "#555" }}>
-            {avgScore ?? "—"}
-          </p>
-        </div>
+      <div className="grid grid-cols-2 gap-2.5">
+        <MetricCard label="Candidates" value={job.candidateCount} icon={Users} />
+        <MetricCard label="Avg Score" value={avgScore ?? "—"} color={avgScore ? confColor(avgScore) : undefined} icon={Target} />
       </div>
 
       {top3.length > 0 && (
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-2.5">Top Candidates</p>
+          <PanelSectionLabel>Top Candidates</PanelSectionLabel>
           <div className="space-y-1.5">
             {top3.map((c, i) => {
               const pct = c.maxScore ? Math.round((c.totalScore / c.maxScore) * 100) : 0;
               return (
-                <div key={c._id} className="flex items-center gap-2.5 p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.05]">
-                  <span className="text-[10px] font-bold text-white/20 w-3 shrink-0">#{i + 1}</span>
-                  <span className="flex-1 text-[12px] text-[#d4d4d4] truncate font-medium">{c.name}</span>
+                <div key={c._id} className="flex items-center gap-2.5 p-2.5 rounded-xl border" style={{ background: "#F9FAFB", borderColor: T.border }}>
+                  <span className="text-[10px] font-bold w-3 shrink-0" style={{ color: "#9CA3AF" }}>#{i + 1}</span>
+                  <span className="flex-1 text-[12px] truncate font-medium" style={{ color: T.text }}>{c.name}</span>
                   <span className="text-[11px] font-bold tabular-nums shrink-0" style={{ color: confColor(pct) }}>{pct}%</span>
                 </div>
               );
@@ -573,9 +637,10 @@ function JobContextPanel({ job, candidates }: { job: Job | null; candidates: Can
         <div className="pt-1">
           <Link
             href={`/recruit/jobs/${job._id}`}
-            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-white/[0.07] text-[12px] font-medium text-white/40 hover:text-white/70 hover:border-white/15 hover:bg-white/[0.04] transition-all"
+            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border text-[12px] font-medium transition-all hover:shadow-sm"
+            style={{ borderColor: T.border, color: T.textSecondary, background: T.card }}
           >
-            <IcUsers />
+            <Users size={13} strokeWidth={2} />
             View all candidates
           </Link>
         </div>
@@ -590,10 +655,10 @@ function GlobalContextPanel({ stats, loading }: { stats: GlobalStats | null; loa
   if (loading && !stats) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center px-4">
-        <div className="w-10 h-10 rounded-2xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center mb-3 animate-pulse">
-          <IcGlobe />
+        <div className="w-10 h-10 rounded-2xl border flex items-center justify-center mb-3 animate-pulse" style={{ background: T.card, borderColor: T.border }}>
+          <Globe size={16} strokeWidth={2} style={{ color: "#D1D5DB" }} />
         </div>
-        <p className="text-[12px] text-white/20">Loading organization data…</p>
+        <p className="text-[12px]" style={{ color: "#9CA3AF" }}>Loading organization data…</p>
       </div>
     );
   }
@@ -601,10 +666,10 @@ function GlobalContextPanel({ stats, loading }: { stats: GlobalStats | null; loa
   if (!stats) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center px-4">
-        <div className="w-10 h-10 rounded-2xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center mb-3">
-          <IcGlobe />
+        <div className="w-10 h-10 rounded-2xl border flex items-center justify-center mb-3" style={{ background: T.card, borderColor: T.border }}>
+          <Globe size={16} strokeWidth={2} style={{ color: "#D1D5DB" }} />
         </div>
-        <p className="text-[12px] text-white/20">No organization data yet</p>
+        <p className="text-[12px]" style={{ color: "#9CA3AF" }}>No organization data yet</p>
       </div>
     );
   }
@@ -612,29 +677,29 @@ function GlobalContextPanel({ stats, loading }: { stats: GlobalStats | null; loa
   return (
     <div className="px-4 py-5 space-y-5 overflow-y-auto h-full scrollbar-none">
       <div>
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-3">Organization Context</p>
-        <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+        <PanelSectionLabel>Organization Context</PanelSectionLabel>
+        <div className="p-3.5 rounded-2xl border" style={{ background: T.card, borderColor: T.border }}>
           <div className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-sky-400 shrink-0" />
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-white/30">Global</p>
+            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "#0EA5E9" }} />
+            <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: T.textSecondary }}>Global</p>
           </div>
-          <p className="text-[0.875rem] font-semibold text-white leading-snug mt-1">Every job, every candidate</p>
+          <p className="text-[0.9rem] font-semibold leading-snug mt-1" style={{ color: T.text }}>Every job, every candidate</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
-        <StatTile label="Active Jobs" value={stats.activeJobs} />
-        <StatTile label="Total Candidates" value={stats.totalCandidates} />
-        <StatTile label="Interview Ready" value={stats.interviewReady} />
-        <StatTile label="Offers Sent" value={stats.offersSent} />
-        <StatTile label="Avg Fit Score" value={stats.avgFitScorePct !== null ? `${stats.avgFitScorePct}%` : "—"} color={stats.avgFitScorePct ? confColor(stats.avgFitScorePct) : undefined} />
-        <StatTile label="Open Positions" value={stats.openPositions} />
+      <div className="grid grid-cols-2 gap-2.5">
+        <MetricCard label="Active Jobs" value={stats.activeJobs} icon={Briefcase} />
+        <MetricCard label="Total Candidates" value={stats.totalCandidates} icon={Users} />
+        <MetricCard label="Interview Ready" value={stats.interviewReady} icon={CheckCircle2} />
+        <MetricCard label="Offers Sent" value={stats.offersSent} icon={Mail} />
+        <MetricCard label="Avg Fit Score" value={stats.avgFitScorePct !== null ? `${stats.avgFitScorePct}%` : "—"} color={stats.avgFitScorePct ? confColor(stats.avgFitScorePct) : undefined} icon={Target} />
+        <MetricCard label="Open Positions" value={stats.openPositions} icon={Briefcase} />
       </div>
 
       {stats.topPipeline && (
-        <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-1">Top Hiring Pipeline</p>
-          <p className="text-[0.85rem] font-semibold text-white">{stats.topPipeline.title}</p>
+        <div className="p-3.5 rounded-2xl border" style={{ background: T.card, borderColor: T.border }}>
+          <PanelSectionLabel>Top Hiring Pipeline</PanelSectionLabel>
+          <p className="text-[0.85rem] font-semibold" style={{ color: T.text }}>{stats.topPipeline.title}</p>
           {stats.topPipeline.avgScorePct !== null && (
             <p className="text-[11px] mt-0.5" style={{ color: confColor(stats.topPipeline.avgScorePct) }}>
               {stats.topPipeline.avgScorePct}% avg fit · {stats.topPipeline.candidateCount} candidates
@@ -644,19 +709,21 @@ function GlobalContextPanel({ stats, loading }: { stats: GlobalStats | null; loa
       )}
 
       {stats.highestRatedCandidate && (
-        <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-1">Highest Rated Candidate</p>
-          <p className="text-[0.85rem] font-semibold text-white">{stats.highestRatedCandidate.name}</p>
-          <p className="text-[11px] text-white/30 mt-0.5">{stats.highestRatedCandidate.jobTitle} · <span style={{ color: confColor(stats.highestRatedCandidate.scorePct) }}>{stats.highestRatedCandidate.scorePct}%</span></p>
+        <div className="p-3.5 rounded-2xl border" style={{ background: T.card, borderColor: T.border }}>
+          <PanelSectionLabel>Highest Rated Candidate</PanelSectionLabel>
+          <p className="text-[0.85rem] font-semibold" style={{ color: T.text }}>{stats.highestRatedCandidate.name}</p>
+          <p className="text-[11px] mt-0.5" style={{ color: T.textSecondary }}>
+            {stats.highestRatedCandidate.jobTitle} · <span style={{ color: confColor(stats.highestRatedCandidate.scorePct) }}>{stats.highestRatedCandidate.scorePct}%</span>
+          </p>
         </div>
       )}
 
       {stats.mostCommonMissingSkills.length > 0 && (
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-2">Commonly Missing Skills</p>
+          <PanelSectionLabel>Commonly Missing Skills</PanelSectionLabel>
           <div className="flex flex-wrap gap-1.5">
             {stats.mostCommonMissingSkills.map((s, i) => (
-              <span key={i} className="text-[11px] px-2.5 py-1 rounded-full border border-amber-500/20 bg-amber-500/10 text-amber-300">{s}</span>
+              <span key={i} className="text-[11px] px-2.5 py-1 rounded-full border" style={{ background: "#FFFBEB", color: "#B45309", borderColor: "#FDE68A" }}>{s}</span>
             ))}
           </div>
         </div>
@@ -664,28 +731,22 @@ function GlobalContextPanel({ stats, loading }: { stats: GlobalStats | null; loa
 
       {stats.recentActivity.length > 0 && (
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-2">Recent Activity</p>
+          <PanelSectionLabel>Recent Activity</PanelSectionLabel>
           <div className="space-y-1.5">
             {stats.recentActivity.map((a, i) => (
-              <div key={i} className="text-[12px] text-[#a3a3a3] p-2 rounded-lg bg-white/[0.02] border border-white/[0.05]">{a}</div>
+              <div key={i} className="text-[12px] p-2.5 rounded-xl border" style={{ background: "#F9FAFB", borderColor: T.border, color: T.textSecondary }}>{a}</div>
             ))}
           </div>
         </div>
       )}
 
-      <div className="p-3 rounded-xl bg-violet-500/10 border border-violet-500/20">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-violet-300/70 mb-1">AI Recommendation</p>
-        <p className="text-[12px] text-violet-100 leading-relaxed">{stats.recommendation}</p>
+      <div className="p-3.5 rounded-2xl border" style={{ background: "rgba(109,93,246,0.06)", borderColor: "rgba(109,93,246,0.18)" }}>
+        <div className="flex items-center gap-1.5 mb-1">
+          <Sparkles size={12} strokeWidth={2.2} style={{ color: T.accent }} />
+          <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: T.accent }}>AI Recommendation</p>
+        </div>
+        <p className="text-[12px] leading-relaxed" style={{ color: "#4C3FD8" }}>{stats.recommendation}</p>
       </div>
-    </div>
-  );
-}
-
-function StatTile({ label, value, color }: { label: string; value: string | number; color?: string }) {
-  return (
-    <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-      <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-1">{label}</p>
-      <p className="text-xl font-bold tabular-nums" style={{ color: color ?? "#fff" }}>{value}</p>
     </div>
   );
 }
@@ -700,41 +761,37 @@ function CandidateContextPanel({ candidate, job, onSwitchToJob }: {
   if (!candidate) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center px-4">
-        <div className="w-10 h-10 rounded-2xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center mb-3">
-          <IcPerson />
+        <div className="w-10 h-10 rounded-2xl border flex items-center justify-center mb-3" style={{ background: T.card, borderColor: T.border }}>
+          <User size={16} strokeWidth={2} style={{ color: "#D1D5DB" }} />
         </div>
-        <p className="text-[12px] text-white/20">No candidate selected</p>
+        <p className="text-[12px]" style={{ color: "#9CA3AF" }}>No candidate selected</p>
       </div>
     );
   }
 
   const pct = candidate.maxScore > 0 ? Math.round((candidate.totalScore / candidate.maxScore) * 100) : null;
   const decision = hiringDecisionLabel(candidate.hiringDecision);
-  const assessmentPct = candidate.assessmentImpact
-    ? null // We don't have a numeric assessment score here, just impact
-    : null;
 
   return (
     <div className="px-4 py-5 space-y-4 overflow-y-auto h-full scrollbar-none">
       <div>
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-3">Candidate Focus</p>
+        <PanelSectionLabel>Candidate Focus</PanelSectionLabel>
 
-        {/* Name + score */}
-        <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+        <div className="p-3.5 rounded-2xl border" style={{ background: T.card, borderColor: T.border }}>
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <div className="flex items-center gap-1.5 mb-0.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-violet-400 shrink-0" />
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-white/30">Candidate</p>
+                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: T.accent }} />
+                <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: T.textSecondary }}>Candidate</p>
               </div>
-              <p className="text-[0.875rem] font-semibold text-white leading-snug">{candidate.name}</p>
+              <p className="text-[0.9rem] font-semibold leading-snug" style={{ color: T.text }}>{candidate.name}</p>
               {candidate.stage && (
-                <p className="text-[11px] text-white/30 mt-0.5 capitalize">{candidate.stage}</p>
+                <p className="text-[11px] mt-0.5 capitalize" style={{ color: T.textSecondary }}>{candidate.stage}</p>
               )}
             </div>
             {pct !== null && (
               <div className="text-right shrink-0">
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-1">Fit Score</p>
+                <p className="text-[10px] font-semibold uppercase tracking-widest mb-1" style={{ color: T.textSecondary }}>Fit Score</p>
                 <p className="text-xl font-bold tabular-nums" style={{ color: confColor(pct) }}>{pct}%</p>
               </div>
             )}
@@ -742,7 +799,7 @@ function CandidateContextPanel({ candidate, job, onSwitchToJob }: {
 
           {pct !== null && (
             <div className="mt-2.5">
-              <div className="h-1 rounded-full bg-white/10 overflow-hidden">
+              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: T.border }}>
                 <div className="h-full rounded-full" style={{ width: `${pct}%`, background: confColor(pct) }} />
               </div>
             </div>
@@ -750,36 +807,32 @@ function CandidateContextPanel({ candidate, job, onSwitchToJob }: {
         </div>
       </div>
 
-      {/* Decision badge */}
       {decision && (
-        <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-1.5">Current Recommendation</p>
+        <div className="p-3.5 rounded-2xl border" style={{ background: T.card, borderColor: T.border }}>
+          <PanelSectionLabel>Current Recommendation</PanelSectionLabel>
           <span className="text-sm font-bold" style={{ color: decision.color }}>{decision.text}</span>
         </div>
       )}
 
-      {/* Assessment status */}
       {candidate.assessmentStatus && (
-        <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-1.5">Assessment</p>
-          <span className={`text-[12px] font-semibold capitalize ${
-            candidate.assessmentStatus === "completed" ? "text-emerald-400" :
-            candidate.assessmentStatus === "sent" ? "text-amber-400" :
-            "text-white/30"
-          }`}>
+        <div className="p-3.5 rounded-2xl border" style={{ background: T.card, borderColor: T.border }}>
+          <PanelSectionLabel>Assessment</PanelSectionLabel>
+          <span className="text-[12px] font-semibold capitalize" style={{
+            color: candidate.assessmentStatus === "completed" ? "#16a34a" :
+              candidate.assessmentStatus === "sent" ? "#d97706" : T.textSecondary
+          }}>
             {candidate.assessmentStatus === "not_sent" ? "Not sent" : candidate.assessmentStatus}
           </span>
         </div>
       )}
 
-      {/* Top strengths */}
       {candidate.strengths && candidate.strengths.length > 0 && (
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-2">Top Strengths</p>
-          <div className="space-y-1">
+          <PanelSectionLabel>Top Strengths</PanelSectionLabel>
+          <div className="space-y-1.5">
             {candidate.strengths.slice(0, 3).map((s, i) => (
-              <div key={i} className="flex items-start gap-2 text-[12px] text-[#a3a3a3]">
-                <span className="text-emerald-400 mt-0.5 shrink-0">✓</span>
+              <div key={i} className="flex items-start gap-2 text-[12px]" style={{ color: T.textSecondary }}>
+                <CheckCircle2 size={13} strokeWidth={2.2} className="mt-0.5 shrink-0" style={{ color: "#16a34a" }} />
                 <span>{s}</span>
               </div>
             ))}
@@ -787,14 +840,13 @@ function CandidateContextPanel({ candidate, job, onSwitchToJob }: {
         </div>
       )}
 
-      {/* Red flags */}
       {candidate.redFlags && candidate.redFlags.length > 0 && (
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-2">Red Flags</p>
-          <div className="space-y-1">
+          <PanelSectionLabel>Red Flags</PanelSectionLabel>
+          <div className="space-y-1.5">
             {candidate.redFlags.slice(0, 3).map((f, i) => (
-              <div key={i} className="flex items-start gap-2 text-[12px] text-[#a3a3a3]">
-                <span className="text-rose-400 mt-0.5 shrink-0">⚠</span>
+              <div key={i} className="flex items-start gap-2 text-[12px]" style={{ color: T.textSecondary }}>
+                <AlertTriangle size={13} strokeWidth={2.2} className="mt-0.5 shrink-0" style={{ color: "#dc2626" }} />
                 <span>{f}</span>
               </div>
             ))}
@@ -802,29 +854,29 @@ function CandidateContextPanel({ candidate, job, onSwitchToJob }: {
         </div>
       )}
 
-      {/* Availability */}
       {candidate.availability && (
-        <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-1">Notice Period / Availability</p>
-          <p className="text-[12px] text-[#d4d4d4]">{candidate.availability}</p>
+        <div className="p-3.5 rounded-2xl border" style={{ background: T.card, borderColor: T.border }}>
+          <PanelSectionLabel>Notice Period / Availability</PanelSectionLabel>
+          <p className="text-[12px]" style={{ color: T.text }}>{candidate.availability}</p>
         </div>
       )}
 
-      {/* Switch to job view */}
       {job && (
         <div className="pt-1 space-y-2">
           <button
             onClick={onSwitchToJob}
-            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-white/[0.07] text-[12px] font-medium text-white/40 hover:text-white/70 hover:border-white/15 hover:bg-white/[0.04] transition-all"
+            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border text-[12px] font-medium transition-all hover:shadow-sm"
+            style={{ borderColor: T.border, color: T.textSecondary, background: T.card }}
           >
-            <IcBriefcase />
+            <Briefcase size={13} strokeWidth={2} />
             Switch to Job View
           </button>
           <Link
             href={`/recruit/jobs/${job._id}`}
-            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-white/[0.07] text-[12px] font-medium text-white/40 hover:text-white/70 hover:border-white/15 hover:bg-white/[0.04] transition-all"
+            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border text-[12px] font-medium transition-all hover:shadow-sm"
+            style={{ borderColor: T.border, color: T.textSecondary, background: T.card }}
           >
-            <IcUsers />
+            <Users size={13} strokeWidth={2} />
             View all candidates
           </Link>
         </div>
@@ -1150,6 +1202,7 @@ function CopilotPageContent() {
       setSelectedCandidate(null);
     }
     if (textareaRef.current) textareaRef.current.style.height = "auto";
+    requestAnimationFrame(() => textareaRef.current?.focus());
   }
 
   // ── Delete conversation ────────────────────────────────────────────────────
@@ -1192,6 +1245,9 @@ function CopilotPageContent() {
     setInput("");
     if (textareaRef.current) textareaRef.current.style.height = "auto";
     setIsStreaming(true);
+    // Keep the cursor active in the input while the AI responds — the field
+    // is never disabled during streaming, so focus should never be lost.
+    requestAnimationFrame(() => textareaRef.current?.focus());
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -1276,6 +1332,9 @@ function CopilotPageContent() {
       }
     } finally {
       setIsStreaming(false);
+      // Restore focus/cursor after the response finishes so the recruiter can
+      // keep chatting without touching the mouse.
+      requestAnimationFrame(() => textareaRef.current?.focus());
     }
   }, [isStreaming, selectedJob, selectedCandidateId, contextMode, getToken, activeConvId, loadConversations]);
 
@@ -1284,6 +1343,7 @@ function CopilotPageContent() {
       e.preventDefault();
       sendMessage(input);
     }
+    // Shift+Enter falls through to the textarea's default behavior (newline).
   }
 
   // ── Input placeholder text ─────────────────────────────────────────────────
@@ -1297,9 +1357,14 @@ function CopilotPageContent() {
     return `Ask about ${selectedJob.title}…`;
   })();
 
-  const inputDisabled = isStreaming ||
+  // The textarea itself is never disabled by streaming — only by a genuinely
+  // missing context (no job / no resolved candidate yet). Disabling it while
+  // the AI responds was the root cause of "have to click the textbox again"
+  // (disabled inputs lose focus in the browser).
+  const textDisabled =
     (contextMode !== "global" && !selectedJob) ||
     (contextMode === "candidate" && !selectedCandidate);
+  const sendDisabled = isStreaming || textDisabled;
 
   // ── Grouped conversations ──────────────────────────────────────────────────
   const grouped = groupConvos(conversations);
@@ -1329,14 +1394,14 @@ function CopilotPageContent() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: "#0f0f0f", color: "#e5e5e5" }}>
+    <div className="flex h-screen overflow-hidden" style={{ background: T.bg, color: T.text }}>
 
       {/* Mobile overlays */}
       {sidebarOpen && (
-        <div className="fixed inset-0 z-20 bg-black/60 lg:hidden" onClick={() => setSidebarOpen(false)} />
+        <div className="fixed inset-0 z-20 bg-black/30 lg:hidden" onClick={() => setSidebarOpen(false)} />
       )}
       {contextOpen && (
-        <div className="fixed inset-0 z-20 bg-black/60 lg:hidden" onClick={() => setContextOpen(false)} />
+        <div className="fixed inset-0 z-20 bg-black/30 lg:hidden" onClick={() => setContextOpen(false)} />
       )}
 
       {/* ── Left sidebar ────────────────────────────────────────────────── */}
@@ -1347,16 +1412,20 @@ function CopilotPageContent() {
           transition-transform duration-300 ease-in-out
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
         `}
-        style={{ background: "#171717", borderColor: "rgba(255,255,255,0.06)" }}
+        style={{ background: T.card, borderColor: T.border }}
       >
         {/* Logo + back */}
-        <div className="flex items-center justify-between px-4 py-4 border-b" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
-          <Link href="/recruit/dashboard" className="flex items-center gap-2 text-white/40 hover:text-white/70 transition-colors text-[13px] font-medium">
-            <IcBack />
+        <div className="flex items-center justify-between px-4 py-4 border-b" style={{ borderColor: T.border }}>
+          <Link
+            href="/recruit/dashboard"
+            className="flex items-center gap-2 transition-colors text-[13px] font-medium"
+            style={{ color: T.textSecondary }}
+          >
+            <Home size={14} strokeWidth={2.2} />
             Dashboard
           </Link>
-          <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
-            <IcSparkle />
+          <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${T.accent}, #4C3FD8)` }}>
+            <Sparkles size={12} strokeWidth={2.4} color="#fff" />
           </div>
         </div>
 
@@ -1364,9 +1433,10 @@ function CopilotPageContent() {
         <div className="px-3 pt-3 pb-2">
           <button
             onClick={() => newChat(true)}
-            className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all border border-white/[0.08] text-white/50 hover:text-white hover:bg-white/[0.06] hover:border-white/[0.14]"
+            className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all border hover:shadow-sm"
+            style={{ borderColor: T.border, color: T.text, background: T.card }}
           >
-            <IcPlus />
+            <Plus size={15} strokeWidth={2.4} style={{ color: T.accent }} />
             New conversation
           </button>
         </div>
@@ -1375,21 +1445,22 @@ function CopilotPageContent() {
         <div className="px-3 pb-2 relative">
           <button
             onClick={() => { setJobDropdownOpen(o => !o); setCandidateDropdownOpen(false); }}
-            className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-[13px] border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06] transition-all"
+            className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-[13px] border transition-all hover:shadow-sm"
+            style={{ borderColor: T.border, background: "#F9FAFB" }}
           >
             <div className="flex items-center gap-2 min-w-0">
-              {contextMode === "global" ? <IcGlobe /> : <IcBriefcase />}
-              <span className="truncate text-white/70">
+              {contextMode === "global" ? <Globe size={14} strokeWidth={2.2} style={{ color: T.textSecondary }} /> : <Briefcase size={14} strokeWidth={2.2} style={{ color: T.textSecondary }} />}
+              <span className="truncate" style={{ color: T.text }}>
                 {contextMode === "global" ? "Organization (all jobs)" : selectedJob ? selectedJob.title : "Select a job"}
               </span>
             </div>
-            <IcChevronDown />
+            <ChevronDown size={14} strokeWidth={2.2} style={{ color: T.textSecondary }} />
           </button>
 
           {jobDropdownOpen && (
             <div
-              className="absolute left-3 right-3 top-full mt-1 z-10 rounded-xl border overflow-hidden shadow-2xl max-h-80 overflow-y-auto"
-              style={{ background: "#222", borderColor: "rgba(255,255,255,0.1)" }}
+              className="absolute left-3 right-3 top-full mt-1 z-10 rounded-xl border overflow-hidden shadow-lg max-h-80 overflow-y-auto"
+              style={{ background: T.card, borderColor: T.border }}
             >
               <button
                 onClick={() => {
@@ -1400,14 +1471,14 @@ function CopilotPageContent() {
                   setSelectedCandidate(null);
                   newChat(false);
                 }}
-                className={`w-full text-left px-4 py-2.5 text-[13px] hover:bg-white/[0.07] transition-colors flex items-center gap-2 border-b ${contextMode === "global" ? "text-sky-400 font-semibold" : "text-white/60"}`}
-                style={{ borderColor: "rgba(255,255,255,0.07)" }}
+                className="w-full text-left px-4 py-2.5 text-[13px] transition-colors flex items-center gap-2 border-b hover:bg-[#F9FAFB]"
+                style={{ borderColor: T.border, color: contextMode === "global" ? T.accent : T.textSecondary, fontWeight: contextMode === "global" ? 600 : 400 }}
               >
-                <IcGlobe />
+                <Globe size={14} strokeWidth={2.2} />
                 Organization (all jobs)
               </button>
               {jobs.length === 0 ? (
-                <div className="px-4 py-3 text-[12px] text-white/30">No jobs found</div>
+                <div className="px-4 py-3 text-[12px]" style={{ color: "#9CA3AF" }}>No jobs found</div>
               ) : (
                 jobs.map(job => (
                   <button
@@ -1420,10 +1491,11 @@ function CopilotPageContent() {
                       setSelectedCandidate(null);
                       newChat(false);
                     }}
-                    className={`w-full text-left px-4 py-2.5 text-[13px] hover:bg-white/[0.07] transition-colors ${selectedJob?._id === job._id ? "text-indigo-400 font-semibold" : "text-white/60"}`}
+                    className="w-full text-left px-4 py-2.5 text-[13px] transition-colors hover:bg-[#F9FAFB]"
+                    style={{ color: selectedJob?._id === job._id ? T.accent : T.textSecondary, fontWeight: selectedJob?._id === job._id ? 600 : 400 }}
                   >
                     {job.title}
-                    <span className="ml-2 text-[11px] text-white/25">{job.candidateCount} candidates</span>
+                    <span className="ml-2 text-[11px]" style={{ color: "#9CA3AF" }}>{job.candidateCount} candidates</span>
                   </button>
                 ))
               )}
@@ -1436,30 +1508,35 @@ function CopilotPageContent() {
           <div className="px-3 pb-2 relative">
             <button
               onClick={() => { setCandidateDropdownOpen(o => !o); setJobDropdownOpen(false); }}
-              className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-[13px] border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06] transition-all"
+              className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-[13px] border transition-all hover:shadow-sm"
+              style={{ borderColor: T.border, background: "#F9FAFB" }}
             >
               <div className="flex items-center gap-2 min-w-0">
-                {contextMode === "candidate" ? <IcPerson /> : <IcUsers />}
-                <span className="truncate text-white/70">
+                {contextMode === "candidate" ? <User size={14} strokeWidth={2.2} style={{ color: T.textSecondary }} /> : <Users size={14} strokeWidth={2.2} style={{ color: T.textSecondary }} />}
+                <span className="truncate" style={{ color: T.text }}>
                   {contextMode === "candidate" && selectedCandidate ? selectedCandidate.name : "All Candidates"}
                 </span>
               </div>
-              <IcChevronDown />
+              <ChevronDown size={14} strokeWidth={2.2} style={{ color: T.textSecondary }} />
             </button>
 
             {candidateDropdownOpen && (
               <div
-                className="absolute left-3 right-3 top-full mt-1 z-10 rounded-xl border overflow-hidden shadow-2xl flex flex-col"
-                style={{ background: "#222", borderColor: "rgba(255,255,255,0.1)", maxHeight: "22rem" }}
+                className="absolute left-3 right-3 top-full mt-1 z-10 rounded-xl border overflow-hidden shadow-lg flex flex-col"
+                style={{ background: T.card, borderColor: T.border, maxHeight: "22rem" }}
               >
-                <div className="p-2 border-b" style={{ borderColor: "rgba(255,255,255,0.07)" }}>
-                  <input
-                    autoFocus
-                    value={candidateSearch}
-                    onChange={e => setCandidateSearch(e.target.value)}
-                    placeholder="Search candidates…"
-                    className="w-full px-3 py-2 rounded-lg text-[12px] bg-white/[0.05] border border-white/[0.08] text-white/80 placeholder-white/25 outline-none focus:border-violet-500/40"
-                  />
+                <div className="p-2 border-b" style={{ borderColor: T.border }}>
+                  <div className="relative">
+                    <Search size={13} strokeWidth={2.2} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: "#9CA3AF" }} />
+                    <input
+                      autoFocus
+                      value={candidateSearch}
+                      onChange={e => setCandidateSearch(e.target.value)}
+                      placeholder="Search candidates…"
+                      className="w-full pl-8 pr-3 py-2 rounded-lg text-[12px] border outline-none"
+                      style={{ background: "#F9FAFB", borderColor: T.border, color: T.text }}
+                    />
+                  </div>
                 </div>
                 <div className="overflow-y-auto">
                   <button
@@ -1471,22 +1548,22 @@ function CopilotPageContent() {
                       setSelectedCandidate(null);
                       newChat(false);
                     }}
-                    className={`w-full text-left px-4 py-2.5 text-[13px] hover:bg-white/[0.07] transition-colors flex items-center gap-2 border-b ${contextMode === "job" ? "text-indigo-400 font-semibold" : "text-white/60"}`}
-                    style={{ borderColor: "rgba(255,255,255,0.07)" }}
+                    className="w-full text-left px-4 py-2.5 text-[13px] transition-colors flex items-center gap-2 border-b hover:bg-[#F9FAFB]"
+                    style={{ borderColor: T.border, color: contextMode === "job" ? T.accent : T.textSecondary, fontWeight: contextMode === "job" ? 600 : 400 }}
                   >
-                    <IcUsers />
+                    <Users size={14} strokeWidth={2.2} />
                     All Candidates
-                    <span className="ml-auto text-[11px] text-white/25">Job context</span>
+                    <span className="ml-auto text-[11px]" style={{ color: "#9CA3AF" }}>Job context</span>
                   </button>
                   {(() => {
                     const filtered = candidates.filter(c =>
                       c.name.toLowerCase().includes(candidateSearch.trim().toLowerCase())
                     );
                     if (candidates.length === 0) {
-                      return <div className="px-4 py-3 text-[12px] text-white/30">No candidates yet</div>;
+                      return <div className="px-4 py-3 text-[12px]" style={{ color: "#9CA3AF" }}>No candidates yet</div>;
                     }
                     if (filtered.length === 0) {
-                      return <div className="px-4 py-3 text-[12px] text-white/30">No matches for "{candidateSearch}"</div>;
+                      return <div className="px-4 py-3 text-[12px]" style={{ color: "#9CA3AF" }}>No matches for "{candidateSearch}"</div>;
                     }
                     return filtered.map(c => {
                       const pct = c.maxScore > 0 ? Math.round((c.totalScore / c.maxScore) * 100) : null;
@@ -1501,7 +1578,8 @@ function CopilotPageContent() {
                             setCandidateSearch("");
                             newChat(false);
                           }}
-                          className={`w-full text-left px-4 py-2.5 text-[13px] hover:bg-white/[0.07] transition-colors flex items-center justify-between gap-2 ${selectedCandidateId === c._id ? "text-violet-400 font-semibold" : "text-white/60"}`}
+                          className="w-full text-left px-4 py-2.5 text-[13px] transition-colors flex items-center justify-between gap-2 hover:bg-[#F9FAFB]"
+                          style={{ color: selectedCandidateId === c._id ? T.accent : T.textSecondary, fontWeight: selectedCandidateId === c._id ? 600 : 400 }}
                         >
                           <span className="truncate">{c.name}</span>
                           {pct !== null && (
@@ -1521,35 +1599,43 @@ function CopilotPageContent() {
         <div className="flex-1 overflow-y-auto scrollbar-none px-3 pb-4 space-y-4 mt-1">
           {groupOrder.filter(g => grouped[g]?.length).map(group => (
             <div key={group}>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-white/20 px-2 mb-1.5">{group}</p>
-              <div className="space-y-0.5">
+              <p className="text-[10px] font-semibold uppercase tracking-widest px-2 mb-1.5 flex items-center gap-1.5" style={{ color: "#9CA3AF" }}>
+                <MessageSquare size={10} strokeWidth={2.2} />
+                {group}
+              </p>
+              <div className="space-y-1">
                 {grouped[group].map(c => (
                   <div
                     key={c.id}
                     onClick={() => { openConversation(c.id); setSidebarOpen(false); }}
-                    className={`group relative flex items-center gap-2 px-3 py-2.5 rounded-xl cursor-pointer transition-all ${
-                      activeConvId === c.id
-                        ? "bg-white/[0.08] text-white"
-                        : "hover:bg-white/[0.04] text-white/50"
-                    }`}
+                    className="group relative flex items-center gap-2 px-3 py-2.5 rounded-xl cursor-pointer transition-all border"
+                    style={{
+                      background: activeConvId === c.id ? "#F5F3FF" : T.card,
+                      borderColor: activeConvId === c.id ? "rgba(109,93,246,0.25)" : "transparent",
+                    }}
+                    onMouseEnter={(e) => { if (activeConvId !== c.id) e.currentTarget.style.background = "#F9FAFB"; }}
+                    onMouseLeave={(e) => { if (activeConvId !== c.id) e.currentTarget.style.background = T.card; }}
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="text-[12px] font-medium truncate leading-snug">{c.title}</p>
+                      <p className="text-[12.5px] font-medium truncate leading-snug" style={{ color: activeConvId === c.id ? T.accent : T.text }}>{c.title}</p>
                       {/* Show candidate name for candidate-context conversations, job for job-context */}
                       {c.selectedCandidateName ? (
-                        <p className="text-[10px] text-violet-400/50 truncate mt-0.5 flex items-center gap-1">
-                          <IcPerson /> {c.selectedCandidateName}
+                        <p className="text-[10.5px] truncate mt-0.5 flex items-center gap-1" style={{ color: "#9CA3AF" }}>
+                          <User size={9} strokeWidth={2.2} /> {c.selectedCandidateName}
                         </p>
                       ) : c.selectedJobTitle ? (
-                        <p className="text-[10px] text-white/25 truncate mt-0.5">{c.selectedJobTitle}</p>
+                        <p className="text-[10.5px] truncate mt-0.5" style={{ color: "#9CA3AF" }}>{c.selectedJobTitle}</p>
                       ) : null}
                     </div>
                     <button
                       onClick={(e) => deleteConversation(c.id, e)}
                       disabled={deletingId === c.id}
-                      className="shrink-0 opacity-0 group-hover:opacity-100 text-white/25 hover:text-rose-400 transition-all"
+                      className="shrink-0 opacity-0 group-hover:opacity-100 transition-all"
+                      style={{ color: "#D1D5DB" }}
+                      onMouseEnter={(e) => { e.currentTarget.style.color = "#dc2626"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.color = "#D1D5DB"; }}
                     >
-                      <IcTrash />
+                      <Trash2 size={13} strokeWidth={2} />
                     </button>
                   </div>
                 ))}
@@ -1557,7 +1643,7 @@ function CopilotPageContent() {
             </div>
           ))}
           {conversations.length === 0 && (
-            <p className="text-[11px] text-white/20 text-center pt-4 px-2">Your conversations will appear here</p>
+            <p className="text-[11px] text-center pt-4 px-2" style={{ color: "#D1D5DB" }}>Your conversations will appear here</p>
           )}
         </div>
       </aside>
@@ -1568,27 +1654,26 @@ function CopilotPageContent() {
         {/* Top bar */}
         <div
           className="flex items-center justify-between px-4 py-3 border-b shrink-0"
-          style={{ borderColor: "rgba(255,255,255,0.06)", background: "#0f0f0f" }}
+          style={{ borderColor: T.border, background: T.bg }}
         >
           <div className="flex items-center gap-3">
             <button
               onClick={() => setSidebarOpen(o => !o)}
-              className="lg:hidden p-1.5 rounded-lg text-white/30 hover:text-white/70 hover:bg-white/[0.06] transition"
+              className="lg:hidden p-1.5 rounded-lg transition"
+              style={{ color: T.textSecondary }}
             >
-              <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" viewBox="0 0 24 24">
-                <path d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
+              <Menu size={16} strokeWidth={2.2} />
             </button>
             <div className="flex items-center gap-2">
-              <div className="w-5 h-5 rounded-md bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
-                <IcSparkle />
+              <div className="w-5 h-5 rounded-md flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${T.accent}, #4C3FD8)` }}>
+                <Sparkles size={11} strokeWidth={2.4} color="#fff" />
               </div>
-              <span className="text-[13px] font-semibold text-white/60">Ask Rolebolt</span>
+              <span className="text-[13px] font-semibold" style={{ color: T.text }}>Ask Rolebolt</span>
             </div>
 
             {/* Context breadcrumb: Global → Job → Candidate, each earlier crumb clickable */}
             <div className="hidden sm:flex items-center gap-1">
-              <span className="text-white/20 text-xs mr-0.5">·</span>
+              <span className="text-xs mr-0.5" style={{ color: "#D1D5DB" }}>·</span>
               <button
                 onClick={() => {
                   setContextMode("global");
@@ -1597,19 +1682,18 @@ function CopilotPageContent() {
                   setSelectedCandidate(null);
                   newChat(false);
                 }}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-colors ${
-                  contextMode === "global"
-                    ? "bg-sky-500/10 border-sky-500/20 text-sky-300"
-                    : "bg-white/[0.03] border-white/[0.07] text-white/40 hover:text-white/70 hover:bg-white/[0.06]"
-                }`}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-colors"
+                style={contextMode === "global"
+                  ? { background: "#F0F9FF", borderColor: "#BAE6FD", color: "#0369A1" }
+                  : { background: "#F9FAFB", borderColor: T.border, color: T.textSecondary }}
               >
-                <IcGlobe />
+                <Globe size={11} strokeWidth={2.2} />
                 <span className="text-[11px] font-medium">Organization</span>
               </button>
 
               {selectedJob && (
                 <>
-                  <span className="text-white/15 text-xs">/</span>
+                  <span className="text-xs" style={{ color: "#E5E7EB" }}>/</span>
                   <button
                     onClick={() => {
                       setContextMode("job");
@@ -1617,13 +1701,12 @@ function CopilotPageContent() {
                       setSelectedCandidate(null);
                       newChat(false);
                     }}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-colors max-w-[10rem] ${
-                      contextMode === "job"
-                        ? "bg-indigo-500/10 border-indigo-500/20 text-indigo-300"
-                        : "bg-white/[0.03] border-white/[0.07] text-white/40 hover:text-white/70 hover:bg-white/[0.06]"
-                    }`}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-colors max-w-[10rem]"
+                    style={contextMode === "job"
+                      ? { background: "#F5F3FF", borderColor: "#E9D5FF", color: "#6D28D9" }
+                      : { background: "#F9FAFB", borderColor: T.border, color: T.textSecondary }}
                   >
-                    <IcBriefcase />
+                    <Briefcase size={11} strokeWidth={2.2} />
                     <span className="text-[11px] font-medium truncate">{selectedJob.title}</span>
                   </button>
                 </>
@@ -1631,10 +1714,10 @@ function CopilotPageContent() {
 
               {contextMode === "candidate" && selectedCandidate && (
                 <>
-                  <span className="text-white/15 text-xs">/</span>
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-violet-500/10 border border-violet-500/20 max-w-[10rem]">
-                    <IcPerson />
-                    <span className="text-[11px] font-medium text-violet-300 truncate">{selectedCandidate.name}</span>
+                  <span className="text-xs" style={{ color: "#E5E7EB" }}>/</span>
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full max-w-[10rem]" style={{ background: "rgba(109,93,246,0.08)", border: "1px solid rgba(109,93,246,0.2)" }}>
+                    <User size={11} strokeWidth={2.2} style={{ color: T.accent }} />
+                    <span className="text-[11px] font-medium truncate" style={{ color: T.accent }}>{selectedCandidate.name}</span>
                   </div>
                 </>
               )}
@@ -1642,9 +1725,10 @@ function CopilotPageContent() {
           </div>
           <button
             onClick={() => setContextOpen(o => !o)}
-            className="lg:hidden p-1.5 rounded-lg text-white/30 hover:text-white/70 hover:bg-white/[0.06] transition"
+            className="lg:hidden p-1.5 rounded-lg transition"
+            style={{ color: T.textSecondary }}
           >
-            {contextMode === "candidate" ? <IcPerson /> : contextMode === "global" ? <IcGlobe /> : <IcUsers />}
+            {contextMode === "candidate" ? <User size={16} strokeWidth={2.2} /> : contextMode === "global" ? <Globe size={16} strokeWidth={2.2} /> : <Users size={16} strokeWidth={2.2} />}
           </button>
         </div>
 
@@ -1672,21 +1756,21 @@ function CopilotPageContent() {
         {/* Input area */}
         <div
           className="shrink-0 border-t px-4 py-4"
-          style={{ borderColor: "rgba(255,255,255,0.06)", background: "#0f0f0f" }}
+          style={{ borderColor: T.border, background: T.bg }}
         >
           <div className="max-w-2xl mx-auto">
-            {!selectedJob && (
-              <p className="text-center text-[12px] text-amber-400/50 mb-2">Select a job from the sidebar to start chatting</p>
+            {!selectedJob && contextMode !== "global" && (
+              <p className="text-center text-[12px] mb-2" style={{ color: "#D97706" }}>Select a job from the sidebar to start chatting</p>
             )}
             {selectedJob && contextMode === "candidate" && !selectedCandidate && (
-              <p className="text-center text-[12px] text-violet-400/50 mb-2">Loading candidate context…</p>
+              <p className="text-center text-[12px] mb-2" style={{ color: T.accent }}>Loading candidate context…</p>
             )}
             <div
               className="flex items-end gap-3 rounded-2xl border px-4 py-3 transition-all"
               style={{
-                background: "#1a1a1a",
-                borderColor: isStreaming ? "rgba(129,140,248,0.3)" : "rgba(255,255,255,0.09)",
-                boxShadow: isStreaming ? "0 0 0 1px rgba(129,140,248,0.15)" : "none",
+                background: T.card,
+                borderColor: isStreaming ? "rgba(109,93,246,0.35)" : T.border,
+                boxShadow: isStreaming ? "0 0 0 3px rgba(109,93,246,0.08)" : "0 1px 2px rgba(17,24,39,0.03)",
               }}
             >
               <textarea
@@ -1695,28 +1779,28 @@ function CopilotPageContent() {
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
                 placeholder={inputPlaceholder}
-                disabled={inputDisabled}
+                disabled={textDisabled}
                 rows={1}
-                className="flex-1 bg-transparent text-[0.875rem] text-[#e5e5e5] placeholder-white/20 resize-none outline-none leading-relaxed disabled:opacity-40"
-                style={{ maxHeight: "160px" }}
+                className="flex-1 bg-transparent text-[0.9rem] resize-none outline-none leading-relaxed disabled:opacity-40"
+                style={{ maxHeight: "160px", color: T.text }}
               />
               <button
                 onClick={() => sendMessage(input)}
-                disabled={!input.trim() || inputDisabled}
-                className="shrink-0 w-8 h-8 rounded-xl flex items-center justify-center transition-all disabled:opacity-25 disabled:cursor-not-allowed"
+                disabled={!input.trim() || sendDisabled}
+                className="shrink-0 w-8 h-8 rounded-xl flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                 style={{
-                  background: input.trim() && !inputDisabled ? "linear-gradient(135deg,#7c3aed,#4338ca)" : "rgba(255,255,255,0.07)",
-                  color: input.trim() && !inputDisabled ? "#fff" : "rgba(255,255,255,0.3)",
+                  background: input.trim() && !sendDisabled ? `linear-gradient(135deg, ${T.accent}, #4C3FD8)` : "#F3F4F6",
+                  color: input.trim() && !sendDisabled ? "#fff" : "#9CA3AF",
                 }}
               >
                 {isStreaming ? (
-                  <span className="w-3 h-3 rounded-sm bg-white/40" />
+                  <span className="w-3 h-3 rounded-sm" style={{ background: "rgba(255,255,255,0.5)" }} />
                 ) : (
-                  <IcSend />
+                  <Send size={14} strokeWidth={2.4} />
                 )}
               </button>
             </div>
-            <p className="text-center text-[10px] text-white/15 mt-2">
+            <p className="text-center text-[10px] mt-2" style={{ color: "#D1D5DB" }}>
               Rolebolt AI can make mistakes. Always verify important decisions.
             </p>
           </div>
@@ -1731,16 +1815,14 @@ function CopilotPageContent() {
           transition-transform duration-300 ease-in-out
           ${contextOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"}
         `}
-        style={{ background: "#171717", borderColor: "rgba(255,255,255,0.06)" }}
+        style={{ background: T.card, borderColor: T.border }}
       >
-        <div className="flex items-center justify-between px-4 py-4 border-b shrink-0" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-white/30">
+        <div className="flex items-center justify-between px-4 py-4 border-b shrink-0" style={{ borderColor: T.border }}>
+          <p className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: "#9CA3AF" }}>
             {contextMode === "candidate" ? "Candidate Context" : "Hiring Context"}
           </p>
-          <button onClick={() => setContextOpen(false)} className="lg:hidden text-white/30 hover:text-white/60 transition">
-            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" viewBox="0 0 24 24">
-              <path d="M18 6 6 18M6 6l12 12" />
-            </svg>
+          <button onClick={() => setContextOpen(false)} className="lg:hidden transition" style={{ color: "#9CA3AF" }}>
+            <X size={14} strokeWidth={2.2} />
           </button>
         </div>
         {contextPanel}
