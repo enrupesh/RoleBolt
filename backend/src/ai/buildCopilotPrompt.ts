@@ -12,9 +12,25 @@
 
 import type { IRecruitJob } from "../models/RecruitJob";
 import type { IRecruitCandidate } from "../models/RecruitCandidate";
+import type { JobPipelineStat } from "./globalHiringStats";
 
 export type CopilotContextLevel = "global" | "job" | "candidate";
 export type CopilotPromptMode = "json" | "stream";
+
+export interface GlobalCandidateSummary {
+  _id: any;
+  name: string;
+  jobId: any;
+  jobTitle: string;
+  totalScore: number;
+  maxScore: number;
+  stage: string;
+  hiringDecision?: string | null;
+  assessmentStatus?: string;
+  strengths?: string[];
+  location?: string;
+  availability?: string;
+}
 
 export interface CopilotPromptContext {
   level: CopilotContextLevel;
@@ -24,10 +40,15 @@ export interface CopilotPromptContext {
   // Job context
   job?: IRecruitJob & { _id: any };
   candidates?: Array<IRecruitCandidate & { _id: any }>;
-  // Candidate context (Phase 3)
+  // Candidate context
   candidate?: IRecruitCandidate & { _id: any };
-  // Global context (Phase 2)
+  // Global context (Phase 3 — Organization Intelligence)
   globalStats?: string;
+  allJobs?: Array<IRecruitJob & { _id: any }>;
+  allCandidates?: GlobalCandidateSummary[];
+  pipelines?: JobPipelineStat[];
+  /** When set, this is a synthetic instruction (e.g. "generate today's insights card") rather than a real recruiter question. */
+  syntheticInstruction?: string;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -353,26 +374,85 @@ ${sharedBehaviourRules()}
 `;
 }
 
-// ─── Global Context Prompt ────────────────────────────────────────────────────
+// ─── Global Context Prompt (Phase 3 — Organization Intelligence) ─────────────
+
+function jobListBlock(jobs: Array<IRecruitJob & { _id: any }>): string {
+  return jobs
+    .map((j) => {
+      return `  • ${j.title} — jobId: ${String(j._id)}
+    Department: ${j.department || "—"} | Status: ${j.status} | Openings: ${j.openings || 1}
+    Must-Have Skills: ${j.mustHaveSkills || "—"}
+    Applicants: ${j.candidateCount ?? 0}`;
+    })
+    .join("\n\n");
+}
+
+function globalCandidateLine(c: GlobalCandidateSummary, rank: number): string {
+  const p = c.maxScore ? Math.round((c.totalScore / c.maxScore) * 100) : null;
+  const strengths = (c.strengths || []).slice(0, 3).join(", ") || "—";
+  const decision =
+    c.hiringDecision === "strong_yes" ? "Strong Yes" : c.hiringDecision === "maybe" ? "Maybe" : c.hiringDecision === "no" ? "No" : "Undecided";
+  return `[${rank}] ${c.name} — candidateId: ${String(c._id)} | Job: ${c.jobTitle} | Score: ${
+    p !== null ? `${p}%` : "N/A"
+  } | Stage: ${c.stage} | Decision: ${decision} | Assessment: ${c.assessmentStatus || "not_sent"} | Strengths: ${strengths} | Location: ${c.location || "—"} | Availability: ${c.availability || "—"}`;
+}
+
+const GLOBAL_CANDIDATE_CAP = 150;
 
 function buildGlobalContextPrompt(ctx: CopilotPromptContext): string {
   const mode = ctx.mode ?? "json";
   const company = ctx.companyName || "the company";
   const recruiter = ctx.recruiterName || "the recruiter";
+  const jobs = ctx.allJobs || [];
+  const allCandidates = ctx.allCandidates || [];
 
-  const formatBlock = mode === "stream"
-    ? `Write your reply in natural markdown, then output:\n---ROLEBOLT_META---\n{"recommendation":"...","confidence":50,"reasoning":"...","sources":[],"quickActions":["..."]}`
-    : `Respond ONLY with JSON: {"reply":"...","recommendation":"...","confidence":50,"reasoning":"...","sources":[],"quickActions":["..."]}`;
+  const rankedCandidates = [...allCandidates].sort((a, b) => {
+    const aPct = a.maxScore ? a.totalScore / a.maxScore : 0;
+    const bPct = b.maxScore ? b.totalScore / b.maxScore : 0;
+    return bPct - aPct;
+  });
+  const shown = rankedCandidates.slice(0, GLOBAL_CANDIDATE_CAP);
+  const truncatedNote =
+    rankedCandidates.length > GLOBAL_CANDIDATE_CAP
+      ? `\n(Showing top ${GLOBAL_CANDIDATE_CAP} of ${rankedCandidates.length} candidates by fit score — org totals above are still exact.)`
+      : "";
+
+  const candidateLines = shown.map((c, i) => globalCandidateLine(c, i + 1)).join("\n");
+
+  const instructionLine = ctx.syntheticInstruction
+    ? `\n## Task\n${ctx.syntheticInstruction}\n`
+    : "";
 
   return `You are Rolebolt AI — an expert AI Hiring Copilot for ${company}, assisting ${recruiter}.
 
+## Your Role
+You are acting as ${recruiter}'s Head of Talent Acquisition. No specific job or candidate is selected — you have visibility across the ENTIRE hiring organization: every active job, every candidate, every pipeline, every assessment. Reason across all of it, not just one job.
+
 ## Current Context
-Level: GLOBAL (no specific job selected)
-${ctx.globalStats ? `\n## Organisation Stats\n${ctx.globalStats}` : ""}
+Level: GLOBAL (Organization Intelligence — no specific job or candidate selected)
+${instructionLine}
+## Organization Stats
+${ctx.globalStats || "(no data yet)"}
 
-Answer organisation-wide hiring questions. For job-specific or candidate-specific questions, ask the recruiter to select a job first.
+## Active & Recent Jobs
+${jobListBlock(jobs) || "(no jobs yet)"}
 
-${formatBlock}`;
+## Candidates Across the Organization (sorted by fit score, highest first)
+${candidateLines || "(no candidates yet)"}${truncatedNote}
+
+---
+
+${mode === "stream" ? streamResponseFormat() : jsonResponseFormat()}
+
+${sharedBehaviourRules()}
+
+## Global Reasoning Rules
+- You can compare across jobs (e.g. "Backend Developer vs DevOps Engineer"), search the entire talent pool (e.g. "everyone with React and Docker"), and identify organization-wide bottlenecks or trends.
+- When citing a candidate, use type "candidate_profile" and ALWAYS include their candidateId from the list above.
+- When citing a job, use type "job_description" and mention the job title in the label.
+- If the recruiter's question is really about one specific job or candidate, still answer using the data above — do not ask them to "select a job first"; you already have everything.
+- Never guess a number. If organization stats don't cover something (e.g. a specific skill not tracked), say the data isn't available rather than inventing it.
+`;
 }
 
 // ─── Main Export ──────────────────────────────────────────────────────────────

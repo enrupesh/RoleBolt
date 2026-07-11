@@ -22,6 +22,9 @@ import { RecruitCompanyProfile } from "./models/RecruitCompanyProfile";
 import { callMeshChatCompletions, streamMeshChatCompletions } from "./ai/meshClient";
 import { buildCopilotPrompt } from "./ai/buildCopilotPrompt";
 import type { ChatMessage } from "./ai/meshClient";
+import type { GlobalCandidateSummary } from "./ai/buildCopilotPrompt";
+import { computeGlobalHiringStats, globalStatsToPromptText } from "./ai/globalHiringStats";
+import type { JobPipelineStat } from "./ai/globalHiringStats";
 
 export const copilotRouter = express.Router();
 copilotRouter.use(requireFirebaseAuth);
@@ -163,7 +166,17 @@ interface ContextData {
   candidate: any | null;
   recruiterName: string | undefined;
   companyName: string | undefined;
+  allJobs?: any[];
+  allCandidates?: GlobalCandidateSummary[];
+  globalStatsText?: string;
+  pipelines?: JobPipelineStat[];
 }
+
+/** Fields needed for org-wide reasoning — deliberately excludes heavy fields
+ * (resumeText, assessmentQuestions/Answers, interviewBrief) to keep the
+ * global prompt within a sane token budget across potentially many candidates. */
+const GLOBAL_CANDIDATE_SELECT =
+  "name jobId totalScore maxScore stage hiringDecision assessmentStatus strengths redFlags scoreBreakdown location availability createdAt stageMovedAt";
 
 async function loadContextData(
   uid: string,
@@ -197,7 +210,72 @@ async function loadContextData(
     return { job, candidates: candidates ?? [], candidate: null, recruiterName, companyName };
   }
 
-  return { job: null, candidates: [], candidate: null, recruiterName, companyName };
+  // ── Global — Organization Intelligence ────────────────────────────────────
+  const [allJobs, rawCandidates] = await Promise.all([
+    RecruitJob.find({ uid }).sort({ createdAt: -1 }).lean(),
+    RecruitCandidate.find({ uid }).select(GLOBAL_CANDIDATE_SELECT).lean(),
+  ]);
+
+  const jobTitleById = new Map(allJobs.map((j: any) => [String(j._id), j.title as string]));
+  const allCandidates: GlobalCandidateSummary[] = rawCandidates.map((c: any) => ({
+    _id: c._id,
+    name: c.name,
+    jobId: c.jobId,
+    jobTitle: jobTitleById.get(String(c.jobId)) || "Unknown role",
+    totalScore: c.totalScore,
+    maxScore: c.maxScore,
+    stage: c.stage,
+    hiringDecision: c.hiringDecision,
+    assessmentStatus: c.assessmentStatus,
+    strengths: c.strengths,
+    location: c.location,
+    availability: c.availability,
+  }));
+
+  const { stats, pipelines } = buildGlobalStatsAndPipelines(allJobs, rawCandidates);
+  const globalStatsText = globalStatsToPromptText(stats, pipelines);
+
+  return {
+    job: null,
+    candidates: [],
+    candidate: null,
+    recruiterName,
+    companyName,
+    allJobs,
+    allCandidates,
+    globalStatsText,
+    pipelines,
+  };
+}
+
+/** Shared helper: compute stats + per-job pipeline breakdown from raw docs. */
+function buildGlobalStatsAndPipelines(allJobs: any[], rawCandidates: any[]) {
+  const stats = computeGlobalHiringStats(allJobs, rawCandidates);
+  // computeGlobalHiringStats already derives pipelines internally for topPipeline/weakestPipeline,
+  // but we also want the full per-job list for the prompt — recompute lightly here.
+  const byJob = new Map<string, any[]>();
+  for (const c of rawCandidates) {
+    const key = String(c.jobId);
+    (byJob.get(key) ?? byJob.set(key, []).get(key)!).push(c);
+  }
+  const pipelines: JobPipelineStat[] = allJobs.map((j: any) => {
+    const list = byJob.get(String(j._id)) ?? [];
+    const scored = list.filter((c: any) => c.maxScore > 0);
+    const avg = scored.length
+      ? Math.round(
+          scored.reduce((s: number, c: any) => s + Math.round((c.totalScore / c.maxScore) * 100), 0) /
+            scored.length
+        )
+      : null;
+    return {
+      jobId: String(j._id),
+      title: j.title,
+      department: j.department,
+      candidateCount: list.length,
+      avgScorePct: avg,
+    };
+  });
+  return { stats, pipelines };
 }
 
 // ─── Starter actions ──────────────────────────────────────────────────────────
@@ -219,9 +297,12 @@ const STARTER_ACTIONS: Record<string, string[]> = {
     "What skills are missing compared to the JD?",
   ],
   global: [
-    "Which job has the most applicants?",
-    "Which role is hardest to fill?",
-    "Show jobs with no strong candidates",
+    "What should I prioritize today?",
+    "Show my strongest candidates",
+    "Which jobs need attention?",
+    "Show hiring bottlenecks",
+    "Compare all active jobs",
+    "Search my talent pool",
   ],
 };
 
@@ -340,7 +421,8 @@ copilotRouter.post("/chat", async (req, res) => {
     }
 
     // ── 2. Load context data ─────────────────────────────────────────────────
-    const { job, candidates, candidate, recruiterName, companyName } = await loadContextData(uid, context);
+    const { job, candidates, candidate, recruiterName, companyName, allJobs, allCandidates, globalStatsText, pipelines } =
+      await loadContextData(uid, context);
     if (context.level === "job" && context.jobId && !job) {
       return res.status(404).json({ error: "Job not found" });
     }
@@ -357,6 +439,10 @@ copilotRouter.post("/chat", async (req, res) => {
       job: job ?? undefined,
       candidates: candidates ?? undefined,
       candidate: candidate ?? undefined,
+      allJobs,
+      allCandidates,
+      globalStats: globalStatsText,
+      pipelines,
     });
 
     const aiMessages = buildMessageHistory(systemPrompt, conversation, message.trim());
@@ -456,7 +542,8 @@ copilotRouter.post("/chat/stream", async (req, res) => {
     }
 
     // ── 2. Load context data ─────────────────────────────────────────────────
-    const { job, candidates, candidate, recruiterName, companyName } = await loadContextData(uid, context);
+    const { job, candidates, candidate, recruiterName, companyName, allJobs, allCandidates, globalStatsText, pipelines } =
+      await loadContextData(uid, context);
     if (context.level === "job" && context.jobId && !job) {
       sendEvent({ type: "error", error: "Job not found" });
       return res.end();
@@ -475,6 +562,10 @@ copilotRouter.post("/chat/stream", async (req, res) => {
       job: job ?? undefined,
       candidates: candidates ?? undefined,
       candidate: candidate ?? undefined,
+      allJobs,
+      allCandidates,
+      globalStats: globalStatsText,
+      pipelines,
     });
 
     const aiMessages = buildMessageHistory(systemPrompt, conversation, message.trim());
@@ -680,4 +771,117 @@ copilotRouter.post("/conversations/:id/clear", async (req, res) => {
 copilotRouter.get("/starter-actions", (req, res) => {
   const level = (req.query.level as string) || "job";
   return res.json({ starterActions: STARTER_ACTIONS[level] ?? STARTER_ACTIONS.job });
+});
+
+// ─── GET /recruit/copilot/global-stats ────────────────────────────────────────
+//
+// Deterministic organization-wide metrics for the Organization Context Panel.
+// No AI call — computed directly from jobs + candidates.
+
+copilotRouter.get("/global-stats", async (req, res) => {
+  const uid = getUid(req);
+  if (!uid) return res.status(401).json({ error: "Unauthorized" });
+
+  try {
+    const [allJobs, rawCandidates] = await Promise.all([
+      RecruitJob.find({ uid }).lean(),
+      RecruitCandidate.find({ uid }).select(GLOBAL_CANDIDATE_SELECT).lean(),
+    ]);
+
+    const { stats, pipelines } = buildGlobalStatsAndPipelines(allJobs, rawCandidates);
+
+    return res.json({ stats, pipelines });
+  } catch (err: any) {
+    console.error("[copilot] global-stats error:", err?.message ?? err);
+    return res.status(500).json({ error: "Failed to load organization stats" });
+  }
+});
+
+// ─── POST /recruit/copilot/insights ───────────────────────────────────────────
+//
+// Auto-generated "Good morning" organization insights card. Called by the
+// frontend when the recruiter opens Global Context with no active
+// conversation — the AI does not wait for a question, it proactively
+// summarizes the org's hiring state and recommends the next action.
+
+copilotRouter.post("/insights", async (req, res) => {
+  const uid = getUid(req);
+  if (!uid) return res.status(401).json({ error: "Unauthorized" });
+
+  const apiKey = process.env.MESHAPI_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: "AI service not configured (MESHAPI_API_KEY missing)" });
+
+  try {
+    const { allJobs, allCandidates, globalStatsText, pipelines, recruiterName, companyName } =
+      await loadContextData(uid, { level: "global" });
+
+    const conversation = await RecruitCopilotConversation.create({
+      uid,
+      context: { level: "global" },
+      title: "Organization Overview",
+      messages: [],
+    });
+
+    const systemPrompt = buildCopilotPrompt({
+      level: "global",
+      mode: "json",
+      recruiterName,
+      companyName,
+      allJobs,
+      allCandidates,
+      globalStats: globalStatsText,
+      pipelines,
+      syntheticInstruction:
+        "The recruiter just opened their Organization Overview — they have not asked a question yet. " +
+        "Proactively greet them by time of day and generate a short 'Here's today's hiring overview' card: " +
+        "a handful of bullet points covering new applicants, interview-ready candidates, the strongest and weakest pipelines, " +
+        "the most commonly missing skill, and end with one concrete recommendation of who to act on today. Keep it brief and scannable.",
+    });
+
+    const aiMessages: ChatMessage[] = [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: "Generate today's hiring overview." },
+    ];
+
+    const rawAi = await callMeshChatCompletions({
+      apiKey,
+      model: "openai/gpt-4o",
+      fallbackModels: ["openai/gpt-4o-mini", "anthropic/claude-3-5-sonnet"],
+      messages: aiMessages,
+      max_tokens: 1200,
+      temperature: 0.5,
+      retries: 2,
+      timeoutMs: 60_000,
+    });
+
+    const parsed = parseAiResponse(rawAi);
+
+    conversation.messages.push({
+      role: "assistant",
+      content: parsed.reply,
+      recommendation: parsed.recommendation || undefined,
+      confidence: parsed.confidence || undefined,
+      reasoning: parsed.reasoning || undefined,
+      sources: parsed.sources,
+      quickActions: parsed.quickActions.length ? parsed.quickActions : STARTER_ACTIONS.global,
+      timestamp: new Date(),
+    } as any);
+    conversation.lastActiveAt = new Date();
+    conversation.totalMessages = conversation.messages.length;
+    await conversation.save();
+
+    return res.status(200).json({
+      conversationId: String(conversation._id),
+      reply: parsed.reply,
+      recommendation: parsed.recommendation,
+      confidence: parsed.confidence,
+      reasoning: parsed.reasoning,
+      sources: parsed.sources,
+      quickActions: parsed.quickActions.length ? parsed.quickActions : STARTER_ACTIONS.global,
+      title: conversation.title,
+    });
+  } catch (err: any) {
+    console.error("[copilot] insights error:", err?.message ?? err);
+    return res.status(500).json({ error: "Failed to generate organization insights" });
+  }
 });
