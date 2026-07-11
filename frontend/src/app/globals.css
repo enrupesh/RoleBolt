@@ -596,6 +596,56 @@ h1, h2, h3, h4, h5, h6, li, td, th {
 }
 .scrollbar-none::-webkit-scrollbar { display: none; }
 
+/* ── Copilot dark markdown ─────────────────────────────────────────────── */
+.copilot-markdown { color: #d4d4d4; line-height: 1.7; font-size: 0.875rem; }
+.copilot-markdown p { margin: 0.45rem 0; }
+.copilot-markdown p:first-child { margin-top: 0; }
+.copilot-markdown p:last-child { margin-bottom: 0; }
+.copilot-markdown h1 { color: #fff; font-weight: 700; font-size: 1.05rem; margin: 0.8rem 0 0.35rem; }
+.copilot-markdown h2 { color: #fff; font-weight: 600; font-size: 0.95rem; margin: 0.75rem 0 0.3rem; }
+.copilot-markdown h3 { color: #e5e5e5; font-weight: 600; font-size: 0.875rem; margin: 0.65rem 0 0.25rem; }
+.copilot-markdown ul, .copilot-markdown ol { padding-left: 1.35rem; margin: 0.4rem 0; }
+.copilot-markdown li { margin: 0.3rem 0; }
+.copilot-markdown strong { color: #fff; font-weight: 650; }
+.copilot-markdown em { color: #c4b5fd; font-style: italic; }
+.copilot-markdown code {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 4px;
+  padding: 0.1em 0.4em;
+  font-size: 0.82em;
+  font-family: ui-monospace, "SF Mono", monospace;
+  color: #a5b4fc;
+}
+.copilot-markdown pre {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  overflow-x: auto;
+  margin: 0.75rem 0;
+}
+.copilot-markdown pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.83em;
+  color: #d4d4d4;
+}
+.copilot-markdown blockquote {
+  border-left: 3px solid rgba(129,140,248,0.4);
+  padding-left: 0.875rem;
+  margin: 0.5rem 0;
+  color: #a3a3a3;
+  font-style: italic;
+}
+.copilot-markdown hr { border: none; border-top: 1px solid rgba(255,255,255,0.08); margin: 0.75rem 0; }
+.copilot-markdown a { color: #818cf8; text-decoration: underline; text-underline-offset: 2px; }
+.copilot-markdown table { width: 100%; border-collapse: collapse; margin: 0.6rem 0; font-size: 0.82rem; }
+.copilot-markdown th { background: rgba(255,255,255,0.06); color: #e5e5e5; font-weight: 600; text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.1); }
+.copilot-markdown td { padding: 0.45rem 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.05); color: #c4c4c4; }
+.copilot-markdown tr:last-child td { border-bottom: none; }
+
 .bihar-sidebar { background: #ffffff; border-right: 1px solid #e2e8f0; }
 .bihar-chat-bg { background: #ffffff; }
 .inbox-reading-pane { background: var(--background); }

@@ -71,6 +71,21 @@ export default function RecruitHeader() {
                 {link.label}
               </Link>
             ))}
+            {role === "creator" && (
+              <Link
+                href="/recruit/copilot"
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium transition-all duration-150 ${
+                  isActive("/recruit/copilot")
+                    ? "bg-violet-50 text-violet-700 font-semibold"
+                    : "text-slate-500 hover:bg-violet-50 hover:text-violet-700"
+                }`}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z" />
+                </svg>
+                Ask Rolebolt
+              </Link>
+            )}
           </nav>
         )}
 
