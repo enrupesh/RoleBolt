@@ -7,6 +7,7 @@ import cookieParser from "cookie-parser";
 import { recruitRouter, recruitPublicRouter } from "./recruit";
 import { formRouter, formPublicRouter } from "./recruitForms";
 import { copilotRouter } from "./recruitCopilot";
+import { siteGuideRouter } from "./siteGuideChat";
 import { connectMongo } from "./db";
 
 dotenv.config();
@@ -138,6 +139,7 @@ app.use(express.json({ limit: "6mb" }));
 
 app.use("/recruit-public", recruitPublicRouter);
 app.use("/recruit-public/forms", formPublicRouter);
+app.use("/recruit-public/site-guide", siteGuideRouter);
 app.use("/recruit/copilot", requireFirebaseAuth, copilotRouter);
 app.use("/recruit", requireFirebaseAuth, recruitRouter);
 app.use("/recruit/forms", requireFirebaseAuth, formRouter);
