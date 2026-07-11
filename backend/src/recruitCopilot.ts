@@ -130,11 +130,11 @@ function parseStreamMeta(metaRaw: string): Omit<ParsedAiResponse, "reply"> {
 }
 
 /**
- * Attach candidate emails to sources, looked up fresh from the database.
- * The AI never sees or generates emails — this is the single point where
- * candidate identity (name + email) is grounded in real data before the
- * response reaches the client. Sources without a matching/known email are
- * left untouched (email is simply omitted, never invented).
+ * Attach candidate emails + fit scores to sources, looked up fresh from the
+ * database. The AI never sees or generates these — this is the single point
+ * where candidate identity (name + email + fit score) is grounded in real
+ * data before the response reaches the client. Sources without a
+ * matching/known value are left untouched (simply omitted, never invented).
  */
 async function attachCandidateEmails(
   uid: string,
@@ -146,16 +146,30 @@ async function attachCandidateEmails(
   if (ids.length === 0) return sources;
 
   const candidates = await RecruitCandidate.find({ _id: { $in: ids }, uid })
-    .select("email")
+    .select("email totalScore maxScore")
     .lean();
-  const emailById = new Map(
-    candidates.map((c: any) => [String(c._id), c.email as string | undefined])
+  const detailsById = new Map(
+    candidates.map((c: any) => [
+      String(c._id),
+      {
+        email: c.email as string | undefined,
+        fitScorePct:
+          typeof c.totalScore === "number" && typeof c.maxScore === "number" && c.maxScore > 0
+            ? Math.round((c.totalScore / c.maxScore) * 100)
+            : undefined,
+      },
+    ])
   );
 
   return sources.map((s) => {
     if (!s.candidateId) return s;
-    const email = emailById.get(s.candidateId);
-    return email ? { ...s, candidateEmail: email } : s;
+    const details = detailsById.get(s.candidateId);
+    if (!details) return s;
+    return {
+      ...s,
+      ...(details.email ? { candidateEmail: details.email } : {}),
+      ...(details.fitScorePct !== undefined ? { candidateFitScorePct: details.fitScorePct } : {}),
+    };
   });
 }
 
