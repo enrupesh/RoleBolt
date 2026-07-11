@@ -101,6 +101,8 @@ function sourceShape(): string {
       "label": "<human label, e.g. 'Rahul — Resume'>",
       "candidateId": "<MongoDB _id string, or null>",
       "candidateName": "<full name, or null>",
+      "jobId": "<MongoDB _id string of the job this candidate belongs to, or null>",
+      "jobTitle": "<job title, or null>",
       "resumeId": null,
       "assessmentId": null,
       "page": <page number if applicable, or null>,
@@ -156,6 +158,7 @@ function sharedBehaviourRules(): string {
 - "candidate_profile" → stage, location, availability, other profile fields.
 - "job_description" → references to the JD text or rubric criteria.
 - If a candidateId is known, ALWAYS include it in the source — the frontend uses it for deep links.
+- If the candidate's jobId/jobTitle is known (always true in Global context, where candidates span multiple jobs), ALWAYS include jobId and jobTitle in the source too — the frontend needs it to jump straight to the right job + candidate.
 - If no source exists, note "Based on available data:" in the reply and omit the source.
 
 ## Recommendation Rules
