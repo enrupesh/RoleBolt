@@ -20,6 +20,7 @@ export type CopilotPromptMode = "json" | "stream";
 export interface GlobalCandidateSummary {
   _id: any;
   name: string;
+  email?: string;
   jobId: any;
   jobTitle: string;
   totalScore: number;
@@ -81,6 +82,7 @@ function candidateSummaryBlock(
 
   return `
 [${rank}] ${c.name} — candidateId: ${String(c._id)}
+  Email: ${(c as any).email || "(not available)"}
   Score: ${scoreStr} | Stage: ${c.stage}
   Strengths: ${strengths}
   Red flags: ${redFlags}
@@ -149,7 +151,22 @@ Then immediately output a single JSON object (no code fences) with this exact sh
 }
 
 function sharedBehaviourRules(): string {
-  return `## Source Rules
+  return `## Candidate Email Display Rule — MANDATORY, NO EXCEPTIONS
+Whenever you mention ANY candidate by name anywhere in your reply — in a list, a comparison, a ranking, a paragraph, a recommendation, anywhere — you MUST immediately display that candidate's email address on the next line, directly below their name, in this exact format:
+
+**<Candidate Name>**
+📧 <email>
+
+If the email is not present in the data provided to you above, output exactly:
+📧 Email not available
+
+Rules:
+- This applies in EVERY context — Global, Job, and Candidate — with no exceptions.
+- If multiple candidates are mentioned (e.g. a shortlist or comparison), show the 📧 line for EACH candidate, immediately after each name.
+- The email MUST be copied verbatim from the candidate data provided in this prompt. NEVER invent, guess, autocomplete, or infer an email address (e.g. never construct one from the candidate's name).
+- Never mention a candidate's name without immediately showing their email (or "Email not available") — recruiters need this because multiple candidates can share the same name.
+
+## Source Rules
 - Every factual claim about a candidate MUST have a matching source entry.
 - "resume" → claims from resume text. Set sectionId to "experience", "skills", "education", etc. when applicable.
 - "score_breakdown" → claims from rubric scores.
@@ -263,6 +280,7 @@ You are a senior talent advisor deeply focused on a SINGLE candidate. Analyse th
 Level: CANDIDATE
 candidateId (include in every source): ${candidateId}
 Candidate Name: ${c.name}
+Candidate Email: ${(c as any).email || "(not available)"}
 
 ## Candidate Profile
 Stage: ${c.stage} | Current Hiring Decision: ${decisionLabel}
@@ -395,7 +413,7 @@ function globalCandidateLine(c: GlobalCandidateSummary, rank: number): string {
   const strengths = (c.strengths || []).slice(0, 3).join(", ") || "—";
   const decision =
     c.hiringDecision === "strong_yes" ? "Strong Yes" : c.hiringDecision === "maybe" ? "Maybe" : c.hiringDecision === "no" ? "No" : "Undecided";
-  return `[${rank}] ${c.name} — candidateId: ${String(c._id)} | Job: ${c.jobTitle} | Score: ${
+  return `[${rank}] ${c.name} — candidateId: ${String(c._id)} | Email: ${c.email || "(not available)"} | Job: ${c.jobTitle} | Score: ${
     p !== null ? `${p}%` : "N/A"
   } | Stage: ${c.stage} | Decision: ${decision} | Assessment: ${c.assessmentStatus || "not_sent"} | Strengths: ${strengths} | Location: ${c.location || "—"} | Availability: ${c.availability || "—"}`;
 }
