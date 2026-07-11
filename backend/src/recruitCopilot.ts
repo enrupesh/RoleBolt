@@ -130,6 +130,36 @@ function parseStreamMeta(metaRaw: string): Omit<ParsedAiResponse, "reply"> {
 }
 
 /**
+ * Attach candidate emails to sources, looked up fresh from the database.
+ * The AI never sees or generates emails — this is the single point where
+ * candidate identity (name + email) is grounded in real data before the
+ * response reaches the client. Sources without a matching/known email are
+ * left untouched (email is simply omitted, never invented).
+ */
+async function attachCandidateEmails(
+  uid: string,
+  sources: ICopilotSource[]
+): Promise<ICopilotSource[]> {
+  const ids = Array.from(
+    new Set(sources.map((s) => s.candidateId).filter((id): id is string => !!id))
+  );
+  if (ids.length === 0) return sources;
+
+  const candidates = await RecruitCandidate.find({ _id: { $in: ids }, uid })
+    .select("email")
+    .lean();
+  const emailById = new Map(
+    candidates.map((c: any) => [String(c._id), c.email as string | undefined])
+  );
+
+  return sources.map((s) => {
+    if (!s.candidateId) return s;
+    const email = emailById.get(s.candidateId);
+    return email ? { ...s, candidateEmail: email } : s;
+  });
+}
+
+/**
  * Auto-generate a short conversation title from the first user message.
  * Fire-and-forget — never blocks the chat response.
  */
@@ -466,6 +496,7 @@ copilotRouter.post("/chat", async (req, res) => {
     });
 
     const parsed = parseAiResponse(rawAi);
+    parsed.sources = await attachCandidateEmails(uid, parsed.sources);
 
     // ── 5. Persist + respond ──────────────────────────────────────────────────
     await persistExchange(conversation, message.trim(), parsed, isNew, job, candidate);
@@ -630,6 +661,7 @@ copilotRouter.post("/chat/stream", async (req, res) => {
 
     const meta = parseStreamMeta(metaRaw);
     const parsed: ParsedAiResponse = { reply: replyText, ...meta };
+    parsed.sources = await attachCandidateEmails(uid, parsed.sources);
 
     // ── 6. Persist ────────────────────────────────────────────────────────────
     await persistExchange(conversation, message.trim(), parsed, isNew, job, candidate);
