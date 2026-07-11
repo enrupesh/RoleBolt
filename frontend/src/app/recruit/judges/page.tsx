@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { RoleboltLogo } from "@/components/RoleboltLogo";
 import { JudgesTestingKit } from "@/components/JudgesTestingKit";
 
@@ -57,46 +56,6 @@ export default function JudgesHackathonPage() {
       {/* ── Testing kit ─────────────────────────────────────────────────────── */}
       <main className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
         <JudgesTestingKit dark={false} />
-
-        {/* ── Try the AI Copilot ──────────────────────────────────────────── */}
-        <div className="mt-16 max-w-3xl mx-auto">
-          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-            <div className="p-6 sm:p-8 pb-0">
-              <div className="inline-flex items-center gap-2 rounded-full border border-violet-300/40 bg-violet-50 px-3.5 py-1.5 text-[11px] font-bold text-violet-600 mb-4 uppercase tracking-widest">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                Step 3 &middot; AI Copilot
-              </div>
-              <h3 className="text-[19px] font-black text-slate-900 leading-snug">Ask Rolebolt about any candidate, job, or your whole pipeline</h3>
-              <p className="mt-2 text-[13px] text-slate-500 leading-relaxed max-w-xl">
-                Once you&apos;ve created a job and a candidate has applied, open the AI Copilot (top nav →
-                <strong className="text-slate-700"> Ask Rolebolt</strong>) to chat in plain English. It switches
-                between three context levels and grounds every answer in your real data — with clickable sources,
-                never invented facts.
-              </p>
-              <div className="mt-4 grid gap-2.5 sm:grid-cols-3">
-                {[
-                  { label: "Organisation", example: "\u201cWhich jobs need attention?\u201d" },
-                  { label: "Job", example: "\u201cWho should I interview first?\u201d" },
-                  { label: "Candidate", example: "\u201cShould I hire this candidate?\u201d" },
-                ].map((mode) => (
-                  <div key={mode.label} className="rounded-xl border border-slate-100 bg-slate-50 px-3.5 py-2.5">
-                    <p className="text-[10.5px] font-bold uppercase tracking-widest text-violet-600">{mode.label}</p>
-                    <p className="text-[12px] text-slate-500 mt-0.5">{mode.example}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="relative mt-6 aspect-[1024/500] w-full border-t border-slate-100 bg-slate-50">
-              <Image
-                src="/screenshots/ai-copilot.png"
-                alt="Ask Rolebolt AI Copilot focused on a candidate, showing quick prompts and candidate context panel"
-                fill
-                className="object-cover object-top"
-                sizes="(max-width: 768px) 100vw, 768px"
-              />
-            </div>
-          </div>
-        </div>
 
         {/* ── Built by / disclosure note ──────────────────────────────────── */}
         <div className="mt-16 max-w-3xl mx-auto rounded-2xl border-2 border-amber-300 bg-amber-50 p-6 sm:p-8 shadow-sm">
