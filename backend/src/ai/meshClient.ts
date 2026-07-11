@@ -183,3 +183,116 @@ export async function callMeshChatCompletions(args: {
 
   throw lastErr ?? new Error("Mesh API call failed without a captured error.");
 }
+
+// ─── Streaming ────────────────────────────────────────────────────────────────
+
+/**
+ * Streaming variant of callMeshChatCompletions.
+ *
+ * Yields text tokens one at a time from the OpenAI-compatible SSE stream
+ * returned by Mesh API (`stream: true`). The caller is responsible for
+ * accumulating tokens and handling the sentinel / metadata split.
+ *
+ * Usage:
+ *   for await (const token of streamMeshChatCompletions({ ... })) {
+ *     process.stdout.write(token);
+ *   }
+ */
+export async function* streamMeshChatCompletions(args: {
+  apiKey: string;
+  baseUrl?: string;
+  model?: string;
+  messages: ChatMessage[];
+  temperature?: number;
+  top_p?: number;
+  max_tokens?: number;
+  timeoutMs?: number;
+}): AsyncGenerator<string, void, unknown> {
+  const {
+    apiKey,
+    baseUrl = "https://api.meshapi.ai/v1",
+    model = "openai/gpt-4o-mini",
+    messages,
+    temperature = 0.7,
+    top_p = 0.9,
+    max_tokens = 2500,
+    timeoutMs = 90_000,
+  } = args;
+
+  const url = `${baseUrl.replace(/\/$/, "")}/chat/completions`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        Accept: "text/event-stream",
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature,
+        top_p,
+        max_tokens,
+        stream: true,
+      }),
+      signal: controller.signal,
+    });
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    throw err?.name === "AbortError"
+      ? new Error(`Mesh API stream timeout after ${Math.round(timeoutMs / 1000)}s`)
+      : err;
+  }
+
+  if (!res.ok) {
+    clearTimeout(timeoutId);
+    const text = await res.text().catch(() => "");
+    throw new Error(`Mesh API stream error (${res.status}): ${text || res.statusText}`);
+  }
+
+  if (!res.body) {
+    clearTimeout(timeoutId);
+    throw new Error("Mesh API: no response body for streaming request");
+  }
+
+  const decoder = new TextDecoder();
+  let lineBuffer = "";
+
+  try {
+    // res.body is a Web Streams ReadableStream; Node 18+ supports async iteration
+    for await (const chunk of res.body as unknown as AsyncIterable<Uint8Array>) {
+      lineBuffer += decoder.decode(chunk, { stream: true });
+
+      // Split on newlines — SSE lines end with \n
+      const lines = lineBuffer.split("\n");
+      // Last element may be an incomplete line; keep it in the buffer
+      lineBuffer = lines.pop() ?? "";
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith(":")) continue; // heartbeat / empty
+        if (!trimmed.startsWith("data:")) continue;
+
+        const payload = trimmed.slice(5).trim();
+        if (payload === "[DONE]") return;
+
+        try {
+          const parsed = JSON.parse(payload);
+          const token: string | undefined =
+            parsed?.choices?.[0]?.delta?.content ??
+            parsed?.choices?.[0]?.text;
+          if (token) yield token;
+        } catch {
+          // Skip malformed SSE chunks — they happen at stream boundaries
+        }
+      }
+    }
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
