@@ -8,6 +8,7 @@ import { signOut } from "firebase/auth";
 import { getFirebaseAuth, isFirebaseAvailable } from "@/lib/firebaseClient";
 import { useRouter } from "next/navigation";
 import { RoleboltLogo } from "@/components/RoleboltLogo";
+import { SiteGuideChatbot } from "@/components/SiteGuideChatbot";
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 
@@ -924,6 +925,7 @@ export default function RecruitLandingPage() {
         </div>
       </footer>
 
+      <SiteGuideChatbot />
     </div>
   );
 }
