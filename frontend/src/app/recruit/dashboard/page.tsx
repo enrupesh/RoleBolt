@@ -67,6 +67,15 @@ function ShareIcon({ size = 12 }: { size?: number }) {
   );
 }
 
+function SparklesIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" />
+      <path d="M20 3v4M22 5h-4M4 17v2M5 18H3" />
+    </svg>
+  );
+}
+
 function UsersIcon({ size = 14 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -462,6 +471,15 @@ function RecruitDashboardContent() {
                   className="flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition">
                   <BarChartIcon /> Analytics
                 </Link>
+                <div className="relative ml-1">
+                  <span className="rb-golden-tag absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full px-2 py-[3px] text-[8.5px] font-extrabold uppercase tracking-wide text-amber-900">
+                    ✨ Made for Standard Jobs
+                  </span>
+                  <Link href="/recruit/copilot"
+                    className="flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition">
+                    <SparklesIcon /> Hiring Copilot
+                  </Link>
+                </div>
               </>
             )}
             <Link href="/recruit/recruiter-profile"
