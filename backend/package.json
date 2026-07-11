@@ -4,7 +4,7 @@
   "description": "Standalone backend for the Recruit tool (jobs, applications, AI matching).",
   "main": "dist/index.js",
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=20.0.0 <21.0.0"
   },
   "scripts": {
     "dev": "tsx watch src/index.ts",
