@@ -781,6 +781,16 @@ function ApplicantDetailsModal({ c, jobId, token, onClose }: {
                 <p className="text-[11px] font-semibold text-gray-300 mt-0.5">{appliedDate}</p>
               </div>
             )}
+            <Link
+              href={`/recruit/copilot?jobId=${jobId}&candidateId=${c._id}`}
+              className="shrink-0 flex items-center gap-1.5 rounded-xl border border-violet-500/30 bg-violet-500/10 px-3 py-1.5 text-[11px] font-bold text-violet-300 hover:bg-violet-500/20 hover:border-violet-500/50 transition"
+              title="Ask Rolebolt AI about this candidate"
+            >
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z" />
+              </svg>
+              Ask Rolebolt
+            </Link>
             <button onClick={onClose} aria-label="Close applicant details" className="ml-1 text-gray-400 hover:text-white transition">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
             </button>
