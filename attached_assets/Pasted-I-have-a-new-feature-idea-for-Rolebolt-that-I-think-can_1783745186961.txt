@@ -1,0 +1,96 @@
+I have a new feature idea for Rolebolt that I think can become one of our biggest differentiators.
+
+Instead of a normal AI chat, I want to build an **AI Recruiter Copilot (Ask Rolebolt)**.
+
+### How it should work
+
+The chat must always understand the current context selected by the recruiter.
+
+There should be three levels of context:
+
+**1. Global Context**
+No job selected.
+The AI can answer organization-wide questions.
+
+Examples:
+
+* Which job has the highest number of applicants?
+* Which role is hardest to fill?
+* Show me all candidates with AWS experience.
+
+---
+
+**2. Job Context**
+When the recruiter selects a specific job (e.g. Backend Developer), the AI should automatically limit its knowledge to that job only.
+
+Examples:
+
+* Who is the strongest candidate?
+* Why is Rahul ranked #1?
+* Which candidates have fintech experience?
+* Generate interview questions for the top candidates.
+* Who should I interview first?
+
+The recruiter should not need to mention the job name every time. The selected job becomes the AI's context automatically.
+
+---
+
+**3. Candidate Context**
+When a recruiter opens a specific candidate, the AI should automatically understand that all questions are about that candidate.
+
+Examples:
+
+* Summarize this candidate.
+* What are the candidate's strengths and weaknesses?
+* Why did they receive a score of 84?
+* Should I hire this candidate?
+* Generate interview questions based on this resume.
+* What skills are missing compared to the JD?
+
+Again, the recruiter shouldn't have to specify the candidate name. The selected candidate defines the context.
+
+---
+
+### Source/Evidence (Very Important)
+
+Every AI response should include evidence.
+
+If the AI says:
+"Rahul has strong AWS experience."
+
+There should be a clickable source such as:
+
+* View Resume
+* View Assessment
+* View Interview Brief
+
+or even direct links like:
+
+* Resume → Page 2
+* Assessment → Question 4
+* Experience Section
+
+The recruiter should always be able to verify why the AI gave a particular answer. This makes the AI explainable and trustworthy.
+
+---
+
+### Future Vision
+
+The goal is to eliminate manual searching and filtering.
+
+Instead of:
+Search → Filter → Open Resume → Compare
+
+The recruiter simply asks:
+
+"Who is the best backend engineer?"
+"Why is Rahul ranked above Aman?"
+"Which candidates can join immediately?"
+"Compare Rahul and Aman."
+
+The AI understands the selected context, analyzes all available hiring data, provides an answer, and links back to the supporting evidence.
+
+This should feel like talking to ChatGPT, but with complete awareness of the recruiter's hiring workflow.
+
+This feature can become Rolebolt's signature capability:
+**Don't search your ATS. Just ask Rolebolt.**
