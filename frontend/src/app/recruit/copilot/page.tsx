@@ -31,6 +31,9 @@ import {
   ClipboardCheck,
   Moon,
   SunMedium,
+  Copy,
+  Check,
+  ExternalLink,
 } from "lucide-react";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { RecruitGuard } from "@/components/RecruitGuard";
@@ -305,6 +308,61 @@ function SourceChip({ src, onNavigate }: { src: CopilotSource; onNavigate?: (src
   );
 }
 
+// ─── Source card ──────────────────────────────────────────────────────────────
+// Clean, self-contained card for a single cited source — replaces the plain
+// chip so recruiters can see at a glance what type of document was used,
+// which candidate it belongs to, and jump straight to it.
+
+function SourceCard({ src, onNavigate }: { src: CopilotSource; onNavigate?: (src: CopilotSource) => void }) {
+  const c = SOURCE_COLORS[src.type] ?? { bg: "var(--rb-disabled-bg)", text: T.textSecondary, border: T.border };
+  const navigable = !!onNavigate && (!!src.candidateId || (!!src.jobId && src.type === "job_description"));
+  return (
+    <div
+      className="flex items-start gap-3 rounded-xl border p-3 transition-all hover:shadow-sm"
+      style={{ background: T.card, borderColor: T.border }}
+    >
+      <div
+        className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+        style={{ background: c.bg, color: c.text }}
+      >
+        <FileText size={14} strokeWidth={2.2} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <span
+          className="inline-block text-[10.5px] font-semibold px-2 py-0.5 rounded-full border"
+          style={{ background: c.bg, color: c.text, borderColor: c.border }}
+        >
+          {src.label}
+        </span>
+        {src.candidateName && (
+          <p className="text-[12.5px] font-semibold mt-1.5 truncate" style={{ color: T.text }}>{src.candidateName}</p>
+        )}
+        {src.candidateEmail && (
+          <p className="text-[11.5px] mt-0.5 flex items-center gap-1 truncate" style={{ color: T.textSecondary }}>
+            <Mail size={10} strokeWidth={2.2} />
+            {src.candidateEmail}
+          </p>
+        )}
+        {src.detail && !src.candidateName && (
+          <p className="text-[11.5px] mt-1 truncate" style={{ color: T.textSecondary }}>{src.detail}</p>
+        )}
+      </div>
+      {navigable && (
+        <button
+          type="button"
+          onClick={() => onNavigate!(src)}
+          className="shrink-0 inline-flex items-center gap-1 text-[11px] font-medium px-2.5 py-1.5 rounded-lg transition-all hover:shadow-sm"
+          style={{ color: T.accent, background: "var(--rb-accent-soft-bg)" }}
+          title="Open this source"
+        >
+          <ExternalLink size={11} strokeWidth={2.2} />
+          Open
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ─── Recommendation card ──────────────────────────────────────────────────────
 
 function RecommendationCard({ recommendation, confidence, reasoning }: {
@@ -340,9 +398,30 @@ function RecommendationCard({ recommendation, confidence, reasoning }: {
 
 // ─── Message bubble ───────────────────────────────────────────────────────────
 
-function MessageBubble({ msg, onQuickAction, onSourceNavigate }: {
-  msg: UIMessage; onQuickAction: (text: string) => void; onSourceNavigate?: (src: CopilotSource) => void;
+function MessageBubble({ msg, onQuickAction, onSourceNavigate, onCopied }: {
+  msg: UIMessage; onQuickAction: (text: string) => void; onSourceNavigate?: (src: CopilotSource) => void; onCopied?: () => void;
 }) {
+  const [copied, setCopied] = useState(false);
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(msg.content);
+    } catch {
+      // Fallback for browsers/contexts without Clipboard API permission
+      const ta = document.createElement("textarea");
+      ta.value = msg.content;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand("copy"); } catch {}
+      document.body.removeChild(ta);
+    }
+    setCopied(true);
+    onCopied?.();
+    setTimeout(() => setCopied(false), 1600);
+  }
+
   if (msg.role === "user") {
     return (
       <div className="flex justify-end mb-6 rb-animate-fade-in">
@@ -365,14 +444,30 @@ function MessageBubble({ msg, onQuickAction, onSourceNavigate }: {
         className="rounded-[20px] px-5 py-4 transition-shadow hover:shadow-md"
         style={{ background: T.card, border: `1px solid ${T.border}`, boxShadow: "0 1px 2px var(--rb-shadow-color)" }}
       >
-        <div className="flex items-center gap-2 mb-3">
-          <div
-            className="w-6 h-6 rounded-full flex items-center justify-center shrink-0"
-            style={{ background: `linear-gradient(135deg, ${T.accent}, var(--rb-accent-dark))` }}
-          >
-            <Sparkles size={12} strokeWidth={2.4} color="#fff" />
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <div className="flex items-center gap-2">
+            <div
+              className="w-6 h-6 rounded-full flex items-center justify-center shrink-0"
+              style={{ background: `linear-gradient(135deg, ${T.accent}, var(--rb-accent-dark))` }}
+            >
+              <Sparkles size={12} strokeWidth={2.4} color="#fff" />
+            </div>
+            <span className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: T.textSecondary }}>Rolebolt AI</span>
           </div>
-          <span className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: T.textSecondary }}>Rolebolt AI</span>
+          {!showEmptyLoading && msg.content && (
+            <button
+              type="button"
+              onClick={handleCopy}
+              title="Copy response"
+              className="shrink-0 inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-lg border transition-all hover:shadow-sm"
+              style={copied
+                ? { color: "var(--rb-success)", borderColor: "var(--rb-success)", background: "var(--rb-accent-softer-bg)" }
+                : { color: T.textSecondary, borderColor: T.border, background: "transparent" }}
+            >
+              {copied ? <Check size={11} strokeWidth={2.4} /> : <Copy size={11} strokeWidth={2.2} />}
+              {copied ? "Copied" : "Copy"}
+            </button>
+          )}
         </div>
 
         {showEmptyLoading ? (
@@ -381,7 +476,7 @@ function MessageBubble({ msg, onQuickAction, onSourceNavigate }: {
           <div className="text-[0.9rem] leading-relaxed copilot-markdown">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
             {msg.isStreaming && (
-              <span className="inline-block w-0.5 h-4 align-middle ml-0.5 animate-pulse" style={{ background: T.accent }} />
+              <span className="inline-block w-[2px] h-4 align-middle ml-0.5 rb-cursor-blink" style={{ background: T.accent }} />
             )}
           </div>
         )}
@@ -409,8 +504,13 @@ function MessageBubble({ msg, onQuickAction, onSourceNavigate }: {
         )}
 
         {!msg.isStreaming && msg.sources && msg.sources.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {msg.sources.map((src, i) => <SourceChip key={i} src={src} onNavigate={onSourceNavigate} />)}
+          <div className="mt-4 pt-4 border-t" style={{ borderColor: T.border }}>
+            <p className="text-[10px] font-semibold uppercase tracking-widest mb-2" style={{ color: T.textSecondary }}>
+              Sources
+            </p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {msg.sources.map((src, i) => <SourceCard key={i} src={src} onNavigate={onSourceNavigate} />)}
+            </div>
           </div>
         )}
 
@@ -928,6 +1028,13 @@ function CopilotPageContent() {
   const [contextOpen, setContextOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [inputFocused, setInputFocused] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showToast = useCallback((message: string) => {
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    setToast(message);
+    toastTimeoutRef.current = setTimeout(() => setToast(null), 2500);
+  }, []);
 
   const { theme, setTheme } = useTheme();
   const isDark = theme === "dark";
@@ -1765,7 +1872,13 @@ function CopilotPageContent() {
           ) : (
             <div className="max-w-2xl mx-auto px-4 py-8">
               {messages.map(msg => (
-                <MessageBubble key={msg.id} msg={msg} onQuickAction={sendMessage} onSourceNavigate={handleSourceNavigate} />
+                <MessageBubble
+                  key={msg.id}
+                  msg={msg}
+                  onQuickAction={sendMessage}
+                  onSourceNavigate={handleSourceNavigate}
+                  onCopied={() => showToast("✓ Copied to clipboard")}
+                />
               ))}
               <div ref={bottomRef} />
             </div>
@@ -1835,6 +1948,22 @@ function CopilotPageContent() {
               Rolebolt AI can make mistakes. Always verify important decisions.
             </p>
           </div>
+        </div>
+
+        {/* Copy success toast */}
+        <div
+          className={`pointer-events-none absolute bottom-24 left-1/2 -translate-x-1/2 z-30 transition-all duration-300 ease-out ${
+            toast ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
+          }`}
+        >
+          {toast && (
+            <div
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-[12px] font-medium border shadow-lg"
+              style={{ background: T.card, borderColor: T.border, color: T.text }}
+            >
+              {toast}
+            </div>
+          )}
         </div>
       </main>
 
