@@ -10,7 +10,7 @@ import { apiUrl } from "@/lib/api";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type ContextMode = "job" | "candidate";
+type ContextMode = "job" | "candidate" | "global";
 
 interface Job {
   _id: string;
@@ -69,6 +69,29 @@ interface CandidateStat {
   currentStatus?: string;
   educationLevel?: string;
   scoreBreakdown?: Array<{ criterion: string; score: number; maxScore: number }>;
+}
+
+interface JobPipelineStat {
+  jobId: string;
+  title: string;
+  department?: string;
+  candidateCount: number;
+  avgScorePct: number | null;
+}
+
+interface GlobalStats {
+  activeJobs: number;
+  openPositions: number;
+  totalCandidates: number;
+  interviewReady: number;
+  offersSent: number;
+  avgFitScorePct: number | null;
+  topPipeline: JobPipelineStat | null;
+  weakestPipeline: JobPipelineStat | null;
+  highestRatedCandidate: { id: string; name: string; jobTitle: string; scorePct: number } | null;
+  mostCommonMissingSkills: string[];
+  recentActivity: string[];
+  recommendation: string;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -153,6 +176,11 @@ const IcPerson = () => (
 const IcDoc = () => (
   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
+  </svg>
+);
+const IcGlobe = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" /><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
   </svg>
 );
 
@@ -303,16 +331,38 @@ const CANDIDATE_PROMPTS = [
   { icon: "📄", text: "Compare against the job description" },
 ];
 
-function WelcomeScreen({ recruiterName, jobSelected, contextMode, candidateName, onPrompt }: {
+const GLOBAL_PROMPTS = [
+  { icon: "🧭", text: "What should I prioritize today?" },
+  { icon: "🏆", text: "Which job has the strongest candidates?" },
+  { icon: "🚧", text: "Which role is hardest to hire for?" },
+  { icon: "🔍", text: "Find candidates with React and Docker" },
+  { icon: "⚖️", text: "Compare all active jobs" },
+  { icon: "🕳️", text: "Where are candidates dropping off?" },
+];
+
+function WelcomeScreen({ recruiterName, jobSelected, contextMode, candidateName, onPrompt, loadingInsights }: {
   recruiterName?: string;
   jobSelected: boolean;
   contextMode: ContextMode;
   candidateName?: string;
   onPrompt: (t: string) => void;
+  loadingInsights?: boolean;
 }) {
   const firstName = recruiterName?.split(" ")[0] ?? "there";
-  const prompts = contextMode === "candidate" ? CANDIDATE_PROMPTS : JOB_PROMPTS;
-  const canChat = contextMode === "candidate" ? !!candidateName : jobSelected;
+  const prompts = contextMode === "candidate" ? CANDIDATE_PROMPTS : contextMode === "global" ? GLOBAL_PROMPTS : JOB_PROMPTS;
+  const canChat = contextMode === "candidate" ? !!candidateName : contextMode === "global" ? true : jobSelected;
+
+  if (contextMode === "global" && loadingInsights) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-center px-6 pb-24">
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center mb-6 shadow-[0_0_40px_rgba(124,58,237,0.3)] animate-pulse">
+          <IcSparkle />
+        </div>
+        <h1 className="text-2xl font-bold text-white mb-2">{hourGreeting()}, {firstName} 👋</h1>
+        <p className="text-[#8b8b8b] text-[0.9rem]">Pulling together today's hiring overview…</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col items-center justify-center h-full text-center px-6 pb-24">
@@ -327,6 +377,13 @@ function WelcomeScreen({ recruiterName, jobSelected, contextMode, candidateName,
         <>
           <p className="text-[#8b8b8b] text-[0.9rem] max-w-sm leading-relaxed mb-2">
             I'm focused on <span className="text-white font-semibold">{candidateName}</span>. Ask me anything about this candidate.
+          </p>
+          <p className="text-[#5a5a5a] text-xs mb-8">Select a prompt or type your own question below</p>
+        </>
+      ) : contextMode === "global" ? (
+        <>
+          <p className="text-[#8b8b8b] text-[0.9rem] max-w-sm leading-relaxed mb-2">
+            I'm looking across your entire hiring organization — every job, every candidate, every pipeline. Ask me anything, no filtering needed.
           </p>
           <p className="text-[#5a5a5a] text-xs mb-8">Select a prompt or type your own question below</p>
         </>
@@ -442,6 +499,112 @@ function JobContextPanel({ job, candidates }: { job: Job | null; candidates: Can
           </Link>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Global / Organization context panel (right sidebar) ─────────────────────
+
+function GlobalContextPanel({ stats, loading }: { stats: GlobalStats | null; loading: boolean }) {
+  if (loading && !stats) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-center px-4">
+        <div className="w-10 h-10 rounded-2xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center mb-3 animate-pulse">
+          <IcGlobe />
+        </div>
+        <p className="text-[12px] text-white/20">Loading organization data…</p>
+      </div>
+    );
+  }
+
+  if (!stats) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-center px-4">
+        <div className="w-10 h-10 rounded-2xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center mb-3">
+          <IcGlobe />
+        </div>
+        <p className="text-[12px] text-white/20">No organization data yet</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-4 py-5 space-y-5 overflow-y-auto h-full scrollbar-none">
+      <div>
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-3">Organization Context</p>
+        <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+          <div className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-sky-400 shrink-0" />
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-white/30">Global</p>
+          </div>
+          <p className="text-[0.875rem] font-semibold text-white leading-snug mt-1">Every job, every candidate</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <StatTile label="Active Jobs" value={stats.activeJobs} />
+        <StatTile label="Total Candidates" value={stats.totalCandidates} />
+        <StatTile label="Interview Ready" value={stats.interviewReady} />
+        <StatTile label="Offers Sent" value={stats.offersSent} />
+        <StatTile label="Avg Fit Score" value={stats.avgFitScorePct !== null ? `${stats.avgFitScorePct}%` : "—"} color={stats.avgFitScorePct ? confColor(stats.avgFitScorePct) : undefined} />
+        <StatTile label="Open Positions" value={stats.openPositions} />
+      </div>
+
+      {stats.topPipeline && (
+        <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-1">Top Hiring Pipeline</p>
+          <p className="text-[0.85rem] font-semibold text-white">{stats.topPipeline.title}</p>
+          {stats.topPipeline.avgScorePct !== null && (
+            <p className="text-[11px] mt-0.5" style={{ color: confColor(stats.topPipeline.avgScorePct) }}>
+              {stats.topPipeline.avgScorePct}% avg fit · {stats.topPipeline.candidateCount} candidates
+            </p>
+          )}
+        </div>
+      )}
+
+      {stats.highestRatedCandidate && (
+        <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-1">Highest Rated Candidate</p>
+          <p className="text-[0.85rem] font-semibold text-white">{stats.highestRatedCandidate.name}</p>
+          <p className="text-[11px] text-white/30 mt-0.5">{stats.highestRatedCandidate.jobTitle} · <span style={{ color: confColor(stats.highestRatedCandidate.scorePct) }}>{stats.highestRatedCandidate.scorePct}%</span></p>
+        </div>
+      )}
+
+      {stats.mostCommonMissingSkills.length > 0 && (
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-2">Commonly Missing Skills</p>
+          <div className="flex flex-wrap gap-1.5">
+            {stats.mostCommonMissingSkills.map((s, i) => (
+              <span key={i} className="text-[11px] px-2.5 py-1 rounded-full border border-amber-500/20 bg-amber-500/10 text-amber-300">{s}</span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {stats.recentActivity.length > 0 && (
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-2">Recent Activity</p>
+          <div className="space-y-1.5">
+            {stats.recentActivity.map((a, i) => (
+              <div key={i} className="text-[12px] text-[#a3a3a3] p-2 rounded-lg bg-white/[0.02] border border-white/[0.05]">{a}</div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="p-3 rounded-xl bg-violet-500/10 border border-violet-500/20">
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-violet-300/70 mb-1">AI Recommendation</p>
+        <p className="text-[12px] text-violet-100 leading-relaxed">{stats.recommendation}</p>
+      </div>
+    </div>
+  );
+}
+
+function StatTile({ label, value, color }: { label: string; value: string | number; color?: string }) {
+  return (
+    <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-1">{label}</p>
+      <p className="text-xl font-bold tabular-nums" style={{ color: color ?? "#fff" }}>{value}</p>
     </div>
   );
 }
@@ -599,10 +762,16 @@ function CopilotPageContent() {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [jobDropdownOpen, setJobDropdownOpen] = useState(false);
 
-  // Context mode: "job" = talking about the whole job, "candidate" = focused on one candidate
-  const [contextMode, setContextMode] = useState<ContextMode>("job");
+  // Context mode: "global" (no job/candidate selected — Organization Intelligence),
+  // "job" = talking about one job, "candidate" = focused on one candidate.
+  const [contextMode, setContextMode] = useState<ContextMode>("global");
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
   const [selectedCandidate, setSelectedCandidate] = useState<CandidateStat | null>(null);
+
+  const [globalStats, setGlobalStats] = useState<GlobalStats | null>(null);
+  const [globalStatsLoading, setGlobalStatsLoading] = useState(false);
+  const [insightsLoading, setInsightsLoading] = useState(false);
+  const insightsRequestedRef = useRef(false);
 
   // Pending URL params (applied after data loads)
   const [pendingJobId, setPendingJobId] = useState<string | null>(null);
@@ -637,7 +806,10 @@ function CopilotPageContent() {
     const params = new URLSearchParams(window.location.search);
     const urlJobId = params.get("jobId");
     const urlCandidateId = params.get("candidateId");
-    if (urlJobId) setPendingJobId(urlJobId);
+    if (urlJobId) {
+      setPendingJobId(urlJobId);
+      setContextMode("job");
+    }
     if (urlCandidateId) {
       setPendingCandidateId(urlCandidateId);
       setContextMode("candidate");
@@ -645,6 +817,8 @@ function CopilotPageContent() {
   }, []);
 
   // ── Load jobs ──────────────────────────────────────────────────────────────
+  // No auto-selection: with no job/candidate selected, Rolebolt defaults to
+  // Global Context (Organization Intelligence) — no manual filtering required.
   useEffect(() => {
     async function load() {
       const token = await getToken();
@@ -655,17 +829,10 @@ function CopilotPageContent() {
         });
         if (!res.ok) return;
         const data = await res.json();
-        const all = data.jobs ?? [];
-        setJobs(all);
-        // Default to first active job only if no pending job from URL
-        if (!pendingJobId) {
-          const active = all.find((j: Job) => j.status === "active");
-          if (active) setSelectedJob(active);
-        }
+        setJobs(data.jobs ?? []);
       } catch {}
     }
     load();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [getToken]);
 
   // ── Apply pending job ID after jobs load ───────────────────────────────────
@@ -675,6 +842,65 @@ function CopilotPageContent() {
     if (job) setSelectedJob(job);
     setPendingJobId(null);
   }, [pendingJobId, jobs]);
+
+  // ── Load organization-wide stats (Global Context Panel) ────────────────────
+  const loadGlobalStats = useCallback(async () => {
+    const token = await getToken();
+    if (!token) return;
+    setGlobalStatsLoading(true);
+    try {
+      const res = await fetch(apiUrl("/recruit/copilot/global-stats"), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setGlobalStats(data.stats ?? null);
+    } catch {} finally {
+      setGlobalStatsLoading(false);
+    }
+  }, [getToken]);
+
+  useEffect(() => {
+    if (contextMode === "global") loadGlobalStats();
+  }, [contextMode, loadGlobalStats]);
+
+  // ── Auto-generate the "Good morning" insights card when Global Context ─────
+  // opens with no active conversation — the AI doesn't wait for a question.
+  const loadInsights = useCallback(async () => {
+    const token = await getToken();
+    if (!token) return;
+    setInsightsLoading(true);
+    try {
+      const res = await fetch(apiUrl("/recruit/copilot/insights"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setActiveConvId(data.conversationId);
+      setMessages([{
+        id: `insights-${Date.now()}`,
+        role: "assistant",
+        content: data.reply,
+        recommendation: data.recommendation,
+        confidence: data.confidence,
+        reasoning: data.reasoning,
+        sources: data.sources ?? [],
+        quickActions: data.quickActions ?? [],
+      }]);
+      loadConversations();
+    } catch {} finally {
+      setInsightsLoading(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [getToken]);
+
+  useEffect(() => {
+    if (contextMode === "global" && messages.length === 0 && !activeConvId && !insightsRequestedRef.current) {
+      insightsRequestedRef.current = true;
+      loadInsights();
+    }
+  }, [contextMode, messages.length, activeConvId, loadInsights]);
 
   // ── Load conversations ─────────────────────────────────────────────────────
   const loadConversations = useCallback(async () => {
@@ -764,6 +990,11 @@ function CopilotPageContent() {
         setContextMode("candidate");
         setSelectedCandidateId(data.selectedCandidateId);
         // The candidate will be found once candidates load for the job
+      } else if (data.context?.level === "global") {
+        setContextMode("global");
+        setSelectedJob(null);
+        setSelectedCandidateId(null);
+        setSelectedCandidate(null);
       } else {
         setContextMode("job");
         setSelectedCandidateId(null);
@@ -786,14 +1017,18 @@ function CopilotPageContent() {
   }
 
   // ── New chat ───────────────────────────────────────────────────────────────
-  function newChat(resetCandidateContext = true) {
+  // Starting a fresh conversation with no job/candidate selected returns to
+  // Global Context — mirrors "no manual filtering required".
+  function newChat(resetToGlobal = true) {
     if (abortRef.current) abortRef.current.abort();
     setActiveConvId(null);
     setMessages([]);
     setInput("");
     setSidebarOpen(false);
-    if (resetCandidateContext) {
-      setContextMode("job");
+    insightsRequestedRef.current = false;
+    if (resetToGlobal) {
+      setContextMode("global");
+      setSelectedJob(null);
       setSelectedCandidateId(null);
       setSelectedCandidate(null);
     }
@@ -822,7 +1057,7 @@ function CopilotPageContent() {
   const sendMessage = useCallback(async (text: string) => {
     const trimmed = text.trim();
     if (!trimmed || isStreaming) return;
-    if (!selectedJob) return;
+    if (contextMode !== "global" && !selectedJob) return;
 
     // In candidate mode, we need a selected candidate
     const isCandidateMode = contextMode === "candidate" && !!selectedCandidateId;
@@ -845,8 +1080,10 @@ function CopilotPageContent() {
     abortRef.current = controller;
 
     const chatContext = isCandidateMode
-      ? { level: "candidate" as const, jobId: selectedJob._id, candidateId: selectedCandidateId! }
-      : { level: "job" as const, jobId: selectedJob._id };
+      ? { level: "candidate" as const, jobId: selectedJob!._id, candidateId: selectedCandidateId! }
+      : contextMode === "global"
+      ? { level: "global" as const }
+      : { level: "job" as const, jobId: selectedJob!._id };
 
     try {
       const res = await fetch(apiUrl("/recruit/copilot/chat/stream"), {
@@ -934,6 +1171,7 @@ function CopilotPageContent() {
 
   // ── Input placeholder text ─────────────────────────────────────────────────
   const inputPlaceholder = (() => {
+    if (contextMode === "global") return "Ask about your entire hiring organization…";
     if (!selectedJob) return "Select a job first…";
     if (contextMode === "candidate") {
       if (!selectedCandidate) return "Loading candidate…";
@@ -942,7 +1180,8 @@ function CopilotPageContent() {
     return `Ask about ${selectedJob.title}…`;
   })();
 
-  const inputDisabled = !selectedJob || isStreaming ||
+  const inputDisabled = isStreaming ||
+    (contextMode !== "global" && !selectedJob) ||
     (contextMode === "candidate" && !selectedCandidate);
 
   // ── Grouped conversations ──────────────────────────────────────────────────
@@ -962,6 +1201,10 @@ function CopilotPageContent() {
           newChat(false);
         }}
       />
+    )
+    : contextMode === "global"
+    ? (
+      <GlobalContextPanel stats={globalStats} loading={globalStatsLoading} />
     )
     : (
       <JobContextPanel job={selectedJob} candidates={candidates} />
@@ -1018,17 +1261,34 @@ function CopilotPageContent() {
             className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-[13px] border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06] transition-all"
           >
             <div className="flex items-center gap-2 min-w-0">
-              <IcBriefcase />
-              <span className="truncate text-white/70">{selectedJob ? selectedJob.title : "Select a job"}</span>
+              {contextMode === "global" ? <IcGlobe /> : <IcBriefcase />}
+              <span className="truncate text-white/70">
+                {contextMode === "global" ? "Organization (all jobs)" : selectedJob ? selectedJob.title : "Select a job"}
+              </span>
             </div>
             <IcChevronDown />
           </button>
 
           {jobDropdownOpen && (
             <div
-              className="absolute left-3 right-3 top-full mt-1 z-10 rounded-xl border overflow-hidden shadow-2xl"
+              className="absolute left-3 right-3 top-full mt-1 z-10 rounded-xl border overflow-hidden shadow-2xl max-h-80 overflow-y-auto"
               style={{ background: "#222", borderColor: "rgba(255,255,255,0.1)" }}
             >
+              <button
+                onClick={() => {
+                  setJobDropdownOpen(false);
+                  setContextMode("global");
+                  setSelectedJob(null);
+                  setSelectedCandidateId(null);
+                  setSelectedCandidate(null);
+                  newChat(false);
+                }}
+                className={`w-full text-left px-4 py-2.5 text-[13px] hover:bg-white/[0.07] transition-colors flex items-center gap-2 border-b ${contextMode === "global" ? "text-sky-400 font-semibold" : "text-white/60"}`}
+                style={{ borderColor: "rgba(255,255,255,0.07)" }}
+              >
+                <IcGlobe />
+                Organization (all jobs)
+              </button>
               {jobs.length === 0 ? (
                 <div className="px-4 py-3 text-[12px] text-white/30">No jobs found</div>
               ) : (
@@ -1137,13 +1397,18 @@ function CopilotPageContent() {
                 <IcBriefcase />
                 <span className="text-[11px] font-medium text-white/50">{selectedJob.title}</span>
               </div>
+            ) : contextMode === "global" ? (
+              <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-sky-500/10 border border-sky-500/20">
+                <IcGlobe />
+                <span className="text-[11px] font-medium text-sky-300">Organization</span>
+              </div>
             ) : null}
           </div>
           <button
             onClick={() => setContextOpen(o => !o)}
             className="lg:hidden p-1.5 rounded-lg text-white/30 hover:text-white/70 hover:bg-white/[0.06] transition"
           >
-            {contextMode === "candidate" ? <IcPerson /> : <IcUsers />}
+            {contextMode === "candidate" ? <IcPerson /> : contextMode === "global" ? <IcGlobe /> : <IcUsers />}
           </button>
         </div>
 
@@ -1156,6 +1421,7 @@ function CopilotPageContent() {
               contextMode={contextMode}
               candidateName={selectedCandidate?.name}
               onPrompt={sendMessage}
+              loadingInsights={insightsLoading}
             />
           ) : (
             <div className="max-w-2xl mx-auto px-4 py-8">

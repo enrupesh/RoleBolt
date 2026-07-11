@@ -1,0 +1,173 @@
+Excellent work. Phase 1 and Phase 2 are now complete.
+
+Let's move to **Phase 3: Global Context (Organization Intelligence).**
+
+This is the final context level that completes the AI Hiring Copilot.
+
+## Goal
+
+When no specific job or candidate is selected, Rolebolt should automatically switch into **Global Context**.
+
+The AI should understand the recruiter's entire hiring organization instead of a single job or candidate.
+
+No manual filtering should be required.
+
+---
+
+## Organization Context
+
+Provide the AI with organization-wide hiring data, including:
+
+* All active jobs
+* Hiring pipelines
+* All candidates
+* Candidate scores
+* Hiring stages
+* Assessments
+* Interview status
+* Talent pool
+* Recruiters
+* Hiring analytics
+* Historical hiring data (if available)
+
+The AI should reason across the entire organization.
+
+---
+
+## Example Questions
+
+* Which job has the strongest candidates?
+* Which role is hardest to hire for?
+* Which job has the most applicants?
+* Show me every AWS candidate across all jobs.
+* Which candidates are interview-ready?
+* Which jobs have low-quality applicants?
+* Which skills are most commonly missing?
+* Which recruiter has hired the fastest?
+* Where are candidates dropping off?
+* Which department should I focus on today?
+* What should I prioritize this morning?
+
+---
+
+## Organization Insights
+
+When the recruiter opens Global Context, don't wait for a question.
+
+Automatically generate an AI Insights card.
+
+Example:
+
+Good morning 👋
+
+Here's today's hiring overview:
+
+• 17 new applicants
+
+• 4 candidates are interview-ready
+
+• Backend Developer has the strongest pipeline
+
+• DevOps Engineer has the lowest applicant quality
+
+• Docker is the most commonly missing skill
+
+• Recommendation:
+Schedule interviews for Rahul and Neha today.
+
+---
+
+## Talent Pool Intelligence
+
+Allow natural language search across the entire talent pool.
+
+Examples:
+
+* Find candidates with React and Docker.
+* Find everyone available within 30 days.
+* Show candidates with fintech experience.
+* Find senior backend engineers.
+* Find candidates suitable for multiple jobs.
+
+The AI should search across every job, not only one.
+
+---
+
+## Cross-Job Comparison
+
+Support organization-level comparisons.
+
+Examples:
+
+* Compare Backend Developer vs DevOps hiring pipeline.
+* Which role receives better applicants?
+* Which hiring pipeline converts best?
+* Which job should receive more attention?
+
+---
+
+## Organization Context Panel
+
+The right panel should display:
+
+Active Jobs
+
+Total Candidates
+
+Interview Ready
+
+Offers Sent
+
+Average Fit Score
+
+Open Positions
+
+Top Hiring Pipeline
+
+Highest Rated Candidate
+
+Recent Hiring Activity
+
+AI Recommendation
+
+---
+
+## Starter Prompts
+
+Examples:
+
+* What should I prioritize today?
+* Show my strongest candidates.
+* Which jobs need attention?
+* Show hiring bottlenecks.
+* Compare all active jobs.
+* Search my talent pool.
+
+---
+
+## AI Principles
+
+The AI should behave like a Head of Talent Acquisition.
+
+It should:
+
+* Analyze trends.
+* Prioritize work.
+* Recommend actions.
+* Explain reasoning.
+* Always provide evidence.
+* Never guess when data is missing.
+
+---
+
+## Vision
+
+Phase 3 completes the AI Hiring Copilot.
+
+After this, recruiters should no longer need to manually search dashboards, reports, or candidate lists.
+
+Instead, they simply ask Rolebolt.
+
+The AI analyzes the organization, explains its reasoning, recommends the next action, and links every answer back to evidence.
+
+This should become the primary interface for managing hiring across the entire organization.
