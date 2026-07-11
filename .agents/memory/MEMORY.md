@@ -1,3 +1,4 @@
+- [AI Copilot backend architecture](copilot-backend.md) — RecruitCopilotConversation model + buildCopilotPrompt + copilot routes; streaming via SSE sentinel ---ROLEBOLT_META---.
 - [Mesh API AI call reliability](meshapi-ai-reliability.md) — AI call sites need retries/fallbackModels + local try/catch, or transient failures 500 the route even with a healthy key.
 - [Form submission non-blocking pattern](form-submit-pattern.md) — persist record first, return 201 immediately, then score via setImmediate; never await AI inside a candidate-facing route.
 - [Form Jobs feature parity](form-jobs-features.md) — answerSignals added to RecruitFormResponse; scoreFormResponse uses 1-based idx mapping; retry-score endpoint added; ScoringCriteriaCard is client-side only.
