@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { signOut } from "firebase/auth";
 import { getFirebaseAuth, isFirebaseAvailable } from "@/lib/firebaseClient";
@@ -86,6 +87,15 @@ const FEATURES = [
     desc: "Every candidate who ever applied is searchable. When a new role opens, surface the right people in seconds — never start from scratch.",
     tag: "Decide",
   },
+  {
+    icon: (
+      <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+    ),
+    title: "AI Copilot — ask about anyone, anytime",
+    desc: "Chat with an AI that already knows your jobs, candidates, resumes, and scores. Ask \"who should I interview first?\" or \"summarise this candidate\" and get grounded, sourced answers instantly.",
+    tag: "Decide",
+    isNew: true,
+  },
 ];
 
 const STEPS = [
@@ -133,6 +143,7 @@ const WHY = [
   { label: "Interview brief generator", rolebolt: true, others: false },
   { label: "Completely free", rolebolt: true, others: false },
   { label: "Talent pool with search", rolebolt: true, others: true },
+  { label: "AI Copilot chat across your pipeline", rolebolt: true, others: false },
 ];
 
 const AI_CAPABILITIES = [
@@ -189,6 +200,7 @@ export default function RecruitLandingPage() {
             <Link href="/recruit/opportunities" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">Find Jobs</Link>
             <a href="#how-it-works" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">How it Works</a>
             <a href="#features" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">Features</a>
+            <a href="#ai-copilot" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">AI Copilot</a>
             <a href="#why-rolebolt" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">Why Rolebolt</a>
             <a href="#team" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">Team</a>
             <Link href="/recruit/judges" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">Judges</Link>
@@ -220,6 +232,7 @@ export default function RecruitLandingPage() {
               <Link href="/recruit/opportunities" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Find Jobs</Link>
               <a href="#how-it-works" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">How it Works</a>
               <a href="#features" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Features</a>
+              <a href="#ai-copilot" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">AI Copilot</a>
               <a href="#why-rolebolt" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Why Rolebolt</a>
               <a href="#team" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Team</a>
               <Link href="/recruit/judges" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Judges</Link>
@@ -495,8 +508,11 @@ export default function RecruitLandingPage() {
           </div>
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 max-w-6xl mx-auto">
             {FEATURES.map(f => (
-              <div key={f.title} className="group rounded-2xl border border-slate-100 bg-white p-7 shadow-[0_2px_12px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_28px_rgba(0,0,0,0.08)] hover:border-[#0a66c2]/20 hover:-translate-y-1 transition-all duration-200">
-                <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-[#0a66c2] group-hover:bg-[#0a66c2] group-hover:text-white transition-all duration-200">
+              <div key={f.title} className={`group relative rounded-2xl border bg-white p-7 shadow-[0_2px_12px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_28px_rgba(0,0,0,0.08)] hover:-translate-y-1 transition-all duration-200 ${f.isNew ? "border-violet-200 ring-1 ring-violet-100" : "border-slate-100 hover:border-[#0a66c2]/20"}`}>
+                {f.isNew && (
+                  <span className="absolute -top-2.5 right-6 inline-flex items-center rounded-full bg-violet-600 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-white shadow-sm">New</span>
+                )}
+                <div className={`mb-4 flex h-11 w-11 items-center justify-center rounded-xl transition-all duration-200 ${f.isNew ? "bg-violet-50 text-violet-600 group-hover:bg-violet-600 group-hover:text-white" : "bg-blue-50 text-[#0a66c2] group-hover:bg-[#0a66c2] group-hover:text-white"}`}>
                   {f.icon}
                 </div>
                 <span className="inline-block mb-2 rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-500">{f.tag}</span>
@@ -504,6 +520,72 @@ export default function RecruitLandingPage() {
                 <p className="text-sm text-slate-500 leading-relaxed">{f.desc}</p>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── AI Copilot spotlight ────────────────────────────────────────────── */}
+      <section id="ai-copilot" className="py-20 bg-white border-t border-slate-100 overflow-hidden">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="grid gap-12 lg:grid-cols-2 items-center">
+            {/* Copy */}
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-4 py-1.5 text-[11px] font-bold text-violet-600 mb-5 uppercase tracking-widest">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                New · AI Copilot
+              </div>
+              <h2 className="text-3xl font-black text-slate-950 tracking-tight sm:text-4xl leading-tight">
+                Your entire hiring pipeline,<br />one conversation away.
+              </h2>
+              <p className="mt-4 text-slate-500 leading-relaxed max-w-lg">
+                Ask Rolebolt anything — about a single candidate, a whole job's pipeline, or your entire
+                hiring organisation — and get a straight answer, grounded in your real data. No dashboards
+                to dig through, no exports to read.
+              </p>
+              <div className="mt-6 space-y-3 max-w-lg">
+                {[
+                  { title: "Organisation-wide intelligence", desc: "\"Which jobs need attention?\" or \"search my talent pool for React devs\" — across every role at once." },
+                  { title: "Job-level pipeline analysis", desc: "\"Who should I interview first?\" or \"compare my top candidates\" for the role you're viewing." },
+                  { title: "Candidate deep-dives", desc: "\"Should I hire this candidate?\" or \"generate interview questions\" — tailored to one person's resume and scores." },
+                ].map(item => (
+                  <div key={item.title} className="flex items-start gap-3">
+                    <div className="mt-0.5 shrink-0 flex h-6 w-6 items-center justify-center rounded-full bg-violet-50 text-violet-600">
+                      <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                    </div>
+                    <div>
+                      <p className="text-[13.5px] font-bold text-slate-900">{item.title}</p>
+                      <p className="text-[13px] text-slate-500 leading-relaxed">{item.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-6 text-[12px] text-slate-400 leading-relaxed max-w-lg">
+                Every answer cites its sources — the exact candidate, job, or score it's referring to — so you
+                can verify it in one click. Nothing is invented; it's your data, explained.
+              </p>
+              <div className="mt-7">
+                <Link href="/recruit/preview" className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-6 py-3.5 text-sm font-bold text-white shadow-[0_4px_14px_rgba(124,58,237,0.32)] hover:bg-violet-700 hover:-translate-y-0.5 transition-all">
+                  See it in the product preview
+                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                </Link>
+              </div>
+            </div>
+
+            {/* Screenshot */}
+            <div className="relative">
+              <div className="absolute -inset-3 bg-gradient-to-br from-violet-200/50 via-blue-100/40 to-transparent rounded-3xl blur-2xl" />
+              <div className="relative rounded-2xl border border-slate-200 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.12)] overflow-hidden">
+                <div className="relative aspect-[1024/500] w-full bg-slate-50">
+                  <Image
+                    src="/screenshots/ai-copilot.png"
+                    alt="Ask Rolebolt AI Copilot chat, focused on a candidate with a 90% fit score"
+                    fill
+                    className="object-cover object-top"
+                    sizes="(max-width: 1024px) 100vw, 50vw"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>

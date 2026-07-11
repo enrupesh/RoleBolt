@@ -104,6 +104,13 @@ const SCREENSHOTS: Screenshot[] = [
     category: "Candidate Experience",
     badge: "Candidate",
   },
+  {
+    src: "/screenshots/ai-copilot.png",
+    title: "AI Copilot",
+    desc: "New — ask natural-language questions about a candidate, a job's pipeline, or your entire hiring organisation, and get sourced, data-grounded answers instantly.",
+    category: "AI Evaluation",
+    badge: "AI",
+  },
 ];
 
 const BADGE_STYLES: Record<string, string> = {
@@ -406,12 +413,12 @@ export default function ProductPreviewPage() {
                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                   </svg>
                 ),
-                title: "AI Recruitment Assistant",
-                desc: "Recruiters can ask natural-language questions about their pipeline — 'Who are my top 3 candidates for this role?' or 'Summarise this applicant's background' — and get instant AI answers.",
-                model: "openai/gpt-4o-mini",
+                title: "AI Copilot — Recruitment Assistant",
+                desc: "New — recruiters can chat with an AI that already knows their jobs, candidates, resumes, and scores. Ask 'who are my top 3 candidates for this role?' or 'should I hire this candidate?' and get sourced, grounded answers instantly.",
+                model: "openai/gpt-4o",
                 accentColor: "text-rose-500",
                 accentBg: "bg-rose-50 border-rose-100",
-                badge: "Recruiter tools",
+                badge: "New · Recruiter tools",
               },
               {
                 icon: (

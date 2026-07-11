@@ -66,12 +66,25 @@ export default function JudgesHackathonPage() {
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                 Step 3 &middot; AI Copilot
               </div>
-              <h3 className="text-[19px] font-black text-slate-900 leading-snug">Ask Rolebolt about any candidate or job</h3>
+              <h3 className="text-[19px] font-black text-slate-900 leading-snug">Ask Rolebolt about any candidate, job, or your whole pipeline</h3>
               <p className="mt-2 text-[13px] text-slate-500 leading-relaxed max-w-xl">
-                Once you&apos;ve created a job and a candidate has applied, open the AI Copilot to ask natural-language
-                questions — summarise a candidate, explain their AI score, generate interview questions, or compare
-                them against the job description.
+                Once you&apos;ve created a job and a candidate has applied, open the AI Copilot (top nav →
+                <strong className="text-slate-700"> Ask Rolebolt</strong>) to chat in plain English. It switches
+                between three context levels and grounds every answer in your real data — with clickable sources,
+                never invented facts.
               </p>
+              <div className="mt-4 grid gap-2.5 sm:grid-cols-3">
+                {[
+                  { label: "Organisation", example: "\u201cWhich jobs need attention?\u201d" },
+                  { label: "Job", example: "\u201cWho should I interview first?\u201d" },
+                  { label: "Candidate", example: "\u201cShould I hire this candidate?\u201d" },
+                ].map((mode) => (
+                  <div key={mode.label} className="rounded-xl border border-slate-100 bg-slate-50 px-3.5 py-2.5">
+                    <p className="text-[10.5px] font-bold uppercase tracking-widest text-violet-600">{mode.label}</p>
+                    <p className="text-[12px] text-slate-500 mt-0.5">{mode.example}</p>
+                  </div>
+                ))}
+              </div>
             </div>
             <div className="relative mt-6 aspect-[1024/500] w-full border-t border-slate-100 bg-slate-50">
               <Image
