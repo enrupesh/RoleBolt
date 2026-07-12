@@ -776,7 +776,14 @@ export default function RecruitLandingPage() {
             ))}
           </div>
 
-          <div className="mt-10 max-w-2xl mx-auto rounded-2xl border-2 border-amber-300 bg-amber-50 px-6 py-5 shadow-sm">
+          <div className="mt-10 max-w-2xl mx-auto text-center">
+            <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 border border-slate-200 px-4 py-1.5 text-[11px] font-bold text-slate-500 uppercase tracking-widest">
+              <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" className="text-slate-400"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              Honestly — For Hackathon Judges
+            </span>
+          </div>
+
+          <div className="mt-4 max-w-2xl mx-auto rounded-2xl border-2 border-amber-300 bg-amber-50 px-6 py-5 shadow-sm">
             <div className="flex items-start gap-3">
               <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" className="text-amber-500 shrink-0 mt-0.5">
                 <path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L14.71 3.86a2 2 0 0 0-3.42 0Z"/>
