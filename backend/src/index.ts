@@ -1,8 +1,6 @@
 import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
-import { clerkMiddleware } from "@clerk/express";
-import { requireAuth } from "./authMiddleware";
 import { recruitRouter, recruitPublicRouter } from "./recruit";
 import { formRouter, formPublicRouter } from "./recruitForms";
 import { copilotRouter } from "./recruitCopilot";
@@ -47,22 +45,13 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true, service: "recruit-backend" });
 });
 
-// Clerk middleware — verifies JWT session tokens on every request.
-// Reads CLERK_SECRET_KEY from env automatically.
-app.use(clerkMiddleware());
-
-// Re-export for any external consumers
-export { requireAuth, requireFirebaseAuth } from "./authMiddleware";
-
-// ── Public routes (no auth required) ────────────────────────────────────────
+// ── Routes (auth removed — all routes are open) ──────────────────────────────
 app.use("/recruit-public", recruitPublicRouter);
 app.use("/recruit-public/forms", formPublicRouter);
 app.use("/recruit-public/site-guide", siteGuideRouter);
-
-// ── Protected routes (Clerk token required) ──────────────────────────────────
-app.use("/recruit/copilot", requireAuth, copilotRouter);
-app.use("/recruit", requireAuth, recruitRouter);
-app.use("/recruit/forms", requireAuth, formRouter);
+app.use("/recruit/copilot", copilotRouter);
+app.use("/recruit", recruitRouter);
+app.use("/recruit/forms", formRouter);
 
 // ── GET /mesh-api-status ─────────────────────────────────────────────────────
 app.get("/mesh-api-status", async (_req, res) => {
@@ -92,7 +81,7 @@ app.get("/mesh-api-status", async (_req, res) => {
       apiVersion: "v1",
       models: models.map(m => ({ ...m, status: "unknown" })),
       services: services.map(s => ({ ...s, status: "unknown" })),
-      systemHealth: { backend: "operational", meshApi: "unavailable", database: "unknown", auth: "clerk" },
+      systemHealth: { backend: "operational", meshApi: "unavailable", database: "unknown", auth: "none" },
     });
   }
 
@@ -153,7 +142,7 @@ app.get("/mesh-api-status", async (_req, res) => {
       backend: "operational",
       meshApi: meshStatus,
       database: "operational",
-      auth: "clerk",
+      auth: "none",
     },
   });
 });
@@ -165,5 +154,5 @@ connectMongo()
   .catch((err) => console.error("[db] MongoDB connection failed:", err?.message || err));
 
 app.listen(PORT, () => {
-  console.log(`Recruit backend listening on port ${PORT} | Auth: Clerk`);
+  console.log(`Recruit backend listening on port ${PORT} | Auth: none (open)`);
 });
