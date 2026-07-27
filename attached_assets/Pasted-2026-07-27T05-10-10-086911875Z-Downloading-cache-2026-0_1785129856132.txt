@@ -1,0 +1,57 @@
+2026-07-27T05:10:10.086911875Z ==> Downloading cache...
+2026-07-27T05:10:10.111927378Z ==> Cloning from https://github.com/enrupesh/ratheeji
+2026-07-27T05:10:17.003797008Z ==> Checking out commit 0c06578f4056f4904af496b6e3a9beb5fcd6566d in branch main
+2026-07-27T05:10:30.840144334Z ==> Downloaded 799MB in 9s. Extraction took 11s.
+2026-07-27T05:10:31.301729224Z ==> Using Node.js version 20.19.0 via /opt/render/project/src/frontend/.node-version
+2026-07-27T05:10:31.301731667Z ==> Docs on specifying a Node.js version: https://render.com/docs/node-version
+2026-07-27T05:10:31.301732649Z ==> Installing Node.js version 20.19.0...
+2026-07-27T05:10:32.125888063Z ==> Running build command 'rm -rf node_modules .next .cache && corepack enable && corepack prepare pnpm@9.15.4 --activate && pnpm install --no-frozen-lockfile && pnpm run build'...
+2026-07-27T05:10:32.694558345Z Preparing pnpm@9.15.4 for immediate activation...
+2026-07-27T05:10:32.740613831Z ! The local project doesn't define a 'packageManager' field. Corepack will now add one referencing pnpm@9.15.4+sha512.b2dc20e2fc72b3e18848459b37359a32064663e5627a51e4c74b2c29dd8e8e0491483c3abb40789cfd578bf362fb6ba8261b05f0387d76792ed6e23ea3b1b6a0.
+2026-07-27T05:10:32.740693305Z ! For more details about this field, consult the documentation at https://nodejs.org/api/packages.html#packagemanager
+2026-07-27T05:10:32.740696006Z 
+2026-07-27T05:10:38.425171877Z 
+2026-07-27T05:10:38.425187825Z dependencies:
+2026-07-27T05:10:38.425190013Z + @tailwindcss/postcss 4.3.3
+2026-07-27T05:10:38.425191335Z + @types/node 20.19.43 (26.1.1 is available)
+2026-07-27T05:10:38.425192559Z + @types/react 19.2.17
+2026-07-27T05:10:38.425193397Z + @types/react-dom 19.2.3
+2026-07-27T05:10:38.425194201Z + better-auth 1.6.25
+2026-07-27T05:10:38.42519514Z + lucide-react 1.27.0
+2026-07-27T05:10:38.42519596Z + next 16.2.3 (16.2.10 is available)
+2026-07-27T05:10:38.425196799Z + react 19.2.4 (19.2.7 is available)
+2026-07-27T05:10:38.425197638Z + react-dom 19.2.4 (19.2.7 is available)
+2026-07-27T05:10:38.425198427Z + react-markdown 10.1.0
+2026-07-27T05:10:38.425199178Z + remark-gfm 4.0.1
+2026-07-27T05:10:38.42519995Z + tailwindcss 4.3.3
+2026-07-27T05:10:38.425200883Z + typescript 6.0.3 (7.0.2 is available)
+2026-07-27T05:10:38.425201577Z 
+2026-07-27T05:10:38.425202833Z devDependencies: skipped because NODE_ENV is set to production
+2026-07-27T05:10:38.42520355Z 
+2026-07-27T05:10:38.425908992Z Done in 5.6s
+2026-07-27T05:10:38.804369088Z 
+2026-07-27T05:10:38.804392341Z > recruit-frontend@0.1.0 build /opt/render/project/src/frontend
+2026-07-27T05:10:38.804393522Z > next build
+2026-07-27T05:10:38.804394277Z 
+2026-07-27T05:10:39.17317604Z ⚠ No build cache found. Please configure build caching for faster rebuilds. Read more: https://nextjs.org/docs/messages/no-cache
+2026-07-27T05:10:39.184422441Z ▲ Next.js 16.2.3 (Turbopack)
+2026-07-27T05:10:39.184521396Z 
+2026-07-27T05:10:39.203090438Z   Creating an optimized production build ...
+2026-07-27T05:10:44.903188198Z ✓ Compiled successfully in 5.6s
+2026-07-27T05:10:44.905362746Z   Running TypeScript ...
+2026-07-27T05:10:51.872909527Z Failed to type check.
+2026-07-27T05:10:51.872926106Z 
+2026-07-27T05:10:51.872930119Z ./src/app/recruit/login/page.tsx:44:27
+2026-07-27T05:10:51.872931622Z Type error: Property 'session' does not exist on type 'Omit<{ redirect: boolean; token: string; url?: string | undefined; user: { id: string; createdAt: Date; updatedAt: Date; email: string; emailVerified: boolean; name: string; image?: string | null | undefined; }; }, "user"> & { ...; }'.
+2026-07-27T05:10:51.872955099Z 
+2026-07-27T05:10:51.872956505Z   42 |         return;
+2026-07-27T05:10:51.872957978Z   43 |       }
+2026-07-27T05:10:51.8729594Z > 44 |       const token = (data.session as any)?.token as string;
+2026-07-27T05:10:51.872961092Z      |                           ^
+2026-07-27T05:10:51.87296246Z   45 |       if (token) await setupProfile(token, data.user?.name, data.user?.email);
+2026-07-27T05:10:51.872963354Z   46 |       await refreshProfile();
+2026-07-27T05:10:51.872964728Z   47 |       router.replace("/recruit/dashboard");
+2026-07-27T05:10:51.935252085Z Next.js build worker exited with code: 1 and signal: null
+2026-07-27T05:10:51.96563448Z  ELIFECYCLE  Command failed with exit code 1.
+2026-07-27T05:10:52.004775886Z ==> Build failed 😞
+2026-07-27T05:10:52.00479573Z ==> Common ways to troubleshoot your deploy: https://render.com/docs/troubleshooting-deploys
