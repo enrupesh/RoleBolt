@@ -1,5 +1,5 @@
 const DEFAULT_BACKEND_URL = "https://back-mp9k.onrender.com";
-const FRONTEND_HOSTS = new Set(["forjob.onrender.com", "rolebolt.app", "www.rolebolt.app"]);
+const FRONTEND_HOSTS = new Set(["forjob.onrender.com", "rolebolt.app", "www.rolebolt.app", "rolebolt.tech", "www.rolebolt.tech"]);
 
 function defaultApiBaseUrl(): string {
   if (process.env.NODE_ENV === "production") return DEFAULT_BACKEND_URL;
