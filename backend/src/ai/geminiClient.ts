@@ -1,6 +1,6 @@
 /**
  * Thin Google Gemini API client using the generateContent REST endpoint.
- * Uses the GOOGLEA_API_KEY environment variable.
+ * Uses the GOOGLE_API_KEY environment variable.
  * Docs: https://ai.google.dev/api/generate-content
  *
  * callGemini       — call one specific model
@@ -42,9 +42,9 @@ export interface GeminiCallArgs {
 
 /** Call a single Gemini model. Throws on any failure. */
 export async function callGemini(args: GeminiCallArgs): Promise<string> {
-  const apiKey = process.env.GOOGLEA_API_KEY;
+  const apiKey = process.env.GOOGLE_API_KEY;
   if (!apiKey) {
-    throw new Error("[geminiClient] GOOGLEA_API_KEY not set in environment.");
+    throw new Error("[geminiClient] GOOGLE_API_KEY not set in environment.");
   }
 
   const {
