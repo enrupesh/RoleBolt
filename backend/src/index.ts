@@ -157,24 +157,34 @@ app.get("/mesh-api-status", async (_req, res) => {
 
 const PORT = Number(process.env.PORT) || 8080;
 
-// Mount Better Auth routes lazily — getAuth() is called per-request after MongoDB connects
-app.all("/api/auth/*splat", async (req, res) => {
-  try {
-    const auth = getAuth();
-    return toNodeHandler(auth)(req, res);
-  } catch (err: any) {
-    console.error("[auth] getAuth failed:", err?.message);
-    return res.status(503).json({ error: "Auth service unavailable. Check MongoDB connection." });
-  }
-});
-
-connectMongo()
+// Keep a reference to the mongo connection promise so auth routes can await it
+const mongoReady = connectMongo()
   .then(() => {
     console.log("[db] MongoDB connected");
     // Pre-initialize Better Auth now that MongoDB is ready
     try { getAuth(); } catch (e: any) { console.error("[auth] init failed:", e?.message); }
   })
-  .catch((err) => console.error("[db] MongoDB connection failed:", err?.message || err));
+  .catch((err) => {
+    console.error("[db] MongoDB connection failed:", err?.message || err);
+  });
+
+// Mount Better Auth routes — await mongoReady so we never call getAuth() before DB is up
+app.all("/api/auth/*splat", async (req, res) => {
+  try {
+    await mongoReady; // wait for MongoDB connection attempt to complete
+    const auth = getAuth();
+    return toNodeHandler(auth)(req, res);
+  } catch (err: any) {
+    console.error("[auth] getAuth failed:", err?.message);
+    const isMongoErr = err?.message?.includes("MongoDB") || err?.message?.includes("MONGODB_URI");
+    return res.status(503).json({
+      error: isMongoErr
+        ? "Database unavailable. Ensure MONGODB_URI is set in Render environment variables."
+        : "Auth service unavailable.",
+      detail: err?.message,
+    });
+  }
+});
 
 app.listen(PORT, () => {
   console.log(`Recruit backend listening on port ${PORT}`);
