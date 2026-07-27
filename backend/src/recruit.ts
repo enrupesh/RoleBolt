@@ -7,6 +7,7 @@ import { RecruitCandidate } from "./models/RecruitCandidate";
 import { RecruitSeekerProfile } from "./models/RecruitSeekerProfile";
 import { RecruitCompanyProfile } from "./models/RecruitCompanyProfile";
 import { callMeshChatCompletions } from "./ai/meshClient";
+import { callGemini } from "./ai/geminiClient";
 import { RecruitJobAlert } from "./models/RecruitJobAlert";
 import { UsageEvent } from "./models/UsageEvent";
 import { RecruitProfile } from "./models/RecruitProfile";
@@ -444,22 +445,33 @@ Rules for the rubric:
     { name: "Growth & Initiative", weight: 10, description: "Evidence of self-driven learning, side projects, or career progression." },
   ];
 
-  // A transport-level failure (auth, timeout, rate limit, all fallback
-  // models exhausted) must not hard-fail job creation — degrade to the
-  // template JD/rubric instead, same as an unparseable AI response.
+  // Primary: Gemini 2.5 Flash (Google Cloud — XPRIZE requirement).
+  // Fallback: Mesh API if Gemini is unavailable or over quota.
   let raw: string;
   try {
-    raw = await callMeshChatCompletions({
-      apiKey: MESHAPI_API_KEY,
-      retries: 2,
-      fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
-      messages: [{ role: "user", content: prompt }],
+    raw = await callGemini({
+      model: "gemini-2.5-flash",
+      prompt,
       temperature: 0.6,
-      max_tokens: 2000,
+      maxOutputTokens: 2000,
+      jsonMode: true,
     });
-  } catch (err) {
-    console.error("[recruit] generateJobDescription: AI call failed, using fallback template:", err);
-    return { jd: fallbackJd, rubric: fallbackRubric };
+    console.log("[recruit] generateJobDescription: used Gemini 2.5 Flash ✓");
+  } catch (geminiErr) {
+    console.warn("[recruit] generateJobDescription: Gemini failed, falling back to Mesh API:", (geminiErr as Error)?.message);
+    try {
+      raw = await callMeshChatCompletions({
+        apiKey: MESHAPI_API_KEY,
+        retries: 2,
+        fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.6,
+        max_tokens: 2000,
+      });
+    } catch (err) {
+      console.error("[recruit] generateJobDescription: both Gemini and Mesh API failed, using fallback template:", err);
+      return { jd: fallbackJd, rubric: fallbackRubric };
+    }
   }
 
   const parsed = safeJson(raw);
