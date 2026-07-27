@@ -1,9 +1,7 @@
 import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
-import cookieParser from "cookie-parser";
-import { toNodeHandler } from "better-auth/node";
-import { getAuth } from "./auth";
+import { clerkMiddleware } from "@clerk/express";
 import { requireAuth } from "./authMiddleware";
 import { recruitRouter, recruitPublicRouter } from "./recruit";
 import { formRouter, formPublicRouter } from "./recruitForms";
@@ -14,8 +12,6 @@ import { connectMongo } from "./db";
 dotenv.config();
 
 const app = express();
-
-app.use(cookieParser());
 
 const isProduction = process.env.NODE_ENV === "production";
 
@@ -46,16 +42,24 @@ app.use(
 
 app.use(express.json({ limit: "6mb" }));
 
+// Clerk middleware — verifies JWT session tokens on every request.
+// Reads CLERK_SECRET_KEY from env automatically.
+app.use(clerkMiddleware());
+
 // Re-export for any external consumers
 export { requireAuth, requireFirebaseAuth } from "./authMiddleware";
 
+// ── Public routes (no auth required) ────────────────────────────────────────
 app.use("/recruit-public", recruitPublicRouter);
 app.use("/recruit-public/forms", formPublicRouter);
 app.use("/recruit-public/site-guide", siteGuideRouter);
+
+// ── Protected routes (Clerk token required) ──────────────────────────────────
 app.use("/recruit/copilot", requireAuth, copilotRouter);
 app.use("/recruit", requireAuth, recruitRouter);
 app.use("/recruit/forms", requireAuth, formRouter);
 
+// ── Health check ─────────────────────────────────────────────────────────────
 app.get("/health", (_req, res) => {
   res.json({ ok: true, service: "recruit-backend" });
 });
@@ -65,18 +69,17 @@ app.get("/mesh-api-status", async (_req, res) => {
   const apiKey = process.env.GOOGLEM_API_KEY || "";
   const meshBaseUrl = "https://api.meshapi.ai/v1";
   const models = [
-    { id: "openai/gpt-4o-mini",              role: "primary",    label: "GPT-4o mini" },
-    { id: "anthropic/claude-3-haiku",         role: "fallback-1", label: "Claude 3 Haiku" },
-    { id: "google/gemini-2.5-flash-lite",     role: "fallback-2", label: "Gemini 2.5 Flash Lite" },
+    { id: "openai/gpt-4o-mini",           role: "primary",    label: "GPT-4o mini" },
+    { id: "anthropic/claude-3-haiku",      role: "fallback-1", label: "Claude 3 Haiku" },
+    { id: "google/gemini-2.5-flash-lite",  role: "fallback-2", label: "Gemini 2.5 Flash Lite" },
   ];
-
   const services = [
-    { id: "resumeAnalysis",          label: "Resume Analysis" },
-    { id: "candidateScoring",        label: "Candidate Scoring" },
-    { id: "candidateMatching",       label: "Candidate Matching" },
-    { id: "jobDescriptionGeneration",label: "Job Description Generation" },
-    { id: "aiAssistant",             label: "AI Recruitment Assistant" },
-    { id: "formResponseScoring",     label: "Form Response Scoring" },
+    { id: "resumeAnalysis",           label: "Resume Analysis" },
+    { id: "candidateScoring",         label: "Candidate Scoring" },
+    { id: "candidateMatching",        label: "Candidate Matching" },
+    { id: "jobDescriptionGeneration", label: "Job Description Generation" },
+    { id: "aiAssistant",              label: "AI Recruitment Assistant" },
+    { id: "formResponseScoring",      label: "Form Response Scoring" },
   ];
 
   if (!apiKey) {
@@ -89,7 +92,7 @@ app.get("/mesh-api-status", async (_req, res) => {
       apiVersion: "v1",
       models: models.map(m => ({ ...m, status: "unknown" })),
       services: services.map(s => ({ ...s, status: "unknown" })),
-      systemHealth: { backend: "operational", meshApi: "unavailable", database: "unknown", auth: "unknown" },
+      systemHealth: { backend: "operational", meshApi: "unavailable", database: "unknown", auth: "clerk" },
     });
   }
 
@@ -150,42 +153,17 @@ app.get("/mesh-api-status", async (_req, res) => {
       backend: "operational",
       meshApi: meshStatus,
       database: "operational",
-      auth: "operational",
+      auth: "clerk",
     },
   });
 });
 
 const PORT = Number(process.env.PORT) || 8080;
 
-// Keep a reference to the mongo connection promise so auth routes can await it
-const mongoReady = connectMongo()
-  .then(() => {
-    console.log("[db] MongoDB connected");
-    // Pre-initialize Better Auth now that MongoDB is ready
-    try { getAuth(); } catch (e: any) { console.error("[auth] init failed:", e?.message); }
-  })
-  .catch((err) => {
-    console.error("[db] MongoDB connection failed:", err?.message || err);
-  });
-
-// Mount Better Auth routes — await mongoReady so we never call getAuth() before DB is up
-app.all("/api/auth/*splat", async (req, res) => {
-  try {
-    await mongoReady; // wait for MongoDB connection attempt to complete
-    const auth = getAuth();
-    return toNodeHandler(auth)(req, res);
-  } catch (err: any) {
-    console.error("[auth] getAuth failed:", err?.message);
-    const isMongoErr = err?.message?.includes("MongoDB") || err?.message?.includes("MONGODB_URI");
-    return res.status(503).json({
-      error: isMongoErr
-        ? "Database unavailable. Ensure MONGODB_URI is set in Render environment variables."
-        : "Auth service unavailable.",
-      detail: err?.message,
-    });
-  }
-});
+connectMongo()
+  .then(() => console.log("[db] MongoDB connected"))
+  .catch((err) => console.error("[db] MongoDB connection failed:", err?.message || err));
 
 app.listen(PORT, () => {
-  console.log(`Recruit backend listening on port ${PORT}`);
+  console.log(`Recruit backend listening on port ${PORT} | Auth: Clerk`);
 });

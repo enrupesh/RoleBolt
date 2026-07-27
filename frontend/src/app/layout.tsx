@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { Sora, Plus_Jakarta_Sans } from "next/font/google";
+import { ClerkProvider } from "@clerk/nextjs";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import "./globals.css";
 
@@ -65,16 +66,22 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${inter.variable} ${sora.variable} ${plusJakarta.variable}`}
-      suppressHydrationWarning
+    <ClerkProvider
+      signInUrl="/recruit/login"
+      signUpUrl="/recruit/signup"
+      afterSignOutUrl="/recruit/login"
     >
-      <body className="app-theme min-h-screen antialiased" suppressHydrationWarning>
-        <ThemeProvider>
-          <div className="min-h-screen">{children}</div>
-        </ThemeProvider>
-      </body>
-    </html>
+      <html
+        lang="en"
+        className={`${inter.variable} ${sora.variable} ${plusJakarta.variable}`}
+        suppressHydrationWarning
+      >
+        <body className="app-theme min-h-screen antialiased" suppressHydrationWarning>
+          <ThemeProvider>
+            <div className="min-h-screen">{children}</div>
+          </ThemeProvider>
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }
