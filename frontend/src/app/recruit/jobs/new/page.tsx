@@ -2,9 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { onAuthStateChanged } from "firebase/auth";
+import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { RecruitGuard } from "@/components/RecruitGuard";
-import { getFirebaseAuth, isFirebaseAvailable } from "@/lib/firebaseClient";
 import Link from "next/link";
 import { computeJobQuality } from "@/lib/jobQuality";
 import { apiUrl, readApiJson } from "@/lib/api";
@@ -538,15 +537,10 @@ function NewJobContent() {
   const [createdJob, setCreatedJob] = useState<{ id: string; title: string } | null>(null);
   const [copied, setCopied] = useState(false);
 
+  const { sessionToken } = useRecruitAuth();
   useEffect(() => {
-    if (!isFirebaseAvailable()) return;
-    const auth = getFirebaseAuth();
-    const unsub = onAuthStateChanged(auth, async (u) => {
-      if (u) setToken(await u.getIdToken());
-      else router.push("/recruit/login");
-    });
-    return () => unsub();
-  }, [router]);
+    if (sessionToken) setToken(sessionToken);
+  }, [sessionToken]);
 
   function update(key: keyof FormData) {
     return (val: string) => setForm(prev => ({ ...prev, [key]: val }));

@@ -4,8 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
-import { signOut } from "firebase/auth";
-import { getFirebaseAuth, isFirebaseAvailable } from "@/lib/firebaseClient";
 import { useRouter } from "next/navigation";
 import { RoleboltLogo } from "@/components/RoleboltLogo";
 import { SiteGuideChatbot } from "@/components/SiteGuideChatbot";
@@ -170,14 +168,13 @@ const AI_CAPABILITIES = [
 export default function RecruitLandingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const router = useRouter();
-  const { recruitProfile, firebaseUser, signOutFromRecruit } = useRecruitAuth();
+  const { recruitProfile, authUser, signOutFromRecruit } = useRecruitAuth();
   const role = recruitProfile?.role ?? null;
-  const isLoggedIn = !!firebaseUser && !!recruitProfile;
+  const isLoggedIn = !!authUser && !!recruitProfile;
 
   async function handleSignOut() {
     try {
       await signOutFromRecruit();
-      if (isFirebaseAvailable()) await signOut(getFirebaseAuth());
     } catch {}
     router.replace("/recruit/login");
   }

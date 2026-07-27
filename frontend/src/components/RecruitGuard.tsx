@@ -54,16 +54,15 @@ function GuardSkeleton() {
 }
 
 export function RecruitGuard({ requiredRole, children }: RecruitGuardProps) {
-  const { firebaseUser, recruitProfile, loading } = useRecruitAuth();
+  const { authUser, recruitProfile, loading } = useRecruitAuth();
   const router = useRouter();
 
   useEffect(() => {
     if (loading) return;
-    if (!firebaseUser) {
+    if (!authUser) {
       router.replace("/recruit/login");
       return;
     }
-    // Email verification requirement disabled for now.
     if (!recruitProfile) {
       router.replace("/recruit/login");
       return;
@@ -75,23 +74,12 @@ export function RecruitGuard({ requiredRole, children }: RecruitGuardProps) {
         router.replace("/recruit/opportunities");
       }
     }
-  }, [loading, firebaseUser, recruitProfile, requiredRole, router]);
+  }, [loading, authUser, recruitProfile, requiredRole, router]);
 
-  if (loading) {
-    return <GuardSkeleton />;
-  }
-
-  if (!firebaseUser) {
-    return null;
-  }
-
-  if (!recruitProfile) {
-    return null;
-  }
-
-  if (recruitProfile.role !== requiredRole) {
-    return null;
-  }
+  if (loading) return <GuardSkeleton />;
+  if (!authUser) return null;
+  if (!recruitProfile) return null;
+  if (recruitProfile.role !== requiredRole) return null;
 
   return <>{children}</>;
 }

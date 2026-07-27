@@ -25,13 +25,7 @@ const nextConfig: NextConfig = {
   productionBrowserSourceMaps: false,
   reactStrictMode: true,
   allowedDevOrigins: allowedDevOrigins.size > 0 ? Array.from(allowedDevOrigins) : undefined,
-  transpilePackages: [
-    "firebase",
-    "@firebase/app",
-    "@firebase/auth",
-    "@firebase/firestore",
-    "@firebase/storage",
-  ],
+  transpilePackages: [],
   async rewrites() {
     // The site-guide chatbot route is brand-new and may not be deployed to the
     // production backend (BACKEND_URL) yet. In local dev, always proxy it to
