@@ -1,11 +1,9 @@
 "use client";
 
-import { Suspense } from "react";
 import Link from "next/link";
-import { SignIn } from "@clerk/nextjs";
 import { RoleboltLogo } from "@/components/RoleboltLogo";
 
-function RecruitLoginForm() {
+export default function RecruitLoginPage() {
   return (
     <div className="min-h-screen bg-[#f8fafc] flex flex-col">
       {/* Top bar */}
@@ -30,38 +28,21 @@ function RecruitLoginForm() {
         </div>
       </div>
 
-      {/* Clerk Sign In */}
+      {/* Placeholder */}
       <div className="flex flex-1 items-center justify-center px-4 py-12">
-        <SignIn
-          forceRedirectUrl="/recruit/dashboard"
-          signUpUrl="/recruit/signup"
-          appearance={{
-            elements: {
-              rootBox: "w-full max-w-[400px]",
-              card: "shadow-[0_4px_20px_rgba(0,0,0,0.06)] border border-slate-200 rounded-2xl w-full",
-              headerTitle: "text-2xl font-extrabold text-slate-950 tracking-tight",
-              headerSubtitle: "text-sm text-slate-500",
-              socialButtonsBlockButton:
-                "border border-slate-200 rounded-xl h-11 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-all",
-              formFieldInput:
-                "h-11 rounded-xl border border-slate-200 px-3.5 text-sm focus:border-[#0a66c2] focus:ring-2 focus:ring-[#0a66c2]/15 transition-all",
-              formButtonPrimary:
-                "h-11 rounded-xl bg-[#0a66c2] text-sm font-bold hover:bg-[#004182] transition-all shadow-[0_2px_10px_rgba(10,102,194,0.28)]",
-              footerActionLink: "text-[#0a66c2] font-semibold hover:underline",
-              dividerLine: "bg-slate-100",
-              dividerText: "text-[11px] font-semibold uppercase tracking-widest text-slate-400",
-            },
-          }}
-        />
+        <div className="w-full max-w-[400px] rounded-2xl bg-white border border-slate-200 shadow-[0_4px_20px_rgba(0,0,0,0.06)] p-8 text-center">
+          <h1 className="text-2xl font-extrabold text-slate-950 tracking-tight mb-2">Sign in</h1>
+          <p className="text-sm text-slate-500 mb-6">
+            Authentication is being rebuilt. This page will be replaced with a custom login form.
+          </p>
+          <Link
+            href="/recruit/dashboard"
+            className="w-full inline-flex justify-center rounded-xl bg-[#0a66c2] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#004182] transition-all shadow-[0_2px_10px_rgba(10,102,194,0.28)]"
+          >
+            Continue to Dashboard →
+          </Link>
+        </div>
       </div>
     </div>
-  );
-}
-
-export default function RecruitLoginPage() {
-  return (
-    <Suspense fallback={<div className="min-h-screen bg-[#f8fafc]" />}>
-      <RecruitLoginForm />
-    </Suspense>
   );
 }

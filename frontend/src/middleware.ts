@@ -1,27 +1,14 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
-// Routes that require the user to be signed in
-const isProtectedRoute = createRouteMatcher([
-  "/recruit/dashboard(.*)",
-  "/recruit/jobs(.*)",
-  "/recruit/analytics(.*)",
-  "/recruit/talent-pool(.*)",
-  "/recruit/copilot(.*)",
-  "/recruit/forms(.*)",
-  "/recruit/recruiter-profile(.*)",
-  "/recruit/verification(.*)",
-  "/recruit/diagnostics(.*)",
-]);
-
-export default clerkMiddleware(async (auth, req) => {
-  if (isProtectedRoute(req)) {
-    await auth.protect();
-  }
-});
+// Auth removed — all routes are open.
+// Replace this with your custom auth middleware when ready.
+export function middleware(_req: NextRequest) {
+  return NextResponse.next();
+}
 
 export const config = {
   matcher: [
-    // Skip Next.js internals and static files
     "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
     "/(api|trpc)(.*)",
   ],
