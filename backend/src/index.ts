@@ -42,6 +42,11 @@ app.use(
 
 app.use(express.json({ limit: "6mb" }));
 
+// ── Health check (before auth middleware so it always works) ─────────────────
+app.get("/health", (_req, res) => {
+  res.json({ ok: true, service: "recruit-backend" });
+});
+
 // Clerk middleware — verifies JWT session tokens on every request.
 // Reads CLERK_SECRET_KEY from env automatically.
 app.use(clerkMiddleware());
@@ -58,11 +63,6 @@ app.use("/recruit-public/site-guide", siteGuideRouter);
 app.use("/recruit/copilot", requireAuth, copilotRouter);
 app.use("/recruit", requireAuth, recruitRouter);
 app.use("/recruit/forms", requireAuth, formRouter);
-
-// ── Health check ─────────────────────────────────────────────────────────────
-app.get("/health", (_req, res) => {
-  res.json({ ok: true, service: "recruit-backend" });
-});
 
 // ── GET /mesh-api-status ─────────────────────────────────────────────────────
 app.get("/mesh-api-status", async (_req, res) => {
