@@ -3,8 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { RecruitGuard } from "@/components/RecruitGuard";
 import { useRouter } from "next/navigation";
-import { onAuthStateChanged } from "firebase/auth";
-import { getFirebaseAuth, isFirebaseAvailable } from "@/lib/firebaseClient";
+import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import Link from "next/link";
 import RecruitHeader from "@/components/RecruitHeader";
 import { apiUrl, readApiJson } from "@/lib/api";
@@ -252,15 +251,14 @@ function RecruiterProfileContent() {
 
   const copy = COPY[profile.profileType];
 
+  const { sessionToken, authUser } = useRecruitAuth();
   useEffect(() => {
-    if (!isFirebaseAvailable()) return;
-    const auth = getFirebaseAuth();
-    const unsub = onAuthStateChanged(auth, async (u) => {
-      if (!u) { router.push("/recruit/login"); return; }
+    if (!sessionToken) return;
+    const token = sessionToken;
+    setAuthToken(token);
+    setUid(authUser?.id ?? "");
+    (async () => {
       try {
-        const token = await u.getIdToken();
-        setAuthToken(token);
-        setUid(u.uid);
         const res = await fetch(apiUrl("/recruit/company/profile"), {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -303,9 +301,8 @@ function RecruiterProfileContent() {
         }
       } catch { /* ignore, use defaults */ }
       setLoading(false);
-    });
-    return () => unsub();
-  }, [router]);
+    })();
+  }, [sessionToken, authUser]);
 
   // Re-run validation live once user has attempted save
   useEffect(() => {
@@ -380,14 +377,10 @@ function RecruiterProfileContent() {
 
     setSaving(true); setError(""); setSaved(false);
     try {
-      if (!isFirebaseAvailable()) throw new Error("Authentication unavailable in this environment.");
-      const auth = getFirebaseAuth();
-      const user = auth.currentUser;
-      if (!user) throw new Error("You must be signed in to save.");
-      const token = await user.getIdToken();
+      if (!authToken) throw new Error("You must be signed in to save.");
       const res = await fetch(apiUrl("/recruit/company/profile"), {
         method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
         body: JSON.stringify(profile),
       });
       if (!res.ok) {

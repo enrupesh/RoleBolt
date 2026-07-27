@@ -4,8 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
-import { signOut } from "firebase/auth";
-import { getFirebaseAuth, isFirebaseAvailable } from "@/lib/firebaseClient";
 import { RoleboltLogo } from "@/components/RoleboltLogo";
 
 const CREATOR_NAV = [
@@ -20,10 +18,10 @@ export default function RecruitHeader() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
-  const { recruitProfile, firebaseUser, signOutFromRecruit } = useRecruitAuth();
+  const { recruitProfile, authUser, signOutFromRecruit } = useRecruitAuth();
 
   const role = recruitProfile?.role ?? null;
-  const isLoggedIn = !!firebaseUser && !!recruitProfile;
+  const isLoggedIn = !!authUser && !!recruitProfile;
   const navLinks = role === "creator" ? CREATOR_NAV : [];
 
   function isActive(href: string) {
@@ -33,10 +31,6 @@ export default function RecruitHeader() {
   async function handleSignOut() {
     try {
       await signOutFromRecruit();
-      if (isFirebaseAvailable()) {
-        const auth = getFirebaseAuth();
-        await signOut(auth);
-      }
     } catch {}
     router.replace("/recruit/login");
   }

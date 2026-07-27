@@ -3,8 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { onAuthStateChanged } from "firebase/auth";
-import { getFirebaseAuth, isFirebaseAvailable } from "@/lib/firebaseClient";
+import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { apiUrl, readApiJson } from "@/lib/api";
 import { RecruitGuard } from "@/components/RecruitGuard";
 import { RoleboltLogo } from "@/components/RoleboltLogo";
@@ -132,16 +131,14 @@ function VerificationContent() {
     };
   }, []);
 
+  const { sessionToken } = useRecruitAuth();
   useEffect(() => {
-    if (!isFirebaseAvailable()) return;
-    const auth = getFirebaseAuth();
-    const unsub = onAuthStateChanged(auth, async (u) => {
-      if (!u) { router.replace("/recruit/login"); return; }
+    if (!sessionToken) return;
+    setAuthToken(sessionToken);
+    (async () => {
       try {
-        const token = await u.getIdToken();
-        setAuthToken(token);
         const res = await fetch(apiUrl("/recruit/company/profile"), {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${sessionToken}` },
         });
         if (res.ok) {
           const data = await readApiJson(res);
@@ -150,7 +147,6 @@ function VerificationContent() {
             setCompanyName(data.profile.companyName || "");
             const status = data.profile.verificationStatus || "none";
             setVerificationStatus(status);
-            // Show success/already-submitted state for requested or verified
             if (status === "requested" || status === "verified") {
               setSubmitted(true);
             }
@@ -162,9 +158,8 @@ function VerificationContent() {
         setLoadError("Failed to load profile. Please check your connection and try again.");
       }
       setLoading(false);
-    });
-    return () => unsub();
-  }, [router]);
+    })();
+  }, [sessionToken]);
 
   const handleRequest = useCallback(async () => {
     if (submitting) return;
@@ -175,9 +170,7 @@ function VerificationContent() {
     setSubmitting(true);
     setError("");
     try {
-      const freshToken = isFirebaseAvailable() && getFirebaseAuth().currentUser
-        ? await getFirebaseAuth().currentUser!.getIdToken()
-        : authToken;
+      const freshToken = authToken;
       const res = await fetch(apiUrl("/recruit/company/request-verification"), {
         method: "POST",
         headers: { Authorization: `Bearer ${freshToken}` },

@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { onAuthStateChanged } from "firebase/auth";
-import { getFirebaseAuth, isFirebaseAvailable } from "@/lib/firebaseClient";
+import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { RecruitGuard } from "@/components/RecruitGuard";
 import Link from "next/link";
 import { RoleboltLogo } from "@/components/RoleboltLogo";
@@ -12,15 +11,10 @@ function NewJobChoiceContent() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
 
+  const { sessionToken } = useRecruitAuth();
   useEffect(() => {
-    if (!isFirebaseAvailable()) { setLoading(false); return; }
-    const auth = getFirebaseAuth();
-    const unsub = onAuthStateChanged(auth, (u) => {
-      if (!u) router.push("/recruit/login");
-      else setLoading(false);
-    });
-    return () => unsub();
-  }, [router]);
+    if (sessionToken !== undefined) setLoading(false);
+  }, [sessionToken]);
 
   if (loading) {
     return (
