@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { onAuthStateChanged } from "firebase/auth";
-import { getFirebaseAuth, isFirebaseAvailable } from "@/lib/firebaseClient";
+import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { RecruitGuard } from "@/components/RecruitGuard";
 import Link from "next/link";
 import { apiUrl, readApiJson } from "@/lib/api";
@@ -260,16 +259,10 @@ function FormBuilderContent() {
   const [showShare, setShowShare] = useState(false);
   const [loadingEdit, setLoadingEdit] = useState(!!editId);
 
+  const { sessionToken } = useRecruitAuth();
   useEffect(() => {
-    if (!isFirebaseAvailable()) return;
-    const auth = getFirebaseAuth();
-    const unsub = onAuthStateChanged(auth, async (u) => {
-      if (!u) { router.push("/recruit/login"); return; }
-      const t = await u.getIdToken();
-      setToken(t);
-    });
-    return () => unsub();
-  }, [router]);
+    if (sessionToken) setToken(sessionToken);
+  }, [sessionToken]);
 
   // Load form for editing
   useEffect(() => {

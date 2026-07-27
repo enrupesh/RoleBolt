@@ -8,8 +8,7 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
-import { onAuthStateChanged, type User } from "firebase/auth";
-import { getFirebaseAuth, isFirebaseAvailable } from "@/lib/firebaseClient";
+import { authClient } from "@/lib/auth-client";
 import { apiUrl } from "@/lib/api";
 
 export type RecruitRole = "creator" | "seeker";
@@ -21,8 +20,15 @@ export interface RecruitProfile {
   email?: string;
 }
 
+export interface AuthUser {
+  id: string;
+  email?: string;
+  name?: string;
+}
+
 interface RecruitAuthState {
-  firebaseUser: User | null;
+  authUser: AuthUser | null;
+  sessionToken: string | null;
   recruitProfile: RecruitProfile | null;
   loading: boolean;
   signOutFromRecruit: () => Promise<void>;
@@ -30,9 +36,10 @@ interface RecruitAuthState {
 }
 
 const RecruitAuthContext = createContext<RecruitAuthState>({
-  firebaseUser: null,
+  authUser: null,
+  sessionToken: null,
   recruitProfile: null,
-  loading: false,
+  loading: true,
   signOutFromRecruit: async () => {},
   refreshProfile: async () => {},
 });
@@ -41,76 +48,99 @@ export function useRecruitAuth() {
   return useContext(RecruitAuthContext);
 }
 
-async function fetchRecruitProfileOnce(user: User): Promise<RecruitProfile | null> {
+async function fetchOrCreateProfile(
+  user: AuthUser,
+  token: string
+): Promise<RecruitProfile | null> {
   try {
-    const token = await user.getIdToken();
-    const res = await fetch(apiUrl("/recruit/auth/profile"), {
+    // Try fetching existing profile first
+    const getRes = await fetch(apiUrl("/recruit/auth/profile"), {
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (!res.ok) return null;
-    return await res.json();
+    if (getRes.ok) return await getRes.json();
+
+    // Profile doesn't exist — create it (default role: creator)
+    const postRes = await fetch(apiUrl("/recruit/auth/profile"), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        role: "creator",
+        name: user.name ?? "",
+        email: user.email ?? "",
+      }),
+    });
+    if (postRes.ok) return await postRes.json();
+    return null;
   } catch {
     return null;
   }
 }
 
-async function fetchRecruitProfileWithRetry(user: User): Promise<RecruitProfile | null> {
-  const first = await fetchRecruitProfileOnce(user);
-  if (first) return first;
-  await new Promise(r => setTimeout(r, 2000));
-  return fetchRecruitProfileOnce(user);
-}
-
 export function RecruitAuthProvider({ children }: { children: ReactNode }) {
-  const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
+  const { data: session, isPending } = authClient.useSession();
   const [recruitProfile, setRecruitProfile] = useState<RecruitProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileFetched, setProfileFetched] = useState(false);
 
-  const loadProfile = useCallback(async (user: User | null) => {
-    if (!user) {
-      setFirebaseUser(null);
-      setRecruitProfile(null);
-      setLoading(false);
-      return;
-    }
-    setFirebaseUser(user);
-    const profile = await fetchRecruitProfileWithRetry(user);
-    setRecruitProfile(profile);
-    setLoading(false);
-  }, []);
+  const authUser: AuthUser | null = session?.user
+    ? { id: session.user.id, email: session.user.email, name: session.user.name }
+    : null;
 
+  const sessionToken: string | null = (session?.session as any)?.token ?? null;
+
+  // Fetch/create profile whenever sessionToken changes
   useEffect(() => {
-    if (!isFirebaseAvailable()) {
-      setLoading(false);
+    if (isPending) return;
+
+    if (!authUser || !sessionToken) {
+      setRecruitProfile(null);
+      setProfileFetched(true);
       return;
     }
-    try {
-      const auth = getFirebaseAuth();
-      const unsub = onAuthStateChanged(auth, (user) => {
-        setLoading(true);
-        loadProfile(user);
-      });
-      return unsub;
-    } catch {
-      setLoading(false);
-    }
-  }, [loadProfile]);
+
+    let cancelled = false;
+    setProfileLoading(true);
+
+    fetchOrCreateProfile(authUser, sessionToken).then((profile) => {
+      if (cancelled) return;
+      setRecruitProfile(profile);
+      setProfileLoading(false);
+      setProfileFetched(true);
+    });
+
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionToken, isPending]);
 
   const signOutFromRecruit = useCallback(async () => {
+    await authClient.signOut();
     setRecruitProfile(null);
+    setProfileFetched(false);
   }, []);
 
   const refreshProfile = useCallback(async () => {
-    if (!firebaseUser) return;
-    setLoading(true);
-    const profile = await fetchRecruitProfileOnce(firebaseUser);
+    if (!authUser || !sessionToken) return;
+    setProfileLoading(true);
+    const profile = await fetchOrCreateProfile(authUser, sessionToken);
     setRecruitProfile(profile);
-    setLoading(false);
-  }, [firebaseUser]);
+    setProfileLoading(false);
+  }, [authUser, sessionToken]);
+
+  const loading = isPending || profileLoading || !profileFetched;
 
   return (
     <RecruitAuthContext.Provider
-      value={{ firebaseUser, recruitProfile, loading, signOutFromRecruit, refreshProfile }}
+      value={{
+        authUser,
+        sessionToken,
+        recruitProfile,
+        loading,
+        signOutFromRecruit,
+        refreshProfile,
+      }}
     >
       {children}
     </RecruitAuthContext.Provider>

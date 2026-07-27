@@ -3,10 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { RecruitGuard } from "@/components/RecruitGuard";
 import Link from "next/link";
-import { onAuthStateChanged } from "firebase/auth";
 import RecruitHeader from "@/components/RecruitHeader";
 import { API_BASE_URL, apiUrl } from "@/lib/api";
-import { getFirebaseAuth } from "@/lib/firebaseClient";
+import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 
 type CheckStatus = "pending" | "pass" | "warn" | "fail" | "skipped";
 
@@ -174,25 +173,14 @@ function RecruitDiagnosticsContent() {
     return { label: "Ready to run", className: "bg-slate-50 text-slate-600 border-slate-200" };
   }, [checks, running]);
 
+  const { authUser, sessionToken } = useRecruitAuth();
   useEffect(() => {
-    try {
-      const firebaseAuth = getFirebaseAuth();
-      return onAuthStateChanged(firebaseAuth, async user => {
-        if (!user) {
-          setAuth({ loading: false, signedIn: false });
-          return;
-        }
-        try {
-          const token = await user.getIdToken();
-          setAuth({ loading: false, signedIn: true, email: user.email, token });
-        } catch (err: any) {
-          setAuth({ loading: false, signedIn: true, email: user.email, error: err?.message || "Could not read auth token." });
-        }
-      });
-    } catch (err: any) {
-      setAuth({ loading: false, signedIn: false, error: err?.message || "Firebase auth is not configured." });
+    if (sessionToken) {
+      setAuth({ loading: false, signedIn: true, email: authUser?.email, token: sessionToken });
+    } else {
+      setAuth({ loading: false, signedIn: false });
     }
-  }, []);
+  }, [authUser, sessionToken]);
 
   async function runChecks() {
     const publicJobs = baseCheck(

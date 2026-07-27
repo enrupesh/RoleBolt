@@ -1,9 +1,10 @@
-import fs from "fs";
 import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
-import admin from "firebase-admin";
 import cookieParser from "cookie-parser";
+import { toNodeHandler } from "better-auth/node";
+import { getAuth } from "./auth";
+import { requireAuth } from "./authMiddleware";
 import { recruitRouter, recruitPublicRouter } from "./recruit";
 import { formRouter, formPublicRouter } from "./recruitForms";
 import { copilotRouter } from "./recruitCopilot";
@@ -15,98 +16,6 @@ dotenv.config();
 const app = express();
 
 app.use(cookieParser());
-
-let firebaseReady = false;
-function parseServiceAccountJson(raw: string) {
-  let parsed: any;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    const normalized = raw
-      .trim()
-      .replace(/^\s*['"]/, "")
-      .replace(/['"]\s*$/, "")
-      .replace(/\\"/g, '"');
-    parsed = JSON.parse(normalized);
-  }
-  if (parsed && typeof parsed.private_key === "string") {
-    parsed.private_key = parsed.private_key.replace(/\\n/g, "\n");
-  }
-  return parsed;
-}
-
-function initFirebaseAdmin() {
-  if (firebaseReady) return;
-  if (admin.apps.length) {
-    firebaseReady = true;
-    return;
-  }
-
-  const serviceAccountJson =
-    process.env.FIREBASE_SERVICE_ACCOUNT_JSON ||
-    process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT_JSON;
-
-  const serviceAccountPath =
-    process.env.FIREBASE_SERVICE_ACCOUNT_PATH ||
-    process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT_PATH;
-
-  if (serviceAccountJson) {
-    const parsed = parseServiceAccountJson(serviceAccountJson);
-    admin.initializeApp({ credential: admin.credential.cert(parsed) });
-    firebaseReady = true;
-    return;
-  }
-
-  if (serviceAccountPath) {
-    const parsed = JSON.parse(fs.readFileSync(serviceAccountPath, "utf8"));
-    admin.initializeApp({ credential: admin.credential.cert(parsed) });
-    firebaseReady = true;
-    return;
-  }
-
-  if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    admin.initializeApp({ credential: admin.credential.applicationDefault() });
-    firebaseReady = true;
-    return;
-  }
-
-  throw new Error(
-    "Firebase Admin credentials not configured. Set one of: FIREBASE_SERVICE_ACCOUNT_JSON, FIREBASE_SERVICE_ACCOUNT_PATH, or GOOGLE_APPLICATION_CREDENTIALS."
-  );
-}
-
-export async function requireFirebaseAuth(
-  req: express.Request,
-  res: express.Response,
-  next: express.NextFunction
-) {
-  try {
-    initFirebaseAdmin();
-  } catch (e) {
-    // eslint-disable-next-line no-console
-    console.error("[auth] firebase init failed:", e);
-    return res
-      .status(500)
-      .json({ error: "Server auth not configured (Firebase Admin missing)" });
-  }
-
-  const authHeader = req.header("Authorization");
-  if (!authHeader?.startsWith("Bearer ")) {
-    return res.status(401).json({ error: "Missing Bearer token" });
-  }
-
-  const token = authHeader.slice("Bearer ".length);
-  try {
-    const decoded = await admin.auth().verifyIdToken(token);
-    // Email verification requirement disabled for now — allow both
-    // Google Sign-In and email/password accounts regardless of
-    // email_verified status.
-    (req as any).user = { uid: decoded.uid, email: decoded.email };
-    return next();
-  } catch {
-    return res.status(401).json({ error: "Invalid or expired token" });
-  }
-}
 
 const isProduction = process.env.NODE_ENV === "production";
 
@@ -137,20 +46,21 @@ app.use(
 
 app.use(express.json({ limit: "6mb" }));
 
+// Re-export for any external consumers
+export { requireAuth, requireFirebaseAuth } from "./authMiddleware";
+
 app.use("/recruit-public", recruitPublicRouter);
 app.use("/recruit-public/forms", formPublicRouter);
 app.use("/recruit-public/site-guide", siteGuideRouter);
-app.use("/recruit/copilot", requireFirebaseAuth, copilotRouter);
-app.use("/recruit", requireFirebaseAuth, recruitRouter);
-app.use("/recruit/forms", requireFirebaseAuth, formRouter);
+app.use("/recruit/copilot", requireAuth, copilotRouter);
+app.use("/recruit", requireAuth, recruitRouter);
+app.use("/recruit/forms", requireAuth, formRouter);
 
 app.get("/health", (_req, res) => {
   res.json({ ok: true, service: "recruit-backend" });
 });
 
 // ── GET /mesh-api-status ─────────────────────────────────────────────────────
-// Public endpoint: pings Mesh API with a 1-token completion to verify
-// connectivity, then returns a structured health payload.
 app.get("/mesh-api-status", async (_req, res) => {
   const apiKey = process.env.GOOGLEM_API_KEY || "";
   const meshBaseUrl = "https://api.meshapi.ai/v1";
@@ -215,7 +125,6 @@ app.get("/mesh-api-status", async (_req, res) => {
       meshStatus = "degraded";
       errorDetail = `HTTP ${meshRes.status}`;
     } else {
-      // 4xx other than 401/429 means the API is reachable but something is wrong
       meshStatus = meshRes.status === 401 ? "unavailable" : "degraded";
       errorDetail = `HTTP ${meshRes.status}`;
     }
@@ -248,8 +157,23 @@ app.get("/mesh-api-status", async (_req, res) => {
 
 const PORT = Number(process.env.PORT) || 8080;
 
+// Mount Better Auth routes lazily — getAuth() is called per-request after MongoDB connects
+app.all("/api/auth/*splat", async (req, res) => {
+  try {
+    const auth = getAuth();
+    return toNodeHandler(auth)(req, res);
+  } catch (err: any) {
+    console.error("[auth] getAuth failed:", err?.message);
+    return res.status(503).json({ error: "Auth service unavailable. Check MongoDB connection." });
+  }
+});
+
 connectMongo()
-  .then(() => console.log("[db] MongoDB connected"))
+  .then(() => {
+    console.log("[db] MongoDB connected");
+    // Pre-initialize Better Auth now that MongoDB is ready
+    try { getAuth(); } catch (e: any) { console.error("[auth] init failed:", e?.message); }
+  })
   .catch((err) => console.error("[db] MongoDB connection failed:", err?.message || err));
 
 app.listen(PORT, () => {

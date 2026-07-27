@@ -3,8 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { RecruitGuard } from "@/components/RecruitGuard";
 import { useRouter } from "next/navigation";
-import { onAuthStateChanged } from "firebase/auth";
-import { getFirebaseAuth, isFirebaseAvailable } from "@/lib/firebaseClient";
+import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import Link from "next/link";
 import { apiUrl, readApiJson } from "@/lib/api";
 import { SkStatCard, SkCandidateCard } from "@/components/Skeleton";
@@ -248,19 +247,10 @@ function TalentPoolContent() {
   const [filter, setFilter] = useState<"all" | "pinned" | "strong_yes" | "maybe">("all");
   const [search, setSearch] = useState("");
 
+  const { sessionToken } = useRecruitAuth();
   useEffect(() => {
-    if (!isFirebaseAvailable()) {
-      // No auth configured in this environment — don't spin forever.
-      setLoading(false);
-      return;
-    }
-    const auth = getFirebaseAuth();
-    const unsub = onAuthStateChanged(auth, async (u) => {
-      if (u) { const t = await u.getIdToken(); setToken(t); }
-      else router.push("/recruit/login");
-    });
-    return () => unsub();
-  }, [router]);
+    if (sessionToken) setToken(sessionToken);
+  }, [sessionToken]);
 
   const fetchPool = useCallback(async () => {
     if (!token) return;

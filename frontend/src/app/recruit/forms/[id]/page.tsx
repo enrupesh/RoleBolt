@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useCallback, use } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { onAuthStateChanged } from "firebase/auth";
-import { getFirebaseAuth, isFirebaseAvailable } from "@/lib/firebaseClient";
+import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { RecruitGuard } from "@/components/RecruitGuard";
 import Link from "next/link";
 import { apiUrl, readApiJson } from "@/lib/api";
@@ -1227,15 +1226,10 @@ function FormResponsesContent({ id }: { id: string }) {
   const [showShare, setShowShare] = useState(justSaved);
   const [stageFilter, setStageFilter] = useState<Stage | "all">("all");
 
+  const { sessionToken } = useRecruitAuth();
   useEffect(() => {
-    if (!isFirebaseAvailable()) return;
-    const auth = getFirebaseAuth();
-    const unsub = onAuthStateChanged(auth, async (u) => {
-      if (!u) { router.push("/recruit/login"); return; }
-      setToken(await u.getIdToken());
-    });
-    return () => unsub();
-  }, [router]);
+    if (sessionToken) setToken(sessionToken);
+  }, [sessionToken]);
 
   const fetchData = useCallback(async () => {
     if (!token) return;

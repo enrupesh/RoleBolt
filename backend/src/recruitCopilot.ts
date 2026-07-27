@@ -12,7 +12,7 @@
  */
 
 import express from "express";
-import { requireFirebaseAuth } from "./index";
+import { requireFirebaseAuth } from "./authMiddleware";
 import { RecruitCopilotConversation } from "./models/RecruitCopilotConversation";
 import type { ICopilotSource } from "./models/RecruitCopilotConversation";
 import { RecruitJob } from "./models/RecruitJob";

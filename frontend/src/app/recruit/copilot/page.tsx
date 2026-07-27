@@ -991,7 +991,7 @@ function CandidateContextPanel({ candidate, job, onSwitchToJob }: {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 function CopilotPageContent() {
-  const { firebaseUser, recruitProfile } = useRecruitAuth();
+  const { sessionToken, recruitProfile } = useRecruitAuth();
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -1046,9 +1046,8 @@ function CopilotPageContent() {
 
   // ── Auth token ─────────────────────────────────────────────────────────────
   const getToken = useCallback(async () => {
-    if (!firebaseUser) return null;
-    return firebaseUser.getIdToken();
-  }, [firebaseUser]);
+    return sessionToken ?? null;
+  }, [sessionToken]);
 
   // ── Read URL params on mount ───────────────────────────────────────────────
   useEffect(() => {
