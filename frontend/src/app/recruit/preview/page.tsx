@@ -504,11 +504,11 @@ export default function ProductPreviewPage() {
                   />
                   <ArchArrow label="HTTPS request" />
 
-                  {/* Firebase Auth */}
+                  {/* Auth */}
                   <ArchNode
                     icon={<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>}
-                    label="Firebase Auth"
-                    sublabel="JWT session"
+                    label="Custom Auth"
+                    sublabel="Session management"
                     color="bg-amber-500 text-white"
                     borderColor="border-amber-400"
                   />
@@ -588,8 +588,8 @@ export default function ProductPreviewPage() {
                   </div>
 
                   <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-3 w-full text-center">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-amber-500 mb-1.5">Firebase Admin</p>
-                    <p className="text-[11px] text-amber-700">Token verification on every protected API route</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-amber-500 mb-1.5">Custom Auth</p>
+                    <p className="text-[11px] text-amber-700">Session validation on every protected API route</p>
                   </div>
 
                   <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 w-full text-center">
@@ -605,7 +605,7 @@ export default function ProductPreviewPage() {
 
                 {[
                   { label: "User (Browser)", sub: "Recruiter or Candidate", bg: "bg-slate-800 text-white" },
-                  { label: "Firebase Auth", sub: "JWT session validation", bg: "bg-amber-500 text-white" },
+                  { label: "Custom Auth", sub: "Session management", bg: "bg-amber-500 text-white" },
                   { label: "Next.js Frontend", sub: "Rolebolt UI · Port 5000", bg: "bg-[#0a66c2] text-white" },
                   { label: "Express Backend", sub: "Node.js API · Port 8080", bg: "bg-slate-700 text-white" },
                   { label: "MongoDB Atlas", sub: "Jobs, Candidates, Forms", bg: "bg-emerald-600 text-white" },
@@ -635,7 +635,7 @@ export default function ProductPreviewPage() {
                 { color: "bg-slate-700", label: "Backend (Express / Node)" },
                 { color: "bg-violet-600", label: "Mesh API (AI gateway)" },
                 { color: "bg-emerald-600", label: "MongoDB (persistence)" },
-                { color: "bg-amber-500", label: "Firebase (auth)" },
+                { color: "bg-amber-500", label: "Custom Auth" },
               ].map((l) => (
                 <span key={l.label} className="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium">
                   <span className={`h-2.5 w-2.5 rounded-full ${l.color}`} />

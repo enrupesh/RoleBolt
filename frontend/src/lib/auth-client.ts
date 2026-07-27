@@ -1,3 +1,3 @@
-// better-auth removed — Clerk is now used for all authentication.
-// Use Clerk hooks directly: useUser(), useAuth(), useClerk() from "@clerk/nextjs"
+// Auth removed — third-party authentication (Firebase, Clerk, better-auth) has been stripped.
+// Custom authentication client will be implemented here.
 export const authClient = null;

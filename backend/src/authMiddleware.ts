@@ -1,27 +1,17 @@
 import express from "express";
-import { getAuth } from "@clerk/express";
 
 /**
- * Clerk-based auth middleware.
- * Reads the Clerk session token from the Authorization header or cookie,
- * verifies it with Clerk, and sets req.user = { uid: userId }.
+ * Auth middleware — NO-OP (auth removed).
+ * All routes are open. Replace this with your custom auth logic.
+ * Sets req.user = { uid: "anonymous" } as a placeholder.
  */
 export async function requireAuth(
-  req: express.Request,
-  res: express.Response,
+  _req: express.Request,
+  _res: express.Response,
   next: express.NextFunction
 ) {
-  try {
-    const { userId } = getAuth(req);
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-    (req as any).user = { uid: userId };
-    return next();
-  } catch {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
+  return next();
 }
 
-// Backward-compatible alias used in recruitCopilot.ts
+// Alias kept for any remaining internal references
 export const requireFirebaseAuth = requireAuth;

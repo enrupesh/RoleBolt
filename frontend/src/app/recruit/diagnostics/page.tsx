@@ -204,7 +204,7 @@ function RecruitDiagnosticsContent() {
     const authenticated = baseCheck(
       "authenticated",
       "Signed-in Recruit API",
-      "If you are signed in, checks that an authenticated recruiter endpoint accepts your Firebase token and returns JSON.",
+      "If you are signed in, checks that an authenticated recruiter endpoint accepts your session token and returns JSON.",
       apiUrl("/recruit/pipeline-summary")
     );
 
