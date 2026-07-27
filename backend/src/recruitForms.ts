@@ -152,6 +152,7 @@ Be specific and honest. If answers are very short or empty, note that in the sum
       messages: [{ role: "user", content: prompt }],
       temperature: 0.3,
       max_tokens: 900,
+      nvidiaFallback: true,
     });
   } catch (err) {
     console.error("[forms] scoreFormResponse: AI call failed:", err);
@@ -225,6 +226,7 @@ Return only the plain text email body.`;
       messages: [{ role: "user", content: prompt }],
       temperature: 0.5,
       max_tokens: 300,
+      nvidiaFallback: true,
     });
     return raw.trim();
   } catch {
@@ -629,6 +631,7 @@ Return ONLY this JSON (no markdown):
         messages: [{ role: "user", content: prompt }],
         temperature: 0.45,
         max_tokens: 700,
+        nvidiaFallback: true,
       });
     } catch (err) {
       console.error("[forms] interview-questions: AI call failed:", err);
