@@ -33,7 +33,6 @@ function RecruitSignUpForm() {
       {/* Clerk Sign Up */}
       <div className="flex flex-1 items-center justify-center px-4 py-12">
         <SignUp
-          routing="hash"
           forceRedirectUrl="/recruit/dashboard"
           signInUrl="/recruit/login"
           appearance={{
