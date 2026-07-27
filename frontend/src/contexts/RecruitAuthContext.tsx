@@ -8,7 +8,7 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
-import { authClient } from "@/lib/auth-client";
+import { useUser, useAuth } from "@clerk/nextjs";
 import { apiUrl } from "@/lib/api";
 
 export type RecruitRole = "creator" | "seeker";
@@ -80,26 +80,40 @@ async function fetchOrCreateProfile(
 }
 
 export function RecruitAuthProvider({ children }: { children: ReactNode }) {
-  const { data: session, isPending } = authClient.useSession();
+  const { user, isLoaded, isSignedIn } = useUser();
+  const { getToken, signOut } = useAuth();
+
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [recruitProfile, setRecruitProfile] = useState<RecruitProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileFetched, setProfileFetched] = useState(false);
 
-  const authUser: AuthUser | null = session?.user
-    ? { id: session.user.id, email: session.user.email, name: session.user.name }
-    : null;
-
-  const sessionToken: string | null = (session?.session as any)?.token ?? null;
-
-  // Fetch/create profile whenever sessionToken changes
+  // Fetch Clerk JWT whenever auth state changes
   useEffect(() => {
-    if (isPending) return;
+    if (!isLoaded) return;
 
-    if (!authUser || !sessionToken) {
+    if (!isSignedIn || !user) {
+      setSessionToken(null);
       setRecruitProfile(null);
       setProfileFetched(true);
       return;
     }
+
+    getToken().then((token) => {
+      setSessionToken(token);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoaded, isSignedIn, user?.id]);
+
+  // Fetch/create backend profile whenever we get a fresh token
+  useEffect(() => {
+    if (!sessionToken || !user) return;
+
+    const authUser: AuthUser = {
+      id: user.id,
+      email: user.primaryEmailAddress?.emailAddress,
+      name: user.fullName ?? undefined,
+    };
 
     let cancelled = false;
     setProfileLoading(true);
@@ -111,15 +125,26 @@ export function RecruitAuthProvider({ children }: { children: ReactNode }) {
       setProfileFetched(true);
     });
 
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionToken, isPending]);
+    return () => {
+      cancelled = true;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionToken]);
+
+  const authUser: AuthUser | null = user
+    ? {
+        id: user.id,
+        email: user.primaryEmailAddress?.emailAddress,
+        name: user.fullName ?? undefined,
+      }
+    : null;
 
   const signOutFromRecruit = useCallback(async () => {
-    await authClient.signOut();
+    await signOut();
     setRecruitProfile(null);
+    setSessionToken(null);
     setProfileFetched(false);
-  }, []);
+  }, [signOut]);
 
   const refreshProfile = useCallback(async () => {
     if (!authUser || !sessionToken) return;
@@ -127,9 +152,10 @@ export function RecruitAuthProvider({ children }: { children: ReactNode }) {
     const profile = await fetchOrCreateProfile(authUser, sessionToken);
     setRecruitProfile(profile);
     setProfileLoading(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authUser, sessionToken]);
 
-  const loading = isPending || profileLoading || !profileFetched;
+  const loading = !isLoaded || profileLoading || (!profileFetched && !!isSignedIn);
 
   return (
     <RecruitAuthContext.Provider
