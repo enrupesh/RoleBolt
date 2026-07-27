@@ -8,8 +8,8 @@
   },
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc -p tsconfig.json",
-    "start": "node dist/index.js"
+    "build": "echo 'tsx runtime used — no tsc compilation needed'",
+    "start": "tsx src/index.ts"
   },
   "license": "ISC",
   "type": "commonjs",
@@ -30,9 +30,8 @@
     "multer": "^2.2.0",
     "pdf-parse": "^1.1.1",
     "resend": "^6.17.2",
+    "tsx": "^4.21.0",
     "typescript": "^6.0.2"
   },
-  "devDependencies": {
-    "tsx": "^4.21.0"
-  }
+  "devDependencies": {}
 }
