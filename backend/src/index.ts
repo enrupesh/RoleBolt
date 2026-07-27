@@ -1,6 +1,8 @@
 import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
+import { authRouter } from "./auth";
+import { requireAuth } from "./authMiddleware";
 import { recruitRouter, recruitPublicRouter } from "./recruit";
 import { formRouter, formPublicRouter } from "./recruitForms";
 import { copilotRouter } from "./recruitCopilot";
@@ -45,13 +47,18 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true, service: "recruit-backend" });
 });
 
-// ── Routes (auth removed — all routes are open) ──────────────────────────────
+// ── Auth routes (public) ──────────────────────────────────────────────────────
+app.use("/auth", authRouter);
+
+// ── Public routes ─────────────────────────────────────────────────────────────
 app.use("/recruit-public", recruitPublicRouter);
 app.use("/recruit-public/forms", formPublicRouter);
 app.use("/recruit-public/site-guide", siteGuideRouter);
-app.use("/recruit/copilot", copilotRouter);
-app.use("/recruit", recruitRouter);
-app.use("/recruit/forms", formRouter);
+
+// ── Protected routes (JWT required) ──────────────────────────────────────────
+app.use("/recruit/copilot", requireAuth, copilotRouter);
+app.use("/recruit", requireAuth, recruitRouter);
+app.use("/recruit/forms", requireAuth, formRouter);
 
 // ── GET /mesh-api-status ─────────────────────────────────────────────────────
 app.get("/mesh-api-status", async (_req, res) => {
