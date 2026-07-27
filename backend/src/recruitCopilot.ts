@@ -183,7 +183,7 @@ async function generateTitle(firstMessage: string): Promise<string> {
   try {
     const raw = await callMeshChatCompletions({
       apiKey,
-      model: "openai/gpt-4o-mini",
+      model: "google/gemini-2.5-flash",
       messages: [
         {
           role: "system",
@@ -501,7 +501,7 @@ copilotRouter.post("/chat", async (req, res) => {
     // ── 4. Call AI ────────────────────────────────────────────────────────────
     const rawAi = await callMeshChatCompletions({
       apiKey,
-      model: "openai/gpt-4o",
+      model: "google/gemini-2.5-flash",
       fallbackModels: ["openai/gpt-4o-mini", "anthropic/claude-3-5-sonnet"],
       messages: aiMessages,
       max_tokens: 2000,
@@ -633,7 +633,7 @@ copilotRouter.post("/chat/stream", async (req, res) => {
 
     for await (const token of streamMeshChatCompletions({
       apiKey,
-      model: "openai/gpt-4o",
+      model: "google/gemini-2.5-flash",
       messages: aiMessages,
       max_tokens: 2500,
       temperature: 0.5,
@@ -898,7 +898,7 @@ copilotRouter.post("/insights", async (req, res) => {
 
     const rawAi = await callMeshChatCompletions({
       apiKey,
-      model: "openai/gpt-4o",
+      model: "google/gemini-2.5-flash",
       fallbackModels: ["openai/gpt-4o-mini", "anthropic/claude-3-5-sonnet"],
       messages: aiMessages,
       max_tokens: 1200,
