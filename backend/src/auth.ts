@@ -41,6 +41,16 @@ export function getAuth() {
       enabled: true,
       requireEmailVerification: false,
     },
+    // SameSite=None required because frontend & backend are on different domains.
+    // Without this, the browser drops the OAuth state cookie on cross-origin requests
+    // → state_mismatch error during Google login callback.
+    advanced: {
+      defaultCookieAttributes: {
+        sameSite: "none",
+        secure: true,
+        httpOnly: true,
+      },
+    },
     ...(googleEnabled
       ? {
           socialProviders: {
