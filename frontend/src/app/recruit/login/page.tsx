@@ -41,7 +41,7 @@ function RecruitLoginForm() {
         setError(signInError?.message ?? "Could not sign in. Please try again.");
         return;
       }
-      const token = (data.session as any)?.token as string;
+      const token = (data as any)?.session?.token as string;
       if (token) await setupProfile(token, data.user?.name, data.user?.email);
       await refreshProfile();
       router.replace("/recruit/dashboard");
