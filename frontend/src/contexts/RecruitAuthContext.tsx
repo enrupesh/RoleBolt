@@ -31,6 +31,8 @@ interface RecruitAuthState {
   sessionToken: string | null;
   recruitProfile: RecruitProfile | null;
   loading: boolean;
+  /** Non-null when the profile fetch completed but returned null (backend error). */
+  profileError: string | null;
   signOutFromRecruit: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -40,6 +42,7 @@ const RecruitAuthContext = createContext<RecruitAuthState>({
   sessionToken: null,
   recruitProfile: null,
   loading: true,
+  profileError: null,
   signOutFromRecruit: async () => {},
   refreshProfile: async () => {},
 });
@@ -87,6 +90,7 @@ export function RecruitAuthProvider({ children }: { children: ReactNode }) {
   const [recruitProfile, setRecruitProfile] = useState<RecruitProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileFetched, setProfileFetched] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
 
   // Fetch Clerk JWT whenever auth state changes
   useEffect(() => {
@@ -96,6 +100,7 @@ export function RecruitAuthProvider({ children }: { children: ReactNode }) {
       setSessionToken(null);
       setRecruitProfile(null);
       setProfileFetched(true);
+      setProfileError(null);
       return;
     }
 
@@ -117,10 +122,17 @@ export function RecruitAuthProvider({ children }: { children: ReactNode }) {
 
     let cancelled = false;
     setProfileLoading(true);
+    setProfileError(null);
 
     fetchOrCreateProfile(authUser, sessionToken).then((profile) => {
       if (cancelled) return;
-      setRecruitProfile(profile);
+      if (profile) {
+        setRecruitProfile(profile);
+        setProfileError(null);
+      } else {
+        setRecruitProfile(null);
+        setProfileError("Could not connect to the server. Please try again.");
+      }
       setProfileLoading(false);
       setProfileFetched(true);
     });
@@ -144,13 +156,21 @@ export function RecruitAuthProvider({ children }: { children: ReactNode }) {
     setRecruitProfile(null);
     setSessionToken(null);
     setProfileFetched(false);
+    setProfileError(null);
   }, [signOut]);
 
   const refreshProfile = useCallback(async () => {
     if (!authUser || !sessionToken) return;
     setProfileLoading(true);
+    setProfileError(null);
     const profile = await fetchOrCreateProfile(authUser, sessionToken);
-    setRecruitProfile(profile);
+    if (profile) {
+      setRecruitProfile(profile);
+      setProfileError(null);
+    } else {
+      setRecruitProfile(null);
+      setProfileError("Could not connect to the server. Please try again.");
+    }
     setProfileLoading(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authUser, sessionToken]);
@@ -164,6 +184,7 @@ export function RecruitAuthProvider({ children }: { children: ReactNode }) {
         sessionToken,
         recruitProfile,
         loading,
+        profileError,
         signOutFromRecruit,
         refreshProfile,
       }}
