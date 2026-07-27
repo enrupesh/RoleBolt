@@ -57,6 +57,12 @@ export async function callMeshChatCompletions(args: {
    * retry budget. A warning is logged whenever a fallback is engaged.
    */
   fallbackModels?: string[];
+  /**
+   * When true, if ALL Mesh models fail the call is automatically retried
+   * against the Nvidia NIM API (5-model fallback chain) before throwing.
+   * Nvidia is the "माई-बाप" — the last resort that should never fail.
+   */
+  nvidiaFallback?: boolean;
 }) {
   const {
     apiKey,
@@ -70,6 +76,7 @@ export async function callMeshChatCompletions(args: {
     timeoutMs = 45_000,
     retries = 0,
     fallbackModels = [],
+    nvidiaFallback = false,
   } = args;
 
   const url = `${baseUrl.replace(/\/$/, "")}/chat/completions`;
@@ -179,6 +186,15 @@ export async function callMeshChatCompletions(args: {
         "";
       return String(content).trim();
     }
+  }
+
+  // All Mesh models exhausted — try Nvidia as the ultimate fallback ("माई-बाप")
+  if (nvidiaFallback) {
+    console.warn(
+      "[meshClient] All Mesh models exhausted. Escalating to Nvidia NIM API (ultimate fallback)…"
+    );
+    const { callNvidia } = await import("./nvidiaClient.js");
+    return callNvidia({ messages, temperature, max_tokens: max_tokens ?? 1200, timeoutMs });
   }
 
   throw lastErr ?? new Error("Mesh API call failed without a captured error.");
