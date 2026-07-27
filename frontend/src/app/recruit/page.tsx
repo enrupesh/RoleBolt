@@ -712,7 +712,7 @@ export default function RecruitLandingPage() {
               <span className="text-white">{"({\n"}</span>
               <span className="text-white">{"  "}</span>
               <span className="text-orange-300">{"apiKey"}</span>
-              <span className="text-white">{": MESHAPI_API_KEY,\n"}</span>
+              <span className="text-white">{": GOOGLEM_API_KEY,\n"}</span>
               <span className="text-white">{"  "}</span>
               <span className="text-orange-300">{"model"}</span>
               <span className="text-white">{": "}</span>

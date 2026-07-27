@@ -152,7 +152,7 @@ app.get("/health", (_req, res) => {
 // Public endpoint: pings Mesh API with a 1-token completion to verify
 // connectivity, then returns a structured health payload.
 app.get("/mesh-api-status", async (_req, res) => {
-  const apiKey = process.env.MESHAPI_API_KEY || "";
+  const apiKey = process.env.GOOGLEM_API_KEY || "";
   const meshBaseUrl = "https://api.meshapi.ai/v1";
   const models = [
     { id: "openai/gpt-4o-mini",              role: "primary",    label: "GPT-4o mini" },
@@ -172,7 +172,7 @@ app.get("/mesh-api-status", async (_req, res) => {
   if (!apiKey) {
     return res.json({
       status: "unavailable",
-      reason: "MESHAPI_API_KEY not configured",
+      reason: "GOOGLEM_API_KEY not configured",
       responseTimeMs: null,
       checkedAt: new Date().toISOString(),
       meshApiUrl: meshBaseUrl,
