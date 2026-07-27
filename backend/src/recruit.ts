@@ -7,7 +7,8 @@ import { RecruitCandidate } from "./models/RecruitCandidate";
 import { RecruitSeekerProfile } from "./models/RecruitSeekerProfile";
 import { RecruitCompanyProfile } from "./models/RecruitCompanyProfile";
 import { callMeshChatCompletions } from "./ai/meshClient";
-import { callGemini } from "./ai/geminiClient";
+import { callGeminiChain } from "./ai/geminiClient";
+import { callNvidia } from "./ai/nvidiaClient";
 import { RecruitJobAlert } from "./models/RecruitJobAlert";
 import { UsageEvent } from "./models/UsageEvent";
 import { RecruitProfile } from "./models/RecruitProfile";
@@ -445,31 +446,37 @@ Rules for the rubric:
     { name: "Growth & Initiative", weight: 10, description: "Evidence of self-driven learning, side projects, or career progression." },
   ];
 
-  // Primary: Gemini 2.5 Flash (Google Cloud — XPRIZE requirement).
-  // Fallback: Mesh API if Gemini is unavailable or over quota.
+  // Strategy: try ALL Gemini models in sequence, then fall back to Nvidia.
+  // callGeminiChain tries: gemini-2.5-flash → gemini-2.5-flash-lite →
+  //   gemini-3.1-flash-lite → gemini-3.5-flash-lite → gemini-3.6-flash
+  // If every Gemini model fails → Nvidia (5-model chain, "माई-बाप").
   let raw: string;
   try {
-    raw = await callGemini({
-      model: "gemini-2.5-flash",
+    raw = await callGeminiChain({
       prompt,
       temperature: 0.6,
       maxOutputTokens: 2000,
       jsonMode: true,
     });
-    console.log("[recruit] generateJobDescription: used Gemini 2.5 Flash ✓");
-  } catch (geminiErr) {
-    console.warn("[recruit] generateJobDescription: Gemini failed, falling back to Mesh API:", (geminiErr as Error)?.message);
+    console.log("[recruit] generateJobDescription: Gemini chain succeeded ✓");
+  } catch (geminiChainErr) {
+    console.warn(
+      "[recruit] generateJobDescription: all Gemini models failed, escalating to Nvidia:",
+      (geminiChainErr as Error)?.message
+    );
     try {
-      raw = await callMeshChatCompletions({
-        apiKey: MESHAPI_API_KEY,
-        retries: 2,
-        fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
+      raw = await callNvidia({
         messages: [{ role: "user", content: prompt }],
         temperature: 0.6,
         max_tokens: 2000,
+        responseFormat: "json_object",
       });
-    } catch (err) {
-      console.error("[recruit] generateJobDescription: both Gemini and Mesh API failed, using fallback template:", err);
+      console.log("[recruit] generateJobDescription: Nvidia fallback succeeded ✓");
+    } catch (nvidiaErr) {
+      console.error(
+        "[recruit] generateJobDescription: Gemini chain + Nvidia all failed, using built-in template:",
+        nvidiaErr
+      );
       return { jd: fallbackJd, rubric: fallbackRubric };
     }
   }
@@ -609,6 +616,7 @@ For "tier": classify each criterion as 1 (must-have skill), 2 (experience depth)
       messages: [{ role: "user", content: prompt }],
       temperature: 0.4,
       max_tokens: 2000,
+      nvidiaFallback: true,
     });
   } catch (err) {
     const rubricMaxScore = args.rubric.reduce((sum, r) => sum + r.weight, 0) || 100;
@@ -794,6 +802,7 @@ Write in plain text, no JSON, no markdown headers.`;
       messages: [{ role: "user", content: prompt }],
       temperature: 0.5,
       max_tokens: 600,
+      nvidiaFallback: true,
     });
   } catch (err) {
     console.error("[recruit] generateInterviewBrief: AI call failed:", err);
@@ -855,6 +864,7 @@ Respond with ONLY this exact JSON structure, no markdown, no extra text:
       messages: [{ role: "user", content: prompt }],
       temperature: 0.5,
       max_tokens: 1200,
+      nvidiaFallback: true,
     });
   } catch (err) {
     console.error("[recruit] generateAssessmentQuestions: AI call failed, using default questions:", err);
@@ -944,6 +954,7 @@ Rules:
       messages: [{ role: "user", content: prompt }],
       temperature: 0.25,
       max_tokens: 700,
+      nvidiaFallback: true,
     });
   } catch (err) {
     console.error("[recruit] analyzeAssessmentAnswers: AI call failed, keeping resume score:", err);
@@ -1021,6 +1032,7 @@ TONE RULES:
       messages: [{ role: "user", content: prompt }],
       temperature: 0.75,
       max_tokens: 350,
+      nvidiaFallback: true,
     });
   } catch (err) {
     console.error("[recruit] generateRejectionEmail: AI call failed, using template:", err);
@@ -2135,6 +2147,7 @@ FORMAT RULES:
       messages: [{ role: "user", content: prompt }],
       temperature: 0.5,
       max_tokens: 900,
+      nvidiaFallback: true,
     });
   } catch (err) {
     console.error("[recruit] generateOfferLetter: AI call failed, using template:", err);
@@ -2604,6 +2617,7 @@ Rules:
       messages: [{ role: "user", content: prompt }],
       temperature: 0.35,
       max_tokens: 800,
+      nvidiaFallback: true,
     });
   } catch (err) {
     console.error("[recruit] generateJobMatch: AI call failed:", err);

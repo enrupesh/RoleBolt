@@ -195,6 +195,7 @@ async function generateTitle(firstMessage: string): Promise<string> {
       max_tokens: 20,
       temperature: 0.4,
       retries: 1,
+      nvidiaFallback: true,
     });
     return raw.trim().replace(/^["']|["']$/g, "").slice(0, 80);
   } catch {
@@ -508,6 +509,7 @@ copilotRouter.post("/chat", async (req, res) => {
       temperature: 0.5,
       retries: 2,
       timeoutMs: 60_000,
+      nvidiaFallback: true,
     });
 
     const parsed = parseAiResponse(rawAi);
@@ -905,6 +907,7 @@ copilotRouter.post("/insights", async (req, res) => {
       temperature: 0.5,
       retries: 2,
       timeoutMs: 60_000,
+      nvidiaFallback: true,
     });
 
     const parsed = parseAiResponse(rawAi);

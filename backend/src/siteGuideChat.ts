@@ -12,6 +12,7 @@
 
 import express from "express";
 import { streamMeshChatCompletions } from "./ai/meshClient";
+import { callNvidia } from "./ai/nvidiaClient";
 import type { ChatMessage } from "./ai/meshClient";
 
 export const siteGuideRouter = express.Router();
@@ -94,6 +95,7 @@ siteGuideRouter.post("/chat/stream", async (req, res) => {
   res.setHeader("Cache-Control", "no-cache, no-transform");
   res.setHeader("X-Accel-Buffering", "no");
 
+  let streamSucceeded = false;
   try {
     for await (const token of streamMeshChatCompletions({
       apiKey,
@@ -104,11 +106,25 @@ siteGuideRouter.post("/chat/stream", async (req, res) => {
       timeoutMs: 45_000,
     })) {
       res.write(token);
+      streamSucceeded = true;
     }
-  } catch (err) {
-    console.error("[siteGuideChat] stream failed:", err);
-    if (!res.headersSent || res.writableLength === 0) {
-      res.write("Sorry, I'm having trouble responding right now — please try again in a moment.");
+  } catch (streamErr) {
+    console.warn("[siteGuideChat] Mesh stream failed, falling back to Nvidia NIM:", (streamErr as Error)?.message);
+    // Nvidia fallback — non-streaming, write the full response at once
+    if (!streamSucceeded) {
+      try {
+        const nvidiaReply = await callNvidia({
+          messages,
+          temperature: 0.6,
+          max_tokens: 700,
+          timeoutMs: 60_000,
+        });
+        res.write(nvidiaReply);
+        console.log("[siteGuideChat] Nvidia fallback succeeded ✓");
+      } catch (nvidiaErr) {
+        console.error("[siteGuideChat] Nvidia fallback also failed:", nvidiaErr);
+        res.write("Sorry, I'm having trouble responding right now — please try again in a moment.");
+      }
     }
   } finally {
     res.end();
