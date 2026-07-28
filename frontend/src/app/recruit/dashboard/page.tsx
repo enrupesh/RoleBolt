@@ -228,7 +228,7 @@ type PipelineSummary = {
 
 function CopyShareModal({ form, onClose }: { form: Form; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
-  const link = `${typeof window !== "undefined" ? window.location.origin : "https://www.rolebolt.app"}/f/${form.slug}`;
+  const link = `${typeof window !== "undefined" ? window.location.origin : "https://www.rolebolt.tech"}/f/${form.slug}`;
 
   function copy() {
     navigator.clipboard.writeText(link).catch(() => {});

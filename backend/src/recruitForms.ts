@@ -6,6 +6,8 @@ import { RecruitForm } from "./models/RecruitForm";
 import { RecruitFormResponse } from "./models/RecruitFormResponse";
 import { callMeshChatCompletions } from "./ai/meshClient";
 import { sendEmail } from "./mailer";
+
+const CANDIDATE_FROM = `Rolebolt Careers <${process.env.CANDIDATE_FROM_EMAIL ?? "careers@rolebolt.tech"}>`;
 import * as emailTemplates from "./emailTemplates";
 
 export const formRouter = express.Router();       // protected — /recruit/forms
@@ -450,7 +452,7 @@ formRouter.patch("/:formId/responses/:responseId", async (req, res) => {
           if (stage === "interview")   payload = emailTemplates.interview(candName, formTitle, "");
           if (stage === "hired")       payload = emailTemplates.hired(candName, formTitle, "");
           if (!payload) return;
-          const result = await sendEmail({ to: candEmail, subject: payload.subject, html: payload.html, text: payload.text });
+          const result = await sendEmail({ to: candEmail, subject: payload.subject, html: payload.html, text: payload.text, from: CANDIDATE_FROM });
           await RecruitFormResponse.findByIdAndUpdate(resId, {
             $push: {
               emailLog: {
@@ -538,7 +540,7 @@ formRouter.post("/:formId/responses/:responseId/send-email", async (req, res) =>
       html = emailTemplates.genericEmail(candName, subject.trim(), body);
     }
 
-    const result = await sendEmail({ to: candEmail, subject: subject.trim(), html, text: body });
+    const result = await sendEmail({ to: candEmail, subject: subject.trim(), html, text: body, from: CANDIDATE_FROM });
 
     const logEntry = {
       type: type || "custom",
