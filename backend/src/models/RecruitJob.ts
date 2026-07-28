@@ -12,6 +12,15 @@ export interface IJobReport {
   reportedAt: Date;
 }
 
+export interface IAgentMode {
+  enabled: boolean;              // false = Manual Mode, true = AI Agent Mode
+  shortlistThreshold: number;    // score% >= this → auto-shortlist (default 75)
+  rejectThreshold: number;       // score% < this → auto-reject (default 40)
+  autoEmailShortlist: boolean;   // send screened email automatically (default true)
+  autoEmailReject: boolean;      // send rejection email automatically (default false)
+  autoSendAssessment: boolean;   // auto-send assessment to shortlisted (default false)
+}
+
 export interface IRecruitJob extends Document {
   uid: string;
   title: string;
@@ -47,6 +56,7 @@ export interface IRecruitJob extends Document {
   status: "active" | "paused" | "closed";
   candidateCount: number;
   reports: IJobReport[];
+  agentMode: IAgentMode;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -65,6 +75,18 @@ const JobReportSchema = new Schema<IJobReport>(
     reason: { type: String, required: true },
     details: { type: String, default: "" },
     reportedAt: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
+const AgentModeSchema = new Schema<IAgentMode>(
+  {
+    enabled:             { type: Boolean, default: false },
+    shortlistThreshold:  { type: Number,  default: 75 },
+    rejectThreshold:     { type: Number,  default: 40 },
+    autoEmailShortlist:  { type: Boolean, default: true },
+    autoEmailReject:     { type: Boolean, default: false },
+    autoSendAssessment:  { type: Boolean, default: false },
   },
   { _id: false }
 );
@@ -105,6 +127,7 @@ const RecruitJobSchema = new Schema<IRecruitJob>(
     status: { type: String, enum: ["active", "paused", "closed"], default: "active" },
     candidateCount: { type: Number, default: 0 },
     reports: { type: [JobReportSchema], default: [] },
+    agentMode: { type: AgentModeSchema, default: () => ({}) },
   },
   { timestamps: true }
 );

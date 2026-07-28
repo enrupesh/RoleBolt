@@ -1392,6 +1392,26 @@ recruitPublicRouter.post("/jobs/:jobId/apply", async (req, res) => {
       rubric: job.rubric,
     });
 
+    // ── Determine initial stage (AI Agent Mode may override "applied") ────────
+    const agentMode = (job as any).agentMode ?? {};
+    const agentEnabled = agentMode.enabled === true && !scored.scoringFailed;
+    const scorePct = scored.maxScore > 0 ? Math.round((scored.totalScore / scored.maxScore) * 100) : 0;
+    const shortlistThreshold = agentMode.shortlistThreshold ?? 75;
+    const rejectThreshold    = agentMode.rejectThreshold    ?? 40;
+
+    let initialStage: string = "applied";
+    let agentAction: "shortlisted" | "rejected" | null = null;
+
+    if (agentEnabled) {
+      if (scorePct >= shortlistThreshold) {
+        initialStage = "screened";
+        agentAction  = "shortlisted";
+      } else if (scorePct < rejectThreshold) {
+        initialStage = "rejected";
+        agentAction  = "rejected";
+      }
+    }
+
     const candidate = await RecruitCandidate.create({
       jobId: job._id,
       uid: job.uid,
@@ -1405,7 +1425,7 @@ recruitPublicRouter.post("/jobs/:jobId/apply", async (req, res) => {
       aiSummary: scored.aiSummary,
       redFlags: scored.redFlags,
       strengths: scored.strengths,
-      stage: "applied",
+      stage: initialStage,
       assessmentStatus: "not_sent",
       previousResumeScore: scored.totalScore,
       scoringFailed: scored.scoringFailed,
@@ -1420,6 +1440,45 @@ recruitPublicRouter.post("/jobs/:jobId/apply", async (req, res) => {
     });
 
     await RecruitJob.updateOne({ _id: job._id }, { $inc: { candidateCount: 1 } });
+
+    // ── AI Agent: send emails non-blocking ───────────────────────────────────
+    if (agentEnabled && email?.trim() && agentAction) {
+      setImmediate(async () => {
+        try {
+          if (agentAction === "shortlisted" && agentMode.autoEmailShortlist !== false) {
+            const tpl = emailTemplates.screened(
+              candidate.name, job.title, job.companyName || ""
+            );
+            const result = await sendEmail({ to: email, subject: tpl.subject, html: tpl.html, text: tpl.text });
+            await RecruitCandidate.updateOne({ _id: candidate._id }, {
+              $push: {
+                emailLog: {
+                  type: "agent_shortlisted", to: email, subject: tpl.subject, body: tpl.text,
+                  sentAt: new Date(), status: result.ok ? "sent" : "failed", error: result.error,
+                }
+              }
+            });
+            console.log(`[agent] Auto-shortlisted & emailed: ${candidate.name} (${scorePct}% ≥ ${shortlistThreshold}%)`);
+          } else if (agentAction === "rejected" && agentMode.autoEmailReject === true) {
+            const rejBody = `Hi ${candidate.name.split(" ")[0]},\n\nThank you for applying for the ${job.title} role${job.companyName ? ` at ${job.companyName}` : ""}. After reviewing your application, we've decided to move forward with other candidates at this time.\n\nWe appreciate your interest and wish you the best in your search.\n\nWarm regards,\nThe Hiring Team`;
+            const tpl = emailTemplates.rejectionEmailHtml(candidate.name, job.title, job.companyName || "", rejBody);
+            const result = await sendEmail({ to: email, subject: tpl.subject, html: tpl.html, text: tpl.text });
+            await RecruitCandidate.updateOne({ _id: candidate._id }, {
+              $push: {
+                emailLog: {
+                  type: "agent_rejected", to: email, subject: tpl.subject, body: tpl.text,
+                  sentAt: new Date(), status: result.ok ? "sent" : "failed", error: result.error,
+                }
+              }
+            });
+            console.log(`[agent] Auto-rejected & emailed: ${candidate.name} (${scorePct}% < ${rejectThreshold}%)`);
+          }
+        } catch (e) {
+          console.error("[agent] Email dispatch failed:", e);
+        }
+      });
+    }
+
     return res.json({ ok: true, candidateId: candidate._id });
   } catch (err: any) {
     console.error("[recruit-public] POST /jobs/:jobId/apply", err);
@@ -1434,6 +1493,29 @@ recruitRouter.delete("/jobs/:jobId", async (req, res) => {
     await RecruitJob.deleteOne({ _id: req.params.jobId, uid });
     await RecruitCandidate.deleteMany({ jobId: req.params.jobId, uid });
     return res.json({ ok: true });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── AI Agent Mode settings ────────────────────────────────────────────────────
+recruitRouter.patch("/jobs/:jobId/agent-mode", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const { enabled, shortlistThreshold, rejectThreshold, autoEmailShortlist, autoEmailReject, autoSendAssessment } = req.body;
+
+    const update: Record<string, unknown> = {};
+    if (enabled !== undefined)            update["agentMode.enabled"]            = Boolean(enabled);
+    if (shortlistThreshold !== undefined) update["agentMode.shortlistThreshold"] = Math.min(100, Math.max(0, Number(shortlistThreshold)));
+    if (rejectThreshold !== undefined)    update["agentMode.rejectThreshold"]    = Math.min(100, Math.max(0, Number(rejectThreshold)));
+    if (autoEmailShortlist !== undefined) update["agentMode.autoEmailShortlist"] = Boolean(autoEmailShortlist);
+    if (autoEmailReject !== undefined)    update["agentMode.autoEmailReject"]    = Boolean(autoEmailReject);
+    if (autoSendAssessment !== undefined) update["agentMode.autoSendAssessment"] = Boolean(autoSendAssessment);
+
+    const job = await RecruitJob.findOneAndUpdate({ _id: req.params.jobId, uid }, { $set: update }, { new: true }).lean();
+    if (!job) return res.status(404).json({ error: "Job not found." });
+    return res.json({ ok: true, agentMode: (job as any).agentMode });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
