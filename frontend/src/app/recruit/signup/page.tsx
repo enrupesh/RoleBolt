@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { apiUrl } from "@/lib/api";
 import { RoleboltLogo } from "@/components/RoleboltLogo";
+import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 
 type Step = "form" | "check-email";
 
@@ -16,6 +18,16 @@ function GitHubIcon() {
 }
 
 export default function RecruitSignUpPage() {
+  const router = useRouter();
+  const { authUser, recruitProfile, loading: authLoading } = useRecruitAuth();
+
+  // Redirect already-authenticated users straight to the dashboard
+  useEffect(() => {
+    if (!authLoading && authUser && recruitProfile) {
+      router.replace("/recruit/dashboard");
+    }
+  }, [authLoading, authUser, recruitProfile, router]);
+
   const [step, setStep] = useState<Step>("form");
 
   const [name, setName]         = useState("");
@@ -24,6 +36,9 @@ export default function RecruitSignUpPage() {
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState("");
   const [showPassword, setShowPassword] = useState(false);
+
+  // Suppress form while auth resolves to prevent flicker
+  if (authLoading) return null;
 
   // Password strength
   const hasLength   = password.length >= 8;

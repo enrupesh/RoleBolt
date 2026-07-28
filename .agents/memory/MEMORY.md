@@ -1,4 +1,5 @@
 - [Custom auth system](custom-auth.md) — JWT auth (signup/login/email verify) replacing Clerk; backend on Render at back-mp9k.onrender.com; full flow tested and live.
+- [Session persistence](session-persistence.md) — dual localStorage+cookie storage; never wipe token on network errors (only on 401/403); landing/login/signup auto-redirect authenticated users.
 - [AI Copilot backend architecture](copilot-backend.md) — RecruitCopilotConversation model + buildCopilotPrompt + copilot routes; streaming via SSE sentinel ---ROLEBOLT_META---.
 - [Mesh API AI call reliability](meshapi-ai-reliability.md) — AI call sites need retries/fallbackModels + local try/catch, or transient failures 500 the route even with a healthy key.
 - [Form submission non-blocking pattern](form-submit-pattern.md) — persist record first, return 201 immediately, then score via setImmediate; never await AI inside a candidate-facing route.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
@@ -168,9 +168,19 @@ const AI_CAPABILITIES = [
 export default function RecruitLandingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const router = useRouter();
-  const { recruitProfile, authUser, signOutFromRecruit } = useRecruitAuth();
+  const { recruitProfile, authUser, loading, signOutFromRecruit } = useRecruitAuth();
   const role = recruitProfile?.role ?? null;
   const isLoggedIn = !!authUser && !!recruitProfile;
+
+  // Auto-redirect authenticated users straight to the dashboard
+  useEffect(() => {
+    if (!loading && isLoggedIn) {
+      router.replace("/recruit/dashboard");
+    }
+  }, [loading, isLoggedIn, router]);
+
+  // While auth is resolving, show nothing to avoid a flash of the landing page
+  if (loading) return null;
 
   async function handleSignOut() {
     try {
