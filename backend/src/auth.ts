@@ -16,7 +16,7 @@ import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { connectMongo } from "./db";
 import { User } from "./models/User";
-import { signToken, requireAuth } from "./authMiddleware";
+import { signToken, verifyToken, requireAuth } from "./authMiddleware";
 import { sendEmail } from "./mailer";
 
 export const authRouter = express.Router();
@@ -127,6 +127,134 @@ async function sendVerificationEmail(email: string, name: string, token: string)
 
   await sendEmail({ to: email, subject: "Verify your Rolebolt account", html, text, from: `${FROM_NAME} <${FROM_EMAIL}>` });
 }
+
+// ─── Config (backend base URL for OAuth callbacks) ───────────────────────────
+
+const BACKEND_URL = (process.env.BACKEND_URL || "https://back-mp9k.onrender.com").replace(/\/$/, "");
+
+// ─── GET /auth/github — initiate GitHub OAuth ─────────────────────────────────
+
+authRouter.get("/github", (_req, res) => {
+  const clientId = process.env.GITHUB_CLIENT_ID;
+  if (!clientId) {
+    return res.status(500).send("GitHub OAuth is not configured (missing GITHUB_CLIENT_ID).");
+  }
+  // Use a short-lived signed JWT as the state — provides CSRF protection without a session store
+  const state = signToken({ sub: "oauth-state", email: `gh-${crypto.randomBytes(8).toString("hex")}` });
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: `${BACKEND_URL}/auth/github/callback`,
+    scope: "user:email",
+    state,
+  });
+  return res.redirect(`https://github.com/login/oauth/authorize?${params}`);
+});
+
+// ─── GET /auth/github/callback ────────────────────────────────────────────────
+
+authRouter.get("/github/callback", async (req, res) => {
+  const { code, state, error: ghError } = req.query as {
+    code?: string; state?: string; error?: string;
+  };
+
+  if (ghError) {
+    return res.redirect(`${FRONTEND_URL}/recruit/signup?error=github_denied`);
+  }
+
+  // Verify CSRF state
+  if (!state || !verifyToken(state)) {
+    return res.redirect(`${FRONTEND_URL}/recruit/signup?error=invalid_state`);
+  }
+
+  if (!code) {
+    return res.redirect(`${FRONTEND_URL}/recruit/signup?error=no_code`);
+  }
+
+  const clientId     = process.env.GITHUB_CLIENT_ID     || "";
+  const clientSecret = process.env.GITHUB_CLIENT_SECRET || "";
+
+  try {
+    // Exchange code for access token
+    const tokenRes = await fetch("https://github.com/login/oauth/access_token", {
+      method: "POST",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify({
+        client_id: clientId,
+        client_secret: clientSecret,
+        code,
+        redirect_uri: `${BACKEND_URL}/auth/github/callback`,
+      }),
+    });
+    const tokenData: any = await tokenRes.json();
+    const accessToken = tokenData?.access_token;
+
+    if (!accessToken) {
+      console.error("[auth/github] No access_token in response:", tokenData);
+      return res.redirect(`${FRONTEND_URL}/recruit/signup?error=github_token_failed`);
+    }
+
+    // Fetch GitHub user profile + emails in parallel
+    const ghHeaders = {
+      Authorization: `Bearer ${accessToken}`,
+      "User-Agent":  "Rolebolt/1.0",
+      Accept:        "application/vnd.github+json",
+    };
+
+    const [userRes, emailsRes] = await Promise.all([
+      fetch("https://api.github.com/user",        { headers: ghHeaders }),
+      fetch("https://api.github.com/user/emails", { headers: ghHeaders }),
+    ]);
+
+    const githubUser: any  = await userRes.json();
+    const emailList: any[] = emailsRes.ok ? await emailsRes.json() : [];
+
+    // Pick the best email: primary + verified > any verified > profile email
+    let email: string | null = null;
+    if (Array.isArray(emailList) && emailList.length > 0) {
+      const primary  = emailList.find((e) => e.primary && e.verified);
+      const verified = emailList.find((e) => e.verified);
+      email = (primary ?? verified ?? emailList[0])?.email ?? null;
+    }
+    if (!email && githubUser.email) email = githubUser.email;
+
+    if (!email) {
+      return res.redirect(`${FRONTEND_URL}/recruit/signup?error=no_github_email`);
+    }
+
+    email = email.trim().toLowerCase();
+    await connectMongo();
+
+    // Find user by githubId first, then by email (to link existing accounts)
+    let user = await User.findOne({
+      $or: [{ githubId: String(githubUser.id) }, { email }],
+    });
+
+    if (user) {
+      // Link githubId to existing account if not already set
+      let changed = false;
+      if (!user.githubId) { user.githubId = String(githubUser.id); changed = true; }
+      if (!user.isVerified) { user.isVerified = true; changed = true; }
+      if (changed) await user.save();
+    } else {
+      // Create new account — no password, already verified via GitHub
+      user = await User.create({
+        email,
+        passwordHash:  "",
+        name:          (githubUser.name || githubUser.login || "").trim(),
+        isVerified:    true,
+        githubId:      String(githubUser.id),
+      });
+    }
+
+    const jwt = signToken({ sub: user._id.toString(), email: user.email });
+
+    // Redirect to frontend callback with token in URL fragment (not query string for security)
+    return res.redirect(`${FRONTEND_URL}/recruit/auth/callback?token=${encodeURIComponent(jwt)}`);
+  } catch (err: any) {
+    console.error("[auth/github] callback error:", err?.message);
+    return res.redirect(`${FRONTEND_URL}/recruit/signup?error=github_failed`);
+  }
+});
 
 // ─── POST /auth/signup ────────────────────────────────────────────────────────
 
