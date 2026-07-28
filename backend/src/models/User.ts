@@ -1,13 +1,14 @@
 import mongoose, { Schema, Document } from "mongoose";
 
 export interface IUser extends Document {
-  email: string;
+  email?: string;
   passwordHash: string;
   name: string;
   isVerified: boolean;
   githubId?: string;
   googleId?: string;
-  microsoftId?: string;
+  phoneNumber?: string;
+  phoneId?: string;
   verificationToken?: string;
   verificationTokenExpiry?: Date;
   resetToken?: string;
@@ -20,10 +21,11 @@ const UserSchema = new Schema<IUser>(
   {
     email: {
       type: String,
-      required: true,
+      required: false,
       unique: true,
       lowercase: true,
       trim: true,
+      sparse: true,
       index: true,
     },
     passwordHash: { type: String, default: "" },
@@ -31,7 +33,8 @@ const UserSchema = new Schema<IUser>(
     isVerified:   { type: Boolean, default: false },
     githubId:     { type: String, index: true, sparse: true },
     googleId:     { type: String, index: true, sparse: true },
-    microsoftId:  { type: String, index: true, sparse: true },
+    phoneNumber:  { type: String, index: true, sparse: true, unique: true },
+    phoneId:      { type: String, index: true, sparse: true },
     verificationToken:       { type: String, index: true, sparse: true },
     verificationTokenExpiry: { type: Date },
     resetToken:              { type: String, index: true, sparse: true },

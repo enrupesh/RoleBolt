@@ -1,15 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiUrl } from "@/lib/api";
 import { RoleboltLogo } from "@/components/RoleboltLogo";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
-import { firebaseAuth, googleProvider, microsoftProvider } from "@/lib/firebaseClient";
-import { signInWithPopup } from "firebase/auth";
+import { firebaseAuth, googleProvider } from "@/lib/firebaseClient";
+import { signInWithPopup, RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from "firebase/auth";
 
 type Step = "form" | "check-email";
+type PhoneStep = "idle" | "entering" | "otp";
 
 function GoogleIcon() {
   return (
@@ -22,13 +23,18 @@ function GoogleIcon() {
   );
 }
 
-function MicrosoftIcon() {
+function GitHubIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-      <rect x="1" y="1" width="10" height="10" fill="#F25022"/>
-      <rect x="13" y="1" width="10" height="10" fill="#7FBA00"/>
-      <rect x="1" y="13" width="10" height="10" fill="#00A4EF"/>
-      <rect x="13" y="13" width="10" height="10" fill="#FFB900"/>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.166 6.839 9.49.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.603-3.369-1.342-3.369-1.342-.454-1.155-1.11-1.463-1.11-1.463-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0 1 12 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.202 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.741 0 .267.18.578.688.48C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z"/>
+    </svg>
+  );
+}
+
+function PhoneIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.44 2 2 0 0 1 3.6 1.27h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 9a16 16 0 0 0 6.09 6.09l1.91-1.91a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
     </svg>
   );
 }
@@ -50,7 +56,16 @@ export default function RecruitSignUpPage() {
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [socialLoading, setSocialLoading] = useState<"google" | "microsoft" | null>(null);
+  const [socialLoading, setSocialLoading] = useState<"google" | "github" | null>(null);
+
+  // Phone auth state
+  const [phoneStep, setPhoneStep]       = useState<PhoneStep>("idle");
+  const [phoneNumber, setPhoneNumber]   = useState("");
+  const [otp, setOtp]                   = useState("");
+  const [phoneLoading, setPhoneLoading] = useState(false);
+  const [phoneError, setPhoneError]     = useState("");
+  const confirmationRef                 = useRef<ConfirmationResult | null>(null);
+  const recaptchaVerifierRef            = useRef<RecaptchaVerifier | null>(null);
 
   // Password strength
   const hasLength   = password.length >= 8;
@@ -60,27 +75,20 @@ export default function RecruitSignUpPage() {
   const strengthLabel = strength === 0 ? "" : strength === 1 ? "Weak" : strength === 2 ? "Fair" : "Strong";
   const strengthColor = strength === 1 ? "bg-red-400" : strength === 2 ? "bg-amber-400" : "bg-emerald-500";
 
-  async function handleSocialLogin(provider: "google" | "microsoft") {
+  async function handleGoogleLogin() {
     if (socialLoading) return;
     setError("");
-    setSocialLoading(provider);
+    setSocialLoading("google");
     try {
-      const fbProvider = provider === "google" ? googleProvider : microsoftProvider;
-      const result = await signInWithPopup(firebaseAuth, fbProvider);
+      const result = await signInWithPopup(firebaseAuth, googleProvider);
       const idToken = await result.user.getIdToken();
-
       const res = await fetch(apiUrl("/auth/social"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idToken, provider }),
+        body: JSON.stringify({ idToken, provider: "google" }),
       });
       const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.error ?? "Social sign-up failed. Please try again.");
-        return;
-      }
-
+      if (!res.ok) { setError(data.error ?? "Google sign-up failed. Please try again."); return; }
       await signInWithToken(data.token);
       router.replace("/recruit/dashboard");
     } catch (err: any) {
@@ -89,6 +97,59 @@ export default function RecruitSignUpPage() {
       }
     } finally {
       setSocialLoading(null);
+    }
+  }
+
+  function handleGitHubLogin() {
+    if (socialLoading) return;
+    setSocialLoading("github");
+    window.location.href = apiUrl("/auth/github");
+  }
+
+  async function handleSendOtp() {
+    setPhoneError("");
+    const trimmed = phoneNumber.trim();
+    if (!trimmed) { setPhoneError("Enter your phone number."); return; }
+    if (!/^\+[1-9]\d{6,14}$/.test(trimmed)) {
+      setPhoneError("Use full international format, e.g. +919876543210");
+      return;
+    }
+    setPhoneLoading(true);
+    try {
+      if (!recaptchaVerifierRef.current) {
+        recaptchaVerifierRef.current = new RecaptchaVerifier(firebaseAuth, "recaptcha-container", { size: "invisible" });
+      }
+      confirmationRef.current = await signInWithPhoneNumber(firebaseAuth, trimmed, recaptchaVerifierRef.current);
+      setPhoneStep("otp");
+    } catch (err: any) {
+      setPhoneError(err?.message ?? "Failed to send OTP. Please try again.");
+      recaptchaVerifierRef.current = null;
+    } finally {
+      setPhoneLoading(false);
+    }
+  }
+
+  async function handleVerifyOtp() {
+    setPhoneError("");
+    if (!otp.trim()) { setPhoneError("Enter the OTP."); return; }
+    if (!confirmationRef.current) { setPhoneError("Session expired. Please start over."); setPhoneStep("entering"); return; }
+    setPhoneLoading(true);
+    try {
+      const result = await confirmationRef.current.confirm(otp.trim());
+      const idToken = await result.user.getIdToken();
+      const res = await fetch(apiUrl("/auth/social"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken, provider: "phone" }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setPhoneError(data.error ?? "Phone sign-up failed."); return; }
+      await signInWithToken(data.token);
+      router.replace("/recruit/dashboard");
+    } catch (err: any) {
+      setPhoneError(err?.code === "auth/invalid-verification-code" ? "Incorrect OTP. Please try again." : (err?.message ?? "Verification failed."));
+    } finally {
+      setPhoneLoading(false);
     }
   }
 
@@ -168,6 +229,8 @@ export default function RecruitSignUpPage() {
   // ── Signup form ────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-[#f0f2f5] flex flex-col">
+      {/* invisible reCAPTCHA container */}
+      <div id="recaptcha-container" />
 
       {/* Top bar */}
       <div className="border-b border-slate-200 bg-white px-4 py-3">
@@ -188,7 +251,6 @@ export default function RecruitSignUpPage() {
       {/* Card */}
       <div className="flex flex-1 items-center justify-center px-4 py-12">
         <div className="w-full max-w-[400px]">
-
           <div className="rounded-2xl bg-white border border-slate-200 shadow-[0_4px_24px_rgba(0,0,0,0.07)] overflow-hidden">
 
             {/* Card header */}
@@ -198,11 +260,11 @@ export default function RecruitSignUpPage() {
             </div>
 
             <div className="px-8 pt-6 pb-2 space-y-3">
-              {/* Google button */}
+              {/* Google */}
               <button
                 type="button"
-                onClick={() => handleSocialLogin("google")}
-                disabled={!!socialLoading}
+                onClick={handleGoogleLogin}
+                disabled={!!socialLoading || phoneStep !== "idle"}
                 className="w-full h-11 flex items-center justify-center gap-2.5 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-800 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm disabled:opacity-60"
               >
                 {socialLoading === "google" ? (
@@ -214,21 +276,115 @@ export default function RecruitSignUpPage() {
                 Continue with Google
               </button>
 
-              {/* Microsoft button */}
+              {/* GitHub */}
               <button
                 type="button"
-                onClick={() => handleSocialLogin("microsoft")}
-                disabled={!!socialLoading}
+                onClick={handleGitHubLogin}
+                disabled={!!socialLoading || phoneStep !== "idle"}
                 className="w-full h-11 flex items-center justify-center gap-2.5 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-800 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm disabled:opacity-60"
               >
-                {socialLoading === "microsoft" ? (
+                {socialLoading === "github" ? (
                   <svg className="animate-spin h-4 w-4 text-slate-500" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
                   </svg>
-                ) : <MicrosoftIcon />}
-                Continue with Microsoft
+                ) : <GitHubIcon />}
+                Continue with GitHub
               </button>
+
+              {/* Phone */}
+              {phoneStep === "idle" ? (
+                <button
+                  type="button"
+                  onClick={() => setPhoneStep("entering")}
+                  disabled={!!socialLoading}
+                  className="w-full h-11 flex items-center justify-center gap-2.5 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-800 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm disabled:opacity-60"
+                >
+                  <PhoneIcon />
+                  Continue with phone number
+                </button>
+              ) : (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-slate-700 uppercase tracking-wide">Phone sign-up</p>
+                    <button
+                      type="button"
+                      onClick={() => { setPhoneStep("idle"); setPhoneError(""); setPhoneNumber(""); setOtp(""); recaptchaVerifierRef.current = null; }}
+                      className="text-xs text-slate-400 hover:text-slate-600"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+
+                  {phoneError && (
+                    <p className="text-xs text-red-600 font-medium">{phoneError}</p>
+                  )}
+
+                  {phoneStep === "entering" && (
+                    <>
+                      <input
+                        type="tel"
+                        value={phoneNumber}
+                        onChange={e => { setPhoneNumber(e.target.value); setPhoneError(""); }}
+                        placeholder="+919876543210"
+                        className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#0a66c2] focus:ring-2 focus:ring-[#0a66c2]/15 outline-none transition-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSendOtp}
+                        disabled={phoneLoading}
+                        className="w-full h-10 rounded-lg bg-[#0a66c2] text-sm font-bold text-white hover:bg-[#004182] disabled:opacity-60 transition-all flex items-center justify-center gap-2"
+                      >
+                        {phoneLoading ? (
+                          <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                          </svg>
+                        ) : null}
+                        {phoneLoading ? "Sending…" : "Send OTP"}
+                      </button>
+                    </>
+                  )}
+
+                  {phoneStep === "otp" && (
+                    <>
+                      <p className="text-xs text-slate-500">OTP sent to <span className="font-semibold text-slate-700">{phoneNumber}</span></p>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={6}
+                        value={otp}
+                        onChange={e => { setOtp(e.target.value.replace(/\D/g, "")); setPhoneError(""); }}
+                        placeholder="Enter 6-digit OTP"
+                        className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#0a66c2] focus:ring-2 focus:ring-[#0a66c2]/15 outline-none transition-all tracking-widest"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => { setPhoneStep("entering"); setOtp(""); setPhoneError(""); }}
+                          className="flex-1 h-10 rounded-lg border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-all"
+                        >
+                          Resend
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleVerifyOtp}
+                          disabled={phoneLoading}
+                          className="flex-1 h-10 rounded-lg bg-[#0a66c2] text-sm font-bold text-white hover:bg-[#004182] disabled:opacity-60 transition-all flex items-center justify-center gap-2"
+                        >
+                          {phoneLoading ? (
+                            <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                            </svg>
+                          ) : null}
+                          {phoneLoading ? "Verifying…" : "Verify"}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
 
               {/* Divider */}
               <div className="flex items-center gap-3 pt-2">

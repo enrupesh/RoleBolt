@@ -57,7 +57,7 @@ externalPort = 8080
 [userenv]
 
 [userenv.shared]
-BACKEND_URL = "https://ratheeji.onrender.com"
+BACKEND_URL = "https://back-mp9k.onrender.com"
 CORS_ORIGIN = "*"
 FRONTEND_URL = "https://www.rolebolt.tech"
 SMTP_FROM_EMAIL = "verify@rolebolt.tech"
