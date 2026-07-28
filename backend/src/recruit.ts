@@ -59,7 +59,16 @@ export const recruitRouter = express.Router();
 export const recruitPublicRouter = express.Router();
 
 const GOOGLEM_API_KEY = process.env.GOOGLEM_API_KEY ?? "";
-const FRONTEND_URL       = process.env.FRONTEND_URL        ?? "https://www.rolebolt.tech";
+// Guard: reject stale/incorrect FRONTEND_URL values so candidate links always point to the real domain.
+const _rawRecruitFrontendUrl = process.env.FRONTEND_URL ?? "";
+const FRONTEND_URL = (
+  _rawRecruitFrontendUrl &&
+  !_rawRecruitFrontendUrl.includes("forjob.onrender.com") &&
+  !_rawRecruitFrontendUrl.includes("localhost") &&
+  !_rawRecruitFrontendUrl.includes("127.0.0.1")
+    ? _rawRecruitFrontendUrl
+    : "https://www.rolebolt.tech"
+).replace(/\/$/, "");
 const CANDIDATE_FROM     = `Rolebolt Careers <${process.env.CANDIDATE_FROM_EMAIL ?? "careers@rolebolt.tech"}>`;
 
 function getUid(req: express.Request): string {
