@@ -21,6 +21,16 @@ export interface IAgentMode {
   autoSendAssessment: boolean;   // auto-send assessment to shortlisted (default false)
 }
 
+export interface IPipelineRule {
+  id: string;
+  condition: "score_above" | "score_below" | "assessment_passed" | "assessment_failed" | "stage_age_days";
+  threshold: number;       // score% for score conditions, days for age condition
+  fromStage?: string;      // optional: only apply when candidate is in this stage
+  action: "move_to_screened" | "move_to_interview" | "move_to_offer" | "move_to_rejected" | "send_assessment" | "send_reminder";
+  enabled: boolean;
+  triggerCount: number;    // how many times this rule has fired (for stats)
+}
+
 export interface IRecruitJob extends Document {
   uid: string;
   title: string;
@@ -57,6 +67,7 @@ export interface IRecruitJob extends Document {
   candidateCount: number;
   reports: IJobReport[];
   agentMode: IAgentMode;
+  pipelineRules: IPipelineRule[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -75,6 +86,19 @@ const JobReportSchema = new Schema<IJobReport>(
     reason: { type: String, required: true },
     details: { type: String, default: "" },
     reportedAt: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
+const PipelineRuleSchema = new Schema<IPipelineRule>(
+  {
+    id:           { type: String, required: true },
+    condition:    { type: String, required: true },
+    threshold:    { type: Number, required: true },
+    fromStage:    { type: String, default: "" },
+    action:       { type: String, required: true },
+    enabled:      { type: Boolean, default: true },
+    triggerCount: { type: Number, default: 0 },
   },
   { _id: false }
 );
@@ -128,6 +152,7 @@ const RecruitJobSchema = new Schema<IRecruitJob>(
     candidateCount: { type: Number, default: 0 },
     reports: { type: [JobReportSchema], default: [] },
     agentMode: { type: AgentModeSchema, default: () => ({}) },
+    pipelineRules: { type: [PipelineRuleSchema], default: [] },
   },
   { timestamps: true }
 );
