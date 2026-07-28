@@ -21,7 +21,7 @@ export function SeekerHeader() {
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
         {/* Logo */}
         <Link href="/seeker/dashboard" className="flex items-center gap-2.5">
-          <RoleboltLogo size={32} />
+          <RoleboltLogo size="md" />
           <div>
             <p className="text-sm font-bold text-slate-900 leading-tight">RoleBolt</p>
             <p className="text-[10px] text-slate-400 leading-tight font-medium">Job Seeker</p>

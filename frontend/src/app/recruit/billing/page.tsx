@@ -173,5 +173,5 @@ function BillingContent() {
 }
 
 export default function BillingPage() {
-  return <RecruitGuard><BillingContent /></RecruitGuard>;
+  return <RecruitGuard requiredRole="creator"><BillingContent /></RecruitGuard>;
 }
