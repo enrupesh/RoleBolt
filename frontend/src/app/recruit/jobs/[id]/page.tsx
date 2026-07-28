@@ -64,6 +64,14 @@ type Candidate = {
 };
 
 type RubricCriteria = { name: string; weight: number; description: string };
+type AgentMode = {
+  enabled: boolean;
+  shortlistThreshold: number;
+  rejectThreshold: number;
+  autoEmailShortlist: boolean;
+  autoEmailReject: boolean;
+  autoSendAssessment: boolean;
+};
 type Job = {
   _id: string;
   title: string;
@@ -77,6 +85,7 @@ type Job = {
   candidateCount: number;
   mustHaveSkills: string;
   createdAt: string;
+  agentMode?: AgentMode;
 };
 
 const STAGES: { id: CandidateStage; label: string; color: string; bg: string }[] = [
@@ -670,6 +679,240 @@ function AddCandidateModal({ jobId, token, onClose, onAdded }: {
 
 function RetryIcon() {
   return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /></svg>;
+}
+function BotIcon() {
+  return <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="15" x2="8" y2="15.01"/><line x1="16" y1="15" x2="16" y2="15.01"/></svg>;
+}
+function UserIcon2() {
+  return <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
+}
+
+// ── AI Agent Mode Toggle ──────────────────────────────────────────────────────
+function AgentModeToggle({ job, token, onUpdate }: {
+  job: Job;
+  token: string;
+  onUpdate: (agentMode: AgentMode) => void;
+}) {
+  const am = job.agentMode ?? { enabled: false, shortlistThreshold: 75, rejectThreshold: 40, autoEmailShortlist: true, autoEmailReject: false, autoSendAssessment: false };
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [localSettings, setLocalSettings] = useState<AgentMode>(am);
+
+  // Sync if job prop changes
+  const enabled = am.enabled;
+
+  async function toggleEnabled() {
+    setSaving(true);
+    try {
+      const res = await fetch(apiUrl(`/recruit/jobs/${job._id}/agent-mode`), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ enabled: !enabled }),
+      });
+      const data = await res.json();
+      if (res.ok && data.agentMode) {
+        onUpdate(data.agentMode);
+        setLocalSettings(data.agentMode);
+      }
+    } catch { /* silent */ }
+    finally { setSaving(false); }
+  }
+
+  async function saveSettings() {
+    setSaving(true);
+    try {
+      const res = await fetch(apiUrl(`/recruit/jobs/${job._id}/agent-mode`), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(localSettings),
+      });
+      const data = await res.json();
+      if (res.ok && data.agentMode) {
+        onUpdate(data.agentMode);
+        setOpen(false);
+      }
+    } catch { /* silent */ }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <div className="relative">
+      {/* ── Master Toggle Button ── */}
+      <div className={`flex items-center gap-2 rounded-2xl border px-3 py-2 transition ${
+        enabled
+          ? "border-indigo-500/40 bg-indigo-500/10"
+          : "border-[var(--border)] bg-[var(--surface-muted)]"
+      }`}>
+        <button
+          onClick={toggleEnabled}
+          disabled={saving}
+          title={enabled ? "Switch to Manual Mode" : "Switch to AI Agent Mode"}
+          className={`relative flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 ${
+            enabled ? "bg-indigo-500" : "bg-gray-400/40"
+          } ${saving ? "opacity-60 cursor-not-allowed" : ""}`}
+        >
+          <span className={`absolute h-3.5 w-3.5 rounded-full bg-white shadow transition-transform duration-200 ${
+            enabled ? "translate-x-4" : "translate-x-0.5"
+          }`} />
+        </button>
+
+        <div className="flex items-center gap-1.5">
+          {enabled ? (
+            <span className="text-indigo-400"><BotIcon /></span>
+          ) : (
+            <span className="text-[var(--text-muted)]"><UserIcon2 /></span>
+          )}
+          <div>
+            <p className={`text-[11px] font-bold leading-none ${enabled ? "text-indigo-300" : "text-[var(--text-secondary)]"}`}>
+              {enabled ? "AI Agent" : "Manual"}
+            </p>
+            <p className="text-[9px] text-[var(--text-muted)] mt-0.5 leading-none">
+              {enabled ? "AI handles pipeline" : "You control everything"}
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={() => setOpen(o => !o)}
+          className="ml-1 text-[var(--text-muted)] hover:text-[var(--foreground)] transition"
+          title="Configure AI Agent settings"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a1 1 0 0 0-1.41 0l-.71.71A8 8 0 0 0 4.93 17.66l.71.71a1 1 0 0 0 1.41 0L8 17.41A8 8 0 0 0 19.07 4.93z"/>
+          </svg>
+        </button>
+      </div>
+
+      {/* ── Settings Panel ── */}
+      {open && (
+        <>
+          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full z-40 mt-2 w-80 rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-xl p-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-indigo-400"><BotIcon /></span>
+                <p className="text-sm font-bold text-[var(--foreground)]">AI Agent Settings</p>
+              </div>
+              <button onClick={() => setOpen(false)} className="text-[var(--text-muted)] hover:text-[var(--foreground)] transition"><XIcon /></button>
+            </div>
+
+            {/* What AI Agent does */}
+            <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/[0.06] px-3 py-2.5 space-y-1">
+              <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-1">When AI Agent is ON, it will:</p>
+              <p className="text-[11px] text-indigo-200/80">🎯 Auto-shortlist candidates scoring above threshold</p>
+              <p className="text-[11px] text-indigo-200/80">❌ Auto-reject candidates scoring below threshold</p>
+              <p className="text-[11px] text-indigo-200/80">📧 Send emails automatically (per settings below)</p>
+            </div>
+
+            {/* Shortlist Threshold */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] font-semibold text-[var(--text-secondary)]">Shortlist if score ≥</label>
+                <span className="text-sm font-bold text-emerald-600">{localSettings.shortlistThreshold}%</span>
+              </div>
+              <input
+                type="range" min={50} max={95} step={5}
+                value={localSettings.shortlistThreshold}
+                onChange={e => setLocalSettings(s => ({ ...s, shortlistThreshold: Number(e.target.value) }))}
+                className="w-full accent-emerald-500"
+              />
+              <div className="flex justify-between text-[9px] text-[var(--text-muted)] mt-0.5">
+                <span>50% (Lenient)</span><span>95% (Strict)</span>
+              </div>
+            </div>
+
+            {/* Reject Threshold */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] font-semibold text-[var(--text-secondary)]">Reject if score &lt;</label>
+                <span className="text-sm font-bold text-rose-600">{localSettings.rejectThreshold}%</span>
+              </div>
+              <input
+                type="range" min={10} max={60} step={5}
+                value={localSettings.rejectThreshold}
+                onChange={e => setLocalSettings(s => ({ ...s, rejectThreshold: Number(e.target.value) }))}
+                className="w-full accent-rose-500"
+              />
+              <div className="flex justify-between text-[9px] text-[var(--text-muted)] mt-0.5">
+                <span>10% (Rare)</span><span>60% (Aggressive)</span>
+              </div>
+            </div>
+
+            {/* Email Options */}
+            <div className="space-y-2 border-t border-[var(--border)] pt-3">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Automatic Emails</p>
+
+              {/* Auto shortlist email */}
+              <label className="flex items-center justify-between cursor-pointer">
+                <div>
+                  <p className="text-[12px] text-[var(--text-secondary)]">Email shortlisted candidates</p>
+                  <p className="text-[10px] text-[var(--text-muted)]">&quot;You&apos;ve been shortlisted&quot; email</p>
+                </div>
+                <button
+                  onClick={() => setLocalSettings(s => ({ ...s, autoEmailShortlist: !s.autoEmailShortlist }))}
+                  className={`relative flex h-4.5 w-8 shrink-0 items-center rounded-full transition-colors ${
+                    localSettings.autoEmailShortlist ? "bg-emerald-500" : "bg-gray-400/30"
+                  }`}
+                >
+                  <span className={`absolute h-3 w-3 rounded-full bg-white shadow transition-transform ${
+                    localSettings.autoEmailShortlist ? "translate-x-4" : "translate-x-0.5"
+                  }`} />
+                </button>
+              </label>
+
+              {/* Auto reject email */}
+              <label className="flex items-center justify-between cursor-pointer">
+                <div>
+                  <p className="text-[12px] text-[var(--text-secondary)]">Email rejected candidates</p>
+                  <p className="text-[10px] text-[var(--text-muted)]">Polite rejection email</p>
+                </div>
+                <button
+                  onClick={() => setLocalSettings(s => ({ ...s, autoEmailReject: !s.autoEmailReject }))}
+                  className={`relative flex h-4.5 w-8 shrink-0 items-center rounded-full transition-colors ${
+                    localSettings.autoEmailReject ? "bg-rose-500" : "bg-gray-400/30"
+                  }`}
+                >
+                  <span className={`absolute h-3 w-3 rounded-full bg-white shadow transition-transform ${
+                    localSettings.autoEmailReject ? "translate-x-4" : "translate-x-0.5"
+                  }`} />
+                </button>
+              </label>
+            </div>
+
+            {/* Score zone preview */}
+            <div className="rounded-xl bg-[var(--surface-muted)] border border-[var(--border)] px-3 py-2.5">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">Score Zones</p>
+              <div className="flex items-center gap-1 text-[10px]">
+                <span className="flex-1 rounded-l-full bg-rose-500/20 px-2 py-1 text-center text-rose-600 font-semibold">
+                  0–{localSettings.rejectThreshold-1}% → Reject
+                </span>
+                <span className="flex-1 bg-amber-500/10 px-2 py-1 text-center text-amber-700 font-semibold">
+                  {localSettings.rejectThreshold}–{localSettings.shortlistThreshold-1}% → Review
+                </span>
+                <span className="flex-1 rounded-r-full bg-emerald-500/20 px-2 py-1 text-center text-emerald-700 font-semibold">
+                  {localSettings.shortlistThreshold}%+ → Shortlist
+                </span>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <button onClick={() => setOpen(false)} className="flex-1 rounded-xl border border-[var(--border)] px-3 py-2 text-xs text-[var(--text-muted)] hover:text-[var(--foreground)] transition">
+                Cancel
+              </button>
+              <button
+                onClick={saveSettings}
+                disabled={saving}
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-indigo-500 px-3 py-2 text-xs font-bold text-white hover:bg-indigo-400 disabled:opacity-50 transition"
+              >
+                {saving ? <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> : null}
+                {saving ? "Saving…" : "Save Settings"}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 function ResumeSection({ resumeText }: { resumeText: string }) {
@@ -1574,6 +1817,10 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
     setJob(prev => prev ? { ...prev, candidateCount: Math.max(0, prev.candidateCount - 1) } : null);
   }
 
+  function handleAgentModeUpdate(agentMode: AgentMode) {
+    setJob(prev => prev ? { ...prev, agentMode } : null);
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#f0f2f5] animate-[rb-fade-in_0.3s_ease_both]">
@@ -1717,6 +1964,9 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 Export CSV
               </a>
+            )}
+            {token && (
+              <AgentModeToggle job={job} token={token} onUpdate={handleAgentModeUpdate} />
             )}
             <button
               onClick={() => setShowAddModal(true)}
