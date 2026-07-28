@@ -525,6 +525,9 @@ function RecruitDashboardContent() {
           </div>
         )}
 
+        {/* ── Upgrade nudge (free plan) ─────────────────────────────────── */}
+        <UpgradeNudge />
+
         {/* ── Daily Briefing card ───────────────────────────────────────── */}
         <DailyBriefingCard />
 
