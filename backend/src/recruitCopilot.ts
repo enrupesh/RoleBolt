@@ -176,7 +176,7 @@ async function attachCandidateEmails(
  * Fire-and-forget — never blocks the chat response.
  */
 async function generateTitle(firstMessage: string): Promise<string> {
-  const apiKey = process.env.GOOGLEM_API_KEY;
+  const apiKey = process.env.GEMINI_MESH_KEY;
   if (!apiKey) return firstMessage.slice(0, 60);
   try {
     const raw = await callMeshChatCompletions({
@@ -451,8 +451,8 @@ copilotRouter.post("/chat", async (req, res) => {
   if (!message?.trim()) return res.status(400).json({ error: "message is required" });
   if (!context?.level) return res.status(400).json({ error: "context.level is required" });
 
-  const apiKey = process.env.GOOGLEM_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: "AI service not configured (GOOGLEM_API_KEY missing)" });
+  const apiKey = process.env.GEMINI_MESH_KEY;
+  if (!apiKey) return res.status(500).json({ error: "AI service not configured (GEMINI_MESH_KEY missing)" });
 
   try {
     // ── 1. Load or create conversation ──────────────────────────────────────
@@ -563,7 +563,7 @@ copilotRouter.post("/chat/stream", async (req, res) => {
   if (!message?.trim()) return res.status(400).json({ error: "message is required" });
   if (!context?.level) return res.status(400).json({ error: "context.level is required" });
 
-  const apiKey = process.env.GOOGLEM_API_KEY;
+  const apiKey = process.env.GEMINI_MESH_KEY;
   if (!apiKey) return res.status(500).json({ error: "AI service not configured" });
 
   // ── Set up SSE ─────────────────────────────────────────────────────────────
@@ -861,8 +861,8 @@ copilotRouter.post("/insights", async (req, res) => {
   const uid = getUid(req);
   if (!uid) return res.status(401).json({ error: "Unauthorized" });
 
-  const apiKey = process.env.GOOGLEM_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: "AI service not configured (GOOGLEM_API_KEY missing)" });
+  const apiKey = process.env.GEMINI_MESH_KEY;
+  if (!apiKey) return res.status(500).json({ error: "AI service not configured (GEMINI_MESH_KEY missing)" });
 
   try {
     const { allJobs, allCandidates, globalStatsText, pipelines, recruiterName, companyName } =
