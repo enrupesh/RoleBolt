@@ -155,9 +155,9 @@ async function handleStatusRoute(_req: any, res: any) {
     checkedAt: new Date().toISOString(),
     totalResponseTimeMs: Date.now() - totalStart,
     aiApis: {
-      geminiMesh: { ...geminiMeshResult, endpoint: "api.meshapi.ai",                        label: "Gemini Mesh API" },
-      geminiFallback: { ...geminiFallbackResult, endpoint: "integrate.api.nvidia.com",              label: "Gemini Fallback API" },
-      geminiPrimary:  { ...geminiPrimaryResult,  endpoint: "generativelanguage.googleapis.com",     label: "Gemini Primary API"   },
+      geminiMesh: { ...geminiMeshResult, endpoint: "api.meshapi.ai",                        label: "Gemini Fallback Key 1" },
+      geminiFallback: { ...geminiFallbackResult, endpoint: "integrate.api.nvidia.com",              label: "Gemini Fallback Key 2" },
+      geminiPrimary:  { ...geminiPrimaryResult,  endpoint: "generativelanguage.googleapis.com",     label: "Gemini Primary Key"    },
     },
     systemHealth: {
       backend:  "operational",
@@ -344,7 +344,7 @@ app.get("/ai-routing", async (_req, res) => {
     routingMode,
     providers: {
       geminiMesh: {
-        label: "Gemini Mesh API",
+        label: "Gemini Fallback Key 1",
         sublabel: "Mesh API Gateway",
         endpoint: "api.meshapi.ai",
         keyConfigured: !!geminiMeshKey,
@@ -365,7 +365,7 @@ app.get("/ai-routing", async (_req, res) => {
         ],
       },
       geminiPrimary: {
-        label: "Gemini Primary API",
+        label: "Gemini Primary Key",
         sublabel: "Gemini Direct",
         endpoint: "generativelanguage.googleapis.com",
         keyConfigured: !!geminiPrimaryKey,
