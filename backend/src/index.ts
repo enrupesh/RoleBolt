@@ -8,6 +8,7 @@ import { formRouter, formPublicRouter } from "./recruitForms";
 import { copilotRouter } from "./recruitCopilot";
 import { siteGuideRouter } from "./siteGuideChat";
 import { connectMongo } from "./db";
+import { startDailyBriefingJob } from "./jobs/dailyBriefing";
 
 dotenv.config();
 
@@ -421,6 +422,10 @@ const PORT = Number(process.env.PORT) || 8080;
 connectMongo()
   .then(() => console.log("[db] MongoDB connected"))
   .catch((err) => console.error("[db] MongoDB connection failed:", err?.message || err));
+
+if (process.env.CRON_ENABLED === "true") {
+  startDailyBriefingJob();
+}
 
 app.listen(PORT, () => {
   console.log(`Recruit backend listening on port ${PORT} | Auth: custom JWT`);
