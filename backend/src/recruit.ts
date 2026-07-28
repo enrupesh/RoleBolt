@@ -58,7 +58,7 @@ function trackEvent(event: string, uid?: string, data?: Record<string, unknown>)
 export const recruitRouter = express.Router();
 export const recruitPublicRouter = express.Router();
 
-const GOOGLEM_API_KEY = process.env.GOOGLEM_API_KEY ?? "";
+const GEMINI_MESH_KEY = process.env.GEMINI_MESH_KEY ?? "";
 // Guard: reject stale/incorrect FRONTEND_URL values so candidate links always point to the real domain.
 const _rawRecruitFrontendUrl = process.env.FRONTEND_URL ?? "";
 const FRONTEND_URL = (
@@ -620,7 +620,7 @@ For "tier": classify each criterion as 1 (must-have skill), 2 (experience depth)
   let raw: string;
   try {
     raw = await callMeshChatCompletions({
-      apiKey: GOOGLEM_API_KEY,
+      apiKey: GEMINI_MESH_KEY,
       retries: 2,
       fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
       messages: [{ role: "user", content: prompt }],
@@ -806,7 +806,7 @@ Write in plain text, no JSON, no markdown headers.`;
 
   try {
     return await callMeshChatCompletions({
-      apiKey: GOOGLEM_API_KEY,
+      apiKey: GEMINI_MESH_KEY,
       retries: 2,
       fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
       messages: [{ role: "user", content: prompt }],
@@ -868,7 +868,7 @@ Respond with ONLY this exact JSON structure, no markdown, no extra text:
   let raw: string;
   try {
     raw = await callMeshChatCompletions({
-      apiKey: GOOGLEM_API_KEY,
+      apiKey: GEMINI_MESH_KEY,
       retries: 2,
       fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
       messages: [{ role: "user", content: prompt }],
@@ -958,7 +958,7 @@ Rules:
   let raw: string | null = null;
   try {
     raw = await callMeshChatCompletions({
-      apiKey: GOOGLEM_API_KEY,
+      apiKey: GEMINI_MESH_KEY,
       retries: 2,
       fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
       messages: [{ role: "user", content: prompt }],
@@ -1036,7 +1036,7 @@ TONE RULES:
 
   try {
     return await callMeshChatCompletions({
-      apiKey: GOOGLEM_API_KEY,
+      apiKey: GEMINI_MESH_KEY,
       retries: 2,
       fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
       messages: [{ role: "user", content: prompt }],
@@ -2151,7 +2151,7 @@ FORMAT RULES:
 
   try {
     return await callMeshChatCompletions({
-      apiKey: GOOGLEM_API_KEY,
+      apiKey: GEMINI_MESH_KEY,
       retries: 2,
       fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
       messages: [{ role: "user", content: prompt }],
@@ -2621,7 +2621,7 @@ Rules:
   let raw: string;
   try {
     raw = await callMeshChatCompletions({
-      apiKey: GOOGLEM_API_KEY,
+      apiKey: GEMINI_MESH_KEY,
       retries: 2,
       fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
       messages: [{ role: "user", content: prompt }],

@@ -93,44 +93,44 @@ async function pingApi(opts: {
 
 // ── GET /status (and legacy /mesh-api-status) ─────────────────────────────────
 async function handleStatusRoute(_req: any, res: any) {
-  const googleMKey = process.env.GOOGLEM_API_KEY || "";
-  const googleNKey = process.env.GOOGLEN_API_KEY || "";
-  const googleKey  = process.env.GOOGLE_API_KEY  || "";
+  const geminiMeshKey = process.env.GEMINI_MESH_KEY || "";
+  const geminiFallbackKey = process.env.GEMINI_FALLBACK_KEY || "";
+  const geminiPrimaryKey  = process.env.GEMINI_PRIMARY_KEY  || "";
   const resendKey  = process.env.RESEND_API_KEY  || "";
   const sessionKey = process.env.SESSION_SECRET  || "";
 
   const totalStart = Date.now();
 
   // ── Ping all three AI APIs in parallel ─────────────────────────────────────
-  const [googleMResult, googleNResult, googleResult] = await Promise.all([
+  const [geminiMeshResult, geminiFallbackResult, geminiPrimaryResult] = await Promise.all([
     // Google M API (Mesh)
-    googleMKey
+    geminiMeshKey
       ? pingApi({
           url: "https://api.meshapi.ai/v1/chat/completions",
           method: "POST",
-          headers: { Authorization: `Bearer ${googleMKey}`, "Content-Type": "application/json" },
+          headers: { Authorization: `Bearer ${geminiMeshKey}`, "Content-Type": "application/json" },
           body: JSON.stringify({ model: "openai/gpt-4o-mini", messages: [{ role: "user", content: "hi" }], max_tokens: 1, stream: false }),
           timeoutMs: 9000,
         })
-      : Promise.resolve({ status: "unavailable" as const, responseTimeMs: 0, error: "GOOGLEM_API_KEY not configured" }),
+      : Promise.resolve({ status: "unavailable" as const, responseTimeMs: 0, error: "GEMINI_MESH_KEY not configured" }),
 
     // Google N API (NVIDIA NIM) — use GET /v1/models (model-agnostic, no 404 from bad model name)
-    googleNKey
+    geminiFallbackKey
       ? pingApi({
           url: "https://integrate.api.nvidia.com/v1/models",
-          headers: { Authorization: `Bearer ${googleNKey}` },
+          headers: { Authorization: `Bearer ${geminiFallbackKey}` },
           timeoutMs: 11000,
         })
-      : Promise.resolve({ status: "unavailable" as const, responseTimeMs: 0, error: "GOOGLEN_API_KEY not configured" }),
+      : Promise.resolve({ status: "unavailable" as const, responseTimeMs: 0, error: "GEMINI_FALLBACK_KEY not configured" }),
 
     // Google API (Gemini — list models endpoint, no chat needed)
-    googleKey
+    geminiPrimaryKey
       ? pingApi({
-          url: `https://generativelanguage.googleapis.com/v1beta/models?key=${googleKey}&pageSize=1`,
+          url: `https://generativelanguage.googleapis.com/v1beta/models?key=${geminiPrimaryKey}&pageSize=1`,
           headers: {},
           timeoutMs: 8000,
         })
-      : Promise.resolve({ status: "unavailable" as const, responseTimeMs: 0, error: "GOOGLE_API_KEY not configured" }),
+      : Promise.resolve({ status: "unavailable" as const, responseTimeMs: 0, error: "GEMINI_PRIMARY_KEY not configured" }),
   ]);
 
   // ── Infrastructure status ───────────────────────────────────────────────────
@@ -142,7 +142,7 @@ async function handleStatusRoute(_req: any, res: any) {
   const emailStatus: "operational" | "unavailable" = resendKey  ? "operational" : "unavailable";
 
   // ── Overall status ──────────────────────────────────────────────────────────
-  const aiStatuses = [googleMResult.status, googleNResult.status, googleResult.status];
+  const aiStatuses = [geminiMeshResult.status, geminiFallbackResult.status, geminiPrimaryResult.status];
   const overallStatus =
     aiStatuses.every(s => s === "operational") && dbStatus === "operational"
       ? "operational"
@@ -155,9 +155,9 @@ async function handleStatusRoute(_req: any, res: any) {
     checkedAt: new Date().toISOString(),
     totalResponseTimeMs: Date.now() - totalStart,
     aiApis: {
-      googleM: { ...googleMResult, endpoint: "api.meshapi.ai",                        label: "Google M API" },
-      googleN: { ...googleNResult, endpoint: "integrate.api.nvidia.com",              label: "Google N API" },
-      google:  { ...googleResult,  endpoint: "generativelanguage.googleapis.com",     label: "Google API"   },
+      geminiMesh: { ...geminiMeshResult, endpoint: "api.meshapi.ai",                        label: "Gemini Mesh API" },
+      geminiFallback: { ...geminiFallbackResult, endpoint: "integrate.api.nvidia.com",              label: "Gemini Fallback API" },
+      geminiPrimary:  { ...geminiPrimaryResult,  endpoint: "generativelanguage.googleapis.com",     label: "Gemini Primary API"   },
     },
     systemHealth: {
       backend:  "operational",
@@ -169,19 +169,19 @@ async function handleStatusRoute(_req: any, res: any) {
     // ── Legacy fields (kept for backward compat) ──────────────────────────────
     meshApiUrl:    "https://api.meshapi.ai/v1",
     apiVersion:    "v1",
-    responseTimeMs: googleMResult.responseTimeMs,
+    responseTimeMs: geminiMeshResult.responseTimeMs,
     models: [
-      { id: "openai/gpt-4o-mini",           role: "primary",    label: "GPT-4o mini",          status: googleMResult.status },
-      { id: "anthropic/claude-3-haiku",      role: "fallback-1", label: "Claude 3 Haiku",        status: googleMResult.status },
-      { id: "google/gemini-2.5-flash-lite",  role: "fallback-2", label: "Gemini 2.5 Flash Lite", status: googleMResult.status },
+      { id: "openai/gpt-4o-mini",           role: "primary",    label: "GPT-4o mini",          status: geminiMeshResult.status },
+      { id: "anthropic/claude-3-haiku",      role: "fallback-1", label: "Claude 3 Haiku",        status: geminiMeshResult.status },
+      { id: "google/gemini-2.5-flash-lite",  role: "fallback-2", label: "Gemini 2.5 Flash Lite", status: geminiMeshResult.status },
     ],
     services: [
-      { id: "resumeAnalysis",           label: "Resume Analysis",            status: googleMResult.status },
-      { id: "candidateScoring",         label: "Candidate Scoring",          status: googleMResult.status },
-      { id: "candidateMatching",        label: "Candidate Matching",         status: googleMResult.status },
-      { id: "jobDescriptionGeneration", label: "Job Description Generation", status: googleMResult.status },
-      { id: "aiAssistant",              label: "AI Recruitment Assistant",   status: googleMResult.status },
-      { id: "formResponseScoring",      label: "Form Response Scoring",      status: googleMResult.status },
+      { id: "resumeAnalysis",           label: "Resume Analysis",            status: geminiMeshResult.status },
+      { id: "candidateScoring",         label: "Candidate Scoring",          status: geminiMeshResult.status },
+      { id: "candidateMatching",        label: "Candidate Matching",         status: geminiMeshResult.status },
+      { id: "jobDescriptionGeneration", label: "Job Description Generation", status: geminiMeshResult.status },
+      { id: "aiAssistant",              label: "AI Recruitment Assistant",   status: geminiMeshResult.status },
+      { id: "formResponseScoring",      label: "Form Response Scoring",      status: geminiMeshResult.status },
     ],
   });
 }
@@ -191,42 +191,42 @@ app.get("/mesh-api-status", handleStatusRoute); // legacy alias
 
 // ── GET /ai-routing — detailed routing intelligence for admin dashboard ────────
 app.get("/ai-routing", async (_req, res) => {
-  const googleMKey = process.env.GOOGLEM_API_KEY || "";
-  const googleNKey = process.env.GOOGLEN_API_KEY || "";
-  const googleKey  = process.env.GOOGLE_API_KEY  || "";
+  const geminiMeshKey = process.env.GEMINI_MESH_KEY || "";
+  const geminiFallbackKey = process.env.GEMINI_FALLBACK_KEY || "";
+  const geminiPrimaryKey  = process.env.GEMINI_PRIMARY_KEY  || "";
 
   // Ping all three in parallel
-  const [googleMResult, googleNResult, googleResult] = await Promise.all([
-    googleMKey
+  const [geminiMeshResult, geminiFallbackResult, geminiPrimaryResult] = await Promise.all([
+    geminiMeshKey
       ? pingApi({
           url: "https://api.meshapi.ai/v1/chat/completions",
           method: "POST",
-          headers: { Authorization: `Bearer ${googleMKey}`, "Content-Type": "application/json" },
+          headers: { Authorization: `Bearer ${geminiMeshKey}`, "Content-Type": "application/json" },
           body: JSON.stringify({ model: "openai/gpt-4o-mini", messages: [{ role: "user", content: "hi" }], max_tokens: 1, stream: false }),
           timeoutMs: 9000,
         })
-      : Promise.resolve({ status: "unavailable" as const, responseTimeMs: 0, error: "GOOGLEM_API_KEY not configured" }),
+      : Promise.resolve({ status: "unavailable" as const, responseTimeMs: 0, error: "GEMINI_MESH_KEY not configured" }),
 
-    googleNKey
+    geminiFallbackKey
       ? pingApi({
           url: "https://integrate.api.nvidia.com/v1/models",
-          headers: { Authorization: `Bearer ${googleNKey}` },
+          headers: { Authorization: `Bearer ${geminiFallbackKey}` },
           timeoutMs: 11000,
         })
-      : Promise.resolve({ status: "unavailable" as const, responseTimeMs: 0, error: "GOOGLEN_API_KEY not configured" }),
+      : Promise.resolve({ status: "unavailable" as const, responseTimeMs: 0, error: "GEMINI_FALLBACK_KEY not configured" }),
 
-    googleKey
+    geminiPrimaryKey
       ? pingApi({
-          url: `https://generativelanguage.googleapis.com/v1beta/models?key=${googleKey}&pageSize=1`,
+          url: `https://generativelanguage.googleapis.com/v1beta/models?key=${geminiPrimaryKey}&pageSize=1`,
           headers: {},
           timeoutMs: 8000,
         })
-      : Promise.resolve({ status: "unavailable" as const, responseTimeMs: 0, error: "GOOGLE_API_KEY not configured" }),
+      : Promise.resolve({ status: "unavailable" as const, responseTimeMs: 0, error: "GEMINI_PRIMARY_KEY not configured" }),
   ]);
 
-  const mUp = googleMResult.status !== "unavailable";
-  const nUp = googleNResult.status !== "unavailable";
-  const gUp = googleResult.status  !== "unavailable";
+  const mUp = geminiMeshResult.status !== "unavailable";
+  const nUp = geminiFallbackResult.status !== "unavailable";
+  const gUp = geminiPrimaryResult.status  !== "unavailable";
 
   // Infer active model for Google M API (Mesh)
   // Primary: google/gemini-2.5-flash; fallbacks: anthropic/claude-3-haiku, google/gemini-2.5-flash-lite
@@ -343,14 +343,14 @@ app.get("/ai-routing", async (_req, res) => {
     checkedAt: new Date().toISOString(),
     routingMode,
     providers: {
-      googleM: {
-        label: "Google M API",
+      geminiMesh: {
+        label: "Gemini Mesh API",
         sublabel: "Mesh API Gateway",
         endpoint: "api.meshapi.ai",
-        keyConfigured: !!googleMKey,
-        status: googleMResult.status,
-        responseTimeMs: googleMResult.responseTimeMs,
-        error: googleMResult.error,
+        keyConfigured: !!geminiMeshKey,
+        status: geminiMeshResult.status,
+        responseTimeMs: geminiMeshResult.responseTimeMs,
+        error: geminiMeshResult.error,
         primaryModel: "google/gemini-2.5-flash",
         fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
         ultimateFallback: "nvidia",
@@ -364,14 +364,14 @@ app.get("/ai-routing", async (_req, res) => {
           { id: "anthropic/claude-3-5-sonnet",      label: "Claude 3.5 Sonnet",       role: "available",  provider: "Anthropic via Mesh" },
         ],
       },
-      google: {
-        label: "Google API",
+      geminiPrimary: {
+        label: "Gemini Primary API",
         sublabel: "Gemini Direct",
         endpoint: "generativelanguage.googleapis.com",
-        keyConfigured: !!googleKey,
-        status: googleResult.status,
-        responseTimeMs: googleResult.responseTimeMs,
-        error: googleResult.error,
+        keyConfigured: !!geminiPrimaryKey,
+        status: geminiPrimaryResult.status,
+        responseTimeMs: geminiPrimaryResult.responseTimeMs,
+        error: geminiPrimaryResult.error,
         primaryModel: "gemini-2.5-flash",
         fallbackModels: ["gemini-2.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-3.6-flash"],
         ultimateFallback: "nvidia",
@@ -389,10 +389,10 @@ app.get("/ai-routing", async (_req, res) => {
         label: "NVIDIA API",
         sublabel: "Ultimate Fallback",
         endpoint: "integrate.api.nvidia.com",
-        keyConfigured: !!googleNKey,
-        status: googleNResult.status,
-        responseTimeMs: googleNResult.responseTimeMs,
-        error: googleNResult.error,
+        keyConfigured: !!geminiFallbackKey,
+        status: geminiFallbackResult.status,
+        responseTimeMs: geminiFallbackResult.responseTimeMs,
+        error: geminiFallbackResult.error,
         primaryModel: "meta/llama-3.1-405b-instruct",
         fallbackModels: [
           "nvidia/llama-3.1-nemotron-70b-instruct",

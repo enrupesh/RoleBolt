@@ -72,9 +72,9 @@ not a sales script. Keep replies tight (a few sentences or a short list) unless 
   — you are the public site guide, not the signed-in AI Copilot.`;
 
 siteGuideRouter.post("/chat/stream", async (req, res) => {
-  const apiKey = process.env.GOOGLEM_API_KEY;
+  const apiKey = process.env.GEMINI_MESH_KEY;
   if (!apiKey) {
-    res.status(500).json({ error: "AI service not configured (GOOGLEM_API_KEY missing)" });
+    res.status(500).json({ error: "AI service not configured (GEMINI_MESH_KEY missing)" });
     return;
   }
 
