@@ -90,6 +90,10 @@ export interface IRecruitCandidate extends Document {
   availability?: string;
   coverLetter?: string;
   linkedinUrl?: string;
+  // Google Natural Language API extracted entities
+  nlpSkills?: string[];
+  nlpCompanies?: string[];
+  nlpJobTitles?: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -202,6 +206,10 @@ const RecruitCandidateSchema = new Schema<IRecruitCandidate>(
     availability: { type: String, default: "" },
     coverLetter: { type: String, default: "" },
     linkedinUrl: { type: String, default: "" },
+    // Google Natural Language API — auto-extracted from resumeText
+    nlpSkills:    { type: [String], default: [] },
+    nlpCompanies: { type: [String], default: [] },
+    nlpJobTitles: { type: [String], default: [] },
   },
   { timestamps: true }
 );
