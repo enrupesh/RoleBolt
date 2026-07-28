@@ -146,7 +146,7 @@ const WHY = [
 
 const AI_CAPABILITIES = [
   {
-    title: "Multi-model routing", desc: "Powered by Mesh API — routes each task to the optimal model across GPT, Claude, Gemini, and 1000+ LLMs. Best output, every time.",
+    title: "Multi-model routing", desc: "Powered by Google M API — routes each task to the optimal model across GPT, Claude, Gemini, and 1000+ LLMs. Best output, every time.",
     icon: <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>,
   },
   {
@@ -319,10 +319,10 @@ export default function RecruitLandingPage() {
 
             {/* Badge */}
             <div className="inline-flex items-stretch rounded-lg border border-[#0a66c2]/35 bg-slate-950/70 text-[11px] font-bold mb-8 overflow-hidden">
-              {/* Left: Mesh API brand tab */}
+              {/* Left: Google M API brand tab */}
               <div className="flex items-center gap-1.5 bg-[#0a66c2]/18 px-3.5 py-2 border-r border-[#0a66c2]/25">
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-                <span className="text-[#60a5fa] tracking-wide">Powered by Mesh API</span>
+                <span className="text-[#60a5fa] tracking-wide">Powered by Google M API</span>
               </div>
               {/* Right: stats + hackathon link */}
               <div className="flex items-center gap-2.5 px-3.5 py-2 text-slate-400">
@@ -471,7 +471,7 @@ export default function RecruitLandingPage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-slate-100">
             {[
-              { val: "1,000+", label: "AI Models via Mesh API" },
+              { val: "1,000+", label: "AI Models via Google M API" },
               { val: "6", label: "Niche industry verticals" },
               { val: "< 2s", label: "Resume scored in" },
               { val: "₹0", label: "Cost to recruiters" },
@@ -666,7 +666,7 @@ export default function RecruitLandingPage() {
         </div>
       </section>
 
-      {/* ── AI Capabilities (Mesh API) ───────────────────────────────────────── */}
+      {/* ── AI Capabilities (Google M API) ───────────────────────────────────────── */}
       <section className="py-20 bg-slate-950 relative overflow-hidden">
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:48px_48px] pointer-events-none" />
         <div className="absolute top-0 left-1/2 -translate-x-1/2 h-[400px] w-[800px] rounded-full bg-[#0a66c2]/10 blur-[100px] pointer-events-none" />
@@ -674,13 +674,13 @@ export default function RecruitLandingPage() {
           <div className="max-w-2xl mx-auto text-center mb-14">
             <div className="inline-flex items-center gap-2 rounded-full border border-[#0a66c2]/30 bg-[#0a66c2]/10 px-4 py-1.5 text-[11px] font-bold text-[#60a5fa] mb-4">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-              Powered by Mesh API
+              Powered by Google M API
             </div>
             <h2 className="text-3xl font-black text-white tracking-tight sm:text-4xl leading-tight">
               AI infrastructure<br />built for reliability.
             </h2>
             <p className="mt-4 text-slate-400 leading-relaxed">
-              Every AI feature in Rolebolt runs through Mesh API — a unified gateway to 1,000+ LLMs including GPT, Claude, and Gemini. Your hiring pipeline never fails because an LLM does.
+              Every AI feature in Rolebolt runs through Google M API — a unified gateway to 1,000+ LLMs including GPT, Claude, and Gemini. Your hiring pipeline never fails because an LLM does.
             </p>
           </div>
 
@@ -698,10 +698,10 @@ export default function RecruitLandingPage() {
           <div className="mx-auto max-w-2xl rounded-2xl border border-white/8 bg-black/40 backdrop-blur-sm overflow-hidden">
             <div className="flex items-center gap-2 px-4 py-3 border-b border-white/6">
               <div className="flex gap-1.5"><div className="h-2.5 w-2.5 rounded-full bg-slate-700"/><div className="h-2.5 w-2.5 rounded-full bg-slate-700"/><div className="h-2.5 w-2.5 rounded-full bg-slate-700"/></div>
-              <span className="text-[11px] text-slate-600 font-mono ml-1">meshClient.ts — Mesh API integration</span>
+              <span className="text-[11px] text-slate-600 font-mono ml-1">meshClient.ts — Google M API integration</span>
             </div>
             <pre className="p-5 text-[12px] leading-relaxed font-mono overflow-x-auto">
-              <span className="text-slate-500">{"// Route AI tasks through Mesh API — 1000+ models, one key\n"}</span>
+              <span className="text-slate-500">{"// Route AI tasks through Google M API — 1000+ models, one key\n"}</span>
               <span className="text-purple-400">{"const "}</span>
               <span className="text-blue-300">{"result"}</span>
               <span className="text-white">{" = await "}</span>
@@ -877,7 +877,7 @@ export default function RecruitLandingPage() {
               <p className="text-xs text-slate-500 leading-relaxed">AI-powered hiring for recruiters and job seekers worldwide. Completely free, forever.</p>
               <div className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-white/8 bg-white/4 px-3 py-1.5 text-[10px] font-bold text-slate-500">
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-                Powered by Mesh API
+                Powered by Google M API
               </div>
             </div>
 
@@ -919,9 +919,9 @@ export default function RecruitLandingPage() {
                 <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-4">Status</p>
                 <ul className="space-y-2.5">
                   <li>
-                    <Link href="/recruit/mesh-api-status" className="text-xs text-slate-500 hover:text-slate-300 transition-colors inline-flex items-center gap-1.5">
+                    <Link href="/recruit/status" className="text-xs text-slate-500 hover:text-slate-300 transition-colors inline-flex items-center gap-1.5">
                       <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-                      Mesh API Status
+                      Status
                     </Link>
                   </li>
                   <li>
@@ -939,7 +939,7 @@ export default function RecruitLandingPage() {
               Built with
               <svg width="11" height="11" viewBox="0 0 24 24" fill="#ef4444" className="inline"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
               for the{" "}
-              <a href="https://hack.meshapi.ai/" target="_blank" rel="noopener noreferrer" className="hover:text-slate-400 underline underline-offset-2 transition-colors">Mesh API Hackathon 2026</a>
+              <a href="https://hack.meshapi.ai/" target="_blank" rel="noopener noreferrer" className="hover:text-slate-400 underline underline-offset-2 transition-colors">Google M API Hackathon 2026</a>
             </div>
           </div>
         </div>
