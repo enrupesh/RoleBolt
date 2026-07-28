@@ -32,6 +32,7 @@ interface RecruitAuthState {
   loading: boolean;
   profileError: string | null;
   signIn: (email: string, password: string) => Promise<{ error?: string; code?: string }>;
+  signInWithToken: (token: string) => Promise<{ error?: string }>;
   signOut: () => void;
   signOutFromRecruit: () => void;
   refreshProfile: () => Promise<void>;
@@ -46,6 +47,7 @@ const RecruitAuthContext = createContext<RecruitAuthState>({
   loading: true,
   profileError: null,
   signIn: async () => ({}),
+  signInWithToken: async () => ({}),
   signOut: () => {},
   signOutFromRecruit: () => {},
   refreshProfile: async () => {},
@@ -128,6 +130,35 @@ export function RecruitAuthProvider({ children }: { children: ReactNode }) {
       });
   }, []);
 
+  // ── signInWithToken (used after OAuth redirect) ───────────────────────────
+  const signInWithToken = useCallback(
+    async (token: string): Promise<{ error?: string }> => {
+      try {
+        const res = await fetch(apiUrl("/auth/me"), {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return { error: "Invalid or expired token." };
+        const data: { id: string; email: string; name: string } = await res.json();
+
+        localStorage.setItem(TOKEN_KEY, token);
+        setSessionToken(token);
+        setAuthUser({ id: data.id, email: data.email, name: data.name });
+
+        setProfileError(null);
+        const profile = await fetchOrCreateProfile(token);
+        if (profile) {
+          setRecruitProfile(profile);
+        } else {
+          setProfileError("Could not reach the server. Please try again.");
+        }
+        return {};
+      } catch {
+        return { error: "Network error. Please check your connection." };
+      }
+    },
+    []
+  );
+
   // ── signIn ────────────────────────────────────────────────────────────────
   const signIn = useCallback(
     async (email: string, password: string): Promise<{ error?: string; code?: string }> => {
@@ -198,6 +229,7 @@ export function RecruitAuthProvider({ children }: { children: ReactNode }) {
         loading,
         profileError,
         signIn,
+        signInWithToken,
         signOut,
         signOutFromRecruit: signOut,
         refreshProfile,
