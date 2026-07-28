@@ -23,7 +23,7 @@ export const authRouter = express.Router();
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-const FRONTEND_URL  = (process.env.FRONTEND_URL || "http://localhost:5000").replace(/\/$/, "");
+const FRONTEND_URL  = (process.env.FRONTEND_URL || "https://www.rolebolt.tech").replace(/\/$/, "");
 const FROM_NAME     = process.env.SMTP_FROM_NAME  || "Rolebolt";
 const FROM_EMAIL    = process.env.SMTP_FROM_EMAIL || "verify@rolebolt.tech";
 
@@ -116,7 +116,7 @@ async function sendVerificationEmail(email: string, name: string, token: string)
 
   const text = `Welcome to Rolebolt${name ? `, ${name}` : ""}!\n\nVerify your email address by visiting this link:\n${link}\n\nThis link expires in 24 hours.\n\nIf you didn't create a Rolebolt account, you can safely ignore this email.`;
 
-  await sendEmail({ to: email, subject: "Verify your Rolebolt account", html, text });
+  await sendEmail({ to: email, subject: "Verify your Rolebolt account", html, text, from: `${FROM_NAME} <${FROM_EMAIL}>` });
 }
 
 // ─── POST /auth/signup ────────────────────────────────────────────────────────
@@ -391,6 +391,7 @@ authRouter.post("/forgot-password", async (req, res) => {
       subject: "Reset your Rolebolt password",
       html,
       text,
+      from:    `${FROM_NAME} <${FROM_EMAIL}>`,
     }).catch((err) => {
       console.error("[auth] Failed to send reset email:", err?.message);
     });
