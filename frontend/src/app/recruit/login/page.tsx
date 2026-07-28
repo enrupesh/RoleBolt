@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
@@ -17,11 +17,21 @@ function GitHubIcon() {
 
 export default function RecruitLoginPage() {
   const router = useRouter();
-  const { signIn } = useRecruitAuth();
+  const { signIn, authUser, recruitProfile, loading } = useRecruitAuth();
+
+  // Redirect already-authenticated users straight to the dashboard
+  useEffect(() => {
+    if (!loading && authUser && recruitProfile) {
+      router.replace("/recruit/dashboard");
+    }
+  }, [loading, authUser, recruitProfile, router]);
+
+  // Suppress the form while auth is resolving to prevent flicker
+  if (loading) return null;
 
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading]   = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError]       = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
@@ -38,7 +48,7 @@ export default function RecruitLoginPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (loading) return;
+    if (submitting) return;
     setError("");
     setUnverified(false);
     setResendSuccess(false);
@@ -46,9 +56,9 @@ export default function RecruitLoginPage() {
     if (!email.trim()) { setError("Email is required."); return; }
     if (!password)     { setError("Password is required."); return; }
 
-    setLoading(true);
+    setSubmitting(true);
     const result = await signIn(email.trim(), password);
-    setLoading(false);
+    setSubmitting(false);
 
     if (result.error) {
       if (result.code === "EMAIL_NOT_VERIFIED") {
@@ -220,10 +230,10 @@ export default function RecruitLoginPage() {
               {/* Submit */}
               <button
                 type="submit"
-                disabled={loading}
+                disabled={submitting}
                 className="w-full h-11 rounded-xl bg-[#0a66c2] text-sm font-bold text-white hover:bg-[#004182] disabled:opacity-60 transition-all shadow-[0_2px_10px_rgba(10,102,194,0.28)] hover:shadow-[0_4px_16px_rgba(10,102,194,0.36)] hover:-translate-y-px active:translate-y-0 flex items-center justify-center gap-2"
               >
-                {loading ? (
+                {submitting ? (
                   <>
                     <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
