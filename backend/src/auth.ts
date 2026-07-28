@@ -23,7 +23,16 @@ export const authRouter = express.Router();
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-const FRONTEND_URL  = (process.env.FRONTEND_URL || "https://www.rolebolt.tech").replace(/\/$/, "");
+// Guard: reject any stale/incorrect FRONTEND_URL values so email links always point to the real domain.
+const _rawFrontendUrl = process.env.FRONTEND_URL ?? "";
+const FRONTEND_URL = (
+  _rawFrontendUrl &&
+  !_rawFrontendUrl.includes("forjob.onrender.com") &&
+  !_rawFrontendUrl.includes("localhost") &&
+  !_rawFrontendUrl.includes("127.0.0.1")
+    ? _rawFrontendUrl
+    : "https://www.rolebolt.tech"
+).replace(/\/$/, "");
 const FROM_NAME     = process.env.SMTP_FROM_NAME  || "Rolebolt";
 const FROM_EMAIL    = process.env.SMTP_FROM_EMAIL || "verify@rolebolt.tech";
 
