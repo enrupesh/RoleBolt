@@ -71,7 +71,7 @@ export default function SeekerSignupPage() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <RoleboltLogo size={48} />
+          <RoleboltLogo size="lg" />
           <h1 className="mt-3 text-2xl font-bold text-slate-900">Create your account</h1>
           <p className="mt-1 text-sm text-slate-500">Find your next job with AI-powered tools</p>
         </div>

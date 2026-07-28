@@ -63,7 +63,7 @@ export default function SeekerLoginPage() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <RoleboltLogo size={48} />
+          <RoleboltLogo size="lg" />
           <h1 className="mt-3 text-2xl font-bold text-slate-900">Welcome back</h1>
           <p className="mt-1 text-sm text-slate-500">Sign in to your job seeker account</p>
         </div>
