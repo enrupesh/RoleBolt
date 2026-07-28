@@ -200,14 +200,14 @@ export default function ProductPreviewPage() {
               Meet the Team
             </Link>
             <Link
-              href="/recruit/mesh-api-status"
+              href="/recruit/status"
               className="relative inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3.5 py-2 text-[13px] font-bold text-emerald-700 shadow-[0_0_0_0_rgba(16,185,129,0.5)] hover:bg-emerald-100 hover:-translate-y-px transition-all animate-[rb-pulse-glow_2.2s_ease-in-out_infinite]"
             >
               <span className="relative flex h-2 w-2">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
               </span>
-              Mesh API Status
+              Status
             </Link>
             <Link
               href="/recruit/signup"
@@ -321,19 +321,19 @@ export default function ProductPreviewPage() {
           <JudgesTestingKit dark={false} />
         </div>
 
-        {/* ── How Mesh API Powers Rolebolt ─────────────────────────────────── */}
+        {/* ── How Google M API Powers Rolebolt ─────────────────────────────────── */}
         <div className="mt-24">
           {/* Header */}
           <div className="max-w-2xl mx-auto text-center mb-12">
             <div className="inline-flex items-center gap-2 rounded-full border border-[#0a66c2]/30 bg-[#0a66c2]/8 px-4 py-1.5 text-[11px] font-bold text-[#0a66c2] mb-5 uppercase tracking-widest">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-              Powered by Mesh API
+              Powered by Google M API
             </div>
             <h2 className="text-3xl font-black text-slate-900 tracking-tight sm:text-4xl leading-tight">
-              How Mesh API powers Rolebolt
+              How Google M API powers Rolebolt
             </h2>
             <p className="mt-4 text-slate-500 leading-relaxed max-w-lg mx-auto">
-              Every AI capability in Rolebolt is routed through Mesh API — giving us access to 1,000+ models with automatic fallback chains, so hiring never stops even when a single provider has issues.
+              Every AI capability in Rolebolt is routed through Google M API — giving us access to 1,000+ models with automatic fallback chains, so hiring never stops even when a single provider has issues.
             </p>
           </div>
 
@@ -362,7 +362,7 @@ export default function ProductPreviewPage() {
                   </svg>
                 ),
                 title: "AI Resume Analysis",
-                desc: "When a candidate applies, Mesh API parses the uploaded PDF/DOCX resume and extracts structured signals: skills, experience depth, career trajectory, and role alignment — all in seconds.",
+                desc: "When a candidate applies, Google M API parses the uploaded PDF/DOCX resume and extracts structured signals: skills, experience depth, career trajectory, and role alignment — all in seconds.",
                 model: "openai/gpt-4o-mini",
                 accentColor: "text-[#0a66c2]",
                 accentBg: "bg-blue-50 border-blue-100",
@@ -401,7 +401,7 @@ export default function ProductPreviewPage() {
                   </svg>
                 ),
                 title: "AI Job Description Generation",
-                desc: "A 4-step wizard collects the role basics, and Mesh API generates a full job description — including requirements, responsibilities, and a custom scoring rubric — ready to publish instantly.",
+                desc: "A 4-step wizard collects the role basics, and Google M API generates a full job description — including requirements, responsibilities, and a custom scoring rubric — ready to publish instantly.",
                 model: "openai/gpt-4o-mini",
                 accentColor: "text-violet-600",
                 accentBg: "bg-violet-50 border-violet-100",
@@ -427,7 +427,7 @@ export default function ProductPreviewPage() {
                   </svg>
                 ),
                 title: "AI Form Response Scoring",
-                desc: "When candidates submit custom intake forms, Mesh API scores each answer against the form's criteria — giving small businesses the same AI evaluation power as the full pipeline, without requiring a resume.",
+                desc: "When candidates submit custom intake forms, Google M API scores each answer against the form's criteria — giving small businesses the same AI evaluation power as the full pipeline, without requiring a resume.",
                 model: "openai/gpt-4o-mini",
                 accentColor: "text-indigo-600",
                 accentBg: "bg-indigo-50 border-indigo-100",
@@ -462,7 +462,7 @@ export default function ProductPreviewPage() {
             </div>
             <div className="flex-1">
               <p className="text-[13px] font-semibold text-slate-800">Automatic fallback chain on every AI call</p>
-              <p className="text-[12px] text-slate-500 mt-0.5">If GPT-4o mini is unavailable or rate-limited, Mesh API automatically retries with Claude 3 Haiku, then Gemini 2.5 Flash Lite — so AI scoring never blocks a candidate&apos;s application.</p>
+              <p className="text-[12px] text-slate-500 mt-0.5">If GPT-4o mini is unavailable or rate-limited, Google M API automatically retries with Claude 3 Haiku, then Gemini 2.5 Flash Lite — so AI scoring never blocks a candidate&apos;s application.</p>
             </div>
           </div>
         </div>
@@ -534,10 +534,10 @@ export default function ProductPreviewPage() {
                   />
                   <ArchArrow label="AI workflow triggered" />
 
-                  {/* Mesh API */}
+                  {/* Google M API */}
                   <ArchNode
                     icon={<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>}
-                    label="Mesh API"
+                    label="Google M API"
                     sublabel="api.meshapi.ai · 1,000+ models"
                     color="bg-violet-600 text-white"
                     borderColor="border-violet-500"
@@ -609,7 +609,7 @@ export default function ProductPreviewPage() {
                   { label: "Next.js Frontend", sub: "Rolebolt UI · Port 5000", bg: "bg-[#0a66c2] text-white" },
                   { label: "Express Backend", sub: "Node.js API · Port 8080", bg: "bg-slate-700 text-white" },
                   { label: "MongoDB Atlas", sub: "Jobs, Candidates, Forms", bg: "bg-emerald-600 text-white" },
-                  { label: "Mesh API", sub: "Model router · 1,000+ models", bg: "bg-violet-600 text-white", highlight: true },
+                  { label: "Google M API", sub: "Model router · 1,000+ models", bg: "bg-violet-600 text-white", highlight: true },
                   { label: "AI Models", sub: "GPT-4o mini → Claude 3 Haiku → Gemini Flash", bg: "bg-slate-100 text-slate-700" },
                 ].map((node, i, arr) => (
                   <div key={node.label} className="flex flex-col items-center w-full max-w-xs">
@@ -633,7 +633,7 @@ export default function ProductPreviewPage() {
               {[
                 { color: "bg-[#0a66c2]", label: "Frontend (Next.js)" },
                 { color: "bg-slate-700", label: "Backend (Express / Node)" },
-                { color: "bg-violet-600", label: "Mesh API (AI gateway)" },
+                { color: "bg-violet-600", label: "Google M API (AI gateway)" },
                 { color: "bg-emerald-600", label: "MongoDB (persistence)" },
                 { color: "bg-amber-500", label: "Custom Auth" },
               ].map((l) => (
