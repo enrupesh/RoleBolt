@@ -525,6 +525,9 @@ function RecruitDashboardContent() {
           </div>
         )}
 
+        {/* ── Daily Briefing card ───────────────────────────────────────── */}
+        <DailyBriefingCard />
+
         {/* ── Tab bar ───────────────────────────────────────────────────── */}
         <div className="flex items-stretch gap-1.5 mb-6 bg-white rounded-2xl p-1.5
           border border-black/[0.06] shadow-[0_1px_3px_rgba(0,0,0,0.05),0_4px_12px_rgba(0,0,0,0.04)]">
@@ -864,6 +867,7 @@ function RecruitDashboardContent() {
         )}
 
         {/* ── Mobile quick-nav ──────────────────────────────────────────── */}
+        {/* ── Mobile quick-links ───────────────────────────────────────── */}
         <div className="mt-8 md:hidden flex flex-wrap gap-2">
           {activeTab === "jobs" && (
             <>
@@ -886,6 +890,63 @@ function RecruitDashboardContent() {
           </Link>
         </div>
       </main>
+    </div>
+  );
+}
+
+// ── Daily Briefing Card ───────────────────────────────────────────────────────
+function DailyBriefingCard() {
+  const { sessionToken } = useRecruitAuth();
+  const [sending, setSending] = useState(false);
+  const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
+  const [msg, setMsg] = useState("");
+
+  async function sendNow() {
+    if (!sessionToken) return;
+    setSending(true);
+    setStatus("idle");
+    try {
+      const res = await fetch(apiUrl("/recruit/briefing/send-now"), {
+        method: "POST",
+        headers: { Authorization: `Bearer ${sessionToken}` },
+      });
+      const data = await readApiJson(res);
+      if (!res.ok) throw new Error(data.error || "Failed to send briefing.");
+      setMsg(data.message || "Briefing sent! Check your inbox.");
+      setStatus("success");
+    } catch (e: any) {
+      setMsg(e.message || "Something went wrong.");
+      setStatus("error");
+    } finally {
+      setSending(false);
+      setTimeout(() => setStatus("idle"), 5000);
+    }
+  }
+
+  return (
+    <div className="mb-6 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50 to-blue-50 p-4 flex items-center justify-between gap-4 flex-wrap">
+      <div className="flex items-center gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-500 text-white shadow shadow-indigo-500/25">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>
+          </svg>
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-slate-800">AI Daily Briefing</p>
+          <p className="text-xs text-slate-500">AI sends a personalised hiring summary to your inbox every day at 8 AM UTC.</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-3">
+        {status === "success" && <p className="text-xs font-medium text-emerald-600">{msg}</p>}
+        {status === "error"   && <p className="text-xs font-medium text-rose-600">{msg}</p>}
+        <button
+          onClick={sendNow}
+          disabled={sending}
+          className="shrink-0 rounded-xl bg-indigo-500 px-4 py-2 text-xs font-bold text-white shadow shadow-indigo-500/20 transition hover:bg-indigo-400 disabled:opacity-60"
+        >
+          {sending ? "Sending…" : "Send today's briefing now"}
+        </button>
+      </div>
     </div>
   );
 }

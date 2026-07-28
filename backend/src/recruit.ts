@@ -1587,6 +1587,20 @@ recruitRouter.patch("/jobs/:jobId/agent-mode", async (req, res) => {
   }
 });
 
+// ── Daily Briefing: manual trigger ───────────────────────────────────────────
+recruitRouter.post("/briefing/send-now", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const { generateBriefingForUser } = await import("./jobs/dailyBriefing.js");
+    await generateBriefingForUser(uid);
+    return res.json({ ok: true, message: "Briefing sent to your email." });
+  } catch (e: any) {
+    console.error("[briefing] manual trigger failed:", e);
+    return res.status(500).json({ error: e.message || "Failed to send briefing." });
+  }
+});
+
 // ── Pipeline Rules CRUD ───────────────────────────────────────────────────────
 
 recruitRouter.get("/jobs/:jobId/pipeline-rules", async (req, res) => {
