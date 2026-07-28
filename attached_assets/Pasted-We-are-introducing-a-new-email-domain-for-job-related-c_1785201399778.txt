@@ -1,0 +1,36 @@
+We are introducing a new email domain for job-related communication. Previously, authentication emails were sent from the rolebolt.app domain (for example, verify@rolebolt.app).
+
+Going forward, all emails sent by job creators to candidates will use our new domain: rolebolt.tech (not rolebolt.app).
+
+For authentication and verification, emails can continue to be sent from verify@rolebolt.app if needed. However, all job-related emails should be sent from a dedicated address on the new domain, such as:
+
+job@rolebolt.tech
+
+Other good alternatives include:
+
+jobs@rolebolt.tech hiring@rolebolt.tech careers@rolebolt.tech recruiting@rolebolt.tech notifications@rolebolt.tech (for general job notifications)
+
+If this address is specifically used to send emails from employers to candidates, jobs@rolebolt.tech or hiring@rolebolt.tech are the most intuitive choices, while job@rolebolt.tech is also perfectly valid if you prefer a shorter address. Currently, candidate email verification emails are being sent with links pointing to https://forjob.onrender.com/. This is incorrect.
+
+Going forward, use only our official domains:
+
+Frontend (public website): https://www.rolebolt.tech/ Backend (API): https://back-mp9k.onrender.com/
+
+The verification flow and all related URLs should use these domains only. Do not use https://forjob.onrender.com/ anywhere anymore.
+
+To confirm:
+
+Frontend domain: https://www.rolebolt.tech/ Backend domain: https://back-mp9k.onrender.com/ Remove all references to https://forjob.onrender.com/. All candidate verification and other backend-related operations should use the backend URL, while any user-facing links should point to the frontend domain.
+
+First, confirm that you fully understand these changes before making any updates. One simple rule:
+
+All authentication-related emails (email verification, password reset, account verification, etc.) must be sent from verify@rolebolt.tech. All job-related emails sent to candidates must be sent from careers@rolebolt.tech.
+
+Please make sure you use only the following official domains throughout the entire codebase:
+
+Backend URL: https://back-mp9k.onrender.com Frontend URL: https://www.rolebolt.tech/ Email domain: rolebolt.tech
+
+There should be no other URLs, domains, or email addresses anywhere in the code. Carefully review the entire project and replace any old or incorrect references (such as rolebolt.app, forjob.onrender.com, or any other outdated URLs) with the correct ones above.
+
+Before making changes, verify that you fully understand these requirements. Then ensure the entire codebase consistently uses only these official domains and email addresses.
+

@@ -2,7 +2,7 @@ import { Resend } from "resend";
 
 const RESEND_API_KEY   = process.env.RESEND_API_KEY   || "";
 const SMTP_FROM_NAME   = process.env.SMTP_FROM_NAME   || "Rolebolt";
-const SMTP_FROM_EMAIL  = process.env.SMTP_FROM_EMAIL  || "noreply@rolebolt.tech";
+const SMTP_FROM_EMAIL  = process.env.SMTP_FROM_EMAIL  || "verify@rolebolt.tech";
 
 let _client: Resend | null = null;
 
