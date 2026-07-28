@@ -22,6 +22,22 @@ npm run dev             # local dev on port 8080
 Deploy `backend/` to any Node host (Render, Railway, Fly.io, etc.). Build with
 `npm run build` and start with `npm start`.
 
+### Google Cloud APIs (optional but recommended)
+
+Two additional Google Cloud APIs enhance the product:
+
+| API | What it does | Free tier |
+|-----|-------------|-----------|
+| **Natural Language API** | Auto-extracts skills, companies & job titles from every resume | 5,000 requests/month |
+| **Cloud Translation API** | Translates any job description into 18+ languages on demand | 500,000 chars/month |
+
+Both share a single key — set `GOOGLE_CLOUD_API_KEY` in your environment.
+Enable both at: https://console.cloud.google.com/apis/library
+
+New endpoints added:
+- `GET /recruit-public/jobs/:jobId/translate?lang=hi` — translate a JD (lang codes: hi, es, fr, de, ar, zh, …)
+- `GET /recruit-public/translate/languages` — list all supported language codes
+
 ## 2. Frontend setup
 
 ```bash
