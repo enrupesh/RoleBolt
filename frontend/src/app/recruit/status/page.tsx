@@ -360,7 +360,7 @@ export default function StatusPage() {
           <ServiceRow
             icon={<Icon d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />}
             name="Google M API"
-            description={`Mesh API gateway · ${ai("googleM").endpoint || "api.meshapi.ai"} · 1,000+ models`}
+            description=""
             status={ai("googleM").status}
             responseMs={ai("googleM").responseTimeMs}
             meta={ai("googleM").error ?? "Primary AI gateway"}
@@ -368,7 +368,7 @@ export default function StatusPage() {
           <ServiceRow
             icon={<Icon d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 6v6l4 2" />}
             name="Google N API"
-            description={`NVIDIA NIM · ${ai("googleN").endpoint || "integrate.api.nvidia.com"} · Llama & Nemotron`}
+            description=""
             status={ai("googleN").status}
             responseMs={ai("googleN").responseTimeMs}
             meta={ai("googleN").error ?? "AI fallback layer"}
