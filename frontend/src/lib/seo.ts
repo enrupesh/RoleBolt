@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-export const SITE_URL = "https://www.rolebolt.app";
+export const SITE_URL = "https://www.rolebolt.tech";
 
 export const siteConfig = {
   name: "Rolebolt",
@@ -106,12 +106,12 @@ export const siteConfig = {
     legalName: "Rolebolt",
     foundingDate: "2024",
     foundingLocation: "Global",
-    email: "support@rolebolt.app",
-    contactEmail: "support@rolebolt.app",
-    pressEmail: "press@rolebolt.app",
-    salesEmail: "sales@rolebolt.app",
+    email: "support@rolebolt.tech",
+    contactEmail: "support@rolebolt.tech",
+    pressEmail: "press@rolebolt.tech",
+    salesEmail: "sales@rolebolt.tech",
     sameAs: [
-      "https://www.rolebolt.app",
+      "https://www.rolebolt.tech",
       "https://twitter.com/roleboltai",
       "https://x.com/roleboltai",
       "https://www.linkedin.com/company/rolebolt-ai",

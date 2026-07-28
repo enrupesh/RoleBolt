@@ -17,6 +17,8 @@ export async function sendEmail(opts: {
   subject: string;
   html: string;
   text?: string;
+  /** Override the default sender. Pass a full "Name <email>" string. */
+  from?: string;
 }): Promise<{ ok: boolean; error?: string }> {
   if (!opts.to?.trim()) {
     console.warn("[mailer] No recipient — skipping");
@@ -31,7 +33,7 @@ export async function sendEmail(opts: {
 
   try {
     const { error } = await client.emails.send({
-      from: `${SMTP_FROM_NAME} <${SMTP_FROM_EMAIL}>`,
+      from: opts.from ?? `${SMTP_FROM_NAME} <${SMTP_FROM_EMAIL}>`,
       to:   [opts.to.trim()],
       subject: opts.subject,
       html: opts.html,

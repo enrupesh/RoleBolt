@@ -25,7 +25,7 @@ export const authRouter = express.Router();
 
 const FRONTEND_URL  = (process.env.FRONTEND_URL || "http://localhost:5000").replace(/\/$/, "");
 const FROM_NAME     = process.env.SMTP_FROM_NAME  || "Rolebolt";
-const FROM_EMAIL    = process.env.SMTP_FROM_EMAIL || "noreply@rolebolt.tech";
+const FROM_EMAIL    = process.env.SMTP_FROM_EMAIL || "verify@rolebolt.app";
 
 const BCRYPT_ROUNDS    = 12;
 const TOKEN_TTL_MS     = 24 * 60 * 60 * 1000;       // 24 h  (email verification)

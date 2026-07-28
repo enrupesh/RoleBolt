@@ -622,7 +622,7 @@ function NewJobContent() {
   }
 
   if (createdJob) {
-    const publicUrl = `${typeof window !== "undefined" ? window.location.origin : "https://forjob.onrender.com"}/recruit/opportunities/${createdJob.id}`;
+    const publicUrl = `${typeof window !== "undefined" ? window.location.origin : "https://www.rolebolt.tech"}/recruit/opportunities/${createdJob.id}`;
     const shareMsg = encodeURIComponent(`We're hiring! Check out this job: ${createdJob.title}\n${publicUrl}`);
 
     function copyLink() {

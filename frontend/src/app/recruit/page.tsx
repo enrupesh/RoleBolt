@@ -405,7 +405,7 @@ export default function RecruitLandingPage() {
                   <div className="h-3 w-3 rounded-full bg-slate-700" />
                 </div>
                 <div className="flex-1 flex items-center justify-center">
-                  <div className="rounded-md bg-slate-800 px-3 py-1 text-[11px] text-slate-500 font-mono">rolebolt.app/recruit/dashboard</div>
+                  <div className="rounded-md bg-slate-800 px-3 py-1 text-[11px] text-slate-500 font-mono">rolebolt.tech/recruit/dashboard</div>
                 </div>
               </div>
               {/* Mock dashboard content */}

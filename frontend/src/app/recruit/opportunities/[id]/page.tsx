@@ -153,7 +153,7 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
     mustHave.length ? `── Must-have skills ──\n${mustHave.map(s => `• ${s}`).join("\n")}` : "",
     niceToHave.length ? `── Good-to-have skills ──\n${niceToHave.map(s => `• ${s}`).join("\n")}` : "",
     "",
-    `View job: https://www.rolebolt.app/recruit/opportunities/${id}`,
+    `View job: https://www.rolebolt.tech/recruit/opportunities/${id}`,
   ].filter(Boolean).join("\n");
 
   const tags = [

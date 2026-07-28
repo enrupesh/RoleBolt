@@ -72,7 +72,7 @@ const howTo = howToJsonLd({
   steps: [
     {
       name: "Sign up for a free Rolebolt account",
-      text: "Go to rolebolt.app and create your account. Navigate to the Recruit AI section and select the Recruiter role.",
+      text: "Go to rolebolt.tech and create your account. Navigate to the Recruit AI section and select the Recruiter role.",
       url: "/signup",
     },
     {

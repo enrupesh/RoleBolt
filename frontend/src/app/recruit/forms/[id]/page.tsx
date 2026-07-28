@@ -463,7 +463,7 @@ function FormRejectionEmailModal({
 
 function ShareModal({ slug, title, onClose }: { slug: string; title: string; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
-  const link = `${typeof window !== "undefined" ? window.location.origin : "https://www.rolebolt.app"}/f/${slug}`;
+  const link = `${typeof window !== "undefined" ? window.location.origin : "https://www.rolebolt.tech"}/f/${slug}`;
 
   function copy() {
     navigator.clipboard.writeText(link).catch(() => {});
