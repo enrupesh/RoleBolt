@@ -190,3 +190,102 @@ export function genericEmail(candidateName: string, subject: string, body: strin
     <p style="margin:0;font-size:15px;color:#333;line-height:1.8;">${nl2br(body)}</p>
   `);
 }
+
+// ── 9. Daily Recruiter Briefing ───────────────────────────────────────────────
+export function dailyBriefing(
+  recruiterName: string,
+  briefingText: string,
+  stats: { newApps: number; pendingReview: number; inInterview: number; activeJobs: number; staleJobs: string[] }
+): string {
+  const firstName = recruiterName.split(" ")[0] || recruiterName;
+  const dateStr = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+  const staleWarning = stats.staleJobs.length > 0
+    ? `<tr><td style="padding:0 36px 24px;">
+        <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:14px 18px;">
+          <p style="margin:0 0 4px;font-size:12px;font-weight:700;color:#92400e;letter-spacing:0.04em;text-transform:uppercase;">⚠ Stale Jobs (low applications)</p>
+          <p style="margin:0;font-size:13px;color:#92400e;">${stats.staleJobs.map(t => esc(t)).join(", ")}</p>
+        </div>
+      </td></tr>`
+    : "";
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Your Daily Hiring Briefing</title>
+</head>
+<body style="margin:0;padding:0;background:#f0f2f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f2f5;padding:40px 16px;">
+    <tr><td align="center">
+      <table width="100%" style="max-width:560px;background:#ffffff;border-radius:16px;border:1px solid #e2e8f0;overflow:hidden;">
+
+        <!-- Header -->
+        <tr>
+          <td style="background:linear-gradient(135deg,#0a66c2 0%,#1d4ed8 100%);padding:28px 36px;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td>
+                  <span style="display:inline-block;background:#ffffff;border-radius:10px;padding:7px 13px;margin-bottom:14px;">
+                    <span style="font-size:16px;font-weight:900;color:#0a66c2;letter-spacing:-0.5px;">Rolebolt</span>
+                  </span>
+                  <p style="margin:0;font-size:13px;font-weight:600;color:rgba(255,255,255,0.75);letter-spacing:0.04em;text-transform:uppercase;">Daily Briefing · ${esc(dateStr)}</p>
+                  <p style="margin:6px 0 0;font-size:22px;font-weight:800;color:#ffffff;">Good morning, ${esc(firstName)}! ☀️</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Stats row -->
+        <tr>
+          <td style="padding:24px 36px 0;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                ${[
+                  { label: "New Applications", value: stats.newApps, color: "#0a66c2", bg: "#eff6ff" },
+                  { label: "Awaiting Review", value: stats.pendingReview, color: "#7c3aed", bg: "#f5f3ff" },
+                  { label: "In Interview", value: stats.inInterview, color: "#059669", bg: "#ecfdf5" },
+                  { label: "Active Jobs", value: stats.activeJobs, color: "#d97706", bg: "#fffbeb" },
+                ].map(s => `
+                <td width="25%" style="padding:0 4px;">
+                  <div style="background:${s.bg};border-radius:10px;padding:12px 10px;text-align:center;">
+                    <p style="margin:0;font-size:22px;font-weight:800;color:${s.color};line-height:1;">${s.value}</p>
+                    <p style="margin:4px 0 0;font-size:10px;font-weight:600;color:#64748b;line-height:1.3;">${s.label}</p>
+                  </div>
+                </td>`).join("")}
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Briefing text -->
+        <tr>
+          <td style="padding:24px 36px;">
+            <p style="margin:0 0 14px;font-size:13px;font-weight:700;color:#64748b;letter-spacing:0.05em;text-transform:uppercase;">AI Analysis</p>
+            <p style="margin:0;font-size:15px;color:#1e293b;line-height:1.75;">${nl2br(esc(briefingText))}</p>
+          </td>
+        </tr>
+
+        ${staleWarning}
+
+        <!-- CTA -->
+        <tr>
+          <td style="padding:0 36px 32px;text-align:center;">
+            <a href="https://www.rolebolt.tech/recruit/dashboard" style="display:inline-block;background:#0a66c2;color:#ffffff;font-size:14px;font-weight:700;text-decoration:none;padding:13px 28px;border-radius:10px;">Open Dashboard →</a>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="border-top:1px solid #f1f5f9;padding:20px 36px;background:#fafafa;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#94a3b8;line-height:1.5;">You're receiving this because you have an active Rolebolt recruiter account.</p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
