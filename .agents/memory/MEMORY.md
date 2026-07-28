@@ -7,3 +7,4 @@
 - [Python script seo.ts edit risk](seo-trim-lesson.md) — Python script used to trim productKeywords left a duplicate "} as const;" — always verify output line counts and spot-check boundaries after programmatic large-file edits.
 - [Copilot input focus loss during streaming](copilot-input-focus.md) — disabling a textarea while awaiting a response blurs it in every browser; guard sends in the handler instead.
 - [Firebase social auth setup](firebase-social-auth.md) — Google popup + GitHub redirect OAuth + phone OTP (Firebase); backend /auth/social handles google|phone; GitHub uses GET /auth/github redirect; User model has googleId/githubId/phoneNumber/phoneId; email optional (sparse) for phone-only users.
+- [Pipeline Rules feature](pipeline-rules.md) — Feature 1.2; evaluatePipelineRules() in recruit.ts; fires non-blocking at apply/stage-change/assessment; CRUD at /recruit/jobs/:id/pipeline-rules; UI tab in jobs/[id]/page.tsx.
