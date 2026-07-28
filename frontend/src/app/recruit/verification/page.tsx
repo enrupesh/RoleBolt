@@ -370,7 +370,7 @@ function VerificationContent() {
             <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 mb-5">
               <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">Contact for queries</p>
               <a
-                href="mailto:verify@rolebolt.app"
+                href="mailto:verify@rolebolt.tech"
                 className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 hover:border-[#0a66c2]/30 hover:bg-blue-50/30 transition group"
               >
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#0a66c2]/10">
@@ -379,7 +379,7 @@ function VerificationContent() {
                   </svg>
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-slate-900 group-hover:text-[#0a66c2] transition">verify@rolebolt.app</p>
+                  <p className="text-sm font-bold text-slate-900 group-hover:text-[#0a66c2] transition">verify@rolebolt.tech</p>
                   <p className="text-xs text-slate-500">For verification queries, disputes, or appeals</p>
                 </div>
               </a>
@@ -435,7 +435,7 @@ function VerificationContent() {
                   "Providing false information during verification will result in permanent removal from the platform.",
                   "Verified status can be revoked at any time if the profile is found to be misleading, inactive, or in violation of our policies.",
                   "One verification request is allowed per 30 days. Multiple requests within this period will be ignored.",
-                  "Verification decisions are final. You may appeal by emailing verify@rolebolt.app with supporting documents.",
+                  "Verification decisions are final. You may appeal by emailing verify@rolebolt.tech with supporting documents.",
                   "Verification does not guarantee a fixed response time, but we aim to complete all reviews within 7 business days.",
                 ].map((rule, i) => (
                   <li key={i} className="flex items-start gap-2.5">
