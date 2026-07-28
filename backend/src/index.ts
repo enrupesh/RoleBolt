@@ -161,5 +161,5 @@ connectMongo()
   .catch((err) => console.error("[db] MongoDB connection failed:", err?.message || err));
 
 app.listen(PORT, () => {
-  console.log(`Recruit backend listening on port ${PORT} | Auth: none (open)`);
+  console.log(`Recruit backend listening on port ${PORT} | Auth: custom JWT`);
 });
