@@ -152,9 +152,14 @@ export default function RecruitLoginPage() {
 
               {/* Password */}
               <div className="space-y-1.5">
-                <label htmlFor="password" className="block text-xs font-semibold text-slate-700 uppercase tracking-wide">
-                  Password
-                </label>
+                <div className="flex items-center justify-between">
+                  <label htmlFor="password" className="block text-xs font-semibold text-slate-700 uppercase tracking-wide">
+                    Password
+                  </label>
+                  <Link href="/recruit/forgot-password" className="text-xs text-[#0a66c2] hover:underline font-medium">
+                    Forgot password?
+                  </Link>
+                </div>
                 <div className="relative">
                   <input
                     id="password"
