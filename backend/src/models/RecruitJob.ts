@@ -21,6 +21,15 @@ export interface IAgentMode {
   autoSendAssessment: boolean;   // auto-send assessment to shortlisted (default false)
 }
 
+export interface IPerformanceAlert {
+  id: string;
+  type: "low_applications" | "no_hire_14_days" | "high_reject_rate";
+  message: string;
+  aiSuggestions: string[];
+  createdAt: Date;
+  dismissed: boolean;
+}
+
 export interface IPipelineRule {
   id: string;
   condition: "score_above" | "score_below" | "assessment_passed" | "assessment_failed" | "stage_age_days";
@@ -68,6 +77,7 @@ export interface IRecruitJob extends Document {
   reports: IJobReport[];
   agentMode: IAgentMode;
   pipelineRules: IPipelineRule[];
+  performanceAlerts: IPerformanceAlert[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -86,6 +96,18 @@ const JobReportSchema = new Schema<IJobReport>(
     reason: { type: String, required: true },
     details: { type: String, default: "" },
     reportedAt: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
+const PerformanceAlertSchema = new Schema<IPerformanceAlert>(
+  {
+    id:             { type: String, required: true },
+    type:           { type: String, required: true },
+    message:        { type: String, default: "" },
+    aiSuggestions:  { type: [String], default: [] },
+    createdAt:      { type: Date, default: Date.now },
+    dismissed:      { type: Boolean, default: false },
   },
   { _id: false }
 );
@@ -153,6 +175,7 @@ const RecruitJobSchema = new Schema<IRecruitJob>(
     reports: { type: [JobReportSchema], default: [] },
     agentMode: { type: AgentModeSchema, default: () => ({}) },
     pipelineRules: { type: [PipelineRuleSchema], default: [] },
+    performanceAlerts: { type: [PerformanceAlertSchema], default: [] },
   },
   { timestamps: true }
 );

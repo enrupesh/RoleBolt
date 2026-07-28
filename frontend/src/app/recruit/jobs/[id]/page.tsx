@@ -73,6 +73,15 @@ type AgentMode = {
   autoSendAssessment: boolean;
 };
 
+type PerformanceAlert = {
+  id: string;
+  type: "low_applications" | "no_hire_14_days" | "high_reject_rate";
+  message: string;
+  aiSuggestions: string[];
+  createdAt: string;
+  dismissed: boolean;
+};
+
 type PipelineRule = {
   id: string;
   condition: "score_above" | "score_below" | "assessment_passed" | "assessment_failed" | "stage_age_days";
@@ -89,6 +98,7 @@ type Job = {
   seniority: string;
   location: string;
   pipelineRules?: PipelineRule[];
+  performanceAlerts?: PerformanceAlert[];
   workMode: string;
   status: string;
   generatedJD: string;
@@ -1792,8 +1802,10 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<"pipeline" | "jd" | "rubric" | "post" | "rules">("pipeline");
+  const [activeTab, setActiveTab] = useState<"pipeline" | "jd" | "rubric" | "post" | "rules" | "performance">("pipeline");
   const [pipelineRules, setPipelineRules] = useState<PipelineRule[]>([]);
+  const [perfAlerts, setPerfAlerts] = useState<PerformanceAlert[]>([]);
+  const [checkingPerf, setCheckingPerf] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [stageFilter, setStageFilter] = useState<CandidateStage | "all">("all");
 
@@ -1817,6 +1829,7 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
       setJob(jobData.job ?? null);
       setCandidates(candData.candidates ?? []);
       setPipelineRules(rulesData.rules ?? []);
+      setPerfAlerts(jobData.job?.performanceAlerts?.filter((a: PerformanceAlert) => !a.dismissed) ?? []);
     } catch { /* silent */ }
     finally { setLoading(false); }
   }, [token, id]);
@@ -2041,7 +2054,7 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
         </div>
 
         <div className="mb-6 flex gap-1 border-b border-[var(--border)]">
-          {(["pipeline", "jd", "rubric", "post", "rules"] as const).map(tab => (
+          {(["pipeline", "jd", "rubric", "post", "rules", "performance"] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -2051,16 +2064,28 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
                   : "border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
               }`}
             >
-              {tab === "jd" ? "Job Description" : tab === "rubric" ? "Scoring Rubric" : tab === "post" ? "Post to Boards" : tab === "rules" ? (
-                <span className="flex items-center gap-1.5">
-                  Pipeline Rules
-                  {pipelineRules.filter(r => r.enabled).length > 0 && (
-                    <span className="rounded-full bg-indigo-500 px-1.5 py-0.5 text-[10px] font-bold text-white leading-none">
-                      {pipelineRules.filter(r => r.enabled).length}
-                    </span>
-                  )}
-                </span>
-              ) : "Pipeline"}
+              {tab === "jd" ? "Job Description"
+                : tab === "rubric" ? "Scoring Rubric"
+                : tab === "post" ? "Post to Boards"
+                : tab === "rules" ? (
+                  <span className="flex items-center gap-1.5">
+                    Pipeline Rules
+                    {pipelineRules.filter(r => r.enabled).length > 0 && (
+                      <span className="rounded-full bg-indigo-500 px-1.5 py-0.5 text-[10px] font-bold text-white leading-none">
+                        {pipelineRules.filter(r => r.enabled).length}
+                      </span>
+                    )}
+                  </span>
+                ) : tab === "performance" ? (
+                  <span className="flex items-center gap-1.5">
+                    Performance
+                    {perfAlerts.length > 0 && (
+                      <span className="rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold text-white leading-none">
+                        {perfAlerts.length}
+                      </span>
+                    )}
+                  </span>
+                ) : "Pipeline"}
             </button>
           ))}
         </div>
@@ -2162,6 +2187,27 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
             token={token!}
             rules={pipelineRules}
             onChange={setPipelineRules}
+          />
+        )}
+
+        {activeTab === "performance" && (
+          <PerformanceTab
+            jobId={id}
+            token={token!}
+            alerts={perfAlerts}
+            checking={checkingPerf}
+            onDismiss={(alertId) => setPerfAlerts(a => a.filter(x => x.id !== alertId))}
+            onApplied={(newJD) => setJob(j => j ? { ...j, generatedJD: newJD } : j)}
+            onRefresh={async () => {
+              setCheckingPerf(true);
+              try {
+                const res = await fetch(apiUrl(`/recruit/jobs/${id}/performance`), {
+                  headers: { Authorization: `Bearer ${token}` },
+                });
+                const data = await res.json();
+                setPerfAlerts(data.alerts ?? []);
+              } finally { setCheckingPerf(false); }
+            }}
           />
         )}
       </main>

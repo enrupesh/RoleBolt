@@ -1587,6 +1587,153 @@ recruitRouter.patch("/jobs/:jobId/agent-mode", async (req, res) => {
   }
 });
 
+// ── Job Performance Monitor ───────────────────────────────────────────────────
+
+async function checkJobPerformanceAlerts(jobId: string, uid: string): Promise<void> {
+  const job = await RecruitJob.findOne({ _id: jobId, uid }).lean() as any;
+  if (!job || job.status !== "active") return;
+
+  const daysSinceCreated = (Date.now() - new Date(job.createdAt).getTime()) / (1000 * 60 * 60 * 24);
+  const applicationCount = await RecruitCandidate.countDocuments({ jobId: job._id });
+  const rejectedCount    = await RecruitCandidate.countDocuments({ jobId: job._id, stage: "rejected" });
+  const hiredCount       = await RecruitCandidate.countDocuments({ jobId: job._id, stage: "hired" });
+
+  const existing: string[] = (job.performanceAlerts ?? [])
+    .filter((a: any) => !a.dismissed)
+    .map((a: any) => a.type);
+
+  const toAdd: any[] = [];
+
+  // Check: low applications after 7+ days
+  if (daysSinceCreated >= 7 && applicationCount < 5 && !existing.includes("low_applications")) {
+    const prompt = `Job Title: ${job.title}
+Days posted: ${Math.floor(daysSinceCreated)}
+Applications received: ${applicationCount}
+Required skills: ${job.mustHaveSkills || "not specified"}
+Location: ${job.location}, Work mode: ${job.workMode}
+
+This job has very few applications. Give exactly 3 specific, actionable suggestions to get more applications.
+Return JSON only: {"suggestions": ["suggestion1", "suggestion2", "suggestion3"]}`;
+    let suggestions: string[] = [];
+    try {
+      const raw = await callGeminiChain({ prompt, jsonMode: true });
+      const parsed = JSON.parse(raw);
+      suggestions = parsed.suggestions ?? [];
+    } catch {
+      suggestions = [
+        "Consider adding a remote work option to reach more candidates",
+        "Reduce required years of experience or mark some skills as 'nice to have'",
+        "Share the job listing on LinkedIn and relevant job boards",
+      ];
+    }
+    toAdd.push({
+      id: crypto.randomUUID(),
+      type: "low_applications",
+      message: `Only ${applicationCount} application${applicationCount !== 1 ? "s" : ""} in ${Math.floor(daysSinceCreated)} days.`,
+      aiSuggestions: suggestions,
+      createdAt: new Date(),
+      dismissed: false,
+    });
+  }
+
+  // Check: no hire after 14+ days with applications
+  if (daysSinceCreated >= 14 && hiredCount === 0 && applicationCount > 0 && !existing.includes("no_hire_14_days")) {
+    toAdd.push({
+      id: crypto.randomUUID(),
+      type: "no_hire_14_days",
+      message: `Job open for ${Math.floor(daysSinceCreated)} days with ${applicationCount} applications but no hire yet.`,
+      aiSuggestions: [
+        "Speed up interview scheduling — candidates accept competing offers fast",
+        "Review your rejection rate; you may be filtering too aggressively",
+        "Consider sending assessment tests to shortlisted candidates immediately",
+      ],
+      createdAt: new Date(),
+      dismissed: false,
+    });
+  }
+
+  // Check: high reject rate (>70% of scored candidates rejected)
+  if (applicationCount >= 10 && !existing.includes("high_reject_rate")) {
+    const rejectRate = applicationCount > 0 ? (rejectedCount / applicationCount) : 0;
+    if (rejectRate > 0.7) {
+      toAdd.push({
+        id: crypto.randomUUID(),
+        type: "high_reject_rate",
+        message: `${Math.round(rejectRate * 100)}% rejection rate — your criteria may be too strict.`,
+        aiSuggestions: [
+          "Review your scoring rubric — some criteria may be weighted too heavily",
+          "Consider widening the experience range or accepting adjacent skill sets",
+          "Add a 'nice to have' tier in your rubric to surface more borderline candidates",
+        ],
+        createdAt: new Date(),
+        dismissed: false,
+      });
+    }
+  }
+
+  if (toAdd.length > 0) {
+    await RecruitJob.updateOne({ _id: jobId }, { $push: { performanceAlerts: { $each: toAdd } } });
+    console.log(`[perf-monitor] Added ${toAdd.length} alert(s) to job ${jobId}`);
+  }
+}
+
+recruitRouter.get("/jobs/:jobId/performance", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    // Trigger a fresh check before returning
+    await checkJobPerformanceAlerts(req.params.jobId, uid);
+    const job = await RecruitJob.findOne({ _id: req.params.jobId, uid }).lean() as any;
+    if (!job) return res.status(404).json({ error: "Job not found." });
+    const alerts = (job.performanceAlerts ?? []).filter((a: any) => !a.dismissed);
+    return res.json({ alerts });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+recruitRouter.post("/jobs/:jobId/performance/dismiss/:alertId", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const job = await RecruitJob.findOneAndUpdate(
+      { _id: req.params.jobId, uid, "performanceAlerts.id": req.params.alertId },
+      { $set: { "performanceAlerts.$.dismissed": true } },
+      { new: true }
+    ).lean();
+    if (!job) return res.status(404).json({ error: "Alert not found." });
+    return res.json({ ok: true });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+recruitRouter.post("/jobs/:jobId/performance/apply", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const { suggestion } = req.body as { suggestion: string };
+    const job = await RecruitJob.findOne({ _id: req.params.jobId, uid }).lean() as any;
+    if (!job) return res.status(404).json({ error: "Job not found." });
+
+    // Use AI to apply the suggestion — rewrite JD with the hint
+    const prompt = `You are a recruitment expert. A recruiter wants to improve this job listing.
+Job Title: ${job.title}
+Current Job Description: ${job.generatedJD || "Not provided"}
+Suggestion to apply: ${suggestion}
+
+Rewrite the job description incorporating this suggestion to attract more qualified candidates.
+Keep it professional, structured, and under 600 words. Return ONLY the new job description text.`;
+
+    const newJD = await callGeminiChain({ prompt });
+    await RecruitJob.updateOne({ _id: req.params.jobId, uid }, { $set: { generatedJD: newJD } });
+    return res.json({ ok: true, newJD });
+  } catch (err: any) {
+    console.error("[perf-monitor] apply suggestion failed:", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Daily Briefing: manual trigger ───────────────────────────────────────────
 recruitRouter.post("/briefing/send-now", async (req, res) => {
   try {
