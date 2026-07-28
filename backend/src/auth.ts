@@ -140,8 +140,8 @@ authRouter.post("/social", async (req, res) => {
     const { idToken, provider } = req.body as { idToken?: string; provider?: string };
 
     if (!idToken?.trim()) return res.status(400).json({ error: "idToken is required." });
-    if (!provider || !["google", "microsoft"].includes(provider)) {
-      return res.status(400).json({ error: "provider must be 'google' or 'microsoft'." });
+    if (!provider || !["google", "phone"].includes(provider)) {
+      return res.status(400).json({ error: "provider must be 'google' or 'phone'." });
     }
 
     // Verify the Firebase ID token
@@ -152,18 +152,52 @@ authRouter.post("/social", async (req, res) => {
       return res.status(401).json({ error: "Invalid or expired Firebase token." });
     }
 
-    const email = decoded.email?.trim().toLowerCase();
-    if (!email) {
-      return res.status(400).json({ error: "No email in token. Ensure the provider shares an email." });
-    }
-
     const firebaseUid = decoded.uid;
     const name        = (decoded.name as string | undefined) || "";
 
     await connectMongo();
 
-    // Look up by provider UID first, then by email (to link existing accounts)
-    const idField = provider === "google" ? "googleId" : "microsoftId";
+    // ── Phone auth ──────────────────────────────────────────────────────────
+    if (provider === "phone") {
+      const phoneNumber = (decoded as any).phone_number as string | undefined;
+      if (!phoneNumber) {
+        return res.status(400).json({ error: "No phone number in token." });
+      }
+
+      let user = await User.findOne({
+        $or: [{ phoneId: firebaseUid }, { phoneNumber }],
+      });
+
+      if (user) {
+        let changed = false;
+        if (!user.phoneId)      { user.phoneId = firebaseUid; changed = true; }
+        if (!user.phoneNumber)  { user.phoneNumber = phoneNumber; changed = true; }
+        if (!user.isVerified)   { user.isVerified = true; changed = true; }
+        if (changed) await user.save();
+      } else {
+        user = await User.create({
+          passwordHash: "",
+          name,
+          isVerified:   true,
+          phoneNumber,
+          phoneId:      firebaseUid,
+        });
+      }
+
+      const token = signToken({ sub: user._id.toString(), email: user.email || user.phoneNumber || firebaseUid });
+      return res.json({
+        token,
+        user: { id: user._id.toString(), email: user.email || "", name: user.name, phoneNumber: user.phoneNumber },
+      });
+    }
+
+    // ── Google auth ─────────────────────────────────────────────────────────
+    const email = decoded.email?.trim().toLowerCase();
+    if (!email) {
+      return res.status(400).json({ error: "No email in token. Ensure the provider shares an email." });
+    }
+
+    const idField = "googleId";
     let user = await User.findOne({
       $or: [{ [idField]: firebaseUid }, { email }],
     });
@@ -184,7 +218,7 @@ authRouter.post("/social", async (req, res) => {
       });
     }
 
-    const token = signToken({ sub: user._id.toString(), email: user.email });
+    const token = signToken({ sub: user._id.toString(), email: user.email! });
     return res.json({
       token,
       user: { id: user._id.toString(), email: user.email, name: user.name },

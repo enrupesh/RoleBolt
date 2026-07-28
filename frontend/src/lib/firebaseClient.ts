@@ -1,10 +1,10 @@
 /**
  * Firebase client SDK — initialised once for the browser.
- * Used for Google and Microsoft OAuth sign-in via popup.
+ * Used for Google OAuth sign-in via popup and phone auth via OTP.
  */
 
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, OAuthProvider } from "firebase/auth";
+import { getAuth, GoogleAuthProvider } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey:            process.env.NEXT_PUBLIC_FIREBASE_API_KEY!,
@@ -22,6 +22,3 @@ export const firebaseAuth = getAuth(app);
 
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: "select_account" });
-
-export const microsoftProvider = new OAuthProvider("microsoft.com");
-microsoftProvider.setCustomParameters({ prompt: "select_account" });
