@@ -9,7 +9,7 @@
 | # | Feature | Category | Status | Priority |
 |---|---------|----------|--------|----------|
 | 1.1 | AI Agent Mode Toggle | Job Creator | ✅ DONE | P1 |
-| 1.2 | AI Pipeline Manager (Rules) | Job Creator | ⏳ Next | P1 |
+| 1.2 | AI Pipeline Manager (Rules) | Job Creator | ✅ DONE | P1 |
 | 1.3 | AI Daily Recruiter Briefing | Job Creator | ⏳ Pending | P1 |
 | 1.4 | AI Job Performance Monitor | Job Creator | ⏳ Pending | P1 |
 | 1.5 | AI Job Description Generator (enhance) | Job Creator | ⏳ Pending | P2 |
