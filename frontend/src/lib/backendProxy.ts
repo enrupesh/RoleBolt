@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 const DEFAULT_BACKEND_URL = "https://back-mp9k.onrender.com";
 const TIMEOUT_MS = 65_000;
-const FRONTEND_HOSTS = new Set(["forjob.onrender.com", "rolebolt.app", "www.rolebolt.app"]);
+const FRONTEND_HOSTS = new Set(["rolebolt.tech", "www.rolebolt.tech"]);
 
 function normalizeBackendUrl(value: string) {
   const raw = value.trim().replace(/\/$/, "");

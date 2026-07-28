@@ -19,26 +19,30 @@ function shell(candidateName: string, subject: string, bodyHtml: string): string
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>${esc(subject)}</title>
 </head>
-<body style="margin:0;padding:0;background:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:36px 16px;">
+<body style="margin:0;padding:0;background:#f0f2f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f2f5;padding:40px 16px;">
     <tr><td align="center">
-      <table width="100%" style="max-width:580px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 1px 6px rgba(0,0,0,0.07);">
+      <table width="100%" style="max-width:520px;background:#ffffff;border-radius:16px;border:1px solid #e2e8f0;overflow:hidden;">
         <tr>
-          <td style="background:#4f46e5;padding:24px 32px;">
-            <span style="font-size:18px;font-weight:700;color:#fff;letter-spacing:-0.3px;">ForJob</span>
-            <span style="font-size:12px;color:rgba(255,255,255,0.6);margin-left:10px;">Powered by AI Hiring</span>
+          <td style="background:#0a66c2;padding:28px 36px;text-align:center;">
+            <span style="display:inline-block;background:#ffffff;border-radius:12px;padding:8px 14px;">
+              <span style="font-size:18px;font-weight:900;color:#0a66c2;letter-spacing:-0.5px;">Rolebolt</span>
+            </span>
           </td>
         </tr>
         <tr>
-          <td style="padding:32px 32px 24px;">
-            <p style="margin:0 0 18px 0;font-size:15px;color:#111;">Hi <strong>${esc(candidateName.split(" ")[0] || candidateName)}</strong>,</p>
+          <td style="padding:32px 36px 24px;">
+            <p style="margin:0 0 18px 0;font-size:15px;color:#0f172a;">Hi <strong>${esc(candidateName.split(" ")[0] || candidateName)}</strong>,</p>
             ${bodyHtml}
           </td>
         </tr>
         <tr>
-          <td style="border-top:1px solid #f0f0f0;padding:16px 32px;background:#fafafa;">
-            <p style="margin:0;font-size:11px;color:#aaa;line-height:1.5;">
-              You received this email because you applied for a job via ForJob. If you believe this was sent in error, please disregard it.
+          <td style="border-top:1px solid #f1f5f9;padding:20px 36px;background:#fafafa;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#94a3b8;line-height:1.5;">
+              You received this email because you applied for a job through Rolebolt. If you believe this was sent in error, please disregard it.
+            </p>
+            <p style="margin:8px 0 0;font-size:12px;color:#94a3b8;">
+              © 2025 Rolebolt · <a href="https://www.rolebolt.tech" style="color:#94a3b8;text-decoration:none;">rolebolt.tech</a>
             </p>
           </td>
         </tr>
@@ -51,8 +55,8 @@ function shell(candidateName: string, subject: string, bodyHtml: string): string
 
 function btn(text: string, href: string) {
   return `<table cellpadding="0" cellspacing="0" style="margin:24px 0 8px;">
-    <tr><td style="background:#4f46e5;border-radius:10px;padding:13px 28px;">
-      <a href="${href}" style="color:#fff;font-size:14px;font-weight:600;text-decoration:none;">${text}</a>
+    <tr><td style="background:#0a66c2;border-radius:12px;padding:14px 32px;box-shadow:0 4px 14px rgba(10,102,194,0.35);">
+      <a href="${href}" style="color:#fff;font-size:14px;font-weight:700;text-decoration:none;letter-spacing:-0.1px;">${text}</a>
     </td></tr>
   </table>`;
 }

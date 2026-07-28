@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-const FRONTEND_HOSTS = new Set(["forjob.onrender.com", "rolebolt.app", "www.rolebolt.app"]);
+const FRONTEND_HOSTS = new Set(["rolebolt.tech", "www.rolebolt.tech"]);
 
 /**
  * Resolve the backend base URL for server-side calls.

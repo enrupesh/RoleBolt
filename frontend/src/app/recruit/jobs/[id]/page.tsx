@@ -11,7 +11,7 @@ import { formatJobDescription } from "@/lib/jobDescription";
 
 function getFrontendUrl(): string {
   if (typeof window !== "undefined" && window.location?.origin) return window.location.origin;
-  return process.env.NEXT_PUBLIC_SITE_URL || "https://www.rolebolt.app";
+  return process.env.NEXT_PUBLIC_SITE_URL || "https://www.rolebolt.tech";
 }
 
 type Confidence = "high" | "medium" | "low";

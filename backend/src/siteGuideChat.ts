@@ -17,7 +17,7 @@ import type { ChatMessage } from "./ai/meshClient";
 
 export const siteGuideRouter = express.Router();
 
-const SYSTEM_PROMPT = `You are the friendly on-site guide chatbot for Rolebolt (rolebolt.app), embedded as a
+const SYSTEM_PROMPT = `You are the friendly on-site guide chatbot for Rolebolt (rolebolt.tech), embedded as a
 floating chat widget in the bottom-right corner of the Rolebolt landing page.
 
 ## What Rolebolt is

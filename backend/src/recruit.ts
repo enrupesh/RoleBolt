@@ -59,7 +59,8 @@ export const recruitRouter = express.Router();
 export const recruitPublicRouter = express.Router();
 
 const GOOGLEM_API_KEY = process.env.GOOGLEM_API_KEY ?? "";
-const FRONTEND_URL = process.env.FRONTEND_URL ?? "https://www.rolebolt.app";
+const FRONTEND_URL       = process.env.FRONTEND_URL        ?? "https://www.rolebolt.tech";
+const CANDIDATE_FROM     = `Rolebolt Careers <${process.env.CANDIDATE_FROM_EMAIL ?? "careers@rolebolt.tech"}>`;
 
 function getUid(req: express.Request): string {
   return (req as any).user?.uid ?? "";
@@ -1529,7 +1530,7 @@ recruitRouter.patch("/jobs/:jobId/candidates/:candidateId", async (req, res) => 
           if (stage === "interview") payload = emailTemplates.interview(candName, jobTitle, companyName);
           if (stage === "hired")     payload = emailTemplates.hired(candName,     jobTitle, companyName);
           if (!payload) return;
-          const result = await sendEmail({ to: candEmail, subject: payload.subject, html: payload.html, text: payload.text });
+          const result = await sendEmail({ to: candEmail, subject: payload.subject, html: payload.html, text: payload.text, from: CANDIDATE_FROM });
           await RecruitCandidate.findByIdAndUpdate(candId, {
             $push: {
               emailLog: {
@@ -1675,7 +1676,7 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/assessment/send", async
       setImmediate(async () => {
         try {
           const payload = emailTemplates.assessment(candName, job.title, companyName, assessmentUrl);
-          const result  = await sendEmail({ to: candEmail, subject: payload.subject, html: payload.html, text: payload.text });
+          const result  = await sendEmail({ to: candEmail, subject: payload.subject, html: payload.html, text: payload.text, from: CANDIDATE_FROM });
           await RecruitCandidate.findByIdAndUpdate(candId, {
             $push: {
               emailLog: {
@@ -1755,7 +1756,7 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/send-email", async (req
       html = emailTemplates.genericEmail(candidate.name, subject.trim(), body);
     }
 
-    const result = await sendEmail({ to: candidate.email, subject: subject.trim(), html, text: body });
+    const result = await sendEmail({ to: candidate.email, subject: subject.trim(), html, text: body, from: CANDIDATE_FROM });
 
     const logEntry = {
       type: type || "custom",
@@ -1807,7 +1808,7 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/reminder", async (req, 
           const jobTitle     = (job as any)?.title       || "";
           const companyName  = (job as any)?.companyName || "";
           const payload = emailTemplates.assessmentReminder(candName, jobTitle, companyName, reminderUrl);
-          const result  = await sendEmail({ to: candEmail, subject: payload.subject, html: payload.html, text: payload.text });
+          const result  = await sendEmail({ to: candEmail, subject: payload.subject, html: payload.html, text: payload.text, from: CANDIDATE_FROM });
           await RecruitCandidate.findByIdAndUpdate(candId, {
             $push: {
               emailLog: {
