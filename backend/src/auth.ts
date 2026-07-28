@@ -1,5 +1,5 @@
 /**
- * Custom authentication — signup, login, email verification.
+ * Custom authentication — signup, login, email verification, password reset.
  *
  * Routes (all mounted under /auth in index.ts):
  *   POST /auth/signup               — create account, send verification email
@@ -7,6 +7,8 @@
  *   POST /auth/verify-email         — verify email with token from URL
  *   POST /auth/resend-verification  — resend verification email
  *   GET  /auth/me                   — return current user (requires Bearer token)
+ *   POST /auth/forgot-password      — send password reset email
+ *   POST /auth/reset-password       — set new password with reset token
  */
 
 import express from "express";
@@ -25,14 +27,18 @@ const FRONTEND_URL  = (process.env.FRONTEND_URL || "http://localhost:5000").repl
 const FROM_NAME     = process.env.SMTP_FROM_NAME  || "Rolebolt";
 const FROM_EMAIL    = process.env.SMTP_FROM_EMAIL || "noreply@rolebolt.tech";
 
-const BCRYPT_ROUNDS = 12;
-const TOKEN_TTL_MS  = 24 * 60 * 60 * 1000; // 24 h
+const BCRYPT_ROUNDS    = 12;
+const TOKEN_TTL_MS     = 24 * 60 * 60 * 1000;       // 24 h  (email verification)
+const RESET_TTL_MS     =  1 * 60 * 60 * 1000;       //  1 h  (password reset)
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function makeVerificationToken(): string {
+function makeToken(): string {
   return crypto.randomBytes(32).toString("hex");
 }
+
+/** @deprecated use makeToken() */
+function makeVerificationToken(): string { return makeToken(); }
 
 async function sendVerificationEmail(email: string, name: string, token: string): Promise<void> {
   const link = `${FRONTEND_URL}/recruit/verify-email?token=${token}`;
@@ -279,6 +285,160 @@ authRouter.post("/resend-verification", async (req, res) => {
     return res.json({ message: "If that email exists and is unverified, a new link has been sent." });
   } catch (err: any) {
     console.error("[auth] resend-verification error:", err?.message);
+    return res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── POST /auth/forgot-password ───────────────────────────────────────────────
+
+authRouter.post("/forgot-password", async (req, res) => {
+  try {
+    await connectMongo();
+
+    const { email } = req.body as { email?: string };
+    if (!email?.trim()) return res.status(400).json({ error: "Email is required." });
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await User.findOne({ email: normalizedEmail });
+
+    // Always return success — prevents email enumeration
+    if (!user || !user.isVerified) {
+      return res.json({ message: "If that email is registered, a reset link has been sent." });
+    }
+
+    const resetToken = makeToken();
+    user.resetToken        = resetToken;
+    user.resetTokenExpiry  = new Date(Date.now() + RESET_TTL_MS);
+    await user.save();
+
+    const link = `${FRONTEND_URL}/recruit/reset-password?token=${resetToken}`;
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reset your password</title>
+</head>
+<body style="margin:0;padding:0;background:#f0f2f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f2f5;padding:40px 16px;">
+    <tr>
+      <td align="center">
+        <table width="100%" style="max-width:520px;background:#ffffff;border-radius:16px;border:1px solid #e2e8f0;overflow:hidden;">
+
+          <!-- Header -->
+          <tr>
+            <td style="background:#0a66c2;padding:28px 36px;text-align:center;">
+              <span style="display:inline-block;background:#ffffff;border-radius:12px;padding:8px 14px;">
+                <span style="font-size:18px;font-weight:900;color:#0a66c2;letter-spacing:-0.5px;">Rolebolt</span>
+              </span>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding:36px 36px 28px;">
+              <p style="margin:0 0 8px;font-size:22px;font-weight:800;color:#0f172a;line-height:1.2;">
+                Reset your password
+              </p>
+              <p style="margin:0 0 24px;font-size:15px;color:#64748b;line-height:1.6;">
+                ${user.name ? `Hi ${user.name},` : "Hi,"} we received a request to reset the password for your Rolebolt account. Click the button below to choose a new password.
+              </p>
+
+              <!-- CTA button -->
+              <table cellpadding="0" cellspacing="0" style="margin:0 0 28px;">
+                <tr>
+                  <td style="border-radius:12px;background:#0a66c2;box-shadow:0 4px 14px rgba(10,102,194,0.35);">
+                    <a href="${link}" style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:12px;letter-spacing:-0.1px;">
+                      Reset Password
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:0 0 8px;font-size:13px;color:#94a3b8;line-height:1.6;">
+                Or copy this link into your browser:
+              </p>
+              <p style="margin:0 0 28px;font-size:12px;color:#0a66c2;word-break:break-all;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;">
+                ${link}
+              </p>
+
+              <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.6;">
+                This link expires in <strong style="color:#64748b;">1 hour</strong> and can only be used once. If you didn't request a password reset, you can safely ignore this email — your password will not change.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="border-top:1px solid #f1f5f9;padding:20px 36px;text-align:center;">
+              <p style="margin:0;font-size:12px;color:#94a3b8;">
+                © 2025 Rolebolt · <a href="https://rolebolt.tech" style="color:#94a3b8;text-decoration:none;">rolebolt.tech</a>
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+    const text = `Hi${user.name ? ` ${user.name}` : ""},\n\nWe received a request to reset your Rolebolt password.\n\nReset your password here:\n${link}\n\nThis link expires in 1 hour and can only be used once.\n\nIf you didn't request this, you can safely ignore this email.`;
+
+    sendEmail({
+      to:      normalizedEmail,
+      subject: "Reset your Rolebolt password",
+      html,
+      text,
+    }).catch((err) => {
+      console.error("[auth] Failed to send reset email:", err?.message);
+    });
+
+    return res.json({ message: "If that email is registered, a reset link has been sent." });
+  } catch (err: any) {
+    console.error("[auth] forgot-password error:", err?.message);
+    return res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── POST /auth/reset-password ────────────────────────────────────────────────
+
+authRouter.post("/reset-password", async (req, res) => {
+  try {
+    await connectMongo();
+
+    const { token, password } = req.body as { token?: string; password?: string };
+
+    if (!token?.trim())
+      return res.status(400).json({ code: "TOKEN_INVALID", error: "Reset token is required." });
+    if (!password)
+      return res.status(400).json({ error: "Password is required." });
+    if (password.length < 8)
+      return res.status(400).json({ error: "Password must be at least 8 characters." });
+
+    const user = await User.findOne({ resetToken: token.trim() });
+    if (!user) {
+      return res.status(400).json({ code: "TOKEN_INVALID", error: "Invalid or expired reset link." });
+    }
+
+    if (user.resetTokenExpiry && user.resetTokenExpiry < new Date()) {
+      // Clean up expired token
+      user.resetToken       = undefined;
+      user.resetTokenExpiry = undefined;
+      await user.save();
+      return res.status(400).json({ code: "TOKEN_EXPIRED", error: "This reset link has expired. Please request a new one." });
+    }
+
+    // Hash new password and clear the reset token (one-time use)
+    user.passwordHash     = await bcrypt.hash(password, BCRYPT_ROUNDS);
+    user.resetToken       = undefined;
+    user.resetTokenExpiry = undefined;
+    await user.save();
+
+    return res.json({ message: "Password updated successfully. You can now sign in with your new password." });
+  } catch (err: any) {
+    console.error("[auth] reset-password error:", err?.message);
     return res.status(500).json({ error: "Internal server error." });
   }
 });
