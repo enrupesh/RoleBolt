@@ -13,7 +13,7 @@ import * as emailTemplates from "./emailTemplates";
 export const formRouter = express.Router();       // protected — /recruit/forms
 export const formPublicRouter = express.Router(); // public    — /recruit-public/forms
 
-const GOOGLEM_API_KEY = process.env.GOOGLEM_API_KEY ?? "";
+const GEMINI_MESH_KEY = process.env.GEMINI_MESH_KEY ?? "";
 
 function getUid(req: express.Request): string {
   return (req as any).user?.uid ?? "";
@@ -148,7 +148,7 @@ Be specific and honest. If answers are very short or empty, note that in the sum
   let raw: string;
   try {
     raw = await callMeshChatCompletions({
-      apiKey: GOOGLEM_API_KEY,
+      apiKey: GEMINI_MESH_KEY,
       retries: 2,
       fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
       messages: [{ role: "user", content: prompt }],
@@ -222,7 +222,7 @@ Return only the plain text email body.`;
 
   try {
     const raw = await callMeshChatCompletions({
-      apiKey: GOOGLEM_API_KEY,
+      apiKey: GEMINI_MESH_KEY,
       retries: 2,
       fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
       messages: [{ role: "user", content: prompt }],
@@ -627,7 +627,7 @@ Return ONLY this JSON (no markdown):
     let raw: string;
     try {
       raw = await callMeshChatCompletions({
-        apiKey: GOOGLEM_API_KEY,
+        apiKey: GEMINI_MESH_KEY,
         retries: 2,
         fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
         messages: [{ role: "user", content: prompt }],

@@ -7,7 +7,7 @@
  * never fails.
  *
  * Models are ordered: largest/best first, reliable alternatives after.
- * Env: GOOGLEN_API_KEY
+ * Env: GEMINI_FALLBACK_KEY
  */
 
 import type { ChatMessage } from "./meshClient";
@@ -42,9 +42,9 @@ export interface NvidiaCallArgs {
  * Throws only if ALL 5 models fail.
  */
 export async function callNvidia(args: NvidiaCallArgs): Promise<string> {
-  const apiKey = process.env.GOOGLEN_API_KEY;
+  const apiKey = process.env.GEMINI_FALLBACK_KEY;
   if (!apiKey) {
-    throw new Error("[nvidiaClient] GOOGLEN_API_KEY not set in environment.");
+    throw new Error("[nvidiaClient] GEMINI_FALLBACK_KEY not set in environment.");
   }
 
   const {
