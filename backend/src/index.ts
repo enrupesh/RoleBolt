@@ -114,13 +114,11 @@ async function handleStatusRoute(_req: any, res: any) {
         })
       : Promise.resolve({ status: "unavailable" as const, responseTimeMs: 0, error: "GOOGLEM_API_KEY not configured" }),
 
-    // Google N API (NVIDIA NIM)
+    // Google N API (NVIDIA NIM) — use GET /v1/models (model-agnostic, no 404 from bad model name)
     googleNKey
       ? pingApi({
-          url: "https://integrate.api.nvidia.com/v1/chat/completions",
-          method: "POST",
-          headers: { Authorization: `Bearer ${googleNKey}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ model: "nvidia/llama-3.1-nemotron-70b-instruct", messages: [{ role: "user", content: "hi" }], max_tokens: 1, stream: false }),
+          url: "https://integrate.api.nvidia.com/v1/models",
+          headers: { Authorization: `Bearer ${googleNKey}` },
           timeoutMs: 11000,
         })
       : Promise.resolve({ status: "unavailable" as const, responseTimeMs: 0, error: "GOOGLEN_API_KEY not configured" }),
@@ -211,10 +209,8 @@ app.get("/ai-routing", async (_req, res) => {
 
     googleNKey
       ? pingApi({
-          url: "https://integrate.api.nvidia.com/v1/chat/completions",
-          method: "POST",
-          headers: { Authorization: `Bearer ${googleNKey}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ model: "nvidia/llama-3.1-nemotron-70b-instruct", messages: [{ role: "user", content: "hi" }], max_tokens: 1, stream: false }),
+          url: "https://integrate.api.nvidia.com/v1/models",
+          headers: { Authorization: `Bearer ${googleNKey}` },
           timeoutMs: 11000,
         })
       : Promise.resolve({ status: "unavailable" as const, responseTimeMs: 0, error: "GOOGLEN_API_KEY not configured" }),
