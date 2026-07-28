@@ -1,0 +1,151 @@
+Devpost
+infocm76
+Portfolio
+Settings
+Help
+Log out
+Join a hackathon
+Host a hackathon
+Resources
+Notifications
+Loading...
+
+Build with Gemini XPRIZE
+Descend
+Overview
+$2,000,000 in prizes. Build with Gemini. Ship products that impact the world.
+Join hackathon
+Who can participate
+Above legal age of majority in country of residence
+Specific countries/territories excluded 
+View full rules
+View schedule
+
+Deadline: Aug 17, 2026 @ 1:00pm PDT
+Online
+Public
+$2,000,000 in cash	22497 participants
+XPRIZE
+Devpost icon rgb30px
+Managed by Devpost
+Machine Learning/AI Education Productivity
+
+90 days. Ideate. Build. Ship. Grow.
+Real product. Real revenue. A real business.
+
+01
+Ideate
+
+Pick a real problem worth solving. AI helps you scope it.
+
+02
+Build
+
+Build a working prototype using AI.
+
+03
+Ship
+
+Deploy a business that operates with AI. Real users in production.
+
+04
+Sell
+
+Market it. Grow it. Show the revenue.
+
+AI is transforming everything, including what small teams can build. Operations that used to take entire engineering departments can now be written in plain English and executed by AI agents. By some estimates, the world’s 45 million software developers will grow to over a billion in the next few years. Everyone will be a developer, and we want to start now, with you. So show us: build a real business that makes real impact.
+
+Requirements
+Build a business in 90 days with real customers and real revenue. The hurdle: your business operates with AI in one of the categories.
+
+Your business has to be operated by AI agents and must use at least one product from Google Cloud.
+
+The Categories
+Five categories spanning economic opportunity and professional access:
+
+Education & Human Potential: Transforming how we learn, grow, and achieve our best.
+Entrepreneurship & Job Creation: Fueling the tools that help new founders and economies thrive.
+Small Business Services: Powering everyday businesses with tools to compete and win.
+Money & Financial Access: Breaking down barriers to banking, capital, and financial freedom.
+Professional Services Access: Connecting everyday people with the expert guidance they need.
+ 
+
+What to Submit
+GitHub repo shared with testing@devpost.com and judging@hacker.fund (Public or Private repositories).
+3-minute video that demonstrates the extent to which AI is live in production and executes key decisions.
+Written narrative (500–1000 words) of how the team uses AI day to day, what humans do versus what AI does, the jobs and economic opportunities the business creates or enables for people beyond the founding team (actual and potential), and the story of building the business this way.
+Revenue evidence such as a Stripe dashboard export or bank statement and simple P&L (template here). Projects must also include their corporate ID if available.
+Expenses incurred during the hackathon period within your P&L (template here). This includes Marketing and customer acquisition spend to disclose total spend on marketing and customer acquisition during the hackathon period. This is used as a check on business viability and must be disclosed even if zero.
+Product evidence showing agent execution logs, API usage records, screenshots of dashboards. Anything that strengthens the case that AI is running in production continuously.
+Customer evidence such as contact info of real customers (name, email, phone) and any testimonials or feedback provided by customers of your project.
+Prizes
+$2,000,000 in prizes
+1st place
+$500,000 in cash
+1 winner
+2nd place
+$200,000 in cash
+1 winner
+3rd place
+$100,000 in cash
+1 winner
+4th place
+$100,000 in cash
+1 winner
+5th place
+$100,000 in cash
+1 winner
+Runner-up
+$50,000 in cash
+15 winners
+Education & Human Potential
+$50,000 in cash
+1 winner
+Entrepreneurship & Job Creation
+$50,000 in cash
+1 winner
+Small Business Services
+$50,000 in cash
+1 winner
+Money & Financial Access
+$50,000 in cash
+1 winner
+Professional Services Access
+$50,000 in cash
+1 winner
+Judging Criteria
+Business Viability
+Teams must launch a real business during the hackathon, acquire real users, and generate real revenue. Judges assess both actual revenue achieved during the 90-day window and the sustainability of the underlying business model.
+AI-Native Operations
+Teams must run their business through AI. Judges assess the extent to which AI is live in production and executes key decisions.
+Category Impact
+Teams built something that meaningfully moves the needle in their chosen category — either by redefining how something works at a fundamental level, or by reaching a scale where widespread adoption is credible.
+Questions? Email the hackathon manager
+
+This site is protected by reCAPTCHA and the Google Privacy Policy and Terms of Service apply.
+
+Devpost
+About
+Careers
+Contact
+Help
+Hackathons
+Browse hackathons
+Explore projects
+Host a hackathon
+Hackathon guides
+Portfolio
+Your projects
+Your hackathons
+Settings
+Connect
+ Twitter
+ Discord
+ Facebook
+ LinkedIn
+© 2026 Devpost, Inc. All rights reserved.
+Community guidelines
+Security
+CA notice
+Privacy policy
+Terms of service
