@@ -191,6 +191,235 @@ async function handleStatusRoute(_req: any, res: any) {
 app.get("/status",          handleStatusRoute);
 app.get("/mesh-api-status", handleStatusRoute); // legacy alias
 
+// ── GET /ai-routing — detailed routing intelligence for admin dashboard ────────
+app.get("/ai-routing", async (_req, res) => {
+  const googleMKey = process.env.GOOGLEM_API_KEY || "";
+  const googleNKey = process.env.GOOGLEN_API_KEY || "";
+  const googleKey  = process.env.GOOGLE_API_KEY  || "";
+
+  // Ping all three in parallel
+  const [googleMResult, googleNResult, googleResult] = await Promise.all([
+    googleMKey
+      ? pingApi({
+          url: "https://api.meshapi.ai/v1/chat/completions",
+          method: "POST",
+          headers: { Authorization: `Bearer ${googleMKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ model: "openai/gpt-4o-mini", messages: [{ role: "user", content: "hi" }], max_tokens: 1, stream: false }),
+          timeoutMs: 9000,
+        })
+      : Promise.resolve({ status: "unavailable" as const, responseTimeMs: 0, error: "GOOGLEM_API_KEY not configured" }),
+
+    googleNKey
+      ? pingApi({
+          url: "https://integrate.api.nvidia.com/v1/chat/completions",
+          method: "POST",
+          headers: { Authorization: `Bearer ${googleNKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ model: "nvidia/llama-3.1-nemotron-70b-instruct", messages: [{ role: "user", content: "hi" }], max_tokens: 1, stream: false }),
+          timeoutMs: 11000,
+        })
+      : Promise.resolve({ status: "unavailable" as const, responseTimeMs: 0, error: "GOOGLEN_API_KEY not configured" }),
+
+    googleKey
+      ? pingApi({
+          url: `https://generativelanguage.googleapis.com/v1beta/models?key=${googleKey}&pageSize=1`,
+          headers: {},
+          timeoutMs: 8000,
+        })
+      : Promise.resolve({ status: "unavailable" as const, responseTimeMs: 0, error: "GOOGLE_API_KEY not configured" }),
+  ]);
+
+  const mUp = googleMResult.status !== "unavailable";
+  const nUp = googleNResult.status !== "unavailable";
+  const gUp = googleResult.status  !== "unavailable";
+
+  // Infer active model for Google M API (Mesh)
+  // Primary: google/gemini-2.5-flash; fallbacks: anthropic/claude-3-haiku, google/gemini-2.5-flash-lite
+  // If Mesh is down → NVIDIA NIM
+  const googleMActiveModel  = mUp ? "google/gemini-2.5-flash"           : (nUp ? "meta/llama-3.1-405b-instruct (via NVIDIA fallback)" : null);
+  const googleMRoutingState = mUp ? "normal"                             : (nUp ? "fallback-nvidia"                                    : "unavailable");
+
+  // Infer active model for Google API (Gemini direct)
+  // Primary chain starts at gemini-2.5-flash; if all down → NVIDIA NIM
+  const googleActiveModel   = gUp ? "gemini-2.5-flash"                  : (nUp ? "meta/llama-3.1-405b-instruct (via NVIDIA fallback)" : null);
+  const googleRoutingState  = gUp ? "normal"                            : (nUp ? "fallback-nvidia"                                    : "unavailable");
+
+  // NVIDIA is the ultimate fallback — active model is head of chain
+  const googleNActiveModel  = nUp ? "meta/llama-3.1-405b-instruct"      : null;
+
+  // Determine overall routing mode
+  const anyDown   = !mUp || !nUp || !gUp;
+  const allDown   = !mUp && !gUp;
+  const routingMode = !anyDown ? "normal" : (allDown ? "critical" : "degraded");
+
+  // Which features route where, with fallback notes
+  const features = [
+    {
+      id: "resumeScoring",
+      label: "Resume Scoring & Analysis",
+      primaryProvider: "googleM",
+      primaryModel: "google/gemini-2.5-flash",
+      fallbackChain: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
+      ultimateFallback: "nvidia",
+      activeProvider: mUp ? "googleM" : (nUp ? "nvidia" : null),
+      activeModel:    mUp ? "google/gemini-2.5-flash" : (nUp ? "meta/llama-3.1-405b-instruct" : null),
+      inFallback:     !mUp,
+    },
+    {
+      id: "candidateScoring",
+      label: "Candidate Fit Scoring",
+      primaryProvider: "googleM",
+      primaryModel: "google/gemini-2.5-flash",
+      fallbackChain: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
+      ultimateFallback: "nvidia",
+      activeProvider: mUp ? "googleM" : (nUp ? "nvidia" : null),
+      activeModel:    mUp ? "google/gemini-2.5-flash" : (nUp ? "meta/llama-3.1-405b-instruct" : null),
+      inFallback:     !mUp,
+    },
+    {
+      id: "assessmentGen",
+      label: "Assessment Question Generation",
+      primaryProvider: "googleM",
+      primaryModel: "google/gemini-2.5-flash",
+      fallbackChain: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
+      ultimateFallback: "nvidia",
+      activeProvider: mUp ? "googleM" : (nUp ? "nvidia" : null),
+      activeModel:    mUp ? "google/gemini-2.5-flash" : (nUp ? "meta/llama-3.1-405b-instruct" : null),
+      inFallback:     !mUp,
+    },
+    {
+      id: "interviewBrief",
+      label: "Interview Brief Generation",
+      primaryProvider: "googleM",
+      primaryModel: "google/gemini-2.5-flash",
+      fallbackChain: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
+      ultimateFallback: "nvidia",
+      activeProvider: mUp ? "googleM" : (nUp ? "nvidia" : null),
+      activeModel:    mUp ? "google/gemini-2.5-flash" : (nUp ? "meta/llama-3.1-405b-instruct" : null),
+      inFallback:     !mUp,
+    },
+    {
+      id: "formScoring",
+      label: "Form Response Scoring",
+      primaryProvider: "googleM",
+      primaryModel: "google/gemini-2.5-flash",
+      fallbackChain: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
+      ultimateFallback: "nvidia",
+      activeProvider: mUp ? "googleM" : (nUp ? "nvidia" : null),
+      activeModel:    mUp ? "google/gemini-2.5-flash" : (nUp ? "meta/llama-3.1-405b-instruct" : null),
+      inFallback:     !mUp,
+    },
+    {
+      id: "copilot",
+      label: "AI Hiring Copilot (Ask Rolebolt)",
+      primaryProvider: "googleM",
+      primaryModel: "google/gemini-2.5-flash",
+      fallbackChain: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
+      ultimateFallback: "nvidia",
+      activeProvider: mUp ? "googleM" : (nUp ? "nvidia" : null),
+      activeModel:    mUp ? "google/gemini-2.5-flash" : (nUp ? "meta/llama-3.1-405b-instruct" : null),
+      inFallback:     !mUp,
+    },
+    {
+      id: "siteGuide",
+      label: "Site Guide Chatbot",
+      primaryProvider: "googleM",
+      primaryModel: "google/gemini-2.5-flash",
+      fallbackChain: [],
+      ultimateFallback: "nvidia",
+      activeProvider: mUp ? "googleM" : (nUp ? "nvidia" : null),
+      activeModel:    mUp ? "google/gemini-2.5-flash" : (nUp ? "meta/llama-3.1-405b-instruct" : null),
+      inFallback:     !mUp,
+    },
+    {
+      id: "jobDescription",
+      label: "Job Description Generation",
+      primaryProvider: "google",
+      primaryModel: "gemini-2.5-flash",
+      fallbackChain: ["gemini-2.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-3.6-flash"],
+      ultimateFallback: "nvidia",
+      activeProvider: gUp ? "google" : (nUp ? "nvidia" : null),
+      activeModel:    gUp ? "gemini-2.5-flash" : (nUp ? "meta/llama-3.1-405b-instruct" : null),
+      inFallback:     !gUp,
+    },
+  ];
+
+  return res.json({
+    checkedAt: new Date().toISOString(),
+    routingMode,
+    providers: {
+      googleM: {
+        label: "Google M API",
+        sublabel: "Mesh API Gateway",
+        endpoint: "api.meshapi.ai",
+        keyConfigured: !!googleMKey,
+        status: googleMResult.status,
+        responseTimeMs: googleMResult.responseTimeMs,
+        error: googleMResult.error,
+        primaryModel: "google/gemini-2.5-flash",
+        fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
+        ultimateFallback: "nvidia",
+        activeModel: googleMActiveModel,
+        routingState: googleMRoutingState,
+        modelRegistry: [
+          { id: "google/gemini-2.5-flash",         label: "Gemini 2.5 Flash",       role: "primary",    provider: "Google via Mesh" },
+          { id: "anthropic/claude-3-haiku",         label: "Claude 3 Haiku",          role: "fallback-1", provider: "Anthropic via Mesh" },
+          { id: "google/gemini-2.5-flash-lite",     label: "Gemini 2.5 Flash Lite",  role: "fallback-2", provider: "Google via Mesh" },
+          { id: "openai/gpt-4o-mini",               label: "GPT-4o Mini",             role: "available",  provider: "OpenAI via Mesh" },
+          { id: "anthropic/claude-3-5-sonnet",      label: "Claude 3.5 Sonnet",       role: "available",  provider: "Anthropic via Mesh" },
+        ],
+      },
+      google: {
+        label: "Google API",
+        sublabel: "Gemini Direct",
+        endpoint: "generativelanguage.googleapis.com",
+        keyConfigured: !!googleKey,
+        status: googleResult.status,
+        responseTimeMs: googleResult.responseTimeMs,
+        error: googleResult.error,
+        primaryModel: "gemini-2.5-flash",
+        fallbackModels: ["gemini-2.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-3.6-flash"],
+        ultimateFallback: "nvidia",
+        activeModel: googleActiveModel,
+        routingState: googleRoutingState,
+        modelRegistry: [
+          { id: "gemini-2.5-flash",       label: "Gemini 2.5 Flash",       role: "primary",    provider: "Google" },
+          { id: "gemini-2.5-flash-lite",  label: "Gemini 2.5 Flash Lite",  role: "fallback-1", provider: "Google" },
+          { id: "gemini-3.1-flash-lite",  label: "Gemini 3.1 Flash Lite",  role: "fallback-2", provider: "Google" },
+          { id: "gemini-3.5-flash-lite",  label: "Gemini 3.5 Flash Lite",  role: "fallback-3", provider: "Google" },
+          { id: "gemini-3.6-flash",       label: "Gemini 3.6 Flash",       role: "fallback-4", provider: "Google" },
+        ],
+      },
+      nvidia: {
+        label: "NVIDIA API",
+        sublabel: "Ultimate Fallback",
+        endpoint: "integrate.api.nvidia.com",
+        keyConfigured: !!googleNKey,
+        status: googleNResult.status,
+        responseTimeMs: googleNResult.responseTimeMs,
+        error: googleNResult.error,
+        primaryModel: "meta/llama-3.1-405b-instruct",
+        fallbackModels: [
+          "nvidia/llama-3.1-nemotron-70b-instruct",
+          "meta/llama-3.3-70b-instruct",
+          "meta/llama-3.1-70b-instruct",
+          "mistralai/mixtral-8x22b-instruct-v0.1",
+        ],
+        ultimateFallback: null,
+        activeModel: googleNActiveModel,
+        routingState: nUp ? "normal" : "unavailable",
+        modelRegistry: [
+          { id: "meta/llama-3.1-405b-instruct",              label: "Llama 3.1 405B",         role: "primary",    provider: "Meta via NVIDIA" },
+          { id: "nvidia/llama-3.1-nemotron-70b-instruct",    label: "Nemotron 70B",            role: "fallback-1", provider: "NVIDIA" },
+          { id: "meta/llama-3.3-70b-instruct",               label: "Llama 3.3 70B",           role: "fallback-2", provider: "Meta via NVIDIA" },
+          { id: "meta/llama-3.1-70b-instruct",               label: "Llama 3.1 70B",           role: "fallback-3", provider: "Meta via NVIDIA" },
+          { id: "mistralai/mixtral-8x22b-instruct-v0.1",     label: "Mixtral 8x22B",           role: "fallback-4", provider: "Mistral via NVIDIA" },
+        ],
+      },
+    },
+    features,
+  });
+});
+
 const PORT = Number(process.env.PORT) || 8080;
 
 connectMongo()
