@@ -536,6 +536,12 @@ function NewJobContent() {
   const [token, setToken] = useState<string | null>(null);
   const [createdJob, setCreatedJob] = useState<{ id: string; title: string } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [benchmarkLoading, setBenchmarkLoading] = useState(false);
+  const [benchmarkError, setBenchmarkError] = useState("");
+  const [benchmark, setBenchmark] = useState<{
+    p25: number; p50: number; p75: number; min: number; max: number;
+    currency: string; insight: string; factors: string[];
+  } | null>(null);
 
   const { sessionToken } = useRecruitAuth();
   useEffect(() => {
@@ -544,6 +550,30 @@ function NewJobContent() {
 
   function update(key: keyof FormData) {
     return (val: string) => setForm(prev => ({ ...prev, [key]: val }));
+  }
+
+  async function fetchSalaryBenchmark() {
+    if (!form.title) return;
+    setBenchmarkLoading(true); setBenchmarkError(""); setBenchmark(null);
+    try {
+      const params = new URLSearchParams({
+        title: form.title,
+        seniority: form.seniority,
+        niche: form.niche,
+        location: form.location || "Global",
+        currency: form.salaryCurrency,
+      });
+      const res = await fetch(apiUrl(`/recruit/salary-benchmark?${params}`), {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to fetch benchmark");
+      setBenchmark(data.benchmark);
+    } catch (e: any) {
+      setBenchmarkError(e.message);
+    } finally {
+      setBenchmarkLoading(false);
+    }
   }
 
   function updateNicheDetail(key: string) {
@@ -989,6 +1019,87 @@ function NewJobContent() {
                   <Input type="number" value={form.salaryMax} onChange={update("salaryMax")} placeholder="e.g. 1400000" />
                 </div>
               </div>
+
+              {/* AI Salary Benchmark */}
+              <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-bold text-indigo-700">📊 AI Market Salary Benchmark</p>
+                    <p className="text-[11px] text-indigo-500 mt-0.5">See what the market pays for this role — fill in your salary range based on data.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={fetchSalaryBenchmark}
+                    disabled={benchmarkLoading || !form.title}
+                    className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50 transition shrink-0"
+                  >
+                    {benchmarkLoading ? (
+                      <><span className="inline-block h-3 w-3 rounded-full border-2 border-white/30 border-t-white animate-spin" />Fetching…</>
+                    ) : "Get Market Range"}
+                  </button>
+                </div>
+                {benchmarkError && <p className="text-xs text-rose-600 font-medium">{benchmarkError}</p>}
+                {benchmark && (() => {
+                  const fmt = (n: number) => n >= 100000
+                    ? `${benchmark.currency} ${(n / 1000).toFixed(0)}K`
+                    : `${benchmark.currency} ${n.toLocaleString()}`;
+                  const range = benchmark.max - benchmark.min;
+                  const pct = (v: number) => range > 0 ? Math.round(((v - benchmark.min) / range) * 100) : 50;
+                  return (
+                    <div className="space-y-3">
+                      {/* Range bar */}
+                      <div className="space-y-1.5">
+                        <div className="relative h-3 rounded-full bg-indigo-100 overflow-hidden">
+                          <div
+                            className="absolute h-full rounded-full bg-gradient-to-r from-indigo-300 to-indigo-500"
+                            style={{ left: `${pct(benchmark.p25)}%`, width: `${pct(benchmark.p75) - pct(benchmark.p25)}%` }}
+                          />
+                        </div>
+                        <div className="flex justify-between text-[10px] font-bold text-indigo-600">
+                          <span>{fmt(benchmark.min)}</span>
+                          <span className="text-indigo-800">Median: {fmt(benchmark.p50)}</span>
+                          <span>{fmt(benchmark.max)}</span>
+                        </div>
+                      </div>
+                      {/* Percentile labels */}
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        {[["P25", benchmark.p25], ["P50 (Median)", benchmark.p50], ["P75", benchmark.p75]].map(([label, val]) => (
+                          <div key={label as string} className="rounded-lg bg-white border border-indigo-100 py-2">
+                            <p className="text-[10px] text-indigo-400 font-semibold uppercase tracking-wide">{label}</p>
+                            <p className="text-xs font-bold text-indigo-800 mt-0.5">{fmt(val as number)}</p>
+                          </div>
+                        ))}
+                      </div>
+                      {/* Insight */}
+                      <p className="text-[11px] text-slate-600 leading-5 italic">&ldquo;{benchmark.insight}&rdquo;</p>
+                      {/* Factors */}
+                      <div className="flex flex-wrap gap-1.5">
+                        {benchmark.factors.map((f, i) => (
+                          <span key={i} className="rounded-full border border-indigo-100 bg-white px-2 py-0.5 text-[10px] font-medium text-indigo-600">{f}</span>
+                        ))}
+                      </div>
+                      {/* Quick fill buttons */}
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setForm(p => ({ ...p, salaryMin: String(benchmark.p25), salaryMax: String(benchmark.p75) }))}
+                          className="rounded-lg border border-indigo-200 bg-white px-3 py-1 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-50 transition"
+                        >
+                          Use P25–P75 range
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setForm(p => ({ ...p, salaryMin: String(benchmark.min), salaryMax: String(benchmark.p75) }))}
+                          className="rounded-lg border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 transition"
+                        >
+                          Use Min–P75
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                 <p className="text-xs text-slate-500 leading-relaxed">
                   Salary information is used only by the AI to write better job descriptions. It is not shown publicly unless you paste the generated JD on a job board.
