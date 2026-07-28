@@ -8,6 +8,7 @@ const allowedDevOrigins = new Set<string>([
   "*.replit.dev",
   "*.janeway.replit.dev",
   "*.repl.co",
+  "127.0.0.1",
 ]);
 if (process.env.REPLIT_DEV_DOMAIN) {
   allowedDevOrigins.add(process.env.REPLIT_DEV_DOMAIN.replace(/^https?:\/\//, ""));
