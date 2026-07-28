@@ -9,6 +9,8 @@ import { copilotRouter } from "./recruitCopilot";
 import { siteGuideRouter } from "./siteGuideChat";
 import { connectMongo } from "./db";
 import { startDailyBriefingJob } from "./jobs/dailyBriefing";
+import { seekerRouter } from "./seeker";
+import { billingRouter, handleStripeWebhook } from "./billing";
 
 dotenv.config();
 
@@ -41,6 +43,9 @@ app.use(
   })
 );
 
+// ── Stripe webhook (raw body BEFORE express.json) ────────────────────────────
+app.post("/billing/webhook", express.raw({ type: "application/json" }), handleStripeWebhook);
+
 app.use(express.json({ limit: "6mb" }));
 
 // ── Health check (before auth middleware so it always works) ─────────────────
@@ -58,8 +63,10 @@ app.use("/recruit-public/site-guide", siteGuideRouter);
 
 // ── Protected routes (JWT required) ──────────────────────────────────────────
 app.use("/recruit/copilot", requireAuth, copilotRouter);
+app.use("/recruit/seeker", requireAuth, seekerRouter);
 app.use("/recruit", requireAuth, recruitRouter);
 app.use("/recruit/forms", requireAuth, formRouter);
+app.use("/billing", requireAuth, billingRouter);
 
 // ── Helper: ping one AI API ───────────────────────────────────────────────────
 async function pingApi(opts: {
@@ -189,6 +196,7 @@ async function handleStatusRoute(_req: any, res: any) {
 
 app.get("/status",          handleStatusRoute);
 app.get("/mesh-api-status", handleStatusRoute); // legacy alias
+app.get("/status/ai",       handleStatusRoute); // Feature 4.1 — Gemini verification alias
 
 // ── GET /ai-routing — detailed routing intelligence for admin dashboard ────────
 app.get("/ai-routing", async (_req, res) => {
@@ -415,6 +423,32 @@ app.get("/ai-routing", async (_req, res) => {
     },
     features,
   });
+});
+
+// ── GET /stats/public — live platform stats for landing page ──────────────────
+app.get("/stats/public", async (_req, res) => {
+  try {
+    await connectMongo();
+    const RecruitJob      = (await import("./models/RecruitJob")).RecruitJob;
+    const RecruitCandidate = (await import("./models/RecruitCandidate")).RecruitCandidate;
+    const User            = (await import("./models/User")).User;
+
+    const [totalJobs, totalCandidates, totalUsers] = await Promise.all([
+      RecruitJob.countDocuments({ status: "active" }),
+      RecruitCandidate.countDocuments({}),
+      User.countDocuments({}),
+    ]);
+
+    return res.json({
+      activeJobs: totalJobs,
+      candidatesScreened: totalCandidates,
+      recruiters: totalUsers,
+      aiProvider: "Google Gemini",
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
 });
 
 const PORT = Number(process.env.PORT) || 8080;

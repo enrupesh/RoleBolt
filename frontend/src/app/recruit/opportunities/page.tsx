@@ -2,6 +2,7 @@ import Link from "next/link";
 import RecruitHeader from "@/components/RecruitHeader";
 import FilterDropdown from "./FilterDropdown";
 import PageTracker from "@/components/PageTracker";
+import JobAlertSubscribe from "./JobAlertSubscribe";
 import { apiUrl, readApiJson } from "@/lib/api";
 
 type PageSearchParams = Record<string, string | string[] | undefined>;
@@ -209,6 +210,11 @@ export default async function RecruitOpportunitiesPage({ searchParams }: { searc
               </span>
             ))}
           </div>
+        </div>
+
+        {/* ── Job Alert Subscribe ── */}
+        <div className="mb-5">
+          <JobAlertSubscribe />
         </div>
 
         {/* ── Job list ── */}
