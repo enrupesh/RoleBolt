@@ -2,8 +2,21 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
+import Script from "next/script";
 import { trackEvent } from "@/lib/trackEvent";
 import { apiUrl, readApiJson } from "@/lib/api";
+
+const RECAPTCHA_SITE_KEY = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY ?? "";
+
+// Execute reCAPTCHA v3 and return a token (returns "" if not configured)
+async function getRecaptchaToken(action: string): Promise<string> {
+  if (!RECAPTCHA_SITE_KEY) return "";
+  try {
+    return await (window as any).grecaptcha.execute(RECAPTCHA_SITE_KEY, { action });
+  } catch {
+    return "";
+  }
+}
 
 /* ─── Constants ─────────────────────────────────────────────────────────── */
 const CURRENT_STATUS_OPTIONS = [
@@ -540,10 +553,13 @@ export default function ApplyForm({
     setSubmitting(true);
     setError("");
     try {
+      // Google reCAPTCHA v3 — get invisible bot-check token before submitting
+      const recaptchaToken = await getRecaptchaToken("apply");
+
       const res = await fetch(apiUrl(`/recruit-public/jobs/${jobId}/apply`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, source: "Rolebolt Jobs" }),
+        body: JSON.stringify({ ...form, source: "Rolebolt Jobs", recaptchaToken }),
       });
       const data = await readApiJson(res);
       if (!res.ok) throw new Error(data.error || "Application failed. Please try again.");
@@ -574,6 +590,14 @@ export default function ApplyForm({
 
   /* ── Main form ── */
   return (
+    <>
+    {/* Google reCAPTCHA v3 — invisible bot protection, no billing required */}
+    {RECAPTCHA_SITE_KEY && (
+      <Script
+        src={`https://www.google.com/recaptcha/api.js?render=${RECAPTCHA_SITE_KEY}`}
+        strategy="lazyOnload"
+      />
+    )}
     <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
 
       {/* Header */}
@@ -952,5 +976,6 @@ export default function ApplyForm({
         )}
       </div>
     </div>
+    </>
   );
 }

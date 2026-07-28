@@ -9,8 +9,6 @@ import { RecruitCompanyProfile } from "./models/RecruitCompanyProfile";
 import { callMeshChatCompletions } from "./ai/meshClient";
 import { callGeminiChain } from "./ai/geminiClient";
 import { callNvidia } from "./ai/nvidiaClient";
-import { extractResumeEntities } from "./ai/googleNlpClient";
-import { translateText, SUPPORTED_LANGUAGES } from "./ai/googleTranslateClient";
 import { RecruitJobAlert } from "./models/RecruitJobAlert";
 import { UsageEvent } from "./models/UsageEvent";
 import { RecruitProfile } from "./models/RecruitProfile";
@@ -1315,14 +1313,7 @@ recruitPublicRouter.post(
         return res.status(422).json({ error: "Could not extract enough text from this file. Please try pasting your resume manually." });
       }
 
-      // ── Google NLP: extract entities in parallel (non-blocking) ──────────────
-      // Runs alongside the response — if NLP key is missing or call fails,
-      // entities will just be empty arrays; the resume text is still returned.
-      const nlpEntities = await extractResumeEntities(text).catch(() => ({
-        skills: [], companies: [], jobTitles: [],
-      }));
-
-      return res.json({ ok: true, text, nlpEntities });
+      return res.json({ ok: true, text });
     } catch (err: any) {
       console.error("[recruit-public] POST /parse-resume", err);
       return res.status(500).json({ error: err.message || "Failed to parse resume." });
@@ -1345,6 +1336,31 @@ recruitPublicRouter.get("/jobs/:jobId", async (req, res) => {
   }
 });
 
+// ── reCAPTCHA v3 helper ────────────────────────────────────────────────────────
+async function verifyRecaptcha(token: string): Promise<{ ok: boolean; score: number }> {
+  const secret = process.env.RECAPTCHA_SECRET_KEY;
+  if (!secret) {
+    // Key not configured — skip verification (graceful degradation)
+    console.warn("[recaptcha] RECAPTCHA_SECRET_KEY not set — skipping bot check.");
+    return { ok: true, score: 1 };
+  }
+  if (!token) return { ok: false, score: 0 };
+  try {
+    const res = await fetch("https://www.google.com/recaptcha/api/siteverify", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: `secret=${encodeURIComponent(secret)}&response=${encodeURIComponent(token)}`,
+    });
+    const data: any = await res.json();
+    const score: number = data?.score ?? 0;
+    console.log(`[recaptcha] success=${data?.success} score=${score} action=${data?.action}`);
+    return { ok: data?.success === true && score >= 0.5, score };
+  } catch (err: any) {
+    console.warn("[recaptcha] Verification request failed:", err?.message);
+    return { ok: true, score: 1 }; // network failure → allow (don't block real users)
+  }
+}
+
 recruitPublicRouter.post("/jobs/:jobId/apply", async (req, res) => {
   try {
     await connectMongo();
@@ -1355,7 +1371,15 @@ recruitPublicRouter.post("/jobs/:jobId/apply", async (req, res) => {
     });
     if (!job) return res.status(404).json({ error: "Job not found." });
 
-    const { name, email, phone, resumeText, source, location, currentStatus, educationLevel, currentClassYear, availability, coverLetter, linkedinUrl } = req.body;
+    const { name, email, phone, resumeText, source, location, currentStatus, educationLevel, currentClassYear, availability, coverLetter, linkedinUrl, recaptchaToken } = req.body;
+
+    // ── Google reCAPTCHA v3 bot check ─────────────────────────────────────────
+    const captcha = await verifyRecaptcha(recaptchaToken ?? "");
+    if (!captcha.ok) {
+      return res.status(403).json({
+        error: "Our spam filter flagged this submission as automated. Please refresh the page and try again.",
+      });
+    }
     if (!name?.trim()) return res.status(400).json({ error: "Name is required." });
     if (!email?.trim()) return res.status(400).json({ error: "Email is required." });
     if (!resumeText?.trim() || resumeText.trim().length < 40) {
@@ -1396,99 +1420,11 @@ recruitPublicRouter.post("/jobs/:jobId/apply", async (req, res) => {
     });
 
     await RecruitJob.updateOne({ _id: job._id }, { $inc: { candidateCount: 1 } });
-
-    // ── Google NLP: enrich candidate with extracted entities (fire-and-forget) ─
-    // Runs after response is sent — never blocks the candidate apply flow.
-    setImmediate(async () => {
-      try {
-        const entities = await extractResumeEntities(resumeText);
-        if (entities.skills.length || entities.companies.length || entities.jobTitles.length) {
-          await RecruitCandidate.updateOne(
-            { _id: candidate._id },
-            {
-              $set: {
-                nlpSkills:    entities.skills,
-                nlpCompanies: entities.companies,
-                nlpJobTitles: entities.jobTitles,
-              },
-            }
-          );
-          console.log(`[nlp-enrich] ✓ Candidate ${candidate._id} enriched with NLP entities.`);
-        }
-      } catch (err: any) {
-        console.warn(`[nlp-enrich] Failed for candidate ${candidate._id}:`, err?.message);
-      }
-    });
-
     return res.json({ ok: true, candidateId: candidate._id });
   } catch (err: any) {
     console.error("[recruit-public] POST /jobs/:jobId/apply", err);
     return res.status(500).json({ error: err.message || "Failed to submit application." });
   }
-});
-
-// ── GET /jobs/:jobId/translate — translate JD to any supported language ────────
-// Uses Google Cloud Translation API (free 500k chars/month).
-// Query param: ?lang=hi  (Hindi), ?lang=es (Spanish), etc.
-recruitPublicRouter.get("/jobs/:jobId/translate", async (req, res) => {
-  try {
-    const targetLang = (req.query.lang as string)?.toLowerCase()?.trim();
-    if (!targetLang) {
-      return res.status(400).json({ error: "Missing ?lang= query parameter. Example: ?lang=hi" });
-    }
-    if (!SUPPORTED_LANGUAGES[targetLang]) {
-      return res.status(400).json({
-        error: `Unsupported language code "${targetLang}".`,
-        supportedLanguages: SUPPORTED_LANGUAGES,
-      });
-    }
-
-    await connectMongo();
-    const job = await RecruitJob.findOne({
-      _id: req.params.jobId,
-      status: "active",
-      publicVisibility: { $ne: false },
-    }).lean();
-    if (!job) return res.status(404).json({ error: "Job not found." });
-
-    // Build the text to translate: title + JD + responsibilities + skills
-    const sourceText = [
-      `Job Title: ${job.title}`,
-      job.generatedJD        ? `\n${job.generatedJD}`        : "",
-      job.responsibilities   ? `\nResponsibilities:\n${job.responsibilities}` : "",
-      job.mustHaveSkills     ? `\nRequired Skills:\n${job.mustHaveSkills}`    : "",
-      job.niceToHaveSkills   ? `\nNice to Have:\n${job.niceToHaveSkills}`     : "",
-    ].join("").trim();
-
-    const result = await translateText(sourceText, targetLang);
-    if (!result) {
-      return res.status(503).json({
-        error: "Translation service unavailable. Please set GOOGLE_CLOUD_API_KEY.",
-      });
-    }
-
-    return res.json({
-      ok: true,
-      jobId: req.params.jobId,
-      jobTitle: job.title,
-      targetLanguage: result.targetLanguage,
-      targetLanguageLabel: result.targetLanguageLabel,
-      detectedSourceLanguage: result.detectedSourceLanguage,
-      translatedText: result.translatedText,
-      supportedLanguages: SUPPORTED_LANGUAGES,
-    });
-  } catch (err: any) {
-    console.error("[recruit-public] GET /jobs/:jobId/translate", err);
-    return res.status(500).json({ error: err.message || "Translation failed." });
-  }
-});
-
-// ── GET /translate/languages — list all supported languages ───────────────────
-recruitPublicRouter.get("/translate/languages", (_req, res) => {
-  return res.json({
-    ok: true,
-    languages: Object.entries(SUPPORTED_LANGUAGES).map(([code, name]) => ({ code, name })),
-  });
 });
 
 recruitRouter.delete("/jobs/:jobId", async (req, res) => {
