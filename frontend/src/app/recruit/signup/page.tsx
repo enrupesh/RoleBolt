@@ -7,6 +7,14 @@ import { RoleboltLogo } from "@/components/RoleboltLogo";
 
 type Step = "form" | "check-email";
 
+function GitHubIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" />
+    </svg>
+  );
+}
+
 export default function RecruitSignUpPage() {
   const [step, setStep] = useState<Step>("form");
 
@@ -24,6 +32,10 @@ export default function RecruitSignUpPage() {
   const strength    = [hasLength, hasUpper, hasNumber].filter(Boolean).length;
   const strengthLabel = strength === 0 ? "" : strength === 1 ? "Weak" : strength === 2 ? "Fair" : "Strong";
   const strengthColor = strength === 1 ? "bg-red-400" : strength === 2 ? "bg-amber-400" : "bg-emerald-500";
+
+  function handleGitHub() {
+    window.location.href = apiUrl("/auth/github");
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -45,7 +57,6 @@ export default function RecruitSignUpPage() {
 
       if (!res.ok) {
         if (data.code === "EMAIL_NOT_VERIFIED") {
-          // Account exists but unverified — backend already resent the link
           setStep("check-email");
           return;
         }
@@ -76,22 +87,17 @@ export default function RecruitSignUpPage() {
 
         <div className="flex flex-1 items-center justify-center px-4 py-12">
           <div className="w-full max-w-[420px] rounded-2xl bg-white border border-slate-200 shadow-[0_4px_24px_rgba(0,0,0,0.07)] p-8 text-center">
-
             <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#0a66c2]/10">
               <svg width="28" height="28" fill="none" stroke="#0a66c2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
                 <rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
               </svg>
             </div>
-
             <h2 className="text-xl font-extrabold text-slate-950 tracking-tight mb-2">Check your inbox</h2>
-            <p className="text-sm text-slate-500 leading-relaxed mb-1">
-              We sent a verification link to
-            </p>
+            <p className="text-sm text-slate-500 leading-relaxed mb-1">We sent a verification link to</p>
             <p className="text-sm font-semibold text-slate-800 mb-5 break-all">{email}</p>
             <p className="text-xs text-slate-400 leading-relaxed mb-6">
               Click the link in the email to activate your account. The link expires in 24 hours. Check your spam folder if you don't see it.
             </p>
-
             <Link
               href="/recruit/login"
               className="inline-flex w-full items-center justify-center rounded-xl bg-[#0a66c2] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#004182] transition-all shadow-[0_2px_10px_rgba(10,102,194,0.28)]"
@@ -136,8 +142,27 @@ export default function RecruitSignUpPage() {
               <p className="text-sm text-slate-500 mt-1">Free forever. No credit card needed.</p>
             </div>
 
+            <div className="px-8 pt-6 pb-2">
+              {/* GitHub OAuth button */}
+              <button
+                type="button"
+                onClick={handleGitHub}
+                className="w-full h-11 flex items-center justify-center gap-2.5 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-800 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm"
+              >
+                <GitHubIcon />
+                Continue with GitHub
+              </button>
+
+              {/* Divider */}
+              <div className="flex items-center gap-3 my-5">
+                <div className="flex-1 h-px bg-slate-200" />
+                <span className="text-xs text-slate-400 font-medium">or sign up with email</span>
+                <div className="flex-1 h-px bg-slate-200" />
+              </div>
+            </div>
+
             {/* Form */}
-            <form onSubmit={handleSubmit} className="px-8 py-6 space-y-4" noValidate>
+            <form onSubmit={handleSubmit} className="px-8 pb-6 space-y-4" noValidate>
 
               {error && (
                 <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
