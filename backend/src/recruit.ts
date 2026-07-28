@@ -1754,6 +1754,135 @@ Keep it professional, structured, and under 600 words. Return ONLY the new job d
   }
 });
 
+// ── Regenerate JD with variant style ─────────────────────────────────────────
+recruitRouter.post("/jobs/:jobId/regenerate-jd", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const job = await RecruitJob.findOne({ _id: req.params.jobId, uid }).lean();
+    if (!job) return res.status(404).json({ error: "Job not found." });
+
+    const { variant = "standard", save = false, newJD: providedJD } = req.body as { variant?: string; save?: boolean; newJD?: string };
+
+    const toneGuides: Record<string, string> = {
+      conservative: "formal, traditional, and straightforward. Use professional corporate language. Focus on clear requirements and structured responsibilities. Safe and credible — suitable for enterprise, finance, healthcare, or government roles.",
+      bold: "energetic, exciting, and startup-like. Use punchy, confident language. Show the company's ambition and culture. Make the role sound like an opportunity to create real impact. Appeal to high-performers who want ownership.",
+      seo_optimized: "optimised for job boards and search engine discovery. Naturally include high-traffic keywords that candidates search for. Use common job-title synonyms and skill terms. Keep sections scannable with short bullets and clear headings.",
+      standard: "balanced, professional, and candidate-friendly. Clear and concise.",
+    };
+    const toneGuide = toneGuides[variant] ?? toneGuides.standard;
+
+    const salary =
+      (job as any).salaryMin && (job as any).salaryMax
+        ? `${(job as any).salaryCurrency ?? "USD"} ${Number((job as any).salaryMin).toLocaleString()} – ${Number((job as any).salaryMax).toLocaleString()} per year`
+        : "Competitive (not disclosed)";
+
+    const prompt = `You are a senior recruiter writing a job description with a specific tone style.
+
+TONE: ${toneGuide}
+
+JOB DETAILS:
+- Title: ${(job as any).title}
+- Niche/Category: ${(job as any).niche || "General"}
+- Seniority: ${(job as any).seniority || "Mid-level"}
+- Location: ${(job as any).location}
+- Work Mode: ${(job as any).workMode}
+- Must-Have Skills: ${(job as any).mustHaveSkills}
+- Nice-to-Have Skills: ${(job as any).niceToHaveSkills || "Not specified"}
+- Key Responsibilities: ${(job as any).responsibilities}
+- Compensation: ${salary}
+
+Write a complete job description in the specified tone. Use exactly these sections:
+About the role | What you will do | What we are looking for | Good to have | Compensation and benefits
+
+Rules:
+- 220–350 words total
+- Human and credible — no filler phrases or invented company facts
+- Short paragraphs and 3–5 bullets under action sections
+- No gendered language or unnecessary degree requirements
+- Return ONLY the job description text — no JSON, no markdown code fences`;
+
+    // If caller already has the generated text and just wants to persist it, skip re-generation
+    let newJD = providedJD?.trim() ?? "";
+
+    if (!newJD) {
+      try {
+        newJD = (await callGeminiChain({ prompt, temperature: 0.7, maxOutputTokens: 1500 })) ?? "";
+        console.log("[recruit] regenerate-jd: Gemini succeeded ✓");
+      } catch {
+        try {
+          newJD = (await callNvidia({ messages: [{ role: "user", content: prompt }], temperature: 0.7, max_tokens: 1500 })) ?? "";
+          console.log("[recruit] regenerate-jd: Nvidia fallback succeeded ✓");
+        } catch {
+          return res.status(500).json({ error: "AI generation failed. Please try again." });
+        }
+      }
+      newJD = newJD.trim();
+    }
+
+    if (save && newJD) {
+      await RecruitJob.updateOne({ _id: req.params.jobId, uid }, { $set: { generatedJD: newJD } });
+    }
+
+    return res.json({ ok: true, newJD, variant });
+  } catch (err: any) {
+    console.error("[recruit] regenerate-jd failed:", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Salary Benchmark ──────────────────────────────────────────────────────────
+recruitRouter.get("/salary-benchmark", async (req, res) => {
+  try {
+    await connectMongo();
+    const { title, location, niche, currency = "USD", seniority } = req.query as Record<string, string>;
+    if (!title) return res.status(400).json({ error: "title is required." });
+
+    const prompt = `You are a compensation data expert with knowledge of current global salary benchmarks.
+
+Provide a realistic salary benchmark for this role based on current market data (2025).
+
+Role: ${title}
+Seniority: ${seniority || "Mid-level"}
+Industry/Niche: ${niche || "General"}
+Location: ${location || "Global / Remote"}
+Currency: ${currency}
+
+Return valid JSON only, no markdown:
+{
+  "p25": <number: 25th percentile annual salary in ${currency}>,
+  "p50": <number: median annual salary in ${currency}>,
+  "p75": <number: 75th percentile annual salary in ${currency}>,
+  "min": <number: realistic floor for entry-level in ${currency}>,
+  "max": <number: realistic ceiling for senior/top in ${currency}>,
+  "currency": "${currency}",
+  "insight": "<one concise sentence about current salary trends for this role>",
+  "factors": ["<factor that raises pay>", "<factor that raises pay>", "<factor that lowers pay>"]
+}
+
+Use realistic, current figures. All values must be annual gross, in ${currency}.`;
+
+    let raw = "";
+    try {
+      raw = (await callGeminiChain({ prompt, temperature: 0.2, maxOutputTokens: 500, jsonMode: true })) ?? "";
+    } catch {
+      try {
+        raw = (await callNvidia({ messages: [{ role: "user", content: prompt }], temperature: 0.2, max_tokens: 500, responseFormat: "json_object" })) ?? "";
+      } catch {
+        return res.status(500).json({ error: "Could not fetch benchmark data. Please try again." });
+      }
+    }
+
+    const parsed = safeJson(raw);
+    if (!parsed || !parsed.p50) return res.status(500).json({ error: "Invalid benchmark response from AI." });
+
+    return res.json({ ok: true, benchmark: parsed });
+  } catch (err: any) {
+    console.error("[recruit] salary-benchmark failed:", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Daily Briefing: manual trigger ───────────────────────────────────────────
 recruitRouter.post("/briefing/send-now", async (req, res) => {
   try {
