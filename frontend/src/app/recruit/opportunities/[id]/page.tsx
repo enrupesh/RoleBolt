@@ -9,6 +9,7 @@ import QualityBreakdown from "./QualityBreakdown";
 import StickyActions from "./StickyActions";
 import { computeJobQuality } from "@/lib/jobQuality";
 import PageTracker from "@/components/PageTracker";
+import MatchScoreSection from "./MatchScoreSection";
 import { apiUrl, readApiJson } from "@/lib/api";
 import { buildMetadata } from "@/lib/seo";
 import { formatJobDescription } from "@/lib/jobDescription";
@@ -423,6 +424,9 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
           companyType={job.companyType}
           location={job.location}
         />
+
+        {/* ── 8b. AI Match Score ── */}
+        <MatchScoreSection jobId={id} />
 
         {/* ── 9. Bottom CTA block ── */}
         <div className="rounded-3xl border border-[#0a66c2]/20 bg-gradient-to-br from-blue-50 to-white p-6 shadow-sm text-center">
