@@ -293,39 +293,6 @@ export default function RecruitLandingPage() {
               </a>
             </div>
 
-            {/* ── Hackathon Judges floating badge ── */}
-            <div className="flex justify-center mb-8">
-              <Link
-                href="/recruit/preview"
-                style={{ animation: "float 3s ease-in-out infinite" }}
-                className="group relative inline-flex items-center gap-2.5 rounded-full px-5 py-2.5 text-[12px] font-bold text-amber-200 tracking-wide cursor-pointer select-none"
-              >
-                {/* Outer glow halo */}
-                <span className="absolute inset-0 rounded-full bg-amber-400/25 blur-[10px] group-hover:bg-amber-400/40 transition-all duration-500" />
-                {/* Inner pill surface */}
-                <span className="absolute inset-0 rounded-full border border-amber-400/50 bg-gradient-to-r from-[#1a0f00]/90 via-slate-900/95 to-[#1a0f00]/90 group-hover:border-amber-400/80 transition-all duration-300" />
-                {/* Shimmer sweep */}
-                <span
-                  className="absolute inset-0 rounded-full overflow-hidden pointer-events-none"
-                  aria-hidden="true"
-                >
-                  <span
-                    style={{
-                      background: "linear-gradient(105deg, transparent 35%, rgba(251,191,36,0.18) 50%, transparent 65%)",
-                      backgroundSize: "200% 100%",
-                      animation: "shimmer 2.8s linear infinite",
-                    }}
-                    className="absolute inset-0"
-                  />
-                </span>
-                {/* Content */}
-                <span className="relative flex items-center gap-2">
-                  <svg width="13" height="13" fill="currentColor" className="text-amber-400 drop-shadow-[0_0_4px_rgba(251,191,36,0.8)]" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-                  <span className="text-amber-100">For Hackathon Judges</span>
-                  <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" className="text-amber-400 group-hover:translate-x-0.5 transition-transform duration-200"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-                </span>
-              </Link>
-            </div>
 
             {/* Badge */}
             <div className="inline-flex items-stretch rounded-lg border border-[#0a66c2]/35 bg-slate-950/70 text-[11px] font-bold mb-8 overflow-hidden">
@@ -771,25 +738,6 @@ export default function RecruitLandingPage() {
             ))}
           </div>
 
-          <div className="mt-10 max-w-2xl mx-auto text-center">
-            <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 border border-slate-200 px-4 py-1.5 text-[11px] font-bold text-slate-500 uppercase tracking-widest">
-              <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" className="text-slate-400"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-              Honestly — For Hackathon Judges
-            </span>
-          </div>
-
-          <div className="mt-4 max-w-2xl mx-auto rounded-2xl border-2 border-amber-300 bg-amber-50 px-6 py-5 shadow-sm">
-            <div className="flex items-start gap-3">
-              <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" className="text-amber-500 shrink-0 mt-0.5">
-                <path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L14.71 3.86a2 2 0 0 0-3.42 0Z"/>
-              </svg>
-              <p className="text-[13px] font-semibold text-amber-900 leading-relaxed">
-                This project was developed between <strong>July 6 and July 12</strong>. During its development,{" "}
-                <strong>Replit AI</strong> and <strong>Cursor AI</strong> were used to assist with coding,
-                implementation, and development tasks.
-              </p>
-            </div>
-          </div>
 
         </div>
       </section>
