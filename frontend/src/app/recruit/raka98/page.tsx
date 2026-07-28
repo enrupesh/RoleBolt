@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 
 const ADMIN_PASSWORD = "raka@9800";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Types ─────────────────────────────────────────────────────────────────────
 
 interface ModelEntry {
   id: string;
@@ -52,154 +52,288 @@ interface RoutingData {
   features: Feature[];
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Helpers ───────────────────────────────────────────────────────────────────
 
 function statusColor(s: string) {
   if (s === "operational") return "bg-emerald-500";
   if (s === "degraded")    return "bg-amber-400";
   return "bg-red-500";
 }
-
 function statusTextColor(s: string) {
   if (s === "operational") return "text-emerald-400";
   if (s === "degraded")    return "text-amber-400";
   return "text-red-400";
 }
-
 function statusLabel(s: string) {
   if (s === "operational") return "Operational";
   if (s === "degraded")    return "Degraded";
   return "Unavailable";
 }
-
 function providerKey(id: string | null) {
   if (id === "googleM") return "Google M API";
   if (id === "google")  return "Google API";
   if (id === "nvidia")  return "NVIDIA API";
   return id ?? "—";
 }
-
-function routingModeColor(mode: string) {
-  if (mode === "normal")   return "text-emerald-400 border-emerald-500/30 bg-emerald-500/8";
-  if (mode === "degraded") return "text-amber-400 border-amber-500/30 bg-amber-500/8";
-  return "text-red-400 border-red-500/30 bg-red-500/8";
+function providerColor(id: string | null) {
+  if (id === "googleM") return "text-blue-400";
+  if (id === "google")  return "text-indigo-400";
+  if (id === "nvidia")  return "text-green-400";
+  return "text-white/50";
+}
+function shortModel(m: string) {
+  return m.split("/").pop() ?? m;
 }
 
-function routingModeLabel(mode: string) {
-  if (mode === "normal")   return "All Systems Normal";
-  if (mode === "degraded") return "Degraded — Fallback Active";
-  return "Critical — Multiple Providers Down";
-}
+// ─── Dot ───────────────────────────────────────────────────────────────────────
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
-function Dot({ status }: { status: string }) {
+function Dot({ status, size = "sm" }: { status: string; size?: "sm" | "lg" }) {
+  const dim = size === "lg" ? "h-2.5 w-2.5" : "h-2 w-2";
   return (
-    <span className="relative flex h-2 w-2 shrink-0">
+    <span className={`relative flex ${dim} shrink-0`}>
       {status === "operational" && (
-        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60" />
+        <span className={`animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60`} />
       )}
-      <span className={`relative inline-flex rounded-full h-2 w-2 ${statusColor(status)}`} />
+      <span className={`relative inline-flex rounded-full ${dim} ${statusColor(status)}`} />
     </span>
   );
 }
 
-function RoleBadge({ role }: { role: string }) {
-  if (role === "primary")
-    return <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-400 border border-indigo-500/20 font-medium">Primary</span>;
-  if (role.startsWith("fallback"))
-    return <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/12 text-amber-400 border border-amber-500/20 font-medium">Fallback</span>;
-  return <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-white/40 border border-white/8 font-medium">Available</span>;
+// ─── Fallback Alert Cards (shown when any provider is in fallback) ──────────────
+
+function FallbackAlerts({ data }: { data: RoutingData }) {
+  const alerts: { providerName: string; affectedCount: number; nvidiaModel: string }[] = [];
+
+  if (data.providers.googleM.routingState === "fallback-nvidia") {
+    const count = data.features.filter(f => f.primaryProvider === "googleM" && f.inFallback).length;
+    const nModel = data.providers.nvidia.activeModel ?? data.providers.nvidia.primaryModel;
+    alerts.push({ providerName: "Google M API", affectedCount: count, nvidiaModel: nModel });
+  }
+  if (data.providers.google.routingState === "fallback-nvidia") {
+    const count = data.features.filter(f => f.primaryProvider === "google" && f.inFallback).length;
+    const nModel = data.providers.nvidia.activeModel ?? data.providers.nvidia.primaryModel;
+    alerts.push({ providerName: "Google API (Gemini)", affectedCount: count, nvidiaModel: nModel });
+  }
+
+  if (alerts.length === 0) return null;
+
+  return (
+    <div className="space-y-3">
+      {alerts.map(alert => (
+        <div key={alert.providerName}
+          className="rounded-xl border border-amber-500/30 bg-amber-500/6 px-5 py-4 flex items-start gap-4">
+          <div className="mt-0.5 text-amber-400 text-lg shrink-0">⚡</div>
+          <div className="flex-1 min-w-0">
+            <div className="font-semibold text-amber-400 text-sm">
+              {alert.providerName} is unavailable — Automatic fallback active
+            </div>
+            <div className="text-amber-300/70 text-xs mt-1 leading-relaxed">
+              {alert.affectedCount > 0 && (
+                <><span className="font-medium text-amber-300">{alert.affectedCount} feature{alert.affectedCount !== 1 ? "s" : ""}</span> ha{alert.affectedCount !== 1 ? "ve" : "s"} automatically rerouted to </>
+              )}
+              <span className="font-medium text-green-400">NVIDIA API</span>.
+              {" "}Currently serving via:{" "}
+              <span className="font-mono text-white/80 bg-white/8 px-1.5 py-0.5 rounded text-[11px]">
+                {alert.nvidiaModel}
+              </span>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
+
+// ─── Model Chain Stepper ───────────────────────────────────────────────────────
+
+function ModelChainStepper({
+  primaryModel,
+  fallbackModels,
+  activeModel,
+  ultimateFallback,
+  providerDown,
+}: {
+  primaryModel: string;
+  fallbackModels: string[];
+  activeModel: string | null;
+  ultimateFallback: string | null;
+  providerDown: boolean;
+}) {
+  const chain = [primaryModel, ...fallbackModels];
+  const activeShort = activeModel
+    ? activeModel.replace(" (via NVIDIA fallback)", "")
+    : null;
+
+  return (
+    <div className="mt-3">
+      <div className="text-[10px] text-white/30 uppercase tracking-wide mb-2">Model Chain</div>
+      <div className="flex items-center gap-1 flex-wrap">
+        {chain.map((m, i) => {
+          const short = shortModel(m);
+          const isActive = activeShort && (shortModel(activeShort) === short || activeShort === m);
+          const isStruckOut = providerDown;
+          return (
+            <div key={i} className="flex items-center gap-1">
+              {i > 0 && <span className="text-white/15 text-[10px]">›</span>}
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-mono transition-all ${
+                isActive && !providerDown
+                  ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30 font-semibold"
+                  : isStruckOut
+                  ? "bg-red-500/8 text-red-400/50 border-red-500/15 line-through opacity-60"
+                  : "bg-white/4 text-white/35 border-white/8"
+              }`}>
+                {short}
+              </span>
+            </div>
+          );
+        })}
+        {ultimateFallback && (
+          <>
+            <span className="text-white/15 text-[10px]">›</span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-mono ${
+              providerDown && activeModel && activeModel.includes("via NVIDIA")
+                ? "bg-amber-500/15 text-amber-400 border-amber-500/30 font-semibold"
+                : "bg-orange-500/8 text-orange-400/60 border-orange-500/15"
+            }`}>
+              NVIDIA fallback
+            </span>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Provider Card ─────────────────────────────────────────────────────────────
 
 function ProviderCard({
   provId,
   prov,
   expanded,
   onToggle,
+  data,
 }: {
   provId: string;
   prov: Provider;
   expanded: boolean;
   onToggle: () => void;
+  data: RoutingData;
 }) {
-  const isFallback = prov.routingState === "fallback-nvidia";
+  const isFallback   = prov.routingState === "fallback-nvidia";
+  const isUnavail    = prov.status === "unavailable";
+  const nvidiaActive = isFallback && data.providers.nvidia.activeModel;
+
+  // Features that primarily use this provider
+  const usedBy = data.features.filter(f => f.primaryProvider === provId);
+  const usedByFallback = data.features.filter(
+    f => f.primaryProvider !== provId && (f.fallbackChain.length > 0 || f.ultimateFallback === provId)
+  );
+
+  const cleanActiveModel = prov.activeModel
+    ? prov.activeModel.replace(" (via NVIDIA fallback)", "")
+    : null;
 
   return (
     <div className={`rounded-xl border transition-colors ${
-      isFallback
-        ? "border-amber-500/25 bg-amber-500/4"
-        : prov.status === "unavailable"
-        ? "border-red-500/20 bg-red-500/4"
-        : "border-white/8 bg-white/3"
+      isFallback   ? "border-amber-500/25 bg-amber-500/3" :
+      isUnavail    ? "border-red-500/20 bg-red-500/3" :
+                     "border-white/8 bg-white/2"
     }`}>
-      {/* Card header */}
       <div className="p-4">
         <div className="flex items-start gap-3">
-          <div className="mt-0.5">
-            <Dot status={prov.status} />
-          </div>
+          <div className="mt-0.5"><Dot status={prov.status} size="lg" /></div>
           <div className="flex-1 min-w-0">
+
+            {/* Header */}
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm font-semibold text-white/90">{prov.label}</span>
-              <span className="text-xs text-white/35">{prov.sublabel}</span>
+              <span className="text-xs text-white/30">{prov.sublabel}</span>
+              <span className="text-[10px] font-mono text-white/25">{prov.endpoint}</span>
               {isFallback && (
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/25 font-medium">
-                  ⚡ Routing to NVIDIA fallback
+                  ⚡ Routing to NVIDIA
+                </span>
+              )}
+              {!prov.keyConfigured && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/12 text-red-400 border border-red-500/20 font-medium">
+                  No API key
                 </span>
               )}
             </div>
-            <div className="text-[11px] text-white/35 font-mono mt-0.5">{prov.endpoint}</div>
 
-            <div className="mt-3 grid grid-cols-3 gap-2">
+            {/* Key metrics row */}
+            <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div>
-                <div className="text-[10px] text-white/35 uppercase tracking-wide mb-0.5">Status</div>
-                <div className={`text-xs font-medium ${statusTextColor(prov.status)}`}>{statusLabel(prov.status)}</div>
-              </div>
-              <div>
-                <div className="text-[10px] text-white/35 uppercase tracking-wide mb-0.5">Response</div>
-                <div className="text-xs text-white/70">
-                  {prov.keyConfigured
-                    ? prov.responseTimeMs > 0 ? `${prov.responseTimeMs} ms` : "—"
-                    : "No key"}
+                <div className="text-[10px] text-white/30 uppercase tracking-wide mb-1">Status</div>
+                <div className={`text-xs font-semibold ${statusTextColor(prov.status)}`}>
+                  {statusLabel(prov.status)}
                 </div>
               </div>
               <div>
-                <div className="text-[10px] text-white/35 uppercase tracking-wide mb-0.5">Active Model</div>
-                <div className="text-xs text-white/70 truncate" title={prov.activeModel ?? "—"}>
-                  {prov.activeModel
-                    ? prov.activeModel.replace(" (via NVIDIA fallback)", "")
+                <div className="text-[10px] text-white/30 uppercase tracking-wide mb-1">Latency</div>
+                <div className="text-xs text-white/65">
+                  {prov.keyConfigured && prov.responseTimeMs > 0 ? `${prov.responseTimeMs} ms` : "—"}
+                </div>
+              </div>
+              <div className="col-span-2">
+                <div className="text-[10px] text-white/30 uppercase tracking-wide mb-1">
+                  Active Model
+                  {isFallback && <span className="text-amber-400 ml-1">· via NVIDIA</span>}
+                </div>
+                <div className={`text-xs font-mono font-medium truncate ${
+                  isFallback ? "text-amber-400" :
+                  isUnavail  ? "text-red-400/60" :
+                               "text-emerald-400"
+                }`} title={cleanActiveModel ?? "—"}>
+                  {isFallback && nvidiaActive
+                    ? shortModel(data.providers.nvidia.activeModel!)
+                    : cleanActiveModel
+                    ? shortModel(cleanActiveModel)
                     : "—"}
                 </div>
+                {isFallback && nvidiaActive && (
+                  <div className="text-[10px] text-white/30 font-mono mt-0.5 truncate">
+                    {data.providers.nvidia.activeModel}
+                  </div>
+                )}
               </div>
             </div>
 
+            {/* Error */}
             {prov.error && (
               <div className="mt-2 text-[11px] text-red-400/80 font-mono bg-red-500/8 rounded px-2 py-1">
                 {prov.error}
               </div>
             )}
 
-            {/* Fallback chain pills */}
-            <div className="mt-3 flex items-center gap-1 flex-wrap">
-              <span className="text-[10px] text-white/30 mr-1">Fallback chain:</span>
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/12 text-indigo-400 border border-indigo-500/15 font-mono">
-                {prov.primaryModel.split("/").pop()}
-              </span>
-              {prov.fallbackModels.map((m, i) => (
-                <span key={i} className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/5 text-white/40 border border-white/8 font-mono">
-                  {m.split("/").pop()}
-                </span>
-              ))}
-              {prov.ultimateFallback && (
-                <>
-                  <span className="text-[10px] text-white/20">→</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-orange-500/12 text-orange-400 border border-orange-500/15">
-                    NVIDIA fallback
-                  </span>
-                </>
-              )}
-            </div>
+            {/* Model chain stepper */}
+            <ModelChainStepper
+              primaryModel={prov.primaryModel}
+              fallbackModels={prov.fallbackModels}
+              activeModel={isFallback ? data.providers.nvidia.activeModel : prov.activeModel}
+              ultimateFallback={prov.ultimateFallback}
+              providerDown={isUnavail}
+            />
+
+            {/* Features using this provider */}
+            {usedBy.length > 0 && (
+              <div className="mt-3">
+                <div className="text-[10px] text-white/30 uppercase tracking-wide mb-1.5">
+                  Primary Provider For ({usedBy.length})
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {usedBy.map(f => (
+                    <span key={f.id} className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${
+                      f.inFallback
+                        ? "bg-amber-500/8 text-amber-400/60 border-amber-500/15 line-through"
+                        : "bg-white/4 text-white/45 border-white/8"
+                    }`}>
+                      {f.label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <button
@@ -217,17 +351,34 @@ function ProviderCard({
       {/* Expanded model registry */}
       {expanded && (
         <div className="border-t border-white/6 px-4 py-3">
-          <div className="text-[10px] text-white/30 uppercase tracking-wide mb-2">Model Registry</div>
-          <div className="space-y-1.5">
-            {prov.modelRegistry.map((m) => (
-              <div key={m.id} className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 min-w-0">
-                  <RoleBadge role={m.role} />
-                  <span className="text-xs text-white/70 font-mono truncate">{m.id}</span>
+          <div className="text-[10px] text-white/30 uppercase tracking-wide mb-2">Full Model Registry</div>
+          <div className="space-y-2">
+            {prov.modelRegistry.map((m) => {
+              const shortActive = cleanActiveModel ? shortModel(cleanActiveModel) : null;
+              const isActiveNow = !isUnavail && (shortModel(m.id) === shortActive || m.id === cleanActiveModel);
+              return (
+                <div key={m.id} className={`flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 ${
+                  isActiveNow ? "bg-emerald-500/8 border border-emerald-500/15" : "border border-transparent"
+                }`}>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium shrink-0 ${
+                      m.role === "primary"
+                        ? "bg-indigo-500/15 text-indigo-400 border-indigo-500/20"
+                        : m.role.startsWith("fallback")
+                        ? "bg-amber-500/12 text-amber-400 border-amber-500/20"
+                        : "bg-white/5 text-white/35 border-white/8"
+                    }`}>
+                      {m.role === "primary" ? "Primary" : m.role.startsWith("fallback") ? m.role.replace("fallback-", "FB ") : "Available"}
+                    </span>
+                    <span className="text-xs text-white/70 font-mono truncate">{m.id}</span>
+                    {isActiveNow && (
+                      <span className="text-[10px] text-emerald-400 shrink-0">← active</span>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-white/30 shrink-0">{m.provider}</span>
                 </div>
-                <span className="text-[11px] text-white/30 shrink-0">{m.provider}</span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -235,122 +386,242 @@ function ProviderCard({
   );
 }
 
+// ─── Provider Usage Map ────────────────────────────────────────────────────────
+
+function ProviderUsageMap({ features, providers }: { features: Feature[]; providers: RoutingData["providers"] }) {
+  const providerIds = ["googleM", "google", "nvidia"] as const;
+
+  const provInfo: Record<string, { label: string; color: string; icon: string }> = {
+    googleM: { label: "Google M API",       color: "border-blue-500/25 bg-blue-500/4",   icon: "M" },
+    google:  { label: "Google API (Gemini)", color: "border-indigo-500/25 bg-indigo-500/4", icon: "G" },
+    nvidia:  { label: "NVIDIA API",          color: "border-green-500/25 bg-green-500/4",  icon: "N" },
+  };
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      {providerIds.map(pid => {
+        const info = provInfo[pid];
+        const primary   = features.filter(f => f.primaryProvider === pid);
+        const fallback  = features.filter(f => f.ultimateFallback === pid && f.primaryProvider !== pid);
+        const prov      = providers[pid];
+
+        return (
+          <div key={pid} className={`rounded-xl border p-4 ${info.color}`}>
+            <div className="flex items-center gap-2 mb-3">
+              <Dot status={prov.status} />
+              <span className="text-xs font-semibold text-white/80">{info.label}</span>
+            </div>
+
+            {primary.length > 0 && (
+              <div className="mb-3">
+                <div className="text-[10px] text-white/35 uppercase tracking-wide mb-1.5">
+                  Primary provider for
+                </div>
+                <div className="space-y-1">
+                  {primary.map(f => (
+                    <div key={f.id} className="flex items-center gap-1.5">
+                      <span className={`w-1 h-1 rounded-full shrink-0 ${f.inFallback ? "bg-amber-400" : "bg-emerald-400"}`} />
+                      <span className="text-[11px] text-white/55">{f.label}</span>
+                      {f.inFallback && <span className="text-[9px] text-amber-400">(fallback)</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {fallback.length > 0 && (
+              <div>
+                <div className="text-[10px] text-white/35 uppercase tracking-wide mb-1.5">
+                  Ultimate fallback for
+                </div>
+                <div className="space-y-1">
+                  {fallback.map(f => (
+                    <div key={f.id} className="flex items-center gap-1.5">
+                      <span className="w-1 h-1 rounded-full shrink-0 bg-orange-400/60" />
+                      <span className="text-[11px] text-white/40">{f.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {primary.length === 0 && fallback.length === 0 && (
+              <div className="text-[11px] text-white/25 italic">No direct feature assignment</div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Fallback Flow Diagram ─────────────────────────────────────────────────────
+
 function FallbackFlowDiagram({ data }: { data: RoutingData }) {
   const { googleM, google, nvidia } = data.providers;
 
   function ProvNode({ prov, label }: { prov: Provider; label: string }) {
     return (
-      <div className={`rounded-lg border px-3 py-2 text-center min-w-[100px] ${
+      <div className={`rounded-lg border px-3 py-2 text-center min-w-[90px] ${
         prov.status === "unavailable" ? "border-red-500/30 bg-red-500/8" :
         prov.status === "degraded"    ? "border-amber-500/30 bg-amber-500/8" :
                                         "border-emerald-500/20 bg-emerald-500/6"
       }`}>
         <div className="flex items-center justify-center gap-1.5 mb-0.5">
           <Dot status={prov.status} />
-          <span className="text-xs font-medium text-white/80">{label}</span>
+          <span className="text-[11px] font-medium text-white/80">{label}</span>
         </div>
         <div className={`text-[10px] ${statusTextColor(prov.status)}`}>{statusLabel(prov.status)}</div>
       </div>
     );
   }
 
-  function Arrow({ active, label }: { active: boolean; label?: string }) {
+  function Arrow({ active }: { active: boolean }) {
     return (
-      <div className="flex flex-col items-center gap-0.5">
-        {label && <span className="text-[9px] text-white/25 uppercase tracking-wide">{label}</span>}
-        <svg className={`w-5 h-5 ${active ? "text-amber-400" : "text-white/15"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
+      <svg className={`w-4 h-4 shrink-0 ${active ? "text-amber-400" : "text-white/12"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+      </svg>
+    );
+  }
+
+  function ModelBox({ title, models, highlight }: { title: string; models: string[]; highlight?: boolean }) {
+    return (
+      <div className={`rounded-lg border px-3 py-2 text-center ${highlight ? "border-amber-500/25 bg-amber-500/6" : "border-white/8 bg-white/2"}`}>
+        <div className={`text-[10px] mb-1 ${highlight ? "text-amber-400" : "text-indigo-400"}`}>{title}</div>
+        {models.map((m, i) => (
+          <div key={i} className="text-[10px] text-white/40 font-mono">{shortModel(m)}</div>
+        ))}
       </div>
     );
   }
 
   return (
-    <div className="rounded-xl border border-white/8 bg-white/2 p-4">
-      <div className="text-[10px] text-white/30 uppercase tracking-wide mb-4">Fallback Chain — Most Features</div>
-      <div className="flex items-center gap-2 flex-wrap">
-        <ProvNode prov={googleM} label="Google M API" />
-        <Arrow active={googleM.status === "unavailable"} label="if down" />
-        <div className="rounded-lg border border-white/8 bg-white/3 px-3 py-2 text-center">
-          <div className="text-[10px] text-indigo-400 mb-0.5">Internal fallbacks</div>
-          <div className="text-[10px] text-white/40 font-mono">claude-3-haiku</div>
-          <div className="text-[10px] text-white/40 font-mono">gemini-2.5-flash-lite</div>
+    <div className="rounded-xl border border-white/8 bg-white/2 p-4 space-y-5">
+      {/* Most features: GoogleM → internal fallbacks → NVIDIA */}
+      <div>
+        <div className="text-[10px] text-white/30 uppercase tracking-wide mb-3">
+          Most Features (Resume Scoring, Copilot, Form Scoring, etc.)
         </div>
-        <Arrow active={googleM.status === "unavailable"} label="if all fail" />
-        <ProvNode prov={nvidia} label="NVIDIA API" />
+        <div className="flex items-center gap-2 flex-wrap">
+          <ProvNode prov={googleM} label="Google M API" />
+          <Arrow active={googleM.status !== "operational"} />
+          <ModelBox
+            title="Internal fallbacks"
+            models={googleM.fallbackModels}
+            highlight={googleM.status !== "operational"}
+          />
+          <Arrow active={googleM.status !== "operational"} />
+          <ProvNode prov={nvidia} label="NVIDIA API" />
+          {googleM.status !== "operational" && nvidia.activeModel && (
+            <div className="w-full mt-1 text-[10px] text-amber-400/70 pl-1">
+              → Currently using NVIDIA:{" "}
+              <span className="font-mono text-amber-300">{nvidia.activeModel}</span>
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="mt-4 border-t border-white/6 pt-4">
-        <div className="text-[10px] text-white/30 uppercase tracking-wide mb-3">Job Description Generation</div>
+      {/* JD generation: Google Gemini → gemini chain → NVIDIA */}
+      <div className="border-t border-white/6 pt-4">
+        <div className="text-[10px] text-white/30 uppercase tracking-wide mb-3">
+          Job Description Generation
+        </div>
         <div className="flex items-center gap-2 flex-wrap">
           <ProvNode prov={google} label="Google API" />
-          <Arrow active={google.status === "unavailable"} label="if down" />
-          <div className="rounded-lg border border-white/8 bg-white/3 px-3 py-2 text-center">
-            <div className="text-[10px] text-indigo-400 mb-0.5">Gemini chain</div>
-            <div className="text-[10px] text-white/40 font-mono">flash → flash-lite</div>
-            <div className="text-[10px] text-white/40 font-mono">3.1 → 3.5 → 3.6</div>
-          </div>
-          <Arrow active={google.status === "unavailable"} label="if all fail" />
+          <Arrow active={google.status !== "operational"} />
+          <ModelBox
+            title="Gemini chain"
+            models={google.fallbackModels}
+            highlight={google.status !== "operational"}
+          />
+          <Arrow active={google.status !== "operational"} />
           <ProvNode prov={nvidia} label="NVIDIA API" />
+          {google.status !== "operational" && nvidia.activeModel && (
+            <div className="w-full mt-1 text-[10px] text-amber-400/70 pl-1">
+              → Currently using NVIDIA:{" "}
+              <span className="font-mono text-amber-300">{nvidia.activeModel}</span>
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-function FeatureRoutingTable({ features, providers }: { features: Feature[]; providers: RoutingData["providers"] }) {
+// ─── Feature Routing Table ─────────────────────────────────────────────────────
+
+function FeatureRoutingTable({ features }: { features: Feature[] }) {
   return (
     <div className="rounded-xl border border-white/8 overflow-hidden">
-      <div className="px-4 py-3 border-b border-white/6">
+      <div className="px-4 py-3 border-b border-white/6 flex items-center justify-between">
         <span className="text-[10px] text-white/30 uppercase tracking-wide">Feature Routing — Live State</span>
+        <span className="text-[10px] text-white/20">
+          {features.filter(f => f.inFallback).length > 0
+            ? `${features.filter(f => f.inFallback).length} in fallback`
+            : "All normal"}
+        </span>
       </div>
       <div className="divide-y divide-white/4">
         {features.map((f) => (
-          <div key={f.id} className="px-4 py-3 flex items-center gap-3 flex-wrap">
-            <div className="flex-1 min-w-[160px]">
-              <div className="text-xs text-white/80 font-medium">{f.label}</div>
+          <div key={f.id} className={`px-4 py-3 ${f.inFallback ? "bg-amber-500/2" : ""}`}>
+            <div className="flex items-start gap-3 flex-wrap">
+              {/* Feature name */}
+              <div className="flex-1 min-w-[140px]">
+                <div className="text-xs text-white/80 font-medium">{f.label}</div>
+                <div className="text-[10px] text-white/30 mt-0.5 font-mono">{f.id}</div>
+              </div>
+
+              {/* Routing state */}
+              <div className="flex items-center gap-4 flex-wrap text-[11px]">
+                <div>
+                  <span className="text-white/25">Primary: </span>
+                  <span className={`font-medium ${f.inFallback ? "text-red-400/60 line-through" : providerColor(f.primaryProvider)}`}>
+                    {providerKey(f.primaryProvider)}
+                  </span>
+                </div>
+                {f.inFallback && (
+                  <>
+                    <span className="text-amber-400/40">→</span>
+                    <div>
+                      <span className="text-white/25">Active: </span>
+                      <span className="font-medium text-amber-400">
+                        {providerKey(f.activeProvider)}
+                      </span>
+                    </div>
+                  </>
+                )}
+                <div>
+                  <span className="text-white/25">Model: </span>
+                  <span className="font-mono text-white/55">
+                    {f.activeModel ? shortModel(f.activeModel.replace(" (via NVIDIA fallback)", "")) : "—"}
+                  </span>
+                </div>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${
+                  f.inFallback
+                    ? "bg-amber-500/12 text-amber-400 border-amber-500/20"
+                    : "bg-emerald-500/8 text-emerald-400 border-emerald-500/15"
+                }`}>
+                  {f.inFallback ? "⚡ Fallback" : "✓ Normal"}
+                </span>
+              </div>
             </div>
 
-            {/* Primary provider */}
-            <div className="flex items-center gap-1.5 min-w-[120px]">
-              <span className="text-[10px] text-white/30">Primary:</span>
-              <span className={`text-[11px] font-medium ${
-                !f.inFallback ? "text-emerald-400" : "text-red-400 line-through opacity-50"
-              }`}>
-                {providerKey(f.primaryProvider)}
-              </span>
-            </div>
-
-            {/* Active provider */}
-            <div className="flex items-center gap-1.5 min-w-[120px]">
-              <span className="text-[10px] text-white/30">Active:</span>
-              <span className={`text-[11px] font-semibold ${
-                f.activeProvider === f.primaryProvider ? "text-emerald-400" :
-                f.activeProvider               ? "text-amber-400" :
-                                                 "text-red-400"
-              }`}>
-                {f.activeProvider ? providerKey(f.activeProvider) : "Unavailable"}
-              </span>
-            </div>
-
-            {/* Active model */}
-            <div className="flex-1 min-w-[160px]">
-              <span className="text-[10px] text-white/30">Model: </span>
-              <span className="text-[11px] text-white/55 font-mono">
-                {f.activeModel ? f.activeModel.replace(" (via NVIDIA fallback)", "") : "—"}
-              </span>
-            </div>
-
-            {/* Fallback badge */}
-            {f.inFallback && f.activeProvider && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/12 text-amber-400 border border-amber-500/20 font-medium">
-                ⚡ Fallback active
-              </span>
-            )}
-            {!f.inFallback && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/15 font-medium">
-                ✓ Normal
-              </span>
+            {/* Fallback chain pills */}
+            {f.fallbackChain.length > 0 && (
+              <div className="mt-2 flex items-center gap-1 flex-wrap pl-0">
+                <span className="text-[9px] text-white/20 uppercase tracking-wide mr-1">Chain:</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400/70 border border-indigo-500/15 font-mono">
+                  {shortModel(f.primaryModel)}
+                </span>
+                {f.fallbackChain.map((m, i) => (
+                  <span key={i} className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/4 text-white/30 border border-white/6 font-mono">
+                    {shortModel(m)}
+                  </span>
+                ))}
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-orange-500/8 text-orange-400/60 border border-orange-500/12 font-mono">
+                  NVIDIA
+                </span>
+              </div>
             )}
           </div>
         ))}
@@ -359,26 +630,88 @@ function FeatureRoutingTable({ features, providers }: { features: Feature[]; pro
   );
 }
 
-// ─── Main admin page ──────────────────────────────────────────────────────────
+// ─── Stats Row ─────────────────────────────────────────────────────────────────
+
+function StatsRow({ data }: { data: RoutingData }) {
+  const { googleM, google, nvidia } = data.providers;
+  const providersUp = [googleM, google, nvidia].filter(p => p.status !== "unavailable").length;
+  const inFallback  = data.features.filter(f => f.inFallback).length;
+  const nvidiaRole  = data.providers.googleM.routingState === "fallback-nvidia" ||
+                      data.providers.google.routingState  === "fallback-nvidia"
+    ? "Active Fallback"
+    : "Standby";
+
+  const stats = [
+    { label: "Providers Online",      value: `${providersUp} / 3`,               alert: providersUp < 3 },
+    { label: "Features in Fallback",  value: `${inFallback} / ${data.features.length}`, alert: inFallback > 0 },
+    { label: "Google M Latency",      value: googleM.keyConfigured && googleM.responseTimeMs > 0 ? `${googleM.responseTimeMs} ms` : "—", alert: false },
+    { label: "Google API Latency",    value: google.keyConfigured  && google.responseTimeMs  > 0 ? `${google.responseTimeMs} ms`  : "—", alert: false },
+    { label: "NVIDIA Latency",        value: nvidia.keyConfigured  && nvidia.responseTimeMs  > 0 ? `${nvidia.responseTimeMs} ms`  : "—", alert: false },
+    { label: "NVIDIA Role",           value: nvidiaRole,            alert: nvidiaRole === "Active Fallback" },
+  ];
+
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      {stats.map(s => (
+        <div key={s.label} className={`rounded-lg border px-4 py-3 ${s.alert ? "border-amber-500/20 bg-amber-500/4" : "border-white/8 bg-white/2"}`}>
+          <div className="text-[10px] text-white/30 uppercase tracking-wide mb-1">{s.label}</div>
+          <div className={`text-base font-semibold ${s.alert ? "text-amber-400" : "text-white/75"}`}>{s.value}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Routing Mode Banner ────────────────────────────────────────────────────────
+
+function RoutingModeBanner({ data }: { data: RoutingData }) {
+  const { routingMode } = data;
+  const color = routingMode === "normal"   ? "text-emerald-400 border-emerald-500/25 bg-emerald-500/5"
+              : routingMode === "degraded" ? "text-amber-400 border-amber-500/25 bg-amber-500/5"
+              :                              "text-red-400 border-red-500/25 bg-red-500/5";
+  const icon  = routingMode === "normal" ? "✓" : routingMode === "degraded" ? "⚡" : "✗";
+  const title = routingMode === "normal"   ? "All Systems Normal"
+              : routingMode === "degraded" ? "Degraded — Fallback Routing Active"
+              :                              "Critical — Multiple Providers Down";
+  const body  = routingMode === "normal"
+    ? "All three AI providers are operational. Requests are routing through primary models."
+    : routingMode === "degraded"
+    ? "One or more providers are unavailable. Automatic fallback is active — review the alerts below."
+    : "Multiple AI providers are unavailable. Service may be severely degraded. Check all providers.";
+
+  return (
+    <div className={`rounded-xl border px-5 py-4 flex items-center gap-4 ${color}`}>
+      <div className="text-xl shrink-0">{icon}</div>
+      <div className="flex-1">
+        <div className="font-semibold text-sm">{title}</div>
+        <div className="text-xs opacity-70 mt-0.5">{body}</div>
+      </div>
+      <div className="text-xs opacity-40 shrink-0">
+        {new Date(data.checkedAt).toLocaleTimeString()}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Admin Page ────────────────────────────────────────────────────────────
 
 export default function AdminPage() {
   const [input, setInput]   = useState("");
   const [error, setError]   = useState(false);
   const [authed, setAuthed] = useState(false);
 
-  const [data, setData]       = useState<RoutingData | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [data, setData]           = useState<RoutingData | null>(null);
+  const [loading, setLoading]     = useState(false);
   const [lastFetch, setLastFetch] = useState<string | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  const [countdown, setCountdown] = useState(30);
-
+  const [countdown, setCountdown]   = useState(30);
   const [expandedProviders, setExpandedProviders] = useState<Record<string, boolean>>({});
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     setFetchError(null);
     try {
-      const r = await fetch("/api/ai-routing", { cache: "no-store" });
+      const r    = await fetch("/api/ai-routing", { cache: "no-store" });
       const json = await r.json();
       if (json.error) throw new Error(json.detail || json.error);
       setData(json);
@@ -394,11 +727,10 @@ export default function AdminPage() {
   useEffect(() => {
     if (!authed) return;
     fetchData();
-    const interval = setInterval(fetchData, 30_000);
-    return () => clearInterval(interval);
+    const iv = setInterval(fetchData, 30_000);
+    return () => clearInterval(iv);
   }, [authed, fetchData]);
 
-  // Countdown ticker
   useEffect(() => {
     if (!authed) return;
     const t = setInterval(() => setCountdown(c => c <= 1 ? 30 : c - 1), 1000);
@@ -415,7 +747,7 @@ export default function AdminPage() {
     setExpandedProviders(prev => ({ ...prev, [key]: !prev[key] }));
   }
 
-  // ── Login gate ──────────────────────────────────────────────────────────────
+  // ── Login gate ─────────────────────────────────────────────────────────────
   if (!authed) {
     return (
       <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center px-4">
@@ -448,15 +780,15 @@ export default function AdminPage() {
     );
   }
 
-  // ── Admin dashboard ─────────────────────────────────────────────────────────
+  // ── Dashboard ──────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white">
 
       {/* Header */}
       <div className="border-b border-white/8 px-6 py-4 flex items-center justify-between sticky top-0 bg-[#0a0a0f]/95 backdrop-blur z-10">
         <div className="flex items-center gap-3">
-          <div className="w-7 h-7 rounded-md bg-white/10 flex items-center justify-center">
-            <svg className="w-4 h-4 text-white/70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="w-7 h-7 rounded-md bg-white/8 flex items-center justify-center">
+            <svg className="w-4 h-4 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
             </svg>
           </div>
@@ -472,7 +804,7 @@ export default function AdminPage() {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60" />
                 <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
               </span>
-              <span>Updated {lastFetch} · refreshes in {countdown}s</span>
+              <span>Updated {lastFetch} · {countdown}s</span>
             </div>
           )}
           <button
@@ -493,46 +825,40 @@ export default function AdminPage() {
 
       <div className="max-w-5xl mx-auto px-6 py-8 space-y-8">
 
-        {/* Error banner */}
         {fetchError && (
           <div className="rounded-lg border border-red-500/25 bg-red-500/8 px-4 py-3 text-sm text-red-400">
             ⚠ Could not reach backend: {fetchError}
           </div>
         )}
 
-        {/* Loading skeleton */}
         {loading && !data && (
           <div className="space-y-4">
             {[1,2,3].map(i => (
-              <div key={i} className="h-24 rounded-xl bg-white/3 border border-white/6 animate-pulse" />
+              <div key={i} className="h-28 rounded-xl bg-white/3 border border-white/6 animate-pulse" />
             ))}
           </div>
         )}
 
         {data && (
           <>
-            {/* ── Routing mode banner ────────────────────────────────────────── */}
-            <div className={`rounded-xl border px-5 py-4 flex items-center gap-4 ${routingModeColor(data.routingMode)}`}>
-              <div className="text-xl">
-                {data.routingMode === "normal" ? "✓" : data.routingMode === "degraded" ? "⚡" : "✗"}
-              </div>
-              <div className="flex-1">
-                <div className="font-semibold text-sm">{routingModeLabel(data.routingMode)}</div>
-                <div className="text-xs opacity-70 mt-0.5">
-                  {data.routingMode === "normal" && "All three AI providers are operational. Requests are routing through primary models."}
-                  {data.routingMode === "degraded" && "One or more providers are down. Automatic fallback routing is active — see details below."}
-                  {data.routingMode === "critical" && "Multiple AI providers are unavailable. Service may be severely degraded."}
-                </div>
-              </div>
-              <div className="text-xs opacity-50 shrink-0">
-                Checked {new Date(data.checkedAt).toLocaleTimeString()}
-              </div>
-            </div>
+            {/* 1 — Overall routing mode */}
+            <RoutingModeBanner data={data} />
 
-            {/* ── Provider cards ─────────────────────────────────────────────── */}
+            {/* 2 — Fallback alerts (only shown when a provider is in fallback) */}
+            <FallbackAlerts data={data} />
+
+            {/* 3 — Stats */}
             <section>
-              <h2 className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-3">
-                AI Providers — Live Status
+              <h2 className="text-[10px] font-semibold text-white/35 uppercase tracking-wider mb-3">
+                Infrastructure Summary
+              </h2>
+              <StatsRow data={data} />
+            </section>
+
+            {/* 4 — Provider cards with active model, chain, and where used */}
+            <section>
+              <h2 className="text-[10px] font-semibold text-white/35 uppercase tracking-wider mb-3">
+                AI Providers — Live Status &amp; Active Models
               </h2>
               <div className="space-y-3">
                 {(["googleM", "google", "nvidia"] as const).map(key => (
@@ -542,45 +868,34 @@ export default function AdminPage() {
                     prov={data.providers[key]}
                     expanded={!!expandedProviders[key]}
                     onToggle={() => toggleProvider(key)}
+                    data={data}
                   />
                 ))}
               </div>
             </section>
 
-            {/* ── Fallback flow diagram ───────────────────────────────────────── */}
+            {/* 5 — Provider usage map */}
             <section>
-              <h2 className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-3">
-                Fallback Flow
+              <h2 className="text-[10px] font-semibold text-white/35 uppercase tracking-wider mb-3">
+                Where Each Provider Is Used
+              </h2>
+              <ProviderUsageMap features={data.features} providers={data.providers} />
+            </section>
+
+            {/* 6 — Fallback flow */}
+            <section>
+              <h2 className="text-[10px] font-semibold text-white/35 uppercase tracking-wider mb-3">
+                Fallback Flow &amp; Routing Logic
               </h2>
               <FallbackFlowDiagram data={data} />
             </section>
 
-            {/* ── Feature routing table ───────────────────────────────────────── */}
+            {/* 7 — Feature routing table */}
             <section>
-              <h2 className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-3">
-                Feature Routing — Current State
+              <h2 className="text-[10px] font-semibold text-white/35 uppercase tracking-wider mb-3">
+                Per-Feature Routing — Current State
               </h2>
-              <FeatureRoutingTable features={data.features} providers={data.providers} />
-            </section>
-
-            {/* ── Summary stats ───────────────────────────────────────────────── */}
-            <section>
-              <h2 className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-3">
-                Infrastructure Summary
-              </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {[
-                  { label: "Providers Online", value: [data.providers.googleM, data.providers.google, data.providers.nvidia].filter(p => p.status !== "unavailable").length + " / 3" },
-                  { label: "Features in Fallback", value: data.features.filter(f => f.inFallback).length + " / " + data.features.length },
-                  { label: "Google M Latency", value: data.providers.googleM.keyConfigured && data.providers.googleM.responseTimeMs > 0 ? data.providers.googleM.responseTimeMs + " ms" : "—" },
-                  { label: "NVIDIA Latency", value: data.providers.nvidia.keyConfigured && data.providers.nvidia.responseTimeMs > 0 ? data.providers.nvidia.responseTimeMs + " ms" : "—" },
-                ].map(stat => (
-                  <div key={stat.label} className="rounded-lg border border-white/8 bg-white/2 px-4 py-3">
-                    <div className="text-[10px] text-white/35 uppercase tracking-wide mb-1">{stat.label}</div>
-                    <div className="text-lg font-semibold text-white/80">{stat.value}</div>
-                  </div>
-                ))}
-              </div>
+              <FeatureRoutingTable features={data.features} />
             </section>
           </>
         )}
