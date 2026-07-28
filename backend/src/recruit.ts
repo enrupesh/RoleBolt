@@ -75,6 +75,63 @@ function getUid(req: express.Request): string {
   return (req as any).user?.uid ?? "";
 }
 
+// ── AI Pipeline Rules: evaluate rules against a candidate (call non-blocking) ─
+async function evaluatePipelineRules(jobId: string, candidateId: string) {
+  try {
+    const job = await RecruitJob.findById(jobId).lean();
+    const candidate = await RecruitCandidate.findById(candidateId);
+    if (!job || !candidate) return;
+    const rules: any[] = ((job as any).pipelineRules ?? []).filter((r: any) => r.enabled);
+    if (!rules.length) return;
+
+    const scorePct = candidate.maxScore > 0
+      ? Math.round((candidate.totalScore / candidate.maxScore) * 100)
+      : 0;
+    const dayInStage = candidate.stageMovedAt
+      ? (Date.now() - (candidate.stageMovedAt as Date).getTime()) / (1000 * 60 * 60 * 24)
+      : 0;
+
+    for (const rule of rules) {
+      if (rule.fromStage && candidate.stage !== rule.fromStage) continue;
+
+      let conditionMet = false;
+      if (rule.condition === "score_above"       && scorePct >= rule.threshold)  conditionMet = true;
+      if (rule.condition === "score_below"       && scorePct < rule.threshold)   conditionMet = true;
+      if (rule.condition === "assessment_passed" && candidate.assessmentStatus === "completed" && candidate.hiringDecision === "strong_yes") conditionMet = true;
+      if (rule.condition === "assessment_failed" && candidate.assessmentStatus === "completed" && candidate.hiringDecision === "no")         conditionMet = true;
+      if (rule.condition === "stage_age_days"    && dayInStage >= rule.threshold) conditionMet = true;
+      if (!conditionMet) continue;
+
+      const stageMap: Record<string, string> = {
+        move_to_screened:  "screened",
+        move_to_interview: "interview",
+        move_to_offer:     "offer",
+        move_to_rejected:  "rejected",
+      };
+
+      if (stageMap[rule.action]) {
+        await RecruitCandidate.updateOne(
+          { _id: candidateId },
+          { stage: stageMap[rule.action], stageMovedAt: new Date() }
+        );
+        await RecruitJob.updateOne(
+          { _id: jobId, "pipelineRules.id": rule.id },
+          { $inc: { "pipelineRules.$.triggerCount": 1 } }
+        );
+        console.log(`[pipeline-rule] "${rule.id}" fired: ${rule.condition} → ${rule.action} for candidate ${candidateId}`);
+      } else if (rule.action === "send_assessment" && candidate.assessmentStatus === "not_sent") {
+        await RecruitJob.updateOne(
+          { _id: jobId, "pipelineRules.id": rule.id },
+          { $inc: { "pipelineRules.$.triggerCount": 1 } }
+        );
+        console.log(`[pipeline-rule] send_assessment triggered for candidate ${candidateId}`);
+      }
+    }
+  } catch (e) {
+    console.error("[pipeline-rule] evaluatePipelineRules failed:", e);
+  }
+}
+
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024; // 4MB decoded
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
@@ -1479,6 +1536,15 @@ recruitPublicRouter.post("/jobs/:jobId/apply", async (req, res) => {
       });
     }
 
+    // Evaluate pipeline rules after apply (non-blocking)
+    const _applyJobId  = String(job._id);
+    const _applyCandId = String(candidate._id);
+    setImmediate(() => {
+      evaluatePipelineRules(_applyJobId, _applyCandId).catch(e =>
+        console.error("[pipeline-rule] post-apply evaluation failed:", e)
+      );
+    });
+
     return res.json({ ok: true, candidateId: candidate._id });
   } catch (err: any) {
     console.error("[recruit-public] POST /jobs/:jobId/apply", err);
@@ -1516,6 +1582,89 @@ recruitRouter.patch("/jobs/:jobId/agent-mode", async (req, res) => {
     const job = await RecruitJob.findOneAndUpdate({ _id: req.params.jobId, uid }, { $set: update }, { new: true }).lean();
     if (!job) return res.status(404).json({ error: "Job not found." });
     return res.json({ ok: true, agentMode: (job as any).agentMode });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Pipeline Rules CRUD ───────────────────────────────────────────────────────
+
+recruitRouter.get("/jobs/:jobId/pipeline-rules", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const job = await RecruitJob.findOne({ _id: req.params.jobId, uid }).lean();
+    if (!job) return res.status(404).json({ error: "Job not found." });
+    return res.json({ rules: (job as any).pipelineRules ?? [] });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+recruitRouter.post("/jobs/:jobId/pipeline-rules", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const { condition, threshold, fromStage, action } = req.body;
+    if (!condition || threshold === undefined || !action) {
+      return res.status(400).json({ error: "condition, threshold, and action are required." });
+    }
+    const rule = {
+      id: crypto.randomUUID(),
+      condition,
+      threshold: Number(threshold),
+      fromStage: fromStage || "",
+      action,
+      enabled: true,
+      triggerCount: 0,
+    };
+    const job = await RecruitJob.findOneAndUpdate(
+      { _id: req.params.jobId, uid },
+      { $push: { pipelineRules: rule } },
+      { new: true }
+    ).lean();
+    if (!job) return res.status(404).json({ error: "Job not found." });
+    return res.status(201).json({ ok: true, rule });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+recruitRouter.patch("/jobs/:jobId/pipeline-rules/:ruleId", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const { enabled, condition, threshold, fromStage, action } = req.body;
+    const setFields: Record<string, unknown> = {};
+    if (enabled !== undefined)    setFields["pipelineRules.$.enabled"]    = Boolean(enabled);
+    if (condition !== undefined)  setFields["pipelineRules.$.condition"]  = condition;
+    if (threshold !== undefined)  setFields["pipelineRules.$.threshold"]  = Number(threshold);
+    if (fromStage !== undefined)  setFields["pipelineRules.$.fromStage"]  = fromStage;
+    if (action !== undefined)     setFields["pipelineRules.$.action"]     = action;
+    const job = await RecruitJob.findOneAndUpdate(
+      { _id: req.params.jobId, uid, "pipelineRules.id": req.params.ruleId },
+      { $set: setFields },
+      { new: true }
+    ).lean();
+    if (!job) return res.status(404).json({ error: "Rule not found." });
+    const updated = ((job as any).pipelineRules ?? []).find((r: any) => r.id === req.params.ruleId);
+    return res.json({ ok: true, rule: updated });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+recruitRouter.delete("/jobs/:jobId/pipeline-rules/:ruleId", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const job = await RecruitJob.findOneAndUpdate(
+      { _id: req.params.jobId, uid },
+      { $pull: { pipelineRules: { id: req.params.ruleId } } },
+      { new: true }
+    ).lean();
+    if (!job) return res.status(404).json({ error: "Job not found." });
+    return res.json({ ok: true });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
@@ -1633,6 +1782,12 @@ recruitRouter.patch("/jobs/:jobId/candidates/:candidateId", async (req, res) => 
     if (!candidate) return res.status(404).json({ error: "Candidate not found." });
     if (update.stage) {
       trackEvent("recruiter_stage_changed", uid, { jobId: req.params.jobId, stage: update.stage });
+      // Evaluate pipeline rules after manual stage change (non-blocking)
+      setImmediate(() => {
+        evaluatePipelineRules(req.params.jobId, req.params.candidateId).catch(e =>
+          console.error("[pipeline-rule] post-stage-change evaluation failed:", e)
+        );
+      });
     }
 
     // Auto-send stage-change emails for screened / interview / hired.
@@ -2019,6 +2174,15 @@ recruitPublicRouter.post("/assessment/:token/submit", async (req, res) => {
     candidate.assessmentImpact = result.impact;
     candidate.stage = "assessed";
     await candidate.save();
+
+    // Evaluate pipeline rules after assessment completion (non-blocking)
+    const _assessedCandId = String(candidate._id);
+    const _assessedJobId  = String(candidate.jobId);
+    setImmediate(() => {
+      evaluatePipelineRules(_assessedJobId, _assessedCandId).catch(e =>
+        console.error("[pipeline-rule] post-assessment evaluation failed:", e)
+      );
+    });
 
     return res.json({ ok: true, message: "Assessment submitted successfully." });
   } catch (err: any) {

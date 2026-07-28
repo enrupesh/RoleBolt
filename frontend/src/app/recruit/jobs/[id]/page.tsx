@@ -72,12 +72,23 @@ type AgentMode = {
   autoEmailReject: boolean;
   autoSendAssessment: boolean;
 };
+
+type PipelineRule = {
+  id: string;
+  condition: "score_above" | "score_below" | "assessment_passed" | "assessment_failed" | "stage_age_days";
+  threshold: number;
+  fromStage?: string;
+  action: "move_to_screened" | "move_to_interview" | "move_to_offer" | "move_to_rejected" | "send_assessment" | "send_reminder";
+  enabled: boolean;
+  triggerCount: number;
+};
 type Job = {
   _id: string;
   title: string;
   department: string;
   seniority: string;
   location: string;
+  pipelineRules?: PipelineRule[];
   workMode: string;
   status: string;
   generatedJD: string;
@@ -1781,7 +1792,8 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<"pipeline" | "jd" | "rubric" | "post">("pipeline");
+  const [activeTab, setActiveTab] = useState<"pipeline" | "jd" | "rubric" | "post" | "rules">("pipeline");
+  const [pipelineRules, setPipelineRules] = useState<PipelineRule[]>([]);
   const [linkCopied, setLinkCopied] = useState(false);
   const [stageFilter, setStageFilter] = useState<CandidateStage | "all">("all");
 
@@ -1794,14 +1806,17 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
     if (!token) return;
     setLoading(true);
     try {
-      const [jobRes, candRes] = await Promise.all([
+      const [jobRes, candRes, rulesRes] = await Promise.all([
         fetch(apiUrl(`/recruit/jobs/${id}`), { headers: { Authorization: `Bearer ${token}` } }),
         fetch(apiUrl(`/recruit/jobs/${id}/candidates`), { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(apiUrl(`/recruit/jobs/${id}/pipeline-rules`), { headers: { Authorization: `Bearer ${token}` } }),
       ]);
       const jobData = await readApiJson(jobRes);
       const candData = await readApiJson(candRes);
+      const rulesData = await readApiJson(rulesRes);
       setJob(jobData.job ?? null);
       setCandidates(candData.candidates ?? []);
+      setPipelineRules(rulesData.rules ?? []);
     } catch { /* silent */ }
     finally { setLoading(false); }
   }, [token, id]);
@@ -2026,17 +2041,26 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
         </div>
 
         <div className="mb-6 flex gap-1 border-b border-[var(--border)]">
-          {(["pipeline", "jd", "rubric", "post"] as const).map(tab => (
+          {(["pipeline", "jd", "rubric", "post", "rules"] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2.5 text-sm capitalize transition border-b-2 -mb-px ${
+              className={`relative px-4 py-2.5 text-sm transition border-b-2 -mb-px ${
                 activeTab === tab
                   ? "border-indigo-500 text-[var(--foreground)] font-medium"
                   : "border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
               }`}
             >
-              {tab === "jd" ? "Job Description" : tab === "rubric" ? "Scoring Rubric" : tab === "post" ? "Post to Boards" : "Pipeline"}
+              {tab === "jd" ? "Job Description" : tab === "rubric" ? "Scoring Rubric" : tab === "post" ? "Post to Boards" : tab === "rules" ? (
+                <span className="flex items-center gap-1.5">
+                  Pipeline Rules
+                  {pipelineRules.filter(r => r.enabled).length > 0 && (
+                    <span className="rounded-full bg-indigo-500 px-1.5 py-0.5 text-[10px] font-bold text-white leading-none">
+                      {pipelineRules.filter(r => r.enabled).length}
+                    </span>
+                  )}
+                </span>
+              ) : "Pipeline"}
             </button>
           ))}
         </div>
@@ -2131,7 +2155,347 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
         {activeTab === "post" && (
           <PostToBoardsTab job={job} />
         )}
+
+        {activeTab === "rules" && (
+          <PipelineRulesTab
+            jobId={id}
+            token={token!}
+            rules={pipelineRules}
+            onChange={setPipelineRules}
+          />
+        )}
       </main>
+    </div>
+  );
+}
+
+// ── Pipeline Rules Tab ────────────────────────────────────────────────────────
+
+const CONDITION_LABELS: Record<PipelineRule["condition"], string> = {
+  score_above:       "Resume score is above",
+  score_below:       "Resume score is below",
+  assessment_passed: "Assessment passed (Strong Yes)",
+  assessment_failed: "Assessment failed (No)",
+  stage_age_days:    "Candidate has been in stage for",
+};
+
+const ACTION_LABELS: Record<PipelineRule["action"], string> = {
+  move_to_screened:  "Move to Screened",
+  move_to_interview: "Move to Interview",
+  move_to_offer:     "Move to Offer",
+  move_to_rejected:  "Move to Rejected",
+  send_assessment:   "Send Assessment",
+  send_reminder:     "Send Reminder Email",
+};
+
+const CONDITION_NEEDS_THRESHOLD: Record<PipelineRule["condition"], boolean> = {
+  score_above: true, score_below: true, stage_age_days: true,
+  assessment_passed: false, assessment_failed: false,
+};
+
+function ruleDescription(rule: PipelineRule): string {
+  const cond = CONDITION_LABELS[rule.condition];
+  const act  = ACTION_LABELS[rule.action];
+  const thresh = CONDITION_NEEDS_THRESHOLD[rule.condition]
+    ? ` ${rule.threshold}${rule.condition === "stage_age_days" ? " days" : "%"}`
+    : "";
+  const from = rule.fromStage ? ` (when in "${rule.fromStage}")` : "";
+  return `${cond}${thresh}${from} → ${act}`;
+}
+
+const BLANK_FORM = {
+  condition: "score_above" as PipelineRule["condition"],
+  threshold: 80,
+  fromStage: "",
+  action: "move_to_interview" as PipelineRule["action"],
+};
+
+function PipelineRulesTab({
+  jobId, token, rules, onChange,
+}: {
+  jobId: string;
+  token: string;
+  rules: PipelineRule[];
+  onChange: (rules: PipelineRule[]) => void;
+}) {
+  const [showModal, setShowModal] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState<typeof BLANK_FORM>({ ...BLANK_FORM });
+  const [saving, setSaving] = useState(false);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  function openAddModal() {
+    setEditingId(null);
+    setForm({ ...BLANK_FORM });
+    setError(null);
+    setShowModal(true);
+  }
+
+  function openEditModal(rule: PipelineRule) {
+    setEditingId(rule.id);
+    setForm({ condition: rule.condition, threshold: rule.threshold, fromStage: rule.fromStage || "", action: rule.action });
+    setError(null);
+    setShowModal(true);
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    setError(null);
+    try {
+      const body = {
+        condition: form.condition,
+        threshold: CONDITION_NEEDS_THRESHOLD[form.condition] ? Number(form.threshold) : 0,
+        fromStage: form.fromStage || "",
+        action: form.action,
+      };
+      if (editingId) {
+        const res = await fetch(apiUrl(`/recruit/jobs/${jobId}/pipeline-rules/${editingId}`), {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to update rule.");
+        onChange(rules.map(r => r.id === editingId ? { ...r, ...body } : r));
+      } else {
+        const res = await fetch(apiUrl(`/recruit/jobs/${jobId}/pipeline-rules`), {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to create rule.");
+        onChange([...rules, data.rule]);
+      }
+      setShowModal(false);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleToggle(rule: PipelineRule) {
+    setTogglingId(rule.id);
+    try {
+      const res = await fetch(apiUrl(`/recruit/jobs/${jobId}/pipeline-rules/${rule.id}`), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ enabled: !rule.enabled }),
+      });
+      if (res.ok) onChange(rules.map(r => r.id === rule.id ? { ...r, enabled: !rule.enabled } : r));
+    } finally { setTogglingId(null); }
+  }
+
+  async function handleDelete(ruleId: string) {
+    setDeletingId(ruleId);
+    try {
+      const res = await fetch(apiUrl(`/recruit/jobs/${jobId}/pipeline-rules/${ruleId}`), {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) onChange(rules.filter(r => r.id !== ruleId));
+    } finally { setDeletingId(null); }
+  }
+
+  const needsThreshold = CONDITION_NEEDS_THRESHOLD[form.condition];
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-base font-semibold text-[var(--foreground)]">AI Pipeline Rules</h2>
+          <p className="mt-1 text-xs text-[var(--text-muted)] max-w-lg">
+            Define rules that automatically move candidates through stages or trigger actions — AI executes them instantly whenever a candidate matches the condition.
+          </p>
+        </div>
+        <button
+          onClick={openAddModal}
+          className="flex shrink-0 items-center gap-2 rounded-2xl bg-indigo-500 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-indigo-500/20 transition hover:bg-indigo-400"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add Rule
+        </button>
+      </div>
+
+      {/* How it works callout */}
+      <div className="mb-6 rounded-2xl border border-indigo-500/20 bg-indigo-500/5 p-4 flex gap-3">
+        <svg className="mt-0.5 shrink-0 text-indigo-500" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <p className="text-xs text-indigo-700 leading-5">
+          Rules fire <strong>non-blocking</strong> after every candidate action: new application, assessment submission, and manual stage change. Conditions are evaluated in order — first match wins.
+        </p>
+      </div>
+
+      {/* Rules list */}
+      {rules.length === 0 ? (
+        <div className="rounded-3xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-muted)] px-6 py-16 text-center">
+          <svg className="mx-auto mb-3 text-[var(--text-muted)]" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>
+          <p className="text-sm font-medium text-[var(--text-secondary)]">No rules yet</p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">Add your first rule to let AI automatically manage this pipeline.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {rules.map((rule) => (
+            <div
+              key={rule.id}
+              className={`rounded-2xl border bg-[var(--surface)] p-4 transition ${
+                rule.enabled ? "border-[var(--border)]" : "border-[var(--border)] opacity-50"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  {/* Enabled toggle */}
+                  <button
+                    onClick={() => handleToggle(rule)}
+                    disabled={togglingId === rule.id}
+                    className={`relative shrink-0 inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                      rule.enabled ? "bg-indigo-500" : "bg-slate-300"
+                    }`}
+                    title={rule.enabled ? "Disable rule" : "Enable rule"}
+                  >
+                    <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform ${
+                      rule.enabled ? "translate-x-4" : "translate-x-1"
+                    }`} />
+                  </button>
+
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-[var(--foreground)] truncate">{ruleDescription(rule)}</p>
+                    <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">
+                      Fired <span className="font-semibold text-[var(--text-secondary)]">{rule.triggerCount}</span> time{rule.triggerCount !== 1 ? "s" : ""}
+                      {!rule.enabled && <span className="ml-2 text-amber-600 font-medium">· Disabled</span>}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    onClick={() => openEditModal(rule)}
+                    className="rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] transition hover:text-[var(--foreground)]"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDelete(rule.id)}
+                    disabled={deletingId === rule.id}
+                    className="rounded-xl border border-rose-500/20 bg-rose-500/5 px-3 py-1.5 text-xs font-medium text-rose-600 transition hover:bg-rose-500/10"
+                  >
+                    {deletingId === rule.id ? "…" : "Delete"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Add / Edit Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-2xl">
+            <h3 className="mb-5 text-base font-bold text-[var(--foreground)]">
+              {editingId ? "Edit Rule" : "Add Pipeline Rule"}
+            </h3>
+
+            <div className="space-y-4">
+              {/* Condition */}
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wide">Condition</label>
+                <select
+                  value={form.condition}
+                  onChange={e => setForm(f => ({ ...f, condition: e.target.value as PipelineRule["condition"] }))}
+                  className="w-full rounded-xl border border-[var(--border-strong)] bg-[var(--surface-muted)] px-3 py-2.5 text-sm text-[var(--foreground)] outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/20"
+                >
+                  {(Object.entries(CONDITION_LABELS) as [PipelineRule["condition"], string][]).map(([val, label]) => (
+                    <option key={val} value={val}>{label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Threshold — only when needed */}
+              {needsThreshold && (
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wide">
+                    {form.condition === "stage_age_days" ? "Days in stage" : "Score threshold (%)"}
+                  </label>
+                  <input
+                    type="number"
+                    min={form.condition === "stage_age_days" ? 1 : 1}
+                    max={form.condition === "stage_age_days" ? 365 : 100}
+                    value={form.threshold}
+                    onChange={e => setForm(f => ({ ...f, threshold: Number(e.target.value) }))}
+                    className="w-full rounded-xl border border-[var(--border-strong)] bg-[var(--surface-muted)] px-3 py-2.5 text-sm text-[var(--foreground)] outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/20"
+                  />
+                </div>
+              )}
+
+              {/* From stage (optional) */}
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wide">
+                  Only apply when in stage <span className="font-normal text-[var(--text-muted)] normal-case">(optional)</span>
+                </label>
+                <select
+                  value={form.fromStage}
+                  onChange={e => setForm(f => ({ ...f, fromStage: e.target.value }))}
+                  className="w-full rounded-xl border border-[var(--border-strong)] bg-[var(--surface-muted)] px-3 py-2.5 text-sm text-[var(--foreground)] outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/20"
+                >
+                  <option value="">Any stage</option>
+                  <option value="applied">Applied</option>
+                  <option value="screened">Screened</option>
+                  <option value="assessed">Assessed</option>
+                  <option value="interview">Interview</option>
+                  <option value="offer">Offer</option>
+                </select>
+              </div>
+
+              {/* Action */}
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wide">Then do this</label>
+                <select
+                  value={form.action}
+                  onChange={e => setForm(f => ({ ...f, action: e.target.value as PipelineRule["action"] }))}
+                  className="w-full rounded-xl border border-[var(--border-strong)] bg-[var(--surface-muted)] px-3 py-2.5 text-sm text-[var(--foreground)] outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/20"
+                >
+                  {(Object.entries(ACTION_LABELS) as [PipelineRule["action"], string][]).map(([val, label]) => (
+                    <option key={val} value={val}>{label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Preview */}
+              <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/5 px-3 py-2.5">
+                <p className="text-[11px] text-indigo-600 font-medium">Rule preview</p>
+                <p className="mt-0.5 text-xs text-indigo-700">
+                  {CONDITION_LABELS[form.condition]}
+                  {needsThreshold ? ` ${form.threshold}${form.condition === "stage_age_days" ? " days" : "%"}` : ""}
+                  {form.fromStage ? ` (when in "${form.fromStage}")` : ""} → {ACTION_LABELS[form.action]}
+                </p>
+              </div>
+
+              {error && <p className="text-xs text-rose-600">{error}</p>}
+            </div>
+
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={() => setShowModal(false)}
+                className="flex-1 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] py-2.5 text-sm font-medium text-[var(--text-secondary)] transition hover:text-[var(--foreground)]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="flex-1 rounded-xl bg-indigo-500 py-2.5 text-sm font-bold text-white shadow shadow-indigo-500/20 transition hover:bg-indigo-400 disabled:opacity-60"
+              >
+                {saving ? "Saving…" : editingId ? "Save Changes" : "Add Rule"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
