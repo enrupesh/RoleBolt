@@ -1,0 +1,50 @@
+2026-07-28T06:41:42.825723362Z + @tailwindcss/postcss 4.3.3
+2026-07-28T06:41:42.82572468Z + @types/node 20.19.43 (26.1.2 is available)
+2026-07-28T06:41:42.825725825Z + @types/react 19.2.17
+2026-07-28T06:41:42.825726654Z + @types/react-dom 19.2.3
+2026-07-28T06:41:42.825727411Z + lucide-react 1.27.0
+2026-07-28T06:41:42.825728286Z + next 16.2.3 (16.2.10 is available)
+2026-07-28T06:41:42.82572908Z + react 19.2.4 (19.2.7 is available)
+2026-07-28T06:41:42.825729891Z + react-dom 19.2.4 (19.2.7 is available)
+2026-07-28T06:41:42.82573076Z + react-markdown 10.1.0
+2026-07-28T06:41:42.825731564Z + remark-gfm 4.0.1
+2026-07-28T06:41:42.825732459Z + tailwindcss 4.3.3
+2026-07-28T06:41:42.825733234Z + typescript 6.0.3 (7.0.2 is available)
+2026-07-28T06:41:42.825733982Z 
+2026-07-28T06:41:42.825735499Z devDependencies: skipped because NODE_ENV is set to production
+2026-07-28T06:41:42.825736379Z 
+2026-07-28T06:41:42.826410279Z Done in 5.2s
+2026-07-28T06:41:43.230949186Z 
+2026-07-28T06:41:43.230955278Z > recruit-frontend@0.1.0 build /opt/render/project/src/frontend
+2026-07-28T06:41:43.230956206Z > next build
+2026-07-28T06:41:43.230956952Z 
+2026-07-28T06:41:43.610512775Z ⚠ No build cache found. Please configure build caching for faster rebuilds. Read more: https://nextjs.org/docs/messages/no-cache
+2026-07-28T06:41:43.621242422Z ▲ Next.js 16.2.3 (Turbopack)
+2026-07-28T06:41:43.621336187Z 
+2026-07-28T06:41:43.622573686Z ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+2026-07-28T06:41:43.641164275Z   Creating an optimized production build ...
+2026-07-28T06:41:49.924032592Z ✓ Compiled successfully in 6.1s
+2026-07-28T06:41:49.925386894Z   Running TypeScript ...
+2026-07-28T06:41:56.827405734Z   Finished TypeScript in 6.9s ...
+2026-07-28T06:41:56.829214023Z   Collecting page data using 41 workers ...
+2026-07-28T06:42:03.579651106Z   Generating static pages using 41 workers (0/32) ...
+2026-07-28T06:42:03.646477147Z ⚠ metadataBase property in metadata export is not set for resolving social open graph or twitter images, using "http://localhost:10000". See https://nextjs.org/docs/app/api-reference/functions/generate-metadata#metadatabase
+2026-07-28T06:42:03.892554316Z ⚠ metadataBase property in metadata export is not set for resolving social open graph or twitter images, using "http://localhost:10000". See https://nextjs.org/docs/app/api-reference/functions/generate-metadata#metadatabase
+2026-07-28T06:42:03.913792848Z ⨯ useSearchParams() should be wrapped in a suspense boundary at page "/recruit/auth/callback". Read more: https://nextjs.org/docs/messages/missing-suspense-with-csr-bailout
+2026-07-28T06:42:03.913809645Z     at S (/opt/render/project/src/frontend/.next/server/chunks/ssr/09w1_next_0lsmze6._.js:2:2692)
+2026-07-28T06:42:03.91381119Z     at r (/opt/render/project/src/frontend/.next/server/chunks/ssr/09w1_next_0lsmze6._.js:4:6761)
+2026-07-28T06:42:03.913812865Z     at /opt/render/project/src/frontend/.next/server/chunks/ssr/_0dbt7s~._.js:1:2476
+2026-07-28T06:42:03.913814152Z     at an (/opt/render/project/src/frontend/node_modules/.pnpm/next@16.2.3_@babel+core@7.29.7_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js:2:84267)
+2026-07-28T06:42:03.913815628Z     at ai (/opt/render/project/src/frontend/node_modules/.pnpm/next@16.2.3_@babel+core@7.29.7_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js:2:86086)
+2026-07-28T06:42:03.913816651Z     at al (/opt/render/project/src/frontend/node_modules/.pnpm/next@16.2.3_@babel+core@7.29.7_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js:2:107860)
+2026-07-28T06:42:03.91381771Z     at ao (/opt/render/project/src/frontend/node_modules/.pnpm/next@16.2.3_@babel+core@7.29.7_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js:2:105275)
+2026-07-28T06:42:03.913818759Z     at aa (/opt/render/project/src/frontend/node_modules/.pnpm/next@16.2.3_@babel+core@7.29.7_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js:2:84619)
+2026-07-28T06:42:03.913819931Z     at ai (/opt/render/project/src/frontend/node_modules/.pnpm/next@16.2.3_@babel+core@7.29.7_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js:2:86135)
+2026-07-28T06:42:03.913821042Z     at ai (/opt/render/project/src/frontend/node_modules/.pnpm/next@16.2.3_@babel+core@7.29.7_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/next/dist/compiled/next-server/app-page-turbo.runtime.prod.js:2:104615)
+2026-07-28T06:42:03.913997433Z Error occurred prerendering page "/recruit/auth/callback". Read more: https://nextjs.org/docs/messages/prerender-error
+2026-07-28T06:42:03.914266889Z   Generating static pages using 41 workers (8/32) 
+2026-07-28T06:42:03.914438841Z Export encountered an error on /recruit/auth/callback/page: /recruit/auth/callback, exiting the build.
+2026-07-28T06:42:03.944875933Z ⨯ Next.js build worker exited with code: 1 and signal: null
+2026-07-28T06:42:04.243772546Z  ELIFECYCLE  Command failed with exit code 1.
+2026-07-28T06:42:04.284623411Z ==> Build failed 😞
+2026-07-28T06:42:04.284638706Z ==> Common ways to troubleshoot your deploy: https://render.com/docs/troubleshooting-deploys
