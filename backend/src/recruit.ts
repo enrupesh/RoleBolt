@@ -201,6 +201,26 @@ recruitRouter.get("/auth/profile", async (req, res) => {
   }
 });
 
+recruitRouter.patch("/auth/profile", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "Unauthorized" });
+    const { role, name, email } = req.body as { role?: string; name?: string; email?: string };
+    if (!role || !["creator", "seeker"].includes(role)) {
+      return res.status(400).json({ error: "Invalid role. Must be 'creator' or 'seeker'." });
+    }
+    const profile = await RecruitProfile.findOneAndUpdate(
+      { uid },
+      { $set: { role, ...(name ? { name } : {}), ...(email ? { email } : {}) } },
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    ).lean() as any;
+    return res.json({ uid: profile.uid, role: profile.role, name: profile.name, email: profile.email });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 function safeJson(text: string): any {
   const normalized = String(text || "").trim();
   const decoded = decodeEscapedAiText(normalized);
@@ -2878,6 +2898,272 @@ recruitRouter.put("/seeker/profile", async (req, res) => {
     return res.json({ profile });
   } catch (err: any) {
     console.error("[recruit] PUT /seeker/profile", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Seeker: applications, saved jobs, one-click apply ───────────────────────
+
+recruitRouter.get("/seeker/applications", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const user = await (await import("./models/User")).User.findById(uid).lean() as any;
+    if (!user) return res.status(404).json({ error: "User not found." });
+    const seekerProfile = await RecruitSeekerProfile.findOne({ uid }).lean() as any;
+    const email = seekerProfile?.email || user.email;
+    if (!email) return res.json({ applications: [] });
+    const candidates = await RecruitCandidate.find({ email }).sort({ createdAt: -1 }).lean();
+    const jobIds = [...new Set(candidates.map((c: any) => c.jobId?.toString()).filter(Boolean))];
+    const jobs = await RecruitJob.find({ _id: { $in: jobIds } }).select("title companyName status location workMode").lean();
+    const jobMap: Record<string, any> = {};
+    for (const j of jobs) jobMap[j._id.toString()] = j;
+    const applications = candidates.map((c: any) => ({
+      id: c._id.toString(),
+      jobId: c.jobId?.toString(),
+      jobTitle: jobMap[c.jobId?.toString()]?.title ?? "Unknown Job",
+      companyName: jobMap[c.jobId?.toString()]?.companyName ?? "",
+      location: jobMap[c.jobId?.toString()]?.location ?? "",
+      workMode: jobMap[c.jobId?.toString()]?.workMode ?? "",
+      stage: c.stage,
+      totalScore: c.totalScore,
+      maxScore: c.maxScore,
+      appliedAt: c.createdAt,
+      stageMovedAt: c.stageMovedAt,
+    }));
+    return res.json({ applications });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+recruitRouter.post("/seeker/jobs/:jobId/apply", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const seekerProfile = await RecruitSeekerProfile.findOne({ uid }).lean() as any;
+    if (!seekerProfile) return res.status(400).json({ error: "Please complete your seeker profile before applying." });
+    if (!seekerProfile.resumeText) return res.status(400).json({ error: "Please add your resume to your profile before applying." });
+    const job = await RecruitJob.findOne({ _id: req.params.jobId, status: "active" }).lean() as any;
+    if (!job) return res.status(404).json({ error: "Job not found." });
+    const existing = await RecruitCandidate.findOne({ jobId: req.params.jobId, email: seekerProfile.email }).lean();
+    if (existing) return res.status(409).json({ error: "You have already applied to this job." });
+    const candidate = await RecruitCandidate.create({
+      jobId: req.params.jobId,
+      uid: job.uid,
+      name: seekerProfile.name,
+      email: seekerProfile.email,
+      phone: seekerProfile.phone ?? "",
+      resumeText: seekerProfile.resumeText,
+      stage: "applied",
+      source: "seeker_profile",
+    });
+    // Non-blocking scoring
+    setImmediate(async () => {
+      try {
+        const scored = await scoreCandidate({ resumeText: seekerProfile.resumeText, jobTitle: job.title, rubric: job.rubric ?? [] });
+        await RecruitCandidate.updateOne({ _id: candidate._id }, { $set: { totalScore: scored.totalScore, maxScore: scored.maxScore, scoreBreakdown: scored.scoreBreakdown, aiSummary: scored.aiSummary, redFlags: scored.redFlags, strengths: scored.strengths, scoringFailed: scored.scoringFailed } });
+      } catch (e) { console.error("[seeker-apply] scoring failed", e); }
+    });
+    return res.status(201).json({ ok: true, candidateId: candidate._id.toString() });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+recruitRouter.post("/seeker/jobs/:jobId/save", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    await RecruitSeekerProfile.findOneAndUpdate(
+      { uid },
+      { $addToSet: { savedJobIds: req.params.jobId } },
+      { upsert: true, new: true }
+    );
+    return res.json({ ok: true });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+recruitRouter.delete("/seeker/jobs/:jobId/save", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    await RecruitSeekerProfile.findOneAndUpdate({ uid }, { $pull: { savedJobIds: req.params.jobId } });
+    return res.json({ ok: true });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+recruitRouter.get("/seeker/saved-jobs", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const profile = await RecruitSeekerProfile.findOne({ uid }).lean() as any;
+    const ids = profile?.savedJobIds ?? [];
+    if (!ids.length) return res.json({ jobs: [] });
+    const jobs = await RecruitJob.find({ _id: { $in: ids }, status: "active" }).select("title companyName location workMode seniority salaryMin salaryMax salaryCurrency applicationDeadline").lean();
+    return res.json({ jobs: jobs.map((j: any) => ({ id: j._id.toString(), title: j.title, companyName: j.companyName, location: j.location, workMode: j.workMode, seniority: j.seniority, salaryMin: j.salaryMin, salaryMax: j.salaryMax, salaryCurrency: j.salaryCurrency, applicationDeadline: j.applicationDeadline })) });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Seeker: AI Resume Builder ────────────────────────────────────────────────
+
+recruitRouter.post("/seeker/resume/build", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const { answers, targetRole } = req.body as { answers: { question: string; answer: string }[]; targetRole?: string };
+    if (!Array.isArray(answers) || answers.length === 0) return res.status(400).json({ error: "answers array required." });
+    const prompt = `You are a professional resume writer. Based on these Q&A answers, create a complete ATS-optimized resume.
+Target Role: ${targetRole || "Not specified"}
+Q&A:
+${answers.map((a, i) => `Q${i + 1}: ${a.question}\nA${i + 1}: ${a.answer}`).join("\n\n")}
+
+Return ONLY valid JSON (no markdown):
+{
+  "contactInfo": { "name": "", "email": "", "phone": "", "location": "" },
+  "summary": "2-3 sentence professional summary",
+  "experience": [{ "title": "", "company": "", "duration": "", "bullets": ["achievement 1", "achievement 2"] }],
+  "education": [{ "degree": "", "school": "", "year": "" }],
+  "skills": { "technical": [], "soft": [] },
+  "atsKeywords": [],
+  "atsScore": 85,
+  "fullText": "full plain text version of the resume"
+}`;
+    let raw = "";
+    try { raw = await callGeminiChain({ prompt, jsonMode: true }); } catch { raw = await callMeshChatCompletions({ apiKey: GEMINI_MESH_KEY, messages: [{ role: "user", content: prompt }] }); }
+    const parsed = safeJson(raw);
+    if (!parsed) return res.status(500).json({ error: "AI failed to generate resume. Please try again." });
+    return res.json({ resume: parsed, fullText: parsed.fullText ?? "" });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+recruitRouter.post("/seeker/resume/improve", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const { resumeText, targetJobDescription } = req.body as { resumeText: string; targetJobDescription: string };
+    if (!resumeText?.trim()) return res.status(400).json({ error: "resumeText is required." });
+    if (!targetJobDescription?.trim()) return res.status(400).json({ error: "targetJobDescription is required." });
+    const prompt = `You are a professional resume editor. Improve this resume for the target job.
+CURRENT RESUME:
+${resumeText.slice(0, 3000)}
+
+TARGET JOB DESCRIPTION:
+${targetJobDescription.slice(0, 1500)}
+
+Return ONLY valid JSON:
+{
+  "improvedResume": "full improved resume text",
+  "changes": ["change 1 description", "change 2 description"],
+  "atsScore": 88
+}`;
+    let raw = "";
+    try { raw = await callGeminiChain({ prompt, jsonMode: true }); } catch { raw = await callMeshChatCompletions({ apiKey: GEMINI_MESH_KEY, messages: [{ role: "user", content: prompt }] }); }
+    const parsed = safeJson(raw);
+    if (!parsed) return res.status(500).json({ error: "AI failed to improve resume. Please try again." });
+    return res.json({ improvedResume: parsed.improvedResume ?? "", changes: parsed.changes ?? [], atsScore: parsed.atsScore ?? 0 });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Seeker: Cover Letter, Interview Prep, Profile Optimizer ─────────────────
+
+recruitRouter.post("/seeker/cover-letter/generate", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const { jobId, jobDescription, resumeText, tone = "professional" } = req.body as { jobId?: string; jobDescription?: string; resumeText: string; tone?: string };
+    if (!resumeText?.trim()) return res.status(400).json({ error: "resumeText is required." });
+    let jd = jobDescription || "";
+    if (!jd && jobId) {
+      const job = await RecruitJob.findOne({ _id: jobId, status: "active" }).lean() as any;
+      if (job) jd = `${job.title} at ${job.companyName}. ${job.generatedJD || ""} Required skills: ${job.mustHaveSkills || ""}`;
+    }
+    if (!jd) return res.status(400).json({ error: "Provide jobId or jobDescription." });
+    const prompt = `Write a compelling cover letter for this job application.
+JOB: ${jd.slice(0, 1200)}
+CANDIDATE RESUME: ${resumeText.slice(0, 2000)}
+TONE: ${tone}
+Rules: 3 paragraphs (hook + fit + CTA), under 300 words, reference specific skills from JD, sound human not robotic, never start with "I am writing to express".
+Return ONLY the cover letter text, no subject line or salutation header.`;
+    let text = "";
+    try { text = await callGeminiChain({ prompt }); } catch { text = await callMeshChatCompletions({ apiKey: GEMINI_MESH_KEY, messages: [{ role: "user", content: prompt }] }); }
+    return res.json({ coverLetter: text.trim(), wordCount: text.trim().split(/\s+/).length });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+recruitRouter.post("/seeker/interview-prep/questions", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const { jobDescription, difficulty = "mid" } = req.body as { jobDescription: string; difficulty?: string };
+    if (!jobDescription?.trim()) return res.status(400).json({ error: "jobDescription is required." });
+    const prompt = `Generate 7 interview questions for this job. Difficulty: ${difficulty}.
+JOB: ${jobDescription.slice(0, 1500)}
+Return ONLY valid JSON array:
+[{"id":"1","question":"...","category":"behavioral|technical|situational|culture","tips":"what a good answer includes"}]
+Mix categories: 2 behavioral, 2 technical, 2 situational, 1 culture fit.`;
+    let raw = "";
+    try { raw = await callGeminiChain({ prompt, jsonMode: true }); } catch { raw = await callMeshChatCompletions({ apiKey: GEMINI_MESH_KEY, messages: [{ role: "user", content: prompt }] }); }
+    const parsed = safeJson(raw);
+    if (!Array.isArray(parsed)) return res.status(500).json({ error: "AI failed to generate questions." });
+    return res.json({ questions: parsed.slice(0, 7) });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+recruitRouter.post("/seeker/interview-prep/evaluate", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const { question, answer, jobContext } = req.body as { question: string; answer: string; jobContext?: string };
+    if (!question?.trim() || !answer?.trim()) return res.status(400).json({ error: "question and answer are required." });
+    const prompt = `You are an interview coach. Evaluate this interview answer.
+Question: ${question}
+Answer: ${answer}
+Job Context: ${jobContext || "Not provided"}
+Return ONLY valid JSON:
+{"score":85,"grade":"B+","strengths":["Used STAR format","Specific example"],"improvements":["Add quantifiable outcome"],"betterAnswer":"Here is how you could improve: ...","followUpQuestions":["Can you quantify the impact?"]}`;
+    let raw = "";
+    try { raw = await callGeminiChain({ prompt, jsonMode: true }); } catch { raw = await callMeshChatCompletions({ apiKey: GEMINI_MESH_KEY, messages: [{ role: "user", content: prompt }] }); }
+    const parsed = safeJson(raw);
+    if (!parsed) return res.status(500).json({ error: "AI evaluation failed." });
+    return res.json({ score: parsed.score ?? 0, grade: parsed.grade ?? "N/A", strengths: parsed.strengths ?? [], improvements: parsed.improvements ?? [], betterAnswer: parsed.betterAnswer ?? "", followUpQuestions: parsed.followUpQuestions ?? [] });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+recruitRouter.post("/seeker/profile/optimize", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const { resumeText, targetRole, currentSkills } = req.body as { resumeText: string; targetRole: string; currentSkills?: string[] };
+    if (!resumeText?.trim()) return res.status(400).json({ error: "resumeText is required." });
+    const prompt = `You are a career coach. Analyze this job seeker's profile and give improvement suggestions.
+Target Role: ${targetRole || "Not specified"}
+Current Skills: ${(currentSkills ?? []).join(", ") || "Not listed"}
+Resume: ${resumeText.slice(0, 2500)}
+Return ONLY valid JSON:
+{"profileScore":72,"grade":"B","improvements":[{"priority":"high|medium|low","action":"Add TypeScript to skills","impact":"+23% more matches","howTo":"Brief instruction"}],"inDemandSkills":["Docker","AWS"],"missingFromProfile":["AWS"],"salaryInsight":"Developers with your profile earn $85K-$110K"}`;
+    let raw = "";
+    try { raw = await callGeminiChain({ prompt, jsonMode: true }); } catch { raw = await callMeshChatCompletions({ apiKey: GEMINI_MESH_KEY, messages: [{ role: "user", content: prompt }] }); }
+    const parsed = safeJson(raw);
+    if (!parsed) return res.status(500).json({ error: "AI analysis failed." });
+    return res.json({ profileScore: parsed.profileScore ?? 0, grade: parsed.grade ?? "N/A", improvements: parsed.improvements ?? [], inDemandSkills: parsed.inDemandSkills ?? [], missingFromProfile: parsed.missingFromProfile ?? [], salaryInsight: parsed.salaryInsight ?? "" });
+  } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 });

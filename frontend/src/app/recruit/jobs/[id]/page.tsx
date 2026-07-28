@@ -2215,6 +2215,166 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
   );
 }
 
+// ── Performance Tab ───────────────────────────────────────────────────────────
+
+const ALERT_META: Record<PerformanceAlert["type"], { label: string; color: string; icon: string }> = {
+  low_applications: { label: "Low Applications",  color: "border-amber-400/40 bg-amber-500/5",  icon: "📉" },
+  no_hire_14_days:  { label: "No Hire (14+ days)", color: "border-orange-400/40 bg-orange-500/5", icon: "⏳" },
+  high_reject_rate: { label: "High Rejection Rate", color: "border-rose-400/40 bg-rose-500/5",   icon: "⚠️" },
+};
+
+function PerformanceTab({
+  jobId, token, alerts, checking, onDismiss, onApplied, onRefresh,
+}: {
+  jobId: string;
+  token: string;
+  alerts: PerformanceAlert[];
+  checking: boolean;
+  onDismiss: (alertId: string) => void;
+  onApplied: (newJD: string) => void;
+  onRefresh: () => Promise<void>;
+}) {
+  const [applyingMap, setApplyingMap]   = useState<Record<string, boolean>>({});
+  const [dismissingId, setDismissingId] = useState<string | null>(null);
+  const [successMap, setSuccessMap]     = useState<Record<string, string>>({});
+  const [errorMsg, setErrorMsg]         = useState<string | null>(null);
+
+  async function handleApply(alertId: string, suggestion: string) {
+    const key = `${alertId}:${suggestion}`;
+    setApplyingMap(m => ({ ...m, [key]: true }));
+    setErrorMsg(null);
+    try {
+      const res = await fetch(apiUrl(`/recruit/jobs/${jobId}/performance/apply`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ suggestion }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to apply suggestion.");
+      onApplied(data.newJD);
+      setSuccessMap(m => ({ ...m, [key]: "✓ Applied — JD updated!" }));
+      setTimeout(() => setSuccessMap(m => { const n = { ...m }; delete n[key]; return n; }), 3000);
+    } catch (e: any) {
+      setErrorMsg(e.message);
+    } finally {
+      setApplyingMap(m => ({ ...m, [key]: false }));
+    }
+  }
+
+  async function handleDismiss(alertId: string) {
+    setDismissingId(alertId);
+    try {
+      const res = await fetch(apiUrl(`/recruit/jobs/${jobId}/performance/dismiss/${alertId}`), {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) onDismiss(alertId);
+    } finally {
+      setDismissingId(null);
+    }
+  }
+
+  return (
+    <div className="space-y-5 py-2">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-base font-bold text-[var(--foreground)]">AI Job Performance Monitor</h2>
+          <p className="mt-0.5 text-xs text-[var(--text-muted)]">
+            AI monitors this job and flags issues automatically. Click &ldquo;Check Now&rdquo; to run a fresh analysis.
+          </p>
+        </div>
+        <button
+          onClick={onRefresh}
+          disabled={checking}
+          className="flex items-center gap-2 rounded-xl bg-indigo-500 px-4 py-2 text-xs font-semibold text-white transition hover:bg-indigo-600 disabled:opacity-60"
+        >
+          {checking ? (
+            <><span className="animate-spin">⟳</span> Checking…</>
+          ) : (
+            <><span>🔍</span> Check Now</>
+          )}
+        </button>
+      </div>
+
+      {errorMsg && (
+        <div className="rounded-2xl border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-600">
+          {errorMsg}
+        </div>
+      )}
+
+      {/* No alerts */}
+      {!checking && alerts.length === 0 && (
+        <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface-muted)] px-6 py-10 text-center">
+          <p className="text-3xl">✅</p>
+          <p className="mt-2 text-sm font-semibold text-[var(--foreground)]">All good — no issues detected</p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
+            AI checks for low applications, stalled pipelines, and high rejection rates.
+          </p>
+        </div>
+      )}
+
+      {/* Alert cards */}
+      {alerts.map(alert => {
+        const meta = ALERT_META[alert.type];
+        return (
+          <div key={alert.id} className={`rounded-3xl border p-5 ${meta.color}`}>
+            {/* Alert header */}
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">{meta.icon}</span>
+                <div>
+                  <span className="text-xs font-bold uppercase tracking-wide text-[var(--text-secondary)]">{meta.label}</span>
+                  <p className="mt-0.5 text-sm font-medium text-[var(--foreground)]">{alert.message}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => handleDismiss(alert.id)}
+                disabled={dismissingId === alert.id}
+                className="shrink-0 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] transition hover:text-[var(--foreground)] disabled:opacity-50"
+              >
+                {dismissingId === alert.id ? "…" : "Dismiss"}
+              </button>
+            </div>
+
+            {/* AI Suggestions */}
+            {alert.aiSuggestions.length > 0 && (
+              <div className="mt-4">
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                  AI Suggestions — click to apply:
+                </p>
+                <div className="space-y-2">
+                  {alert.aiSuggestions.map((suggestion, i) => {
+                    const key = `${alert.id}:${suggestion}`;
+                    const applying = applyingMap[key];
+                    const success  = successMap[key];
+                    return (
+                      <div key={i} className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
+                        <p className="text-sm text-[var(--foreground)]">{suggestion}</p>
+                        <button
+                          onClick={() => handleApply(alert.id, suggestion)}
+                          disabled={!!applying}
+                          className="shrink-0 rounded-xl bg-indigo-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-600 disabled:opacity-60"
+                        >
+                          {success ? success : applying ? "Applying…" : "Apply →"}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <p className="mt-3 text-[11px] text-[var(--text-muted)]">
+              Detected {new Date(alert.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+            </p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── Pipeline Rules Tab ────────────────────────────────────────────────────────
 
 const CONDITION_LABELS: Record<PipelineRule["condition"], string> = {
