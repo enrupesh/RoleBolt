@@ -6,6 +6,8 @@ export interface IUser extends Document {
   name: string;
   isVerified: boolean;
   githubId?: string;
+  googleId?: string;
+  microsoftId?: string;
   verificationToken?: string;
   verificationTokenExpiry?: Date;
   resetToken?: string;
@@ -28,6 +30,8 @@ const UserSchema = new Schema<IUser>(
     name:         { type: String, default: "" },
     isVerified:   { type: Boolean, default: false },
     githubId:     { type: String, index: true, sparse: true },
+    googleId:     { type: String, index: true, sparse: true },
+    microsoftId:  { type: String, index: true, sparse: true },
     verificationToken:       { type: String, index: true, sparse: true },
     verificationTokenExpiry: { type: Date },
     resetToken:              { type: String, index: true, sparse: true },

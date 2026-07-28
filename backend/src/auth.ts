@@ -18,6 +18,7 @@ import { connectMongo } from "./db";
 import { User } from "./models/User";
 import { signToken, verifyToken, requireAuth } from "./authMiddleware";
 import { sendEmail } from "./mailer";
+import { verifyFirebaseToken } from "./firebaseAdmin";
 
 export const authRouter = express.Router();
 
@@ -131,6 +132,68 @@ async function sendVerificationEmail(email: string, name: string, token: string)
 // ─── Config (backend base URL for OAuth callbacks) ───────────────────────────
 
 const BACKEND_URL = (process.env.BACKEND_URL || "https://back-mp9k.onrender.com").replace(/\/$/, "");
+
+// ─── POST /auth/social — Firebase social login (Google, Microsoft) ────────────
+
+authRouter.post("/social", async (req, res) => {
+  try {
+    const { idToken, provider } = req.body as { idToken?: string; provider?: string };
+
+    if (!idToken?.trim()) return res.status(400).json({ error: "idToken is required." });
+    if (!provider || !["google", "microsoft"].includes(provider)) {
+      return res.status(400).json({ error: "provider must be 'google' or 'microsoft'." });
+    }
+
+    // Verify the Firebase ID token
+    let decoded: import("firebase-admin").auth.DecodedIdToken;
+    try {
+      decoded = await verifyFirebaseToken(idToken);
+    } catch {
+      return res.status(401).json({ error: "Invalid or expired Firebase token." });
+    }
+
+    const email = decoded.email?.trim().toLowerCase();
+    if (!email) {
+      return res.status(400).json({ error: "No email in token. Ensure the provider shares an email." });
+    }
+
+    const firebaseUid = decoded.uid;
+    const name        = (decoded.name as string | undefined) || "";
+
+    await connectMongo();
+
+    // Look up by provider UID first, then by email (to link existing accounts)
+    const idField = provider === "google" ? "googleId" : "microsoftId";
+    let user = await User.findOne({
+      $or: [{ [idField]: firebaseUid }, { email }],
+    });
+
+    if (user) {
+      let changed = false;
+      if (!(user as any)[idField]) { (user as any)[idField] = firebaseUid; changed = true; }
+      if (!user.isVerified)        { user.isVerified = true;               changed = true; }
+      if (!user.name && name)      { user.name = name;                     changed = true; }
+      if (changed) await user.save();
+    } else {
+      user = await User.create({
+        email,
+        passwordHash: "",
+        name,
+        isVerified:   true,
+        [idField]:    firebaseUid,
+      });
+    }
+
+    const token = signToken({ sub: user._id.toString(), email: user.email });
+    return res.json({
+      token,
+      user: { id: user._id.toString(), email: user.email, name: user.name },
+    });
+  } catch (err: any) {
+    console.error("[auth/social] error:", err?.message);
+    return res.status(500).json({ error: "Internal server error." });
+  }
+});
 
 // ─── GET /auth/github — initiate GitHub OAuth ─────────────────────────────────
 
