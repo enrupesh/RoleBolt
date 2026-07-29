@@ -11,7 +11,7 @@ export const seekerRouter = express.Router();
 
 // Helper: get uid from request (set by requireAuth middleware)
 function getUid(req: express.Request): string {
-  return (req as any).user?._id?.toString() ?? (req as any).user?.id?.toString() ?? "";
+  return (req as any).user?.uid ?? (req as any).user?._id?.toString() ?? (req as any).user?.id?.toString() ?? "";
 }
 
 // Fallback AI chain
