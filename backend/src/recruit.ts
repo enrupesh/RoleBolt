@@ -236,14 +236,31 @@ recruitRouter.patch("/auth/profile", async (req, res) => {
     await connectMongo();
     const uid = getUid(req);
     if (!uid) return res.status(401).json({ error: "Unauthorized" });
-    const { role, name, email } = req.body as { role?: string; name?: string; email?: string };
-    if (!role || !["creator", "seeker"].includes(role)) {
+    const { role, name, email, designation, bio, photoUrl, companyName, socialLinks } = req.body as {
+      role?: string; name?: string; email?: string;
+      designation?: string; bio?: string; photoUrl?: string;
+      companyName?: string; socialLinks?: Record<string, string>;
+    };
+
+    // role is optional on PATCH — only validate if explicitly provided
+    if (role && !["creator", "seeker"].includes(role)) {
       return res.status(400).json({ error: "Invalid role. Must be 'creator' or 'seeker'." });
     }
+
+    const $set: Record<string, any> = {};
+    if (role) $set.role = role;
+    if (name !== undefined) $set.name = name;
+    if (email !== undefined) $set.email = email;
+    if (designation !== undefined) $set.designation = designation;
+    if (bio !== undefined) $set.bio = bio;
+    if (photoUrl !== undefined) $set.photoUrl = photoUrl;
+    if (companyName !== undefined) $set.companyName = companyName;
+    if (socialLinks !== undefined) $set.socialLinks = socialLinks;
+
     const profile = await RecruitProfile.findOneAndUpdate(
       { uid },
-      { $set: { role, ...(name ? { name } : {}), ...(email ? { email } : {}) } },
-      { new: true, upsert: true, setDefaultsOnInsert: true }
+      { $set },
+      { returnDocument: "after", upsert: true, setDefaultsOnInsert: true }
     ).lean() as any;
     return res.json({ uid: profile.uid, role: profile.role, name: profile.name, email: profile.email });
   } catch (err: any) {
@@ -1322,7 +1339,7 @@ recruitRouter.patch("/jobs/:jobId", async (req, res) => {
     }
     const companyProfileForPatch = await RecruitCompanyProfile.findOne({ uid }).lean();
     update.verifiedCompany = (companyProfileForPatch as any)?.verificationStatus === "verified";
-    const job = await RecruitJob.findOneAndUpdate({ _id: req.params.jobId, uid }, update, { new: true }).lean();
+    const job = await RecruitJob.findOneAndUpdate({ _id: req.params.jobId, uid }, update, { returnDocument: "after" }).lean();
     if (!job) return res.status(404).json({ error: "Job not found." });
     return res.json({ job: serializeRecruitJob(job) });
   } catch (err: any) {
@@ -1629,7 +1646,7 @@ recruitRouter.patch("/jobs/:jobId/agent-mode", async (req, res) => {
     if (autoEmailReject !== undefined)    update["agentMode.autoEmailReject"]    = Boolean(autoEmailReject);
     if (autoSendAssessment !== undefined) update["agentMode.autoSendAssessment"] = Boolean(autoSendAssessment);
 
-    const job = await RecruitJob.findOneAndUpdate({ _id: req.params.jobId, uid }, { $set: update }, { new: true }).lean();
+    const job = await RecruitJob.findOneAndUpdate({ _id: req.params.jobId, uid }, { $set: update }, { returnDocument: "after" }).lean();
     if (!job) return res.status(404).json({ error: "Job not found." });
     return res.json({ ok: true, agentMode: (job as any).agentMode });
   } catch (err: any) {
@@ -1749,7 +1766,7 @@ recruitRouter.post("/jobs/:jobId/performance/dismiss/:alertId", async (req, res)
     const job = await RecruitJob.findOneAndUpdate(
       { _id: req.params.jobId, uid, "performanceAlerts.id": req.params.alertId },
       { $set: { "performanceAlerts.$.dismissed": true } },
-      { new: true }
+      { returnDocument: "after" }
     ).lean();
     if (!job) return res.status(404).json({ error: "Alert not found." });
     return res.json({ ok: true });
@@ -1792,7 +1809,8 @@ recruitRouter.post("/jobs/:jobId/regenerate-jd", async (req, res) => {
     const job = await RecruitJob.findOne({ _id: req.params.jobId, uid }).lean();
     if (!job) return res.status(404).json({ error: "Job not found." });
 
-    const { variant = "standard", save = false, newJD: providedJD } = req.body as { variant?: string; save?: boolean; newJD?: string };
+    const body = req.body ?? {};
+    const { variant = "standard", save = false, newJD: providedJD } = body as { variant?: string; save?: boolean; newJD?: string };
 
     const toneGuides: Record<string, string> = {
       conservative: "formal, traditional, and straightforward. Use professional corporate language. Focus on clear requirements and structured responsibilities. Safe and credible — suitable for enterprise, finance, healthcare, or government roles.",
@@ -1961,7 +1979,7 @@ recruitRouter.post("/jobs/:jobId/pipeline-rules", async (req, res) => {
     const job = await RecruitJob.findOneAndUpdate(
       { _id: req.params.jobId, uid },
       { $push: { pipelineRules: rule } },
-      { new: true }
+      { returnDocument: "after" }
     ).lean();
     if (!job) return res.status(404).json({ error: "Job not found." });
     return res.status(201).json({ ok: true, rule });
@@ -1984,7 +2002,7 @@ recruitRouter.patch("/jobs/:jobId/pipeline-rules/:ruleId", async (req, res) => {
     const job = await RecruitJob.findOneAndUpdate(
       { _id: req.params.jobId, uid, "pipelineRules.id": req.params.ruleId },
       { $set: setFields },
-      { new: true }
+      { returnDocument: "after" }
     ).lean();
     if (!job) return res.status(404).json({ error: "Rule not found." });
     const updated = ((job as any).pipelineRules ?? []).find((r: any) => r.id === req.params.ruleId);
@@ -2001,7 +2019,7 @@ recruitRouter.delete("/jobs/:jobId/pipeline-rules/:ruleId", async (req, res) => 
     const job = await RecruitJob.findOneAndUpdate(
       { _id: req.params.jobId, uid },
       { $pull: { pipelineRules: { id: req.params.ruleId } } },
-      { new: true }
+      { returnDocument: "after" }
     ).lean();
     if (!job) return res.status(404).json({ error: "Job not found." });
     return res.json({ ok: true });
@@ -2117,7 +2135,7 @@ recruitRouter.patch("/jobs/:jobId/candidates/:candidateId", async (req, res) => 
     const candidate = await RecruitCandidate.findOneAndUpdate(
       { _id: req.params.candidateId, jobId: req.params.jobId, uid },
       update,
-      { new: true }
+      { returnDocument: "after" }
     ).lean();
     if (!candidate) return res.status(404).json({ error: "Candidate not found." });
     if (update.stage) {
@@ -2710,7 +2728,7 @@ recruitRouter.patch("/talent-pool/:candidateId", async (req, res) => {
     const candidate = await RecruitCandidate.findOneAndUpdate(
       { _id: req.params.candidateId, uid },
       update,
-      { new: true }
+      { returnDocument: "after" }
     ).lean();
     if (!candidate) return res.status(404).json({ error: "Candidate not found." });
     return res.json({ candidate: { ...candidate, autoEligible: isAutoEligibleForTalentPool(candidate) } });
@@ -2757,7 +2775,7 @@ Write a complete, ready-to-send offer letter that includes:
 2. Job details: title, department, location, work mode, start date
 3. Compensation: base salary${args.signingBonus ? ", signing bonus" : ""}${args.benefits ? ", key benefits" : ""}
 4. At-will employment / standard employment terms statement (one paragraph)
-5. A clear acceptance instruction (e.g., "Please confirm your acceptance by replying to this email or signing and returning this letter by [date 5 days from start date]")
+5. A clear acceptance instruction (e.g., "Please confirm your acceptance by replying to this email within 5 business days")
 6. A warm, encouraging close
 
 FORMAT RULES:
@@ -2765,8 +2783,11 @@ FORMAT RULES:
 - Use professional but human language — not robotic legalese
 - Keep it between 350–500 words
 - Use proper letter formatting with spacing between sections
-- If company name is not provided, use "the Company" as a placeholder
-- End with a signature block for the hiring manager`;
+- Do NOT include any placeholder text like [Address], [City], [Date] — use only the information provided above
+- If company name is not provided, use "our company"
+- Start the letter directly with the date using today's actual context or the start date year
+- End with a signature block for the hiring manager
+- NEVER include square bracket placeholders in the output`;
 
   try {
     return await callMeshChatCompletions({
@@ -3052,7 +3073,7 @@ recruitRouter.put("/seeker/profile", async (req, res) => {
     const profile = await RecruitSeekerProfile.findOneAndUpdate(
       { uid },
       { $set: update },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
+      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
     ).lean();
     return res.json({ profile });
   } catch (err: any) {
@@ -3375,7 +3396,7 @@ recruitRouter.put("/company/profile", async (req, res) => {
     const profile = await RecruitCompanyProfile.findOneAndUpdate(
       { uid },
       { $set: update },
-      { new: true, upsert: true }
+      { returnDocument: "after", upsert: true }
     ).lean();
 
     return res.json({ profile });
@@ -3406,7 +3427,7 @@ recruitRouter.post("/company/request-verification", async (req, res) => {
     const updated = await RecruitCompanyProfile.findOneAndUpdate(
       { uid },
       { $set: { verificationStatus: "requested", verificationRequestedAt: new Date() } },
-      { new: true }
+      { returnDocument: "after" }
     ).lean();
 
     return res.json({ status: "requested", message: "Verification request submitted. Our team will review within 2–3 business days.", profile: updated });
@@ -3577,7 +3598,7 @@ recruitPublicRouter.post("/jobs/:jobId/report", async (req, res) => {
     const job = await RecruitJob.findOneAndUpdate(
       { _id: req.params.jobId, status: "active" },
       { $push: { reports: { reason: String(reason).trim(), details: String(details || "").trim(), reportedAt: new Date() } } },
-      { new: true }
+      { returnDocument: "after" }
     ).lean();
     if (!job) return res.status(404).json({ error: "Job not found." });
     return res.json({ ok: true });

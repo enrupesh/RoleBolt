@@ -86,13 +86,25 @@ function parseAiResponse(raw: string): ParsedAiResponse {
     } catch { /* fall through */ }
   }
 
-  // 3. First JSON object containing "reply"
-  const objMatch = raw.match(/\{[\s\S]*?"reply"[\s\S]*?\}/);
+  // 3. Outermost JSON object (greedy — captures full object)
+  const objMatch = raw.match(/\{[\s\S]*\}/);
   if (objMatch) {
     try {
       const result = extract(JSON.parse(objMatch[0]));
       if (result) return result;
     } catch { /* fall through */ }
+  }
+
+  // 4. Fallback: return raw text — but if it still looks like JSON, strip it
+  if (fallback.reply.trim().startsWith("{") || fallback.reply.trim().startsWith("```")) {
+    // Last-ditch: extract anything after "reply": "
+    const inlineMatch = raw.match(/"reply"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+    if (inlineMatch) {
+      try {
+        const unescaped = JSON.parse(`"${inlineMatch[1]}"`);
+        return { ...fallback, reply: unescaped };
+      } catch { /* use fallback */ }
+    }
   }
 
   return fallback;
@@ -805,7 +817,7 @@ copilotRouter.post("/conversations/:id/clear", async (req, res) => {
     const conversation = await RecruitCopilotConversation.findOneAndUpdate(
       { _id: req.params.id, uid },
       { $set: { messages: [], title: "New conversation", totalMessages: 0 } },
-      { new: true }
+      { returnDocument: "after" }
     );
     if (!conversation) return res.status(404).json({ error: "Conversation not found" });
 
