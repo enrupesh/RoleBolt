@@ -1686,12 +1686,26 @@ Return JSON only: {"suggestions": ["suggestion1", "suggestion2", "suggestion3"]}
       const raw = await callGeminiChain({ prompt, jsonMode: true });
       const parsed = JSON.parse(raw);
       suggestions = parsed.suggestions ?? [];
-    } catch {
-      suggestions = [
-        "Consider adding a remote work option to reach more candidates",
-        "Reduce required years of experience or mark some skills as 'nice to have'",
-        "Share the job listing on LinkedIn and relevant job boards",
-      ];
+    } catch (geminiErr) {
+      console.warn("[perf-monitor] Gemini failed for performance alert suggestions, trying Nvidia:", (geminiErr as Error)?.message);
+      try {
+        const nvidiaRaw = await callNvidia({
+          messages: [{ role: "user", content: prompt }],
+          temperature: 0.5,
+          max_tokens: 300,
+          responseFormat: "json_object",
+        });
+        const parsed = JSON.parse(nvidiaRaw);
+        suggestions = parsed.suggestions ?? [];
+        console.log("[perf-monitor] Nvidia fallback succeeded for performance alert suggestions ✓");
+      } catch (nvidiaErr) {
+        console.error("[perf-monitor] Nvidia also failed, using default suggestions:", nvidiaErr);
+        suggestions = [
+          "Consider adding a remote work option to reach more candidates",
+          "Reduce required years of experience or mark some skills as 'nice to have'",
+          "Share the job listing on LinkedIn and relevant job boards",
+        ];
+      }
     }
     toAdd.push({
       id: crypto.randomUUID(),
