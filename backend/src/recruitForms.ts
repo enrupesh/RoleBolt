@@ -150,7 +150,7 @@ Be specific and honest. If answers are very short or empty, note that in the sum
     raw = await callMeshChatCompletions({
       apiKey: GEMINI_MESH_KEY,
       retries: 2,
-      fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
+      fallbackModels: ["openai/gpt-4o-mini", "google/gemini-2.5-flash-lite"],
       messages: [{ role: "user", content: prompt }],
       temperature: 0.3,
       max_tokens: 900,
@@ -224,7 +224,7 @@ Return only the plain text email body.`;
     const raw = await callMeshChatCompletions({
       apiKey: GEMINI_MESH_KEY,
       retries: 2,
-      fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
+      fallbackModels: ["openai/gpt-4o-mini", "google/gemini-2.5-flash-lite"],
       messages: [{ role: "user", content: prompt }],
       temperature: 0.5,
       max_tokens: 300,
@@ -629,7 +629,7 @@ Return ONLY this JSON (no markdown):
       raw = await callMeshChatCompletions({
         apiKey: GEMINI_MESH_KEY,
         retries: 2,
-        fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
+        fallbackModels: ["openai/gpt-4o-mini", "google/gemini-2.5-flash-lite"],
         messages: [{ role: "user", content: prompt }],
         temperature: 0.45,
         max_tokens: 700,
