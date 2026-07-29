@@ -91,6 +91,7 @@ Rules: Under 200 words total. Conversational tone, not robotic. No bullet points
     subject: `☀️ Your Daily Hiring Briefing — ${new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}`,
     html,
     text: briefingText,
+    from: `Rolebolt <${process.env.NOTIFICATION_FROM_EMAIL ?? "notification@rolebolt.tech"}>`,
   });
 
   console.log(`[briefing] Sent to ${user.email}`);
@@ -145,6 +146,7 @@ export async function sendJobAlerts(): Promise<void> {
         subject: `🎯 ${topJobs.length} new job match${topJobs.length > 1 ? "es" : ""} — Rolebolt`,
         html,
         text: `${topJobs.length} new job${topJobs.length > 1 ? "s" : ""} match your alert. Visit https://www.rolebolt.tech/recruit/opportunities to apply.`,
+        from: `Rolebolt <${process.env.NOTIFICATION_FROM_EMAIL ?? "notification@rolebolt.tech"}>`,
       });
       await RecruitJobAlert.updateOne({ _id: alert._id }, { lastCheckedAt: new Date() });
       sent++;
