@@ -746,7 +746,7 @@ For "tier": classify each criterion as 1 (must-have skill), 2 (experience depth)
     raw = await callMeshChatCompletions({
       apiKey: GEMINI_MESH_KEY,
       retries: 2,
-      fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
+      fallbackModels: ["openai/gpt-4o-mini", "google/gemini-2.5-flash-lite"],
       messages: [{ role: "user", content: prompt }],
       temperature: 0.4,
       max_tokens: 2000,
@@ -932,7 +932,7 @@ Write in plain text, no JSON, no markdown headers.`;
     return await callMeshChatCompletions({
       apiKey: GEMINI_MESH_KEY,
       retries: 2,
-      fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
+      fallbackModels: ["openai/gpt-4o-mini", "google/gemini-2.5-flash-lite"],
       messages: [{ role: "user", content: prompt }],
       temperature: 0.5,
       max_tokens: 600,
@@ -994,7 +994,7 @@ Respond with ONLY this exact JSON structure, no markdown, no extra text:
     raw = await callMeshChatCompletions({
       apiKey: GEMINI_MESH_KEY,
       retries: 2,
-      fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
+      fallbackModels: ["openai/gpt-4o-mini", "google/gemini-2.5-flash-lite"],
       messages: [{ role: "user", content: prompt }],
       temperature: 0.5,
       max_tokens: 1200,
@@ -1084,7 +1084,7 @@ Rules:
     raw = await callMeshChatCompletions({
       apiKey: GEMINI_MESH_KEY,
       retries: 2,
-      fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
+      fallbackModels: ["openai/gpt-4o-mini", "google/gemini-2.5-flash-lite"],
       messages: [{ role: "user", content: prompt }],
       temperature: 0.25,
       max_tokens: 700,
@@ -1162,7 +1162,7 @@ TONE RULES:
     return await callMeshChatCompletions({
       apiKey: GEMINI_MESH_KEY,
       retries: 2,
-      fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
+      fallbackModels: ["openai/gpt-4o-mini", "google/gemini-2.5-flash-lite"],
       messages: [{ role: "user", content: prompt }],
       temperature: 0.75,
       max_tokens: 350,
@@ -2800,7 +2800,7 @@ FORMAT RULES:
     return await callMeshChatCompletions({
       apiKey: GEMINI_MESH_KEY,
       retries: 2,
-      fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
+      fallbackModels: ["openai/gpt-4o-mini", "google/gemini-2.5-flash-lite"],
       messages: [{ role: "user", content: prompt }],
       temperature: 0.5,
       max_tokens: 900,
@@ -3536,7 +3536,7 @@ Rules:
     raw = await callMeshChatCompletions({
       apiKey: GEMINI_MESH_KEY,
       retries: 2,
-      fallbackModels: ["anthropic/claude-3-haiku", "google/gemini-2.5-flash-lite"],
+      fallbackModels: ["openai/gpt-4o-mini", "google/gemini-2.5-flash-lite"],
       messages: [{ role: "user", content: prompt }],
       temperature: 0.35,
       max_tokens: 800,
