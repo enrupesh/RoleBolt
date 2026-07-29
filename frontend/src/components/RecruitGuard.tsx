@@ -79,12 +79,12 @@ export function RecruitGuard({ requiredRole, children }: RecruitGuardProps) {
   useEffect(() => {
     if (loading) return;
     if (!authUser) {
-      router.replace("/recruit/login");
+      router.replace(requiredRole === "seeker" ? "/seeker/login" : "/recruit/login");
       return;
     }
     if (!recruitProfile) return;
     if (recruitProfile.role !== requiredRole) {
-      router.replace(recruitProfile.role === "creator" ? "/recruit/dashboard" : "/recruit/opportunities");
+      router.replace(recruitProfile.role === "creator" ? "/recruit/dashboard" : "/seeker/dashboard");
     }
   }, [loading, authUser, recruitProfile, requiredRole, router]);
 
