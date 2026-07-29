@@ -163,7 +163,101 @@ const AI_CAPABILITIES = [
   },
 ];
 
+// ─── Animated counter hook ───────────────────────────────────────────────────
+
+function useCountUp(target: number, duration = 1400) {
+  const [val, setVal] = useState(0);
+  useEffect(() => {
+    if (target === 0) return;
+    const steps = 40;
+    const increment = target / steps;
+    let current = 0;
+    const timer = setInterval(() => {
+      current += increment;
+      if (current >= target) { setVal(target); clearInterval(timer); }
+      else { setVal(Math.floor(current)); }
+    }, duration / steps);
+    return () => clearInterval(timer);
+  }, [target, duration]);
+  return val;
+}
+
+// ─── LiveStatsBar component ───────────────────────────────────────────────────
+
+function StatCell({ value, label, prefix = "", suffix = "", isLive }: {
+  value: number; label: string; prefix?: string; suffix?: string; isLive?: boolean;
+}) {
+  const count = useCountUp(value);
+  const display = value >= 1000
+    ? (count >= 1000 ? `${(count / 1000).toFixed(count >= 10000 ? 0 : 1)}k` : count.toString())
+    : count.toString();
+
+  return (
+    <div className="py-7 px-4 sm:px-6 text-center">
+      <div className="flex items-center justify-center gap-1.5">
+        <p className="text-2xl font-black text-slate-950 tracking-tight tabular-nums">
+          {prefix}{display}{suffix}
+        </p>
+        {isLive && (
+          <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+        )}
+      </div>
+      <p className="text-xs text-slate-500 mt-1 font-medium">{label}</p>
+    </div>
+  );
+}
+
+function LiveStatsBar({ stats }: { stats: { activeJobs: number; candidatesScreened: number; recruiters: number } | null }) {
+  // Static fallback stats shown while loading or if fetch fails
+  if (!stats) {
+    return (
+      <section className="border-b border-slate-100 bg-white">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-slate-100">
+            {[
+              { val: "1,000+", label: "AI Models via Google M API" },
+              { val: "6",      label: "Niche industry verticals" },
+              { val: "< 2s",   label: "Resume scored in" },
+              { val: "₹0",     label: "Cost to recruiters" },
+            ].map(s => (
+              <div key={s.label} className="py-7 px-4 sm:px-6 text-center">
+                <p className="text-2xl font-black text-slate-950 tracking-tight">{s.val}</p>
+                <p className="text-xs text-slate-500 mt-1 font-medium">{s.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="border-b border-slate-100 bg-white">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        {/* LIVE badge */}
+        <div className="flex justify-center pt-4 pb-1">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-600">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            Live platform stats
+          </span>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-slate-100">
+          <StatCell value={stats.recruiters}         label="Recruiters on platform"    isLive />
+          <StatCell value={stats.activeJobs}         label="Active job listings"        isLive />
+          <StatCell value={stats.candidatesScreened} label="Candidates screened by AI"  isLive />
+          <div className="py-7 px-4 sm:px-6 text-center">
+            <p className="text-2xl font-black text-slate-950 tracking-tight">₹0</p>
+            <p className="text-xs text-slate-500 mt-1 font-medium">Cost to recruiters</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
+
+type LiveStats = { activeJobs: number; candidatesScreened: number; recruiters: number };
 
 export default function RecruitLandingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -171,6 +265,17 @@ export default function RecruitLandingPage() {
   const { recruitProfile, authUser, loading, signOutFromRecruit } = useRecruitAuth();
   const role = recruitProfile?.role ?? null;
   const isLoggedIn = !!authUser && !!recruitProfile;
+
+  // Live stats state
+  const [liveStats, setLiveStats] = useState<LiveStats | null>(null);
+
+  // Fetch live platform stats (no auth needed)
+  useEffect(() => {
+    fetch("/backend/stats/public")
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setLiveStats(d); })
+      .catch(() => {});
+  }, []);
 
   // Auto-redirect authenticated users straight to the dashboard
   useEffect(() => {
@@ -443,24 +548,8 @@ export default function RecruitLandingPage() {
         </div>
       </section>
 
-      {/* ── Stats bar ───────────────────────────────────────────────────────── */}
-      <section className="border-b border-slate-100 bg-white">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-slate-100">
-            {[
-              { val: "1,000+", label: "AI Models via Google M API" },
-              { val: "6", label: "Niche industry verticals" },
-              { val: "< 2s", label: "Resume scored in" },
-              { val: "₹0", label: "Cost to recruiters" },
-            ].map(s => (
-              <div key={s.label} className="py-6 px-4 sm:px-6 text-center">
-                <p className="text-2xl font-black text-slate-950 tracking-tight">{s.val}</p>
-                <p className="text-xs text-slate-500 mt-1 font-medium">{s.label}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* ── Live Stats bar ──────────────────────────────────────────────────── */}
+      <LiveStatsBar stats={liveStats} />
 
       {/* ── How it works ────────────────────────────────────────────────────── */}
       <section id="how-it-works" className="py-20 bg-white">
