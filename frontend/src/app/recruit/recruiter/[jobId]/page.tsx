@@ -61,10 +61,12 @@ type RecruiterData = {
 
 function salary(job: OtherJob) {
   if (!job.salaryMin && !job.salaryMax) return null;
-  const fmt = (n: number) => n >= 100000
+  const cur = job.salaryCurrency || "INR";
+  const locale = cur === "INR" ? "en-IN" : "en-US";
+  const fmt = (n: number) => cur === "INR" && n >= 100000
     ? `${(n / 100000).toFixed(n % 100000 === 0 ? 0 : 1)}L`
-    : n.toLocaleString();
-  return `${job.salaryCurrency || "INR"} ${fmt(job.salaryMin ?? 0)}${job.salaryMax ? `–${fmt(job.salaryMax)}` : "+"}`;
+    : n.toLocaleString(locale);
+  return `${cur} ${fmt(job.salaryMin ?? 0)}${job.salaryMax ? `–${fmt(job.salaryMax)}` : "+"}`;
 }
 
 function externalHref(url: string) {

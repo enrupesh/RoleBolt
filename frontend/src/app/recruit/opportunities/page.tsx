@@ -47,11 +47,17 @@ function paramValue(params: PageSearchParams, key: string) {
   return Array.isArray(value) ? value[0] ?? "" : value ?? "";
 }
 
+function fmtNum(n: number, currency: string) {
+  const locale = currency === "INR" ? "en-IN" : "en-US";
+  return n.toLocaleString(locale);
+}
+
 function formatSalary(job: Job) {
   if (!job.salaryMin && !job.salaryMax) return "Salary not disclosed";
-  const min = job.salaryMin ? job.salaryMin.toLocaleString("en-IN") : "0";
-  const max = job.salaryMax ? job.salaryMax.toLocaleString("en-IN") : "";
-  return `${job.salaryCurrency || "INR"} ${min}${max ? `–${max}` : "+"}`;
+  const cur = job.salaryCurrency || "INR";
+  const min = job.salaryMin ? fmtNum(job.salaryMin, cur) : "0";
+  const max = job.salaryMax ? fmtNum(job.salaryMax, cur) : "";
+  return `${cur} ${min}${max ? `–${max}` : "+"}`;
 }
 
 function buildQuery(params: PageSearchParams) {

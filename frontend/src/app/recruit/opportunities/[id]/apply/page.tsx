@@ -58,8 +58,9 @@ export default async function ApplyPage({
   function salaryLabel(j: Job) {
     if (!j.salaryMin && !j.salaryMax) return null;
     const cur = j.salaryCurrency || "INR";
-    const min = j.salaryMin?.toLocaleString("en-IN") ?? "0";
-    const max = j.salaryMax ? `–${j.salaryMax.toLocaleString("en-IN")}` : "+";
+    const locale = cur === "INR" ? "en-IN" : "en-US";
+    const min = j.salaryMin?.toLocaleString(locale) ?? "0";
+    const max = j.salaryMax ? `–${j.salaryMax.toLocaleString(locale)}` : "+";
     return `${cur} ${min}${max}`;
   }
 
