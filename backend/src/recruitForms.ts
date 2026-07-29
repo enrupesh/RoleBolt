@@ -153,7 +153,7 @@ Be specific and honest. If answers are very short or empty, note that in the sum
       fallbackModels: ["openai/gpt-4o-mini", "google/gemini-2.5-flash-lite"],
       messages: [{ role: "user", content: prompt }],
       temperature: 0.3,
-      max_tokens: 900,
+      max_tokens: 5000,
       nvidiaFallback: true,
     });
   } catch (err) {
@@ -227,7 +227,7 @@ Return only the plain text email body.`;
       fallbackModels: ["openai/gpt-4o-mini", "google/gemini-2.5-flash-lite"],
       messages: [{ role: "user", content: prompt }],
       temperature: 0.5,
-      max_tokens: 300,
+      max_tokens: 2000,
       nvidiaFallback: true,
     });
     return raw.trim();
@@ -632,7 +632,7 @@ Return ONLY this JSON (no markdown):
         fallbackModels: ["openai/gpt-4o-mini", "google/gemini-2.5-flash-lite"],
         messages: [{ role: "user", content: prompt }],
         temperature: 0.45,
-        max_tokens: 700,
+        max_tokens: 3000,
         nvidiaFallback: true,
       });
     } catch (err) {
