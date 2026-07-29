@@ -51,9 +51,14 @@ function formatDeadline(value?: string) {
   return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 }
 
+function fmtNum(n: number, currency: string) {
+  return n.toLocaleString(currency === "INR" ? "en-IN" : "en-US");
+}
+
 function salary(job: Job) {
   if (!job.salaryMin && !job.salaryMax) return "Salary not disclosed";
-  return `${job.salaryCurrency || "INR"} ${job.salaryMin?.toLocaleString("en-IN") ?? "0"}${job.salaryMax ? `–${job.salaryMax.toLocaleString("en-IN")}` : "+"}`;
+  const cur = job.salaryCurrency || "INR";
+  return `${cur} ${fmtNum(job.salaryMin ?? 0, cur)}${job.salaryMax ? `–${fmtNum(job.salaryMax, cur)}` : "+"}`;
 }
 
 function splitLines(value?: string) {

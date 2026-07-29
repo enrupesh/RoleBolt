@@ -1,0 +1,68 @@
+Now listen carefully.
+
+My website is essentially complete. At this stage, I want you to test it exactly like a real user, a real customer, and even a Hackathon judge would. I don't want a code review anymore—I want a complete end-to-end functional validation of the entire product.
+
+I want you to personally go through every workflow from beginning to end.
+
+For example:
+
+Create a recruiter account.
+Create jobs yourself.
+Publish those jobs.
+Create or use a job seeker account.
+Apply to the jobs yourself as a real candidate.
+Upload resumes and complete every application step.
+Verify resume parsing, scoring, AI analysis, matching, recommendations, and every stage of the application process.
+Review candidates as a recruiter.
+Move candidates through every hiring stage.
+Send interviews, assessments, offers, and rejection emails where applicable.
+Test every recruiter workflow from beginning to end.
+
+Then test the AI workflows in two different ways:
+
+Perform every action manually yourself.
+Enable the AI Agent and let it perform the same tasks automatically.
+
+Compare both flows and verify that they behave correctly.
+
+I also want you to test every job seeker feature:
+
+Resume Builder
+Cover Letter Generator
+Interview Preparation
+Applications
+Profile
+Dashboard
+Any other seeker tools
+
+Likewise, test every recruiter feature, every admin feature, every AI feature, and every system workflow.
+
+Treat this exactly as a production system.
+
+I want you to verify:
+
+Every page
+Every URL
+Every button
+Every form
+Every modal
+Every API call
+Every AI integration
+Every email flow
+Every authentication flow
+Every redirect
+Every upload
+Every dashboard
+Every navigation path
+Every permission
+Every workflow from start to finish
+
+Nothing should be skipped.
+
+If you need anything to perform this testing—such as API keys, test credentials, login details, sample data, or database access—ask me for it. If you cannot sign up or log in yourself, I can provide credentials, or you may use existing test users in the database if appropriate.
+
+As you test, if you find any bug, broken workflow, missing implementation, UI issue, UX issue, incorrect behavior, edge case, or inconsistency, fix it immediately before continuing. Do not simply report issues.
+
+After all fixes are complete, perform a second full end-to-end verification of the entire application to ensure that every workflow now works correctly.
+
+I want this to be treated as a real production readiness audit, not a code review. Think like a real customer, a recruiter, a job seeker, an administrator, an AI agent, and a Hackathon judge. Execute every feature exactly as it would be used in production and verify that the entire platform is fully functional, fully connected, bug-free, and ready for launch. Nothing should remain untested.
