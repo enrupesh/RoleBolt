@@ -99,7 +99,7 @@ siteGuideRouter.post("/chat/stream", async (req, res) => {
   try {
     for await (const token of streamMeshChatCompletions({
       apiKey,
-      model: "google/gemini-2.5-flash",
+      model: "openai/gpt-4o-mini",
       messages,
       temperature: 0.6,
       max_tokens: 700,

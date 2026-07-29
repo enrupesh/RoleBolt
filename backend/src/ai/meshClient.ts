@@ -67,7 +67,7 @@ export async function callMeshChatCompletions(args: {
   const {
     apiKey,
     baseUrl = "https://api.meshapi.ai/v1",
-    model = "google/gemini-2.5-flash",
+    model = "openai/gpt-4o-mini",
     messages,
     temperature = 0.7,
     top_p = 0.9,
@@ -227,7 +227,7 @@ export async function* streamMeshChatCompletions(args: {
   const {
     apiKey,
     baseUrl = "https://api.meshapi.ai/v1",
-    model = "google/gemini-2.5-flash",
+    model = "openai/gpt-4o-mini",
     messages,
     temperature = 0.7,
     top_p = 0.9,
