@@ -71,6 +71,7 @@ export default function RootLayout({
       lang="en"
       className={`${inter.variable} ${sora.variable} ${plusJakarta.variable}`}
       suppressHydrationWarning
+      data-scroll-behavior="smooth"
     >
       <body className="app-theme min-h-screen antialiased" suppressHydrationWarning>
         <RecruitAuthProvider>
