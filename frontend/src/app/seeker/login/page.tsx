@@ -73,7 +73,7 @@ export default function SeekerLoginPage() {
             <div>
               <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1.5">Email address</label>
               <input
-                type="email" required value={email} onChange={e => setEmail(e.target.value)}
+                type="email" required autoComplete="email" value={email} onChange={e => setEmail(e.target.value)}
                 placeholder="you@example.com"
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/20 transition"
               />
@@ -83,6 +83,7 @@ export default function SeekerLoginPage() {
               <div className="relative">
                 <input
                   type={showPw ? "text" : "password"} required value={password} onChange={e => setPassword(e.target.value)}
+                  autoComplete="current-password"
                   placeholder="••••••••"
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 pr-11 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/20 transition"
                 />

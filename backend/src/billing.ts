@@ -13,7 +13,7 @@ function getStripe(): Stripe {
 }
 
 function getUid(req: express.Request): string {
-  return (req as any).user?._id?.toString() ?? (req as any).user?.id?.toString() ?? "";
+  return (req as any).user?.uid ?? (req as any).user?._id?.toString() ?? (req as any).user?.id?.toString() ?? "";
 }
 
 const PRICE_IDS: Record<string, string | undefined> = {
