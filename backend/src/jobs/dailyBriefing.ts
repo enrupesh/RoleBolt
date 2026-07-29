@@ -3,6 +3,7 @@ import { connectMongo } from "../db";
 import { User } from "../models/User";
 import { RecruitJob } from "../models/RecruitJob";
 import { RecruitCandidate } from "../models/RecruitCandidate";
+import { RecruitJobAlert } from "../models/RecruitJobAlert";
 import { sendEmail } from "../mailer";
 import { callGeminiChain } from "../ai/geminiClient";
 import { callMeshChatCompletions } from "../ai/meshClient";
@@ -95,6 +96,65 @@ Rules: Under 200 words total. Conversational tone, not robotic. No bullet points
   console.log(`[briefing] Sent to ${user.email}`);
 }
 
+// ── Send job alerts to subscribers ───────────────────────────────────────────
+export async function sendJobAlerts(): Promise<void> {
+  await connectMongo();
+  const alerts = await RecruitJobAlert.find({}).lean() as any[];
+  if (!alerts.length) return;
+
+  const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const newJobs = await RecruitJob.find({ status: "active", createdAt: { $gte: yesterday } }).lean() as any[];
+  if (!newJobs.length) { console.log("[alerts] No new jobs in last 24h, skipping"); return; }
+
+  let sent = 0;
+  for (const alert of alerts) {
+    try {
+      // Filter jobs by alert preferences
+      const matching = newJobs.filter((job: any) => {
+        if (alert.niche && job.niche !== alert.niche) return false;
+        if (alert.workMode && job.workMode && job.workMode !== alert.workMode) return false;
+        if (alert.freshersOnly && !job.freshersAllowed) return false;
+        if (alert.verifiedOnly && !job.verifiedCompany) return false;
+        if (alert.keywords) {
+          const kws = (alert.keywords as string).toLowerCase().split(/[\s,]+/).filter(Boolean);
+          const haystack = `${job.title ?? ""} ${job.mustHaveSkills ?? ""} ${job.niche ?? ""} ${job.location ?? ""}`.toLowerCase();
+          if (!kws.some((k: string) => haystack.includes(k))) return false;
+        }
+        return true;
+      });
+
+      if (!matching.length) continue;
+
+      const topJobs = matching.slice(0, 5);
+      const jobLines = topJobs.map((j: any) =>
+        `<li style="margin-bottom:8px"><strong>${j.title}</strong> — ${j.companyName ?? "Company"} · ${j.location ?? "Remote"} · ${j.workMode ?? ""}</li>`
+      ).join("");
+
+      const html = `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px">
+<h2 style="color:#4f46e5;margin-bottom:4px">🎯 ${topJobs.length} new job match${topJobs.length > 1 ? "es" : ""} for you</h2>
+<p style="color:#64748b;margin-top:0">Fresh listings matching your alert:</p>
+<ul style="padding-left:20px;color:#1e293b">${jobLines}</ul>
+<a href="https://www.rolebolt.tech/recruit/opportunities" style="display:inline-block;margin-top:16px;padding:12px 24px;background:#4f46e5;color:#fff;border-radius:8px;text-decoration:none;font-weight:600">
+  View all jobs →
+</a>
+<p style="margin-top:24px;font-size:12px;color:#94a3b8">You're receiving this because you subscribed to job alerts at Rolebolt.</p>
+</div>`;
+
+      await sendEmail({
+        to: alert.email,
+        subject: `🎯 ${topJobs.length} new job match${topJobs.length > 1 ? "es" : ""} — Rolebolt`,
+        html,
+        text: `${topJobs.length} new job${topJobs.length > 1 ? "s" : ""} match your alert. Visit https://www.rolebolt.tech/recruit/opportunities to apply.`,
+      });
+      await RecruitJobAlert.updateOne({ _id: alert._id }, { lastCheckedAt: new Date() });
+      sent++;
+    } catch (e) {
+      console.error("[alerts] Failed for", alert.email, e);
+    }
+  }
+  console.log(`[alerts] Sent job alerts to ${sent}/${alerts.length} subscribers`);
+}
+
 // ── Cron job: runs at 8:00 AM UTC every day ───────────────────────────────────
 export function startDailyBriefingJob(): void {
   cron.schedule("0 8 * * *", async () => {
@@ -114,6 +174,13 @@ export function startDailyBriefingJob(): void {
       console.log(`[briefing] Done — sent to ${sent}/${users.length} users`);
     } catch (e) {
       console.error("[briefing] Cron job failed:", e);
+    }
+
+    // Send job alerts to subscribers
+    try {
+      await sendJobAlerts();
+    } catch (e) {
+      console.error("[briefing] sendJobAlerts failed:", e);
     }
   }, { timezone: "UTC" });
   console.log("[briefing] Daily briefing cron scheduled (8:00 AM UTC)");

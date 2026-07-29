@@ -9,7 +9,7 @@ export const billingRouter = express.Router();
 function getStripe(): Stripe {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) throw new Error("STRIPE_SECRET_KEY is not configured.");
-  return new Stripe(key, { apiVersion: "2025-06-30.basil" });
+  return new Stripe(key, { apiVersion: "2026-06-24.dahlia" });
 }
 
 function getUid(req: express.Request): string {
@@ -151,7 +151,7 @@ async function handleStripeEvent(event: Stripe.Event) {
       if (!userId || !plan) return;
 
       const sub = session.subscription
-        ? await new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2025-06-30.basil" }).subscriptions.retrieve(session.subscription as string)
+        ? await new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2026-06-24.dahlia" }).subscriptions.retrieve(session.subscription as string)
         : null;
 
       await Subscription.findOneAndUpdate(
@@ -180,7 +180,7 @@ async function handleStripeEvent(event: Stripe.Event) {
       if (!sub) return;
       sub.status = subscription.status as any;
       sub.cancelAtPeriodEnd = subscription.cancel_at_period_end;
-      sub.currentPeriodEnd = new Date(subscription.current_period_end * 1000);
+      sub.currentPeriodEnd = new Date((subscription as any).current_period_end * 1000);
       await sub.save();
       console.log(`[billing] subscription.updated → customer=${customerId} status=${subscription.status}`);
       break;

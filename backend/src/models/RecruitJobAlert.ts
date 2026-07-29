@@ -21,7 +21,7 @@ const RecruitJobAlertSchema = new Schema<IRecruitJobAlert>(
     location: { type: String, default: "" },
     freshersOnly: { type: Boolean, default: false },
     verifiedOnly: { type: Boolean, default: false },
-    lastCheckedAt: { type: Date, default: () => new Date() },
+    lastCheckedAt: { type: Date, default: () => new Date(0) },
   },
   { timestamps: true }
 );

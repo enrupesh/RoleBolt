@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-// Auth removed — all routes are open.
-// Replace this with your custom auth middleware when ready.
-export function middleware(_req: NextRequest) {
+// All routes are open — auth is handled client-side by RecruitGuard.
+export function proxy(_req: NextRequest) {
   return NextResponse.next();
 }
 

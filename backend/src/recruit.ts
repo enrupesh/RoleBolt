@@ -120,11 +120,41 @@ async function evaluatePipelineRules(jobId: string, candidateId: string) {
         );
         console.log(`[pipeline-rule] "${rule.id}" fired: ${rule.condition} → ${rule.action} for candidate ${candidateId}`);
       } else if (rule.action === "send_assessment" && candidate.assessmentStatus === "not_sent") {
-        await RecruitJob.updateOne(
-          { _id: jobId, "pipelineRules.id": rule.id },
-          { $inc: { "pipelineRules.$.triggerCount": 1 } }
-        );
-        console.log(`[pipeline-rule] send_assessment triggered for candidate ${candidateId}`);
+        try {
+          const questions = await generateAssessmentQuestions({
+            jobTitle: (job as any).title,
+            rubric:   (job as any).rubric,
+            jd:       (job as any).generatedJD,
+            niche:    (job as any).niche,
+            nicheDetails: (job as any).nicheDetails,
+            languageRequirement: (job as any).languageRequirement,
+          });
+          const token = generateToken();
+          await RecruitCandidate.findByIdAndUpdate(candidateId, {
+            assessmentToken: token,
+            assessmentQuestions: questions,
+            assessmentStatus: "sent",
+            assessmentSentAt: new Date(),
+            previousResumeScore: candidate.totalScore,
+          });
+          const assessmentUrl = `${FRONTEND_URL}/recruit/assessment/${token}`;
+          if (candidate.email) {
+            const companyName = (job as any).companyName ?? "";
+            const payload = emailTemplates.assessment(candidate.name, (job as any).title, companyName, assessmentUrl);
+            setImmediate(async () => {
+              try {
+                await sendEmail({ to: candidate.email!, subject: payload.subject, html: payload.html, text: payload.text, from: CANDIDATE_FROM });
+              } catch (e) { console.error("[pipeline-rule] assessment email failed:", e); }
+            });
+          }
+          await RecruitJob.updateOne(
+            { _id: jobId, "pipelineRules.id": rule.id },
+            { $inc: { "pipelineRules.$.triggerCount": 1 } }
+          );
+          console.log(`[pipeline-rule] send_assessment fired for candidate ${candidateId}`);
+        } catch (e) {
+          console.error("[pipeline-rule] send_assessment failed:", e);
+        }
       }
     }
   } catch (e) {
@@ -3037,7 +3067,7 @@ recruitRouter.get("/seeker/applications", async (req, res) => {
   try {
     await connectMongo();
     const uid = getUid(req);
-    const user = await (await import("./models/User")).User.findById(uid).lean() as any;
+    const user = await (await import("./models/User.js")).User.findById(uid).lean() as any;
     if (!user) return res.status(404).json({ error: "User not found." });
     const seekerProfile = await RecruitSeekerProfile.findOne({ uid }).lean() as any;
     const email = seekerProfile?.email || user.email;
@@ -3638,8 +3668,14 @@ recruitPublicRouter.get("/job-alerts", async (req, res) => {
         if (a.freshersOnly) filter.freshersAllowed = true;
         if (a.verifiedOnly) filter.verifiedCompany = true;
         if (a.keywords) {
-          const rx = new RegExp(a.keywords.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
-          filter.$or = [{ title: rx }, { mustHaveSkills: rx }, { companyName: rx }, { location: rx }];
+          const terms = a.keywords.split(/[\s,]+/).map((k: string) => k.trim()).filter(Boolean);
+          if (terms.length > 0) {
+            const orClauses = terms.flatMap((t: string) => {
+              const rx = new RegExp(t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+              return [{ title: rx }, { mustHaveSkills: rx }, { companyName: rx }, { location: rx }];
+            });
+            filter.$or = orClauses;
+          }
         }
         if (a.location) filter.location = new RegExp(a.location.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
         const newCount = await RecruitJob.countDocuments(filter);

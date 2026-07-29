@@ -12,6 +12,7 @@ const CREATOR_NAV = [
   { href: "/recruit/analytics", label: "Analytics" },
   { href: "/recruit/talent-pool", label: "Talent Pool" },
   { href: "/recruit/recruiter-profile", label: "Profile" },
+  { href: "/recruit/billing", label: "Billing" },
 ];
 
 export default function RecruitHeader() {
