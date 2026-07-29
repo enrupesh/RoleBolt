@@ -42,7 +42,7 @@ function shell(candidateName: string, subject: string, bodyHtml: string): string
               You received this email because you applied for a job through Rolebolt. If you believe this was sent in error, please disregard it.
             </p>
             <p style="margin:8px 0 0;font-size:12px;color:#94a3b8;">
-              © 2025 Rolebolt · <a href="https://www.rolebolt.tech" style="color:#94a3b8;text-decoration:none;">rolebolt.tech</a>
+              © 2026 Rolebolt · <a href="https://www.rolebolt.tech" style="color:#94a3b8;text-decoration:none;">rolebolt.tech</a>
             </p>
           </td>
         </tr>
