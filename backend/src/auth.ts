@@ -113,7 +113,7 @@ async function sendVerificationEmail(email: string, name: string, token: string)
           <tr>
             <td style="border-top:1px solid #f1f5f9;padding:20px 36px;text-align:center;">
               <p style="margin:0;font-size:12px;color:#94a3b8;">
-                © 2025 Rolebolt · <a href="https://rolebolt.tech" style="color:#94a3b8;text-decoration:none;">rolebolt.tech</a>
+                © 2026 Rolebolt · <a href="https://rolebolt.tech" style="color:#94a3b8;text-decoration:none;">rolebolt.tech</a>
               </p>
             </td>
           </tr>
@@ -607,7 +607,7 @@ authRouter.post("/forgot-password", async (req, res) => {
           <tr>
             <td style="border-top:1px solid #f1f5f9;padding:20px 36px;text-align:center;">
               <p style="margin:0;font-size:12px;color:#94a3b8;">
-                © 2025 Rolebolt · <a href="https://rolebolt.tech" style="color:#94a3b8;text-decoration:none;">rolebolt.tech</a>
+                © 2026 Rolebolt · <a href="https://rolebolt.tech" style="color:#94a3b8;text-decoration:none;">rolebolt.tech</a>
               </p>
             </td>
           </tr>

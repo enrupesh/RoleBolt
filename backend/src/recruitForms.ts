@@ -7,7 +7,7 @@ import { RecruitFormResponse } from "./models/RecruitFormResponse";
 import { callMeshChatCompletions } from "./ai/meshClient";
 import { sendEmail } from "./mailer";
 
-const CANDIDATE_FROM = `Rolebolt Careers <${process.env.CANDIDATE_FROM_EMAIL ?? "careers@rolebolt.tech"}>`;
+const CANDIDATE_FROM = `Rolebolt <${process.env.CANDIDATE_FROM_EMAIL ?? "notification@rolebolt.tech"}>`;
 import * as emailTemplates from "./emailTemplates";
 
 export const formRouter = express.Router();       // protected — /recruit/forms
