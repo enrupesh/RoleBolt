@@ -745,11 +745,12 @@ For "tier": classify each criterion as 1 (must-have skill), 2 (experience depth)
   try {
     raw = await callMeshChatCompletions({
       apiKey: GEMINI_MESH_KEY,
+      model: "openai/gpt-4o-mini",
       retries: 2,
-      fallbackModels: ["openai/gpt-4o-mini", "google/gemini-2.5-flash-lite"],
+      fallbackModels: ["google/gemini-2.5-flash-lite", "meta-llama/llama-3.1-8b-instruct"],
       messages: [{ role: "user", content: prompt }],
       temperature: 0.4,
-      max_tokens: 8000,
+      max_tokens: 3000,
       nvidiaFallback: true,
     });
   } catch (err) {
@@ -931,11 +932,12 @@ Write in plain text, no JSON, no markdown headers.`;
   try {
     return await callMeshChatCompletions({
       apiKey: GEMINI_MESH_KEY,
+      model: "openai/gpt-4o-mini",
       retries: 2,
-      fallbackModels: ["openai/gpt-4o-mini", "google/gemini-2.5-flash-lite"],
+      fallbackModels: ["google/gemini-2.5-flash-lite", "meta-llama/llama-3.1-8b-instruct"],
       messages: [{ role: "user", content: prompt }],
       temperature: 0.5,
-      max_tokens: 3000,
+      max_tokens: 2000,
       nvidiaFallback: true,
     });
   } catch (err) {
@@ -993,11 +995,12 @@ Respond with ONLY this exact JSON structure, no markdown, no extra text:
   try {
     raw = await callMeshChatCompletions({
       apiKey: GEMINI_MESH_KEY,
+      model: "openai/gpt-4o-mini",
       retries: 2,
-      fallbackModels: ["openai/gpt-4o-mini", "google/gemini-2.5-flash-lite"],
+      fallbackModels: ["google/gemini-2.5-flash-lite", "meta-llama/llama-3.1-8b-instruct"],
       messages: [{ role: "user", content: prompt }],
       temperature: 0.5,
-      max_tokens: 5000,
+      max_tokens: 2000,
       nvidiaFallback: true,
     });
   } catch (err) {
@@ -1083,11 +1086,12 @@ Rules:
   try {
     raw = await callMeshChatCompletions({
       apiKey: GEMINI_MESH_KEY,
+      model: "openai/gpt-4o-mini",
       retries: 2,
-      fallbackModels: ["openai/gpt-4o-mini", "google/gemini-2.5-flash-lite"],
+      fallbackModels: ["google/gemini-2.5-flash-lite", "meta-llama/llama-3.1-8b-instruct"],
       messages: [{ role: "user", content: prompt }],
       temperature: 0.25,
-      max_tokens: 3000,
+      max_tokens: 2000,
       nvidiaFallback: true,
     });
   } catch (err) {
@@ -1161,11 +1165,12 @@ TONE RULES:
   try {
     return await callMeshChatCompletions({
       apiKey: GEMINI_MESH_KEY,
+      model: "openai/gpt-4o-mini",
       retries: 2,
-      fallbackModels: ["openai/gpt-4o-mini", "google/gemini-2.5-flash-lite"],
+      fallbackModels: ["google/gemini-2.5-flash-lite", "meta-llama/llama-3.1-8b-instruct"],
       messages: [{ role: "user", content: prompt }],
       temperature: 0.75,
-      max_tokens: 2000,
+      max_tokens: 1000,
       nvidiaFallback: true,
     });
   } catch (err) {
@@ -2799,11 +2804,12 @@ FORMAT RULES:
   try {
     return await callMeshChatCompletions({
       apiKey: GEMINI_MESH_KEY,
+      model: "openai/gpt-4o-mini",
       retries: 2,
-      fallbackModels: ["openai/gpt-4o-mini", "google/gemini-2.5-flash-lite"],
+      fallbackModels: ["google/gemini-2.5-flash-lite", "meta-llama/llama-3.1-8b-instruct"],
       messages: [{ role: "user", content: prompt }],
       temperature: 0.5,
-      max_tokens: 4000,
+      max_tokens: 2500,
       nvidiaFallback: true,
     });
   } catch (err) {
@@ -3223,7 +3229,7 @@ Return ONLY valid JSON (no markdown):
   "fullText": "full plain text version of the resume"
 }`;
     let raw = "";
-    try { raw = await callGeminiChain({ prompt, jsonMode: true }); } catch { raw = await callMeshChatCompletions({ apiKey: GEMINI_MESH_KEY, messages: [{ role: "user", content: prompt }] }); }
+    raw = await callMeshChatCompletions({ apiKey: GEMINI_MESH_KEY, model: "openai/gpt-4o-mini", fallbackModels: ["google/gemini-2.5-flash-lite", "meta-llama/llama-3.1-8b-instruct"], messages: [{ role: "user", content: prompt }], temperature: 0.7, max_tokens: 3000, retries: 2, responseFormat: "json_object", nvidiaFallback: true });
     const parsed = safeJson(raw);
     if (!parsed) return res.status(500).json({ error: "AI failed to generate resume. Please try again." });
     return res.json({ resume: parsed, fullText: parsed.fullText ?? "" });
@@ -3253,7 +3259,7 @@ Return ONLY valid JSON:
   "atsScore": 88
 }`;
     let raw = "";
-    try { raw = await callGeminiChain({ prompt, jsonMode: true }); } catch { raw = await callMeshChatCompletions({ apiKey: GEMINI_MESH_KEY, messages: [{ role: "user", content: prompt }] }); }
+    raw = await callMeshChatCompletions({ apiKey: GEMINI_MESH_KEY, model: "openai/gpt-4o-mini", fallbackModels: ["google/gemini-2.5-flash-lite", "meta-llama/llama-3.1-8b-instruct"], messages: [{ role: "user", content: prompt }], temperature: 0.7, max_tokens: 3000, retries: 2, responseFormat: "json_object", nvidiaFallback: true });
     const parsed = safeJson(raw);
     if (!parsed) return res.status(500).json({ error: "AI failed to improve resume. Please try again." });
     return res.json({ improvedResume: parsed.improvedResume ?? "", changes: parsed.changes ?? [], atsScore: parsed.atsScore ?? 0 });
@@ -3283,7 +3289,7 @@ TONE: ${tone}
 Rules: 3 paragraphs (hook + fit + CTA), under 300 words, reference specific skills from JD, sound human not robotic, never start with "I am writing to express".
 Return ONLY the cover letter text, no subject line or salutation header.`;
     let text = "";
-    try { text = await callGeminiChain({ prompt }); } catch { text = await callMeshChatCompletions({ apiKey: GEMINI_MESH_KEY, messages: [{ role: "user", content: prompt }] }); }
+    text = await callMeshChatCompletions({ apiKey: GEMINI_MESH_KEY, model: "openai/gpt-4o-mini", fallbackModels: ["google/gemini-2.5-flash-lite", "meta-llama/llama-3.1-8b-instruct"], messages: [{ role: "user", content: prompt }], temperature: 0.7, max_tokens: 1000, retries: 2, nvidiaFallback: true });
     return res.json({ coverLetter: text.trim(), wordCount: text.trim().split(/\s+/).length });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
@@ -3302,7 +3308,7 @@ Return ONLY valid JSON array:
 [{"id":"1","question":"...","category":"behavioral|technical|situational|culture","tips":"what a good answer includes"}]
 Mix categories: 2 behavioral, 2 technical, 2 situational, 1 culture fit.`;
     let raw = "";
-    try { raw = await callGeminiChain({ prompt, jsonMode: true }); } catch { raw = await callMeshChatCompletions({ apiKey: GEMINI_MESH_KEY, messages: [{ role: "user", content: prompt }] }); }
+    raw = await callMeshChatCompletions({ apiKey: GEMINI_MESH_KEY, model: "openai/gpt-4o-mini", fallbackModels: ["google/gemini-2.5-flash-lite", "meta-llama/llama-3.1-8b-instruct"], messages: [{ role: "user", content: prompt }], temperature: 0.7, max_tokens: 2000, retries: 2, responseFormat: "json_object", nvidiaFallback: true });
     const parsed = safeJson(raw);
     if (!Array.isArray(parsed)) return res.status(500).json({ error: "AI failed to generate questions." });
     return res.json({ questions: parsed.slice(0, 7) });
@@ -3324,7 +3330,7 @@ Job Context: ${jobContext || "Not provided"}
 Return ONLY valid JSON:
 {"score":85,"grade":"B+","strengths":["Used STAR format","Specific example"],"improvements":["Add quantifiable outcome"],"betterAnswer":"Here is how you could improve: ...","followUpQuestions":["Can you quantify the impact?"]}`;
     let raw = "";
-    try { raw = await callGeminiChain({ prompt, jsonMode: true }); } catch { raw = await callMeshChatCompletions({ apiKey: GEMINI_MESH_KEY, messages: [{ role: "user", content: prompt }] }); }
+    raw = await callMeshChatCompletions({ apiKey: GEMINI_MESH_KEY, model: "openai/gpt-4o-mini", fallbackModels: ["google/gemini-2.5-flash-lite", "meta-llama/llama-3.1-8b-instruct"], messages: [{ role: "user", content: prompt }], temperature: 0.5, max_tokens: 1500, retries: 2, responseFormat: "json_object", nvidiaFallback: true });
     const parsed = safeJson(raw);
     if (!parsed) return res.status(500).json({ error: "AI evaluation failed." });
     return res.json({ score: parsed.score ?? 0, grade: parsed.grade ?? "N/A", strengths: parsed.strengths ?? [], improvements: parsed.improvements ?? [], betterAnswer: parsed.betterAnswer ?? "", followUpQuestions: parsed.followUpQuestions ?? [] });
@@ -3346,7 +3352,7 @@ Resume: ${resumeText.slice(0, 2500)}
 Return ONLY valid JSON:
 {"profileScore":72,"grade":"B","improvements":[{"priority":"high|medium|low","action":"Add TypeScript to skills","impact":"+23% more matches","howTo":"Brief instruction"}],"inDemandSkills":["Docker","AWS"],"missingFromProfile":["AWS"],"salaryInsight":"Developers with your profile earn $85K-$110K"}`;
     let raw = "";
-    try { raw = await callGeminiChain({ prompt, jsonMode: true }); } catch { raw = await callMeshChatCompletions({ apiKey: GEMINI_MESH_KEY, messages: [{ role: "user", content: prompt }] }); }
+    raw = await callMeshChatCompletions({ apiKey: GEMINI_MESH_KEY, model: "openai/gpt-4o-mini", fallbackModels: ["google/gemini-2.5-flash-lite", "meta-llama/llama-3.1-8b-instruct"], messages: [{ role: "user", content: prompt }], temperature: 0.5, max_tokens: 2000, retries: 2, responseFormat: "json_object", nvidiaFallback: true });
     const parsed = safeJson(raw);
     if (!parsed) return res.status(500).json({ error: "AI analysis failed." });
     return res.json({ profileScore: parsed.profileScore ?? 0, grade: parsed.grade ?? "N/A", improvements: parsed.improvements ?? [], inDemandSkills: parsed.inDemandSkills ?? [], missingFromProfile: parsed.missingFromProfile ?? [], salaryInsight: parsed.salaryInsight ?? "" });
@@ -3535,11 +3541,12 @@ Rules:
   try {
     raw = await callMeshChatCompletions({
       apiKey: GEMINI_MESH_KEY,
+      model: "openai/gpt-4o-mini",
       retries: 2,
-      fallbackModels: ["openai/gpt-4o-mini", "google/gemini-2.5-flash-lite"],
+      fallbackModels: ["google/gemini-2.5-flash-lite", "meta-llama/llama-3.1-8b-instruct"],
       messages: [{ role: "user", content: prompt }],
       temperature: 0.35,
-      max_tokens: 3000,
+      max_tokens: 2000,
       nvidiaFallback: true,
     });
   } catch (err) {
