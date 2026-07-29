@@ -74,7 +74,7 @@ seekerRouter.put("/profile", async (req, res) => {
     const profile = await RecruitSeekerProfile.findOneAndUpdate(
       { uid },
       { $set: update },
-      { new: true, upsert: true, setDefaultsOnInsert: true }
+      { returnDocument: "after", upsert: true, setDefaultsOnInsert: true }
     ).lean();
     return res.json({ profile });
   } catch (err: any) {
@@ -152,7 +152,7 @@ seekerRouter.post("/jobs/:id/save", async (req, res) => {
     const profile = await RecruitSeekerProfile.findOneAndUpdate(
       { uid },
       { $addToSet: { savedJobIds: jobId } },
-      { new: true, upsert: true, setDefaultsOnInsert: true }
+      { returnDocument: "after", upsert: true, setDefaultsOnInsert: true }
     ).lean();
     return res.json({ ok: true, savedJobIds: (profile as any).savedJobIds });
   } catch (err: any) {
@@ -169,7 +169,7 @@ seekerRouter.delete("/jobs/:id/save", async (req, res) => {
     const profile = await RecruitSeekerProfile.findOneAndUpdate(
       { uid },
       { $pull: { savedJobIds: jobId } },
-      { new: true }
+      { returnDocument: "after" }
     ).lean();
     return res.json({ ok: true, savedJobIds: (profile as any)?.savedJobIds ?? [] });
   } catch (err: any) {
