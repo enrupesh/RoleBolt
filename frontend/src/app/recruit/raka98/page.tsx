@@ -45,9 +45,9 @@ interface RoutingData {
   checkedAt: string;
   routingMode: "normal" | "degraded" | "critical";
   providers: {
-    googleM: Provider;
-    google: Provider;
-    nvidia: Provider;
+    geminiMesh:    Provider;
+    geminiPrimary: Provider;
+    nvidia:        Provider;
   };
   features: Feature[];
 }
@@ -70,15 +70,15 @@ function statusLabel(s: string) {
   return "Unavailable";
 }
 function providerKey(id: string | null) {
-  if (id === "googleM") return "Google M API";
-  if (id === "google")  return "Google API";
-  if (id === "nvidia")  return "NVIDIA API";
+  if (id === "geminiMesh")    return "Mesh API Gateway";
+  if (id === "geminiPrimary") return "Gemini Direct";
+  if (id === "nvidia")        return "NVIDIA NIM API";
   return id ?? "—";
 }
 function providerColor(id: string | null) {
-  if (id === "googleM") return "text-blue-400";
-  if (id === "google")  return "text-indigo-400";
-  if (id === "nvidia")  return "text-green-400";
+  if (id === "geminiMesh")    return "text-blue-400";
+  if (id === "geminiPrimary") return "text-indigo-400";
+  if (id === "nvidia")        return "text-green-400";
   return "text-white/50";
 }
 function shortModel(m: string) {
@@ -104,15 +104,15 @@ function Dot({ status, size = "sm" }: { status: string; size?: "sm" | "lg" }) {
 function FallbackAlerts({ data }: { data: RoutingData }) {
   const alerts: { providerName: string; affectedCount: number; nvidiaModel: string }[] = [];
 
-  if (data.providers.googleM.routingState === "fallback-nvidia") {
-    const count = data.features.filter(f => f.primaryProvider === "googleM" && f.inFallback).length;
+  if (data.providers.geminiMesh.routingState === "fallback-nvidia") {
+    const count = data.features.filter(f => f.primaryProvider === "geminiMesh" && f.inFallback).length;
     const nModel = data.providers.nvidia.activeModel ?? data.providers.nvidia.primaryModel;
-    alerts.push({ providerName: "Google M API", affectedCount: count, nvidiaModel: nModel });
+    alerts.push({ providerName: "Mesh API Gateway", affectedCount: count, nvidiaModel: nModel });
   }
-  if (data.providers.google.routingState === "fallback-nvidia") {
-    const count = data.features.filter(f => f.primaryProvider === "google" && f.inFallback).length;
+  if (data.providers.geminiPrimary.routingState === "fallback-nvidia") {
+    const count = data.features.filter(f => f.primaryProvider === "geminiPrimary" && f.inFallback).length;
     const nModel = data.providers.nvidia.activeModel ?? data.providers.nvidia.primaryModel;
-    alerts.push({ providerName: "Google API (Gemini)", affectedCount: count, nvidiaModel: nModel });
+    alerts.push({ providerName: "Google Gemini Direct", affectedCount: count, nvidiaModel: nModel });
   }
 
   if (alerts.length === 0) return null;
@@ -228,6 +228,7 @@ function ProviderCard({
   const usedByFallback = data.features.filter(
     f => f.primaryProvider !== provId && (f.fallbackChain.length > 0 || f.ultimateFallback === provId)
   );
+  void usedByFallback; // referenced for future use
 
   const cleanActiveModel = prov.activeModel
     ? prov.activeModel.replace(" (via NVIDIA fallback)", "")
@@ -389,12 +390,12 @@ function ProviderCard({
 // ─── Provider Usage Map ────────────────────────────────────────────────────────
 
 function ProviderUsageMap({ features, providers }: { features: Feature[]; providers: RoutingData["providers"] }) {
-  const providerIds = ["googleM", "google", "nvidia"] as const;
+  const providerIds = ["geminiMesh", "geminiPrimary", "nvidia"] as const;
 
   const provInfo: Record<string, { label: string; color: string; icon: string }> = {
-    googleM: { label: "Google M API",       color: "border-blue-500/25 bg-blue-500/4",   icon: "M" },
-    google:  { label: "Google API (Gemini)", color: "border-indigo-500/25 bg-indigo-500/4", icon: "G" },
-    nvidia:  { label: "NVIDIA API",          color: "border-green-500/25 bg-green-500/4",  icon: "N" },
+    geminiMesh:    { label: "Mesh API Gateway",    color: "border-blue-500/25 bg-blue-500/4",    icon: "M" },
+    geminiPrimary: { label: "Google Gemini Direct", color: "border-indigo-500/25 bg-indigo-500/4", icon: "G" },
+    nvidia:        { label: "NVIDIA NIM API",       color: "border-green-500/25 bg-green-500/4",  icon: "N" },
   };
 
   return (
@@ -458,7 +459,7 @@ function ProviderUsageMap({ features, providers }: { features: Feature[]; provid
 // ─── Fallback Flow Diagram ─────────────────────────────────────────────────────
 
 function FallbackFlowDiagram({ data }: { data: RoutingData }) {
-  const { googleM, google, nvidia } = data.providers;
+  const { geminiMesh, geminiPrimary, nvidia } = data.providers;
 
   function ProvNode({ prov, label }: { prov: Provider; label: string }) {
     return (
@@ -503,16 +504,16 @@ function FallbackFlowDiagram({ data }: { data: RoutingData }) {
           Most Features (Resume Scoring, Copilot, Form Scoring, etc.)
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <ProvNode prov={googleM} label="Google M API" />
-          <Arrow active={googleM.status !== "operational"} />
+          <ProvNode prov={geminiMesh} label="Mesh API Gateway" />
+          <Arrow active={geminiMesh.status !== "operational"} />
           <ModelBox
             title="Internal fallbacks"
-            models={googleM.fallbackModels}
-            highlight={googleM.status !== "operational"}
+            models={geminiMesh.fallbackModels}
+            highlight={geminiMesh.status !== "operational"}
           />
-          <Arrow active={googleM.status !== "operational"} />
-          <ProvNode prov={nvidia} label="NVIDIA API" />
-          {googleM.status !== "operational" && nvidia.activeModel && (
+          <Arrow active={geminiMesh.status !== "operational"} />
+          <ProvNode prov={nvidia} label="NVIDIA NIM API" />
+          {geminiMesh.status !== "operational" && nvidia.activeModel && (
             <div className="w-full mt-1 text-[10px] text-amber-400/70 pl-1">
               → Currently using NVIDIA:{" "}
               <span className="font-mono text-amber-300">{nvidia.activeModel}</span>
@@ -527,16 +528,16 @@ function FallbackFlowDiagram({ data }: { data: RoutingData }) {
           Job Description Generation
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <ProvNode prov={google} label="Google API" />
-          <Arrow active={google.status !== "operational"} />
+          <ProvNode prov={geminiPrimary} label="Gemini Direct" />
+          <Arrow active={geminiPrimary.status !== "operational"} />
           <ModelBox
             title="Gemini chain"
-            models={google.fallbackModels}
-            highlight={google.status !== "operational"}
+            models={geminiPrimary.fallbackModels}
+            highlight={geminiPrimary.status !== "operational"}
           />
-          <Arrow active={google.status !== "operational"} />
-          <ProvNode prov={nvidia} label="NVIDIA API" />
-          {google.status !== "operational" && nvidia.activeModel && (
+          <Arrow active={geminiPrimary.status !== "operational"} />
+          <ProvNode prov={nvidia} label="NVIDIA NIM API" />
+          {geminiPrimary.status !== "operational" && nvidia.activeModel && (
             <div className="w-full mt-1 text-[10px] text-amber-400/70 pl-1">
               → Currently using NVIDIA:{" "}
               <span className="font-mono text-amber-300">{nvidia.activeModel}</span>
@@ -633,21 +634,21 @@ function FeatureRoutingTable({ features }: { features: Feature[] }) {
 // ─── Stats Row ─────────────────────────────────────────────────────────────────
 
 function StatsRow({ data }: { data: RoutingData }) {
-  const { googleM, google, nvidia } = data.providers;
-  const providersUp = [googleM, google, nvidia].filter(p => p.status !== "unavailable").length;
+  const { geminiMesh, geminiPrimary, nvidia } = data.providers;
+  const providersUp = [geminiMesh, geminiPrimary, nvidia].filter(p => p.status !== "unavailable").length;
   const inFallback  = data.features.filter(f => f.inFallback).length;
-  const nvidiaRole  = data.providers.googleM.routingState === "fallback-nvidia" ||
-                      data.providers.google.routingState  === "fallback-nvidia"
+  const nvidiaRole  = data.providers.geminiMesh.routingState === "fallback-nvidia" ||
+                      data.providers.geminiPrimary.routingState === "fallback-nvidia"
     ? "Active Fallback"
     : "Standby";
 
   const stats = [
-    { label: "Providers Online",      value: `${providersUp} / 3`,               alert: providersUp < 3 },
-    { label: "Features in Fallback",  value: `${inFallback} / ${data.features.length}`, alert: inFallback > 0 },
-    { label: "Google M Latency",      value: googleM.keyConfigured && googleM.responseTimeMs > 0 ? `${googleM.responseTimeMs} ms` : "—", alert: false },
-    { label: "Google API Latency",    value: google.keyConfigured  && google.responseTimeMs  > 0 ? `${google.responseTimeMs} ms`  : "—", alert: false },
-    { label: "NVIDIA Latency",        value: nvidia.keyConfigured  && nvidia.responseTimeMs  > 0 ? `${nvidia.responseTimeMs} ms`  : "—", alert: false },
-    { label: "NVIDIA Role",           value: nvidiaRole,            alert: nvidiaRole === "Active Fallback" },
+    { label: "Providers Online",     value: `${providersUp} / 3`,                    alert: providersUp < 3 },
+    { label: "Features in Fallback", value: `${inFallback} / ${data.features.length}`, alert: inFallback > 0 },
+    { label: "Mesh API Latency",     value: geminiMesh.keyConfigured    && geminiMesh.responseTimeMs    > 0 ? `${geminiMesh.responseTimeMs} ms`    : "—", alert: false },
+    { label: "Gemini Direct Latency",value: geminiPrimary.keyConfigured && geminiPrimary.responseTimeMs > 0 ? `${geminiPrimary.responseTimeMs} ms` : "—", alert: false },
+    { label: "NVIDIA Latency",       value: nvidia.keyConfigured        && nvidia.responseTimeMs        > 0 ? `${nvidia.responseTimeMs} ms`        : "—", alert: false },
+    { label: "NVIDIA Role",          value: nvidiaRole,                               alert: nvidiaRole === "Active Fallback" },
   ];
 
   return (
@@ -862,7 +863,7 @@ export default function AdminPage() {
                 AI Providers — Live Status &amp; Active Models
               </h2>
               <div className="space-y-3">
-                {(["googleM", "google", "nvidia"] as const).map(key => (
+                {(["geminiMesh", "geminiPrimary", "nvidia"] as const).map(key => (
                   <ProviderCard
                     key={key}
                     provId={key}
