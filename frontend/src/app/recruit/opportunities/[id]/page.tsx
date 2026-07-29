@@ -13,6 +13,7 @@ import MatchScoreSection from "./MatchScoreSection";
 import { apiUrl, readApiJson } from "@/lib/api";
 import { buildMetadata } from "@/lib/seo";
 import { formatJobDescription } from "@/lib/jobDescription";
+import JDRenderer from "./JDRenderer";
 
 type Job = {
   _id: string;
@@ -289,9 +290,10 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
             <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-50 text-xs text-[#0a66c2]">📄</span>
             <h2 className="text-base font-bold text-slate-900">Role overview</h2>
           </div>
-          <div className="prose prose-sm max-w-none text-slate-700 leading-relaxed whitespace-pre-wrap">
-            {roleOverview || "The recruiter has not published a full job description yet."}
-          </div>
+          {roleOverview
+            ? <JDRenderer content={roleOverview} />
+            : <p className="text-sm text-slate-500 italic">The recruiter has not published a full job description yet.</p>
+          }
         </div>
 
         {/* ── 3. Skills ── */}

@@ -344,7 +344,7 @@ formRouter.patch("/:formId", async (req, res) => {
     const form = await RecruitForm.findOneAndUpdate(
       { _id: req.params.formId, uid },
       { $set: update },
-      { new: true }
+      { returnDocument: "after" }
     );
     if (!form) return res.status(404).json({ error: "Form not found." });
 
@@ -431,7 +431,7 @@ formRouter.patch("/:formId/responses/:responseId", async (req, res) => {
     const response = await RecruitFormResponse.findOneAndUpdate(
       { _id: req.params.responseId, formId: req.params.formId, uid },
       { $set: { stage } },
-      { new: true }
+      { returnDocument: "after" }
     );
     if (!response) return res.status(404).json({ error: "Response not found." });
 
@@ -710,7 +710,7 @@ formRouter.post("/:formId/responses/:responseId/retry-score", async (req, res) =
           scoringFailed: scored.scoringFailed,
         },
       },
-      { new: true }
+      { returnDocument: "after" }
     ).lean();
 
     return res.json({ response: updated });

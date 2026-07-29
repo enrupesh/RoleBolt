@@ -167,7 +167,7 @@ async function handleStripeEvent(event: Stripe.Event) {
             cancelAtPeriodEnd: false,
           },
         },
-        { upsert: true, new: true, setDefaultsOnInsert: true }
+        { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
       );
       console.log(`[billing] checkout.session.completed → userId=${userId} plan=${plan}`);
       break;
