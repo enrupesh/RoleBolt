@@ -13,3 +13,4 @@
 - [Stripe API version](stripe-api-version.md) — Always use "2026-06-24.dahlia" as apiVersion; `current_period_end` on Stripe.Subscription requires `(sub as any).current_period_end` cast; proxy.ts must export `proxy` function (not `middleware`).
 - [Job alerts lastCheckedAt bug](job-alerts-fix.md) — RecruitJobAlert.lastCheckedAt must default to new Date(0) not new Date(); keywords must be split by comma/space for regex, not searched as full string.
 - [Gemini 2.5 Flash thinking tokens](gemini-thinking-tokens.md) — reasoning tokens count against max_tokens; any JSON-producing call needs max_tokens≥3000 or output is truncated (finish_reason:"length") → scoringFailed.
+- [seeker-getuid-mismatch](seeker-getuid.md) — seeker.ts getUid() must read user.uid (not user._id/user.id); authMiddleware sets req.user={uid,email}.
