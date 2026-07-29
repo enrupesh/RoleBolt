@@ -749,7 +749,7 @@ For "tier": classify each criterion as 1 (must-have skill), 2 (experience depth)
       fallbackModels: ["openai/gpt-4o-mini", "google/gemini-2.5-flash-lite"],
       messages: [{ role: "user", content: prompt }],
       temperature: 0.4,
-      max_tokens: 2000,
+      max_tokens: 8000,
       nvidiaFallback: true,
     });
   } catch (err) {
@@ -935,7 +935,7 @@ Write in plain text, no JSON, no markdown headers.`;
       fallbackModels: ["openai/gpt-4o-mini", "google/gemini-2.5-flash-lite"],
       messages: [{ role: "user", content: prompt }],
       temperature: 0.5,
-      max_tokens: 600,
+      max_tokens: 3000,
       nvidiaFallback: true,
     });
   } catch (err) {
@@ -997,7 +997,7 @@ Respond with ONLY this exact JSON structure, no markdown, no extra text:
       fallbackModels: ["openai/gpt-4o-mini", "google/gemini-2.5-flash-lite"],
       messages: [{ role: "user", content: prompt }],
       temperature: 0.5,
-      max_tokens: 1200,
+      max_tokens: 5000,
       nvidiaFallback: true,
     });
   } catch (err) {
@@ -1087,7 +1087,7 @@ Rules:
       fallbackModels: ["openai/gpt-4o-mini", "google/gemini-2.5-flash-lite"],
       messages: [{ role: "user", content: prompt }],
       temperature: 0.25,
-      max_tokens: 700,
+      max_tokens: 3000,
       nvidiaFallback: true,
     });
   } catch (err) {
@@ -1165,7 +1165,7 @@ TONE RULES:
       fallbackModels: ["openai/gpt-4o-mini", "google/gemini-2.5-flash-lite"],
       messages: [{ role: "user", content: prompt }],
       temperature: 0.75,
-      max_tokens: 350,
+      max_tokens: 2000,
       nvidiaFallback: true,
     });
   } catch (err) {
@@ -2803,7 +2803,7 @@ FORMAT RULES:
       fallbackModels: ["openai/gpt-4o-mini", "google/gemini-2.5-flash-lite"],
       messages: [{ role: "user", content: prompt }],
       temperature: 0.5,
-      max_tokens: 900,
+      max_tokens: 4000,
       nvidiaFallback: true,
     });
   } catch (err) {
@@ -3539,7 +3539,7 @@ Rules:
       fallbackModels: ["openai/gpt-4o-mini", "google/gemini-2.5-flash-lite"],
       messages: [{ role: "user", content: prompt }],
       temperature: 0.35,
-      max_tokens: 800,
+      max_tokens: 3000,
       nvidiaFallback: true,
     });
   } catch (err) {
