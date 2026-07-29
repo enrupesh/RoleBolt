@@ -279,7 +279,7 @@ export default function ProductPreviewPage() {
       {/* ── Grid ────────────────────────────────────────────────────────────── */}
       <main className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((shot) => (
+          {filtered.map((shot, idx) => (
             <article
               key={shot.src}
               onClick={() => setLightbox(shot)}
@@ -291,6 +291,7 @@ export default function ProductPreviewPage() {
                   src={shot.src}
                   alt={shot.title}
                   fill
+                  loading={idx === 0 ? "eager" : "lazy"}
                   className="object-cover object-top transition-transform duration-500 group-hover:scale-[1.03]"
                   sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                 />

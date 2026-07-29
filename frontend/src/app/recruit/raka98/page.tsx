@@ -767,6 +767,7 @@ export default function AdminPage() {
               value={input}
               onChange={e => { setInput(e.target.value); setError(false); }}
               placeholder="Password"
+              autoComplete="current-password"
               autoFocus
               className={`w-full bg-[#111118] border ${error ? "border-red-500/60" : "border-white/10"} rounded-lg px-4 py-3 text-white text-sm placeholder-white/30 outline-none focus:border-white/30 transition-colors`}
             />
