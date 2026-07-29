@@ -429,9 +429,9 @@ app.get("/ai-routing", async (_req, res) => {
 app.get("/stats/public", async (_req, res) => {
   try {
     await connectMongo();
-    const RecruitJob      = (await import("./models/RecruitJob")).RecruitJob;
-    const RecruitCandidate = (await import("./models/RecruitCandidate")).RecruitCandidate;
-    const User            = (await import("./models/User")).User;
+    const RecruitJob      = (await import("./models/RecruitJob.js")).RecruitJob;
+    const RecruitCandidate = (await import("./models/RecruitCandidate.js")).RecruitCandidate;
+    const User            = (await import("./models/User.js")).User;
 
     const [totalJobs, totalCandidates, totalUsers] = await Promise.all([
       RecruitJob.countDocuments({ status: "active" }),

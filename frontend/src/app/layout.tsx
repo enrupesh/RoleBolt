@@ -34,6 +34,7 @@ const inter = localFont({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://www.rolebolt.tech"),
   title: {
     default: "Recruit — Find Jobs & Hire Talent",
     template: "%s | Recruit",
