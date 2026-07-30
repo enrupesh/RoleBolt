@@ -1,0 +1,87 @@
+Please implement a new **Assessment Completion Rate Alert** feature for the Assessment Analytics Dashboard.
+
+## Objective
+
+Proactively notify recruiters when the assessment completion rate falls below a recruiter-defined threshold, allowing them to identify potential issues early and take corrective action.
+
+## Feature Requirements
+
+### Recruiter Settings
+
+Allow recruiters to configure a completion rate threshold for each job.
+
+Example:
+
+* Notify me if the assessment completion rate drops below **50%**.
+
+The threshold should be fully configurable and can be enabled or disabled by the recruiter.
+
+---
+
+## Automatic Monitoring
+
+The system should continuously monitor assessment completion rates.
+
+Completion Rate Formula:
+
+**Completed Assessments ÷ Assessments Sent × 100**
+
+If the completion rate falls below the configured threshold, automatically trigger an alert.
+
+---
+
+## Email Notification
+
+Send an email notification to the recruiter containing:
+
+* Job Title
+* Current Completion Rate
+* Configured Threshold
+* Total Assessments Sent
+* Total Assessments Completed
+* Report Generation Time
+
+Example:
+
+> **Assessment Completion Rate Alert**
+>
+> The assessment completion rate for **Senior Backend Engineer** has dropped to **42%**, which is below your configured threshold of **50%**.
+>
+> You may want to review the assessment experience, send reminder emails to candidates, or evaluate whether the assessment is too long or difficult.
+
+---
+
+## Dashboard Alerts
+
+In addition to email notifications, display a warning banner or notification within the recruiter dashboard until the completion rate returns above the configured threshold.
+
+---
+
+## Activity Feed
+
+Record every alert in the Activity Feed and Audit Log, including:
+
+* Alert Triggered
+* Current Completion Rate
+* Configured Threshold
+* Timestamp
+
+---
+
+## Alert Rules
+
+* Prevent duplicate alerts from being sent repeatedly for the same condition.
+* Send a new alert only if the completion rate improves and then falls below the threshold again, or if the recruiter changes the configured threshold.
+
+---
+
+## Acceptance Criteria
+
+1. Recruiters can configure a completion rate threshold.
+2. The system continuously monitors assessment completion rates.
+3. Automatic email notifications are sent when the completion rate falls below the configured threshold.
+4. Dashboard alerts are displayed alongside email notifications.
+5. All alerts are recorded in the Activity Feed and Audit Log.
+6. Duplicate or excessive alert emails are prevented.
+
+This feature will help recruiters detect low candidate engagement early, improve assessment completion rates, and take timely action before hiring pipelines are impacted.
