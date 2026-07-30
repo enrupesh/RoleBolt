@@ -208,7 +208,7 @@ const RecruitCandidateSchema = new Schema<IRecruitCandidate>(
       type: [
         new Schema(
           {
-            action:      { type: String, enum: ["shortlisted", "rejected"], required: true },
+            action:      { type: String, enum: ["shortlisted", "rejected", "review_zone"], required: true },
             score:       { type: Number, required: true },
             reason:      { type: String, default: "" },
             emailSent:   { type: Boolean, default: false },
