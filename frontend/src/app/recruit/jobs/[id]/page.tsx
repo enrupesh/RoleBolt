@@ -1802,9 +1802,10 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<"pipeline" | "jd" | "rubric" | "post" | "rules" | "performance">("pipeline");
+  const [activeTab, setActiveTab] = useState<"pipeline" | "jd" | "rubric" | "post" | "rules" | "performance" | "agent-log">("pipeline");
   const [pipelineRules, setPipelineRules] = useState<PipelineRule[]>([]);
   const [perfAlerts, setPerfAlerts] = useState<PerformanceAlert[]>([]);
+  const [agentLogCount, setAgentLogCount] = useState(0);
   const [checkingPerf, setCheckingPerf] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [stageFilter, setStageFilter] = useState<CandidateStage | "all">("all");
@@ -1818,18 +1819,21 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
     if (!token) return;
     setLoading(true);
     try {
-      const [jobRes, candRes, rulesRes] = await Promise.all([
+      const [jobRes, candRes, rulesRes, agentLogRes] = await Promise.all([
         fetch(apiUrl(`/recruit/jobs/${id}`), { headers: { Authorization: `Bearer ${token}` } }),
         fetch(apiUrl(`/recruit/jobs/${id}/candidates`), { headers: { Authorization: `Bearer ${token}` } }),
         fetch(apiUrl(`/recruit/jobs/${id}/pipeline-rules`), { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(apiUrl(`/recruit/jobs/${id}/agent-log`), { headers: { Authorization: `Bearer ${token}` } }),
       ]);
       const jobData = await readApiJson(jobRes);
       const candData = await readApiJson(candRes);
       const rulesData = await readApiJson(rulesRes);
+      const agentLogData = await readApiJson(agentLogRes).catch(() => ({ total: 0 }));
       setJob(jobData.job ?? null);
       setCandidates(candData.candidates ?? []);
       setPipelineRules(rulesData.rules ?? []);
       setPerfAlerts(jobData.job?.performanceAlerts?.filter((a: PerformanceAlert) => !a.dismissed) ?? []);
+      setAgentLogCount(agentLogData.total ?? 0);
     } catch { /* silent */ }
     finally { setLoading(false); }
   }, [token, id]);
@@ -2053,12 +2057,12 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
           </div>
         </div>
 
-        <div className="mb-6 flex gap-1 border-b border-[var(--border)]">
-          {(["pipeline", "jd", "rubric", "post", "rules", "performance"] as const).map(tab => (
+        <div className="mb-6 flex gap-1 border-b border-[var(--border)] overflow-x-auto">
+          {(["pipeline", "jd", "rubric", "post", "rules", "performance", "agent-log"] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`relative px-4 py-2.5 text-sm transition border-b-2 -mb-px ${
+              className={`relative whitespace-nowrap px-4 py-2.5 text-sm transition border-b-2 -mb-px ${
                 activeTab === tab
                   ? "border-indigo-500 text-[var(--foreground)] font-medium"
                   : "border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
@@ -2082,6 +2086,15 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
                     {perfAlerts.length > 0 && (
                       <span className="rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold text-white leading-none">
                         {perfAlerts.length}
+                      </span>
+                    )}
+                  </span>
+                ) : tab === "agent-log" ? (
+                  <span className="flex items-center gap-1.5">
+                    Agent Log
+                    {agentLogCount > 0 && (
+                      <span className="rounded-full bg-indigo-500 px-1.5 py-0.5 text-[10px] font-bold text-white leading-none">
+                        {agentLogCount}
                       </span>
                     )}
                   </span>
@@ -2213,7 +2226,316 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
             }}
           />
         )}
+
+        {activeTab === "agent-log" && (
+          <AgentLogTab
+            jobId={id}
+            token={token!}
+            agentEnabled={job.agentMode?.enabled ?? false}
+            onCountChange={setAgentLogCount}
+          />
+        )}
       </main>
+    </div>
+  );
+}
+
+// ── Agent Log Tab ─────────────────────────────────────────────────────────────
+type AgentLogEntry = {
+  candidateId: string;
+  candidateName: string;
+  candidateEmail: string;
+  action: "shortlisted" | "rejected";
+  score: number;
+  reason: string;
+  emailSent: boolean;
+  emailStatus: "sent" | "failed" | "skipped" | "disabled";
+  timestamp: string;
+};
+
+function timeAgo(isoString: string): string {
+  const diff = Date.now() - new Date(isoString).getTime();
+  const mins  = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days  = Math.floor(diff / 86400000);
+  if (mins < 1)   return "Just now";
+  if (mins < 60)  return `${mins}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days < 7)   return `${days}d ago`;
+  return new Date(isoString).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+}
+
+function AgentLogTab({
+  jobId, token, agentEnabled, onCountChange,
+}: {
+  jobId: string;
+  token: string;
+  agentEnabled: boolean;
+  onCountChange: (n: number) => void;
+}) {
+  const [entries, setEntries]   = useState<AgentLogEntry[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [filter, setFilter]     = useState<"all" | "shortlisted" | "rejected">("all");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true);
+      try {
+        const res  = await fetch(apiUrl(`/recruit/jobs/${jobId}/agent-log`), {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        const list: AgentLogEntry[] = data.entries ?? [];
+        setEntries(list);
+        onCountChange(list.length);
+      } catch { /* silent */ }
+      finally { setLoading(false); }
+    }
+    load();
+  }, [jobId, token, onCountChange]);
+
+  const filtered = filter === "all" ? entries : entries.filter(e => e.action === filter);
+  const totalShortlisted = entries.filter(e => e.action === "shortlisted").length;
+  const totalRejected    = entries.filter(e => e.action === "rejected").length;
+  const totalEmailed     = entries.filter(e => e.emailSent).length;
+
+  if (loading) {
+    return (
+      <div className="space-y-3 py-4">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="h-16 rounded-2xl rb-skeleton" />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5 py-2">
+      {/* ── Header ── */}
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h2 className="text-base font-bold text-[var(--foreground)] flex items-center gap-2">
+            <span className="text-indigo-400">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/>
+                <path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/>
+              </svg>
+            </span>
+            Agent Activity Log
+          </h2>
+          <p className="mt-0.5 text-xs text-[var(--text-muted)]">
+            Every action taken by the AI Agent — who was shortlisted, who was rejected, and why.
+          </p>
+        </div>
+
+        {/* Agent status pill */}
+        <div className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold border ${
+          agentEnabled
+            ? "border-indigo-500/30 bg-indigo-500/10 text-indigo-400"
+            : "border-[var(--border)] bg-[var(--surface-muted)] text-[var(--text-muted)]"
+        }`}>
+          <span className={`h-1.5 w-1.5 rounded-full ${agentEnabled ? "bg-indigo-400 animate-pulse" : "bg-gray-400"}`} />
+          {agentEnabled ? "Agent Active" : "Agent Paused"}
+        </div>
+      </div>
+
+      {/* ── Stats row ── */}
+      {entries.length > 0 && (
+        <div className="grid grid-cols-3 gap-3">
+          <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-center">
+            <p className="text-2xl font-bold text-emerald-600">{totalShortlisted}</p>
+            <p className="text-[11px] text-emerald-700/70 mt-0.5">Shortlisted</p>
+          </div>
+          <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 px-4 py-3 text-center">
+            <p className="text-2xl font-bold text-rose-600">{totalRejected}</p>
+            <p className="text-[11px] text-rose-700/70 mt-0.5">Rejected</p>
+          </div>
+          <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 px-4 py-3 text-center">
+            <p className="text-2xl font-bold text-blue-600">{totalEmailed}</p>
+            <p className="text-[11px] text-blue-700/70 mt-0.5">Emails Sent</p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Filter tabs ── */}
+      {entries.length > 0 && (
+        <div className="flex gap-1">
+          {(["all", "shortlisted", "rejected"] as const).map(f => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                filter === f
+                  ? f === "all"
+                    ? "bg-indigo-500 text-white"
+                    : f === "shortlisted"
+                      ? "bg-emerald-500 text-white"
+                      : "bg-rose-500 text-white"
+                  : "bg-[var(--surface-muted)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+              }`}
+            >
+              {f === "all" ? `All (${entries.length})` : f === "shortlisted" ? `✅ Shortlisted (${totalShortlisted})` : `❌ Rejected (${totalRejected})`}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* ── Empty state ── */}
+      {entries.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-indigo-500/10">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-indigo-400">
+              <path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/>
+              <path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/>
+            </svg>
+          </div>
+          <p className="text-sm font-semibold text-[var(--foreground)]">No agent actions yet</p>
+          <p className="mt-1.5 text-xs text-[var(--text-muted)] max-w-xs">
+            {agentEnabled
+              ? "The agent is active. Actions will appear here as new candidates apply."
+              : "Turn on the AI Agent to let it automatically shortlist and reject candidates."}
+          </p>
+        </div>
+      )}
+
+      {/* ── Log entries ── */}
+      {filtered.length > 0 && (
+        <div className="space-y-2">
+          {filtered.map((entry, idx) => {
+            const key = `${entry.candidateId}-${idx}`;
+            const isOpen = expandedId === key;
+            const isShortlisted = entry.action === "shortlisted";
+
+            return (
+              <div
+                key={key}
+                className={`rounded-2xl border transition-all ${
+                  isShortlisted
+                    ? "border-emerald-500/20 bg-emerald-500/[0.03] hover:bg-emerald-500/[0.06]"
+                    : "border-rose-500/20 bg-rose-500/[0.03] hover:bg-rose-500/[0.06]"
+                }`}
+              >
+                {/* ── Row summary ── */}
+                <button
+                  onClick={() => setExpandedId(isOpen ? null : key)}
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left"
+                >
+                  {/* Action icon */}
+                  <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm ${
+                    isShortlisted ? "bg-emerald-100 text-emerald-600" : "bg-rose-100 text-rose-600"
+                  }`}>
+                    {isShortlisted ? "✅" : "❌"}
+                  </div>
+
+                  {/* Candidate info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-semibold text-[var(--foreground)] truncate">{entry.candidateName}</p>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                        isShortlisted ? "bg-emerald-500/15 text-emerald-700" : "bg-rose-500/15 text-rose-700"
+                      }`}>
+                        {isShortlisted ? "Shortlisted" : "Rejected"}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-[var(--text-muted)] mt-0.5 truncate">{entry.reason}</p>
+                  </div>
+
+                  {/* Score + time */}
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <span className={`text-sm font-bold ${
+                      entry.score >= 75 ? "text-emerald-600" : entry.score >= 40 ? "text-amber-600" : "text-rose-600"
+                    }`}>
+                      {entry.score}%
+                    </span>
+                    <span className="text-[10px] text-[var(--text-muted)]">{timeAgo(entry.timestamp)}</span>
+                  </div>
+
+                  {/* Expand chevron */}
+                  <svg
+                    width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                    className={`shrink-0 text-[var(--text-muted)] transition-transform ${isOpen ? "rotate-180" : ""}`}
+                  >
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </button>
+
+                {/* ── Expanded detail ── */}
+                {isOpen && (
+                  <div className="border-t border-[var(--border)]/50 px-4 py-3 space-y-3">
+                    {/* Detail grid */}
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-0.5">Candidate</p>
+                        <p className="text-[var(--foreground)] font-medium">{entry.candidateName}</p>
+                        {entry.candidateEmail && (
+                          <p className="text-[var(--text-muted)]">{entry.candidateEmail}</p>
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-0.5">Score</p>
+                        <p className={`font-bold text-sm ${
+                          entry.score >= 75 ? "text-emerald-600" : entry.score >= 40 ? "text-amber-600" : "text-rose-600"
+                        }`}>{entry.score}%</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-0.5">Decision</p>
+                        <p className={`font-semibold ${isShortlisted ? "text-emerald-600" : "text-rose-600"}`}>
+                          {isShortlisted ? "Auto-Shortlisted" : "Auto-Rejected"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-0.5">Time</p>
+                        <p className="text-[var(--foreground)]">{new Date(entry.timestamp).toLocaleString("en-IN", {
+                          day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"
+                        })}</p>
+                      </div>
+                    </div>
+
+                    {/* Email status */}
+                    <div className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs ${
+                      entry.emailStatus === "sent"
+                        ? "bg-blue-500/5 border border-blue-500/20"
+                        : entry.emailStatus === "failed"
+                          ? "bg-rose-500/5 border border-rose-500/20"
+                          : "bg-[var(--surface-muted)] border border-[var(--border)]"
+                    }`}>
+                      <span className="text-base">
+                        {entry.emailStatus === "sent" ? "📧" : entry.emailStatus === "failed" ? "⚠️" : "🔕"}
+                      </span>
+                      <div>
+                        <p className="font-semibold text-[var(--foreground)]">
+                          {entry.emailStatus === "sent" ? "Email sent to candidate"
+                            : entry.emailStatus === "failed" ? "Email failed to send"
+                            : entry.emailStatus === "skipped" ? "Email skipped (no address)"
+                            : "Email disabled in settings"}
+                        </p>
+                        {entry.emailStatus === "disabled" && (
+                          <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
+                            Turn on auto-email in Agent Settings to notify candidates.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Link to candidate */}
+                    <a
+                      href={`/recruit/jobs/${jobId}/candidates/${entry.candidateId}`}
+                      className="flex items-center justify-center gap-1.5 w-full rounded-xl border border-indigo-500/30 bg-indigo-500/5 px-3 py-2 text-xs font-semibold text-indigo-500 hover:bg-indigo-500/10 transition"
+                    >
+                      View {entry.candidateName.split(" ")[0]}&apos;s Profile
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M7 17L17 7"/><path d="M7 7h10v10"/>
+                      </svg>
+                    </a>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
