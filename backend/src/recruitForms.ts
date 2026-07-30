@@ -93,6 +93,15 @@ interface AnswerSignal {
   note: string;
 }
 
+interface QuestionScore {
+  questionId: string;
+  score: number; // 0-10
+  strengths: string[];
+  weaknesses: string[];
+  feedback: string;
+  confidence: "High" | "Medium" | "Low";
+}
+
 async function scoreFormResponse(args: {
   formTitle: string;
   answers: ScoredAnswer[];
@@ -103,6 +112,7 @@ async function scoreFormResponse(args: {
   strengths: string[];
   redFlags: string[];
   answerSignals: AnswerSignal[];
+  questionScores: QuestionScore[];
   scoringFailed: boolean;
 }> {
   // Build a numbered list so the AI can reference answers by index
@@ -122,16 +132,26 @@ Evaluate this candidate and respond with ONLY this JSON (no markdown):
 {
   "aiScore": <integer 0-100 representing overall fit>,
   "aiSummary": "<2-3 sentence direct assessment — mention their strongest relevant point and one area of uncertainty>",
-  "strengths": ["<specific strength 1>", "<specific strength 2>"],
+  "strengths": ["<specific overall strength 1>", "<specific overall strength 2>"],
   "redFlags": ["<only genuine concern — leave empty array if none>"],
   "answerSignals": [
     { "idx": 1, "signal": "strong", "note": "<one short phrase why — e.g. specific examples, deep expertise>" },
     { "idx": 2, "signal": "ok", "note": "<one short phrase>" },
     { "idx": 3, "signal": "thin", "note": "<one short phrase why — e.g. very brief, vague, no examples>" }
+  ],
+  "questionScores": [
+    {
+      "idx": 1,
+      "score": <number 0-10>,
+      "strengths": ["<specific strength in this answer>"],
+      "weaknesses": ["<specific weakness or gap — omit if none>"],
+      "feedback": "<1-2 sentence explanation of the score>",
+      "confidence": "<High|Medium|Low based on answer length and clarity>"
+    }
   ]
 }
 
-Scoring guide:
+Scoring guide (overall aiScore):
 - 80-100: Strong, clear fit with excellent answers
 - 60-79: Good candidate, solid answers, minor gaps
 - 40-59: Some relevant background, unclear fit
@@ -142,7 +162,19 @@ Answer signal guide (for each numbered answer above):
 - "ok": adequate but generic — answers the question without standing out
 - "thin": very brief, vague, off-topic, or missing entirely
 
-Only include signals for answers that were actually provided (match the [idx] numbers above). Skip contact-info-only answers (name, email, phone).
+Question score guide (score 0-10 per answer):
+- 9-10: Exceptional — highly specific, compelling, demonstrates deep expertise or experience
+- 7-8: Good — solid answer with relevant detail, minor gaps
+- 5-6: Adequate — answers the question but generic or lacking depth
+- 3-4: Weak — vague, very brief, or only partially on-topic
+- 0-2: Poor — off-topic, missing, or a single-word answer
+
+Confidence guide:
+- "High": answer is detailed enough to evaluate confidently
+- "Medium": answer gives some signal but is somewhat brief or ambiguous
+- "Low": answer is very short, vague, or context is insufficient
+
+Only include signals and questionScores for answers that were actually provided (match the [idx] numbers above). Skip contact-info-only answers (name, email, phone).
 Be specific and honest. If answers are very short or empty, note that in the summary.`;
 
   let raw: string;
@@ -154,18 +186,18 @@ Be specific and honest. If answers are very short or empty, note that in the sum
       fallbackModels: ["google/gemini-2.5-flash-lite", "meta-llama/llama-3.1-8b-instruct"],
       messages: [{ role: "user", content: prompt }],
       temperature: 0.3,
-      max_tokens: 2500,
+      max_tokens: 3500,
       nvidiaFallback: true,
     });
   } catch (err) {
     console.error("[forms] scoreFormResponse: AI call failed:", err);
-    return { aiScore: 0, aiSummary: "", strengths: [], redFlags: [], answerSignals: [], scoringFailed: true };
+    return { aiScore: 0, aiSummary: "", strengths: [], redFlags: [], answerSignals: [], questionScores: [], scoringFailed: true };
   }
 
   const parsed = safeJson(raw);
   if (!parsed) {
     console.error("[forms] scoreFormResponse: unparseable AI response:", raw?.slice(0, 300));
-    return { aiScore: 0, aiSummary: "", strengths: [], redFlags: [], answerSignals: [], scoringFailed: true };
+    return { aiScore: 0, aiSummary: "", strengths: [], redFlags: [], answerSignals: [], questionScores: [], scoringFailed: true };
   }
 
   // Map AI's 1-based indices back to questionIds
@@ -186,12 +218,33 @@ Be specific and honest. If answers are very short or empty, note that in the sum
     }
   }
 
+  // Map AI's 1-based questionScore indices back to questionIds
+  const questionScores: QuestionScore[] = [];
+  if (Array.isArray(parsed.questionScores)) {
+    for (const qs of parsed.questionScores) {
+      const idx = Number(qs.idx);
+      if (!idx || idx < 1 || idx > indexedAnswers.length) continue;
+      const answer = indexedAnswers[idx - 1];
+      if (!answer) continue;
+      const conf = String(qs.confidence || "Medium");
+      questionScores.push({
+        questionId: answer.questionId,
+        score: Math.min(10, Math.max(0, Number(qs.score) || 0)),
+        strengths: Array.isArray(qs.strengths) ? qs.strengths.filter((s: unknown) => typeof s === "string" && s.trim()).map((s: string) => s.trim()) : [],
+        weaknesses: Array.isArray(qs.weaknesses) ? qs.weaknesses.filter((w: unknown) => typeof w === "string" && w.trim()).map((w: string) => w.trim()) : [],
+        feedback: String(qs.feedback || "").trim().slice(0, 300),
+        confidence: (["High", "Medium", "Low"].includes(conf) ? conf : "Medium") as "High" | "Medium" | "Low",
+      });
+    }
+  }
+
   return {
     aiScore: Math.min(100, Math.max(0, Number(parsed.aiScore) || 0)),
     aiSummary: String(parsed.aiSummary || "").trim(),
     strengths: Array.isArray(parsed.strengths) ? parsed.strengths.filter((s: unknown) => typeof s === "string" && s.trim()) : [],
     redFlags: Array.isArray(parsed.redFlags) ? parsed.redFlags.filter((f: unknown) => typeof f === "string" && f.trim()) : [],
     answerSignals,
+    questionScores,
     scoringFailed: false,
   };
 }
@@ -710,6 +763,7 @@ formRouter.post("/:formId/responses/:responseId/retry-score", async (req, res) =
           strengths: scored.strengths,
           redFlags: scored.redFlags,
           answerSignals: scored.answerSignals,
+          questionScores: scored.questionScores,
           scoringFailed: scored.scoringFailed,
         },
       },
@@ -846,6 +900,7 @@ formPublicRouter.post(
               strengths: scored.strengths,
               redFlags: scored.redFlags,
               answerSignals: scored.answerSignals,
+              questionScores: scored.questionScores,
               scoringFailed: scored.scoringFailed,
             },
           });

@@ -12,6 +12,15 @@ export interface IAnswerSignal {
   note: string;
 }
 
+export interface IQuestionScore {
+  questionId: string;
+  score: number; // 0-10
+  strengths: string[];
+  weaknesses: string[];
+  feedback: string;
+  confidence: "High" | "Medium" | "Low";
+}
+
 export interface IEmailLogEntry {
   type: string;
   to: string;
@@ -32,6 +41,7 @@ export interface IRecruitFormResponse extends Document {
   strengths: string[];
   redFlags: string[];
   answerSignals: IAnswerSignal[];
+  questionScores: IQuestionScore[];
   interviewQuestions: string[];
   scoringFailed: boolean;
   stage: "new" | "shortlisted" | "interview" | "hired" | "rejected";
@@ -61,6 +71,18 @@ const AnswerSignalSchema = new Schema<IAnswerSignal>(
   { _id: false }
 );
 
+const QuestionScoreSchema = new Schema<IQuestionScore>(
+  {
+    questionId: { type: String, required: true },
+    score: { type: Number, default: 0 },
+    strengths: { type: [String], default: [] },
+    weaknesses: { type: [String], default: [] },
+    feedback: { type: String, default: "" },
+    confidence: { type: String, enum: ["High", "Medium", "Low"], default: "Medium" },
+  },
+  { _id: false }
+);
+
 const EmailLogEntrySchema = new Schema<IEmailLogEntry>(
   {
     type: { type: String, required: true },
@@ -85,6 +107,7 @@ const RecruitFormResponseSchema = new Schema<IRecruitFormResponse>(
     strengths: { type: [String], default: [] },
     redFlags: { type: [String], default: [] },
     answerSignals: { type: [AnswerSignalSchema], default: [] },
+    questionScores: { type: [QuestionScoreSchema], default: [] },
     interviewQuestions: { type: [String], default: [] },
     scoringFailed: { type: Boolean, default: false },
     stage: {
