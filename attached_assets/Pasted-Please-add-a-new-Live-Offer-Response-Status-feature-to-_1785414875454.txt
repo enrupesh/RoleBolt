@@ -1,0 +1,111 @@
+Please add a new **Live Offer Response Status** feature to the candidate pipeline.
+
+## Objective
+
+Display the candidate's current offer response status directly on the **Pipeline Board**, so recruiters can instantly see the latest offer status without opening the candidate profile or offer details.
+
+This should provide real-time visibility into the offer stage and reduce unnecessary clicks.
+
+---
+
+## Feature Requirements
+
+### Pipeline Status Indicators
+
+When a candidate is in the **Offer** stage, display a live status badge on the candidate card.
+
+Supported statuses:
+
+* 👀 Viewed
+* ⏳ Pending (Offer sent but not yet viewed)
+* ✅ Accepted
+* ❌ Declined
+* ⌛ Expired
+
+Example:
+
+```
+Rahul Kumar
+
+Offer Stage
+
+👀 Viewed
+```
+
+or
+
+```
+Rahul Kumar
+
+Offer Stage
+
+✅ Accepted
+```
+
+or
+
+```
+Rahul Kumar
+
+Offer Stage
+
+❌ Declined
+```
+
+---
+
+## Real-Time Updates
+
+The status should update automatically whenever the candidate:
+
+* Opens the offer
+* Accepts the offer
+* Declines the offer
+* The offer expires
+* The recruiter reactivates or extends the offer
+
+Recruiters should not need to refresh the page manually to see the latest status.
+
+---
+
+## Pipeline Board Behavior
+
+* Display the status badge directly on the candidate card.
+* Keep the badge compact and easy to recognize.
+* Show the latest offer status at a glance.
+* Do not require opening the candidate profile or offer modal.
+
+---
+
+## Candidate Timeline & Activity Feed
+
+Record all offer response events, including:
+
+* Offer Sent
+* Offer Viewed
+* Offer Accepted
+* Offer Declined
+* Offer Expired
+* Offer Reactivated
+* Offer Expiry Extended
+
+Each event should include a timestamp for complete tracking.
+
+---
+
+## Acceptance Criteria
+
+1. Display live offer response status on every candidate card in the Offer stage.
+2. Support the following statuses:
+
+   * Pending
+   * Viewed
+   * Accepted
+   * Declined
+   * Expired
+3. Automatically update the status whenever the candidate takes an action or the offer status changes.
+4. Keep the Pipeline Board synchronized with the Offer Management module.
+5. Record all offer status changes in the Activity Feed and Audit Log.
+6. Ensure the implementation is lightweight, responsive, and does not impact pipeline performance.
+
+This feature will allow recruiters to monitor offer progress directly from the pipeline, making the hiring process faster, more transparent, and easier to manage without opening individual candidate records.

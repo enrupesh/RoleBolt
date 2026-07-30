@@ -2164,6 +2164,33 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete }: {
             )}
           </div>
 
+          {/* ── Live Offer Response Status badge (offer / hired stage only) ── */}
+          {(c.stage === "offer" || c.stage === "hired") && c.offerCandidateStatus && c.offerCandidateStatus !== "" && (() => {
+            const statusMap: Record<string, { icon: string; label: string; cls: string }> = {
+              pending:  { icon: "⏳", label: "Pending",  cls: "border-amber-500/30  bg-amber-500/10  text-amber-400"  },
+              viewed:   { icon: "👀", label: "Viewed",   cls: "border-sky-500/30    bg-sky-500/10    text-sky-400"    },
+              accepted: { icon: "✅", label: "Accepted", cls: "border-emerald-500/30 bg-emerald-500/10 text-emerald-400" },
+              declined: { icon: "❌", label: "Declined", cls: "border-rose-500/30   bg-rose-500/10   text-rose-400"   },
+              expired:  { icon: "⌛", label: "Expired",  cls: "border-zinc-500/30   bg-zinc-500/10   text-zinc-400"   },
+            };
+            const s = statusMap[c.offerCandidateStatus];
+            if (!s) return null;
+            return (
+              <div className="flex items-center gap-2 mb-3">
+                <span className={`flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[10px] font-semibold ${s.cls}`}>
+                  <span>{s.icon}</span>
+                  <span>Offer: {s.label}</span>
+                </span>
+                {c.offerCandidateStatus === "pending" && (
+                  <span className="flex h-1.5 w-1.5 shrink-0">
+                    <span className="animate-ping absolute inline-flex h-1.5 w-1.5 rounded-full bg-amber-400 opacity-75" />
+                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-amber-400" />
+                  </span>
+                )}
+              </div>
+            );
+          })()}
+
           <div className="flex items-center gap-2 flex-wrap">
             <select
               value={c.stage}
@@ -2461,6 +2488,48 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
   }, [token, id]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // ── Live offer status polling ──────────────────────────────────────────────
+  // Poll every 20 s when any offer-stage candidate still has a non-terminal status
+  // (pending or viewed). Stops automatically once all responses are terminal.
+  useEffect(() => {
+    if (!token || !id) return;
+    const hasLiveOffer = candidates.some(
+      c => (c.stage === "offer" || c.stage === "hired") &&
+           (c.offerCandidateStatus === "pending" || c.offerCandidateStatus === "viewed")
+    );
+    if (!hasLiveOffer) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(apiUrl(`/recruit/jobs/${id}/offer-statuses`), {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const statuses: Array<{ _id: string; offerStatus: string; offerCandidateStatus: string; offerExpiryDate: string }> = data.statuses ?? [];
+        if (!statuses.length) return;
+        setCandidates(prev => prev.map(c => {
+          const s = statuses.find(x => x._id === c._id);
+          if (!s) return c;
+          // Only update if something actually changed to avoid spurious re-renders
+          if (s.offerStatus === c.offerStatus && s.offerCandidateStatus === c.offerCandidateStatus) return c;
+          return {
+            ...c,
+            offerStatus:          s.offerStatus          as Candidate["offerStatus"],
+            offerCandidateStatus: s.offerCandidateStatus as Candidate["offerCandidateStatus"],
+            offerDetails:         s.offerExpiryDate
+              ? { ...(c.offerDetails || {}), offerExpiryDate: s.offerExpiryDate }
+              : c.offerDetails,
+          };
+        }));
+      } catch { /* silent — polling errors must not surface to recruiter */ }
+    }, 20_000);
+
+    return () => clearInterval(interval);
+  // Re-evaluate whenever the set of live offers changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, id, candidates.filter(c => c.stage === "offer" || c.stage === "hired").map(c => c.offerCandidateStatus).join(",")]);
 
   function handleUpdate(cid: string, update: Partial<Candidate>) {
     setCandidates(prev => prev.map(c => c._id === cid ? { ...c, ...update } : c));
