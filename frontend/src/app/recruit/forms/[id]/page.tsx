@@ -44,7 +44,6 @@ type QuestionScore = {
   strengths: string[];
   weaknesses: string[];
   feedback: string;
-  confidence: "High" | "Medium" | "Low";
 };
 
 type EmailLogEntry = {
@@ -576,33 +575,6 @@ function FormResumeSection({ resumeText }: { resumeText: string }) {
   );
 }
 
-// ─── Confidence badge ─────────────────────────────────────────────────────────
-
-function ConfidenceBadge({ confidence }: { confidence: "High" | "Medium" | "Low" }) {
-  if (confidence === "High") {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 px-2 py-0.5 text-[10px] font-bold text-emerald-400 shrink-0">
-        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shrink-0" />
-        High confidence
-      </span>
-    );
-  }
-  if (confidence === "Low") {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/10 border border-rose-500/25 px-2 py-0.5 text-[10px] font-bold text-rose-400 shrink-0">
-        <span className="h-1.5 w-1.5 rounded-full bg-rose-400 shrink-0" />
-        Low confidence
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 border border-amber-500/25 px-2 py-0.5 text-[10px] font-bold text-amber-400 shrink-0">
-      <span className="h-1.5 w-1.5 rounded-full bg-amber-400 shrink-0" />
-      Medium confidence
-    </span>
-  );
-}
-
 // ─── Question score row ───────────────────────────────────────────────────────
 
 function QuestionScoreRow({
@@ -687,12 +659,11 @@ function QuestionScoreRow({
 
           {qs ? (
             <>
-              {/* Score + confidence */}
+              {/* Score */}
               <div className="flex items-center gap-2 flex-wrap">
                 <span className={`rounded-lg border px-2.5 py-1 text-sm font-bold ${scoreBg} ${scoreColor}`}>
                   {qs.score.toFixed(1)} / 10
                 </span>
-                <ConfidenceBadge confidence={qs.confidence} />
               </div>
 
               {/* AI Feedback */}
