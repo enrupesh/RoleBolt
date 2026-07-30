@@ -18,7 +18,6 @@ export interface IQuestionScore {
   strengths: string[];
   weaknesses: string[];
   feedback: string;
-  confidence: "High" | "Medium" | "Low";
 }
 
 export interface IEmailLogEntry {
@@ -78,7 +77,6 @@ const QuestionScoreSchema = new Schema<IQuestionScore>(
     strengths: { type: [String], default: [] },
     weaknesses: { type: [String], default: [] },
     feedback: { type: String, default: "" },
-    confidence: { type: String, enum: ["High", "Medium", "Low"], default: "Medium" },
   },
   { _id: false }
 );
