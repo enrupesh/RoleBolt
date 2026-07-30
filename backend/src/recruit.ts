@@ -1529,7 +1529,7 @@ recruitPublicRouter.post("/jobs/:jobId/apply", async (req, res) => {
     const rejectThreshold    = agentMode.rejectThreshold    ?? 40;
 
     let initialStage: string = "applied";
-    let agentAction: "shortlisted" | "rejected" | null = null;
+    let agentAction: "shortlisted" | "rejected" | "review_zone" | null = null;
 
     if (agentEnabled) {
       if (scorePct >= shortlistThreshold) {
@@ -1538,6 +1538,9 @@ recruitPublicRouter.post("/jobs/:jobId/apply", async (req, res) => {
       } else if (scorePct < rejectThreshold) {
         initialStage = "rejected";
         agentAction  = "rejected";
+      } else {
+        // Score is between rejectThreshold and shortlistThreshold → Review Zone
+        agentAction = "review_zone";
       }
     }
 
@@ -1574,7 +1577,9 @@ recruitPublicRouter.post("/jobs/:jobId/apply", async (req, res) => {
     if (agentEnabled && agentAction) {
       const _agentReason = agentAction === "shortlisted"
         ? `Score ${scorePct}% ≥ shortlist threshold ${shortlistThreshold}%`
-        : `Score ${scorePct}% < reject threshold ${rejectThreshold}%`;
+        : agentAction === "rejected"
+          ? `Score ${scorePct}% < reject threshold ${rejectThreshold}%`
+          : `Score ${scorePct}% is in review zone (${rejectThreshold}%–${shortlistThreshold}%)`;
 
       setImmediate(async () => {
         let emailSent = false;
@@ -1614,6 +1619,23 @@ recruitPublicRouter.post("/jobs/:jobId/apply", async (req, res) => {
             console.log(`[agent] Auto-rejected & emailed: ${candidate.name} (${scorePct}% < ${rejectThreshold}%)`);
           } else if (agentAction === "rejected") {
             emailStatus = "disabled"; // autoEmailReject is off
+          } else if (agentAction === "review_zone" && agentMode.emailReviewZoneCandidates === true && email?.trim()) {
+            // ── Review Zone: send "under review" acknowledgment email ──────────
+            const tpl = emailTemplates.reviewZoneEmail(candidate.name, job.title, job.companyName || "");
+            const result = await sendEmail({ to: email, subject: tpl.subject, html: tpl.html, text: tpl.text });
+            emailSent = result.ok;
+            emailStatus = result.ok ? "sent" : "failed";
+            await RecruitCandidate.updateOne({ _id: candidate._id }, {
+              $push: {
+                emailLog: {
+                  type: "agent_review_zone", to: email, subject: tpl.subject, body: tpl.text,
+                  sentAt: new Date(), status: emailStatus, error: result.error,
+                }
+              }
+            });
+            console.log(`[agent] Review zone email sent: ${candidate.name} (${scorePct}% in ${rejectThreshold}%–${shortlistThreshold}%)`);
+          } else if (agentAction === "review_zone") {
+            emailStatus = "disabled"; // emailReviewZoneCandidates is off
           }
         } catch (e) {
           console.error("[agent] Email dispatch failed:", e);
@@ -1726,15 +1748,16 @@ recruitRouter.patch("/jobs/:jobId/agent-mode", async (req, res) => {
   try {
     await connectMongo();
     const uid = getUid(req);
-    const { enabled, shortlistThreshold, rejectThreshold, autoEmailShortlist, autoEmailReject, autoSendAssessment } = req.body;
+    const { enabled, shortlistThreshold, rejectThreshold, autoEmailShortlist, autoEmailReject, autoSendAssessment, emailReviewZoneCandidates } = req.body;
 
     const update: Record<string, unknown> = {};
-    if (enabled !== undefined)            update["agentMode.enabled"]            = Boolean(enabled);
-    if (shortlistThreshold !== undefined) update["agentMode.shortlistThreshold"] = Math.min(100, Math.max(0, Number(shortlistThreshold)));
-    if (rejectThreshold !== undefined)    update["agentMode.rejectThreshold"]    = Math.min(100, Math.max(0, Number(rejectThreshold)));
-    if (autoEmailShortlist !== undefined) update["agentMode.autoEmailShortlist"] = Boolean(autoEmailShortlist);
-    if (autoEmailReject !== undefined)    update["agentMode.autoEmailReject"]    = Boolean(autoEmailReject);
-    if (autoSendAssessment !== undefined) update["agentMode.autoSendAssessment"] = Boolean(autoSendAssessment);
+    if (enabled !== undefined)                   update["agentMode.enabled"]                   = Boolean(enabled);
+    if (shortlistThreshold !== undefined)        update["agentMode.shortlistThreshold"]        = Math.min(100, Math.max(0, Number(shortlistThreshold)));
+    if (rejectThreshold !== undefined)           update["agentMode.rejectThreshold"]           = Math.min(100, Math.max(0, Number(rejectThreshold)));
+    if (autoEmailShortlist !== undefined)        update["agentMode.autoEmailShortlist"]        = Boolean(autoEmailShortlist);
+    if (autoEmailReject !== undefined)           update["agentMode.autoEmailReject"]           = Boolean(autoEmailReject);
+    if (autoSendAssessment !== undefined)        update["agentMode.autoSendAssessment"]        = Boolean(autoSendAssessment);
+    if (emailReviewZoneCandidates !== undefined) update["agentMode.emailReviewZoneCandidates"] = Boolean(emailReviewZoneCandidates);
 
     const job = await RecruitJob.findOneAndUpdate({ _id: req.params.jobId, uid }, { $set: update }, { returnDocument: "after" }).lean();
     if (!job) return res.status(404).json({ error: "Job not found." });

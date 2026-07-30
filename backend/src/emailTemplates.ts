@@ -175,7 +175,27 @@ export function hired(candidateName: string, jobTitle: string, companyName: stri
   return { subject, html, text };
 }
 
-// ── 7. Rejection ──────────────────────────────────────────────────────────────
+// ── 7. Review Zone (Under Review) ────────────────────────────────────────────
+export function reviewZoneEmail(candidateName: string, jobTitle: string, companyName: string): EmailPayload {
+  const co = companyName ? ` at <strong>${esc(companyName)}</strong>` : "";
+  const subject = `Your application is under review`;
+  const html = shell(candidateName, subject, `
+    <p style="margin:0 0 16px;font-size:15px;color:#333;line-height:1.65;">
+      Thank you for applying for the <strong>${esc(jobTitle)}</strong>${co} position.
+    </p>
+    <p style="margin:0 0 16px;font-size:15px;color:#333;line-height:1.65;">
+      We have successfully received your application, and it is currently <strong>under review</strong> by our hiring team.
+    </p>
+    <p style="margin:0 0 24px;font-size:15px;color:#333;line-height:1.65;">
+      If your profile is selected for the next stage, we will contact you with further details.
+    </p>
+    <p style="margin:0;font-size:15px;color:#333;">Thank you for your interest in joining <strong>${companyName ? esc(companyName) : "our team"}</strong>.<br><br>Best regards,<br><strong>${companyName ? esc(companyName) : "The Hiring Team"}</strong></p>
+  `);
+  const text = `Hi ${candidateName},\n\nThank you for applying for the ${jobTitle}${companyName ? ` position at ${companyName}` : " position"}.\n\nWe have successfully received your application, and it is currently under review by our hiring team.\n\nIf your profile is selected for the next stage, we will contact you with further details.\n\nThank you for your interest in joining ${companyName || "our team"}.\n\nBest regards,\n${companyName || "The Hiring Team"}`;
+  return { subject, html, text };
+}
+
+// ── 8. Rejection ──────────────────────────────────────────────────────────────
 export function rejectionEmailHtml(candidateName: string, jobTitle: string, companyName: string, body: string): EmailPayload {
   const subject = `Update on your application — ${jobTitle}${companyName ? ` at ${companyName}` : ""}`;
   const html = shell(candidateName, subject, `
