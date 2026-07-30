@@ -93,6 +93,50 @@ export interface IRecruitCandidate extends Document {
   emailLog: IEmailLogEntry[];
   agentLog: IAgentActionEntry[];
   offerLetter?: string;
+  offerStatus?: "none" | "draft" | "approved" | "sent" | "expired";
+  offerTemplate?: string;
+  offerToken?: string;
+  offerCandidateStatus?: "pending" | "viewed" | "accepted" | "declined" | "expired";
+  offerDetails?: {
+    startDate?: string;
+    salary?: string;
+    salaryCurrency?: string;
+    signingBonus?: string;
+    benefits?: string;
+    companyName?: string;
+    hiringManagerName?: string;
+    offerExpiryDate?: string;
+    reportingManager?: string;
+  };
+  offerSignature?: {
+    signedAt?: Date;
+    signerName?: string;
+    signerIp?: string;
+    method?: string;
+  };
+  offerReminderConfig?: {
+    enabled: boolean;
+    delayDays: number;
+    frequencyDays: number;
+    maxReminders: number;
+    remindersSent: number;
+    lastReminderSentAt?: Date;
+  };
+  offerVersions?: Array<{
+    _id?: any;
+    versionNumber: number;
+    content: string;
+    template: string;
+    details: any;
+    editedAt: Date;
+    changeSummary: string;
+  }>;
+  offerLog?: Array<{
+    _id?: any;
+    action: string;
+    note: string;
+    timestamp: Date;
+  }>;
   location?: string;
   currentStatus?: string;
   educationLevel?: string;
@@ -221,6 +265,76 @@ const RecruitCandidateSchema = new Schema<IRecruitCandidate>(
       default: [],
     },
     offerLetter: { type: String, default: "" },
+    offerStatus: { type: String, enum: ["none", "draft", "approved", "sent", "expired"], default: "none" },
+    offerTemplate: { type: String, default: "" },
+    offerToken: { type: String, index: true, sparse: true },
+    offerCandidateStatus: {
+      type: String,
+      enum: ["pending", "viewed", "accepted", "declined", "expired"],
+    },
+    offerSignature: {
+      type: {
+        signedAt:   { type: Date },
+        signerName: { type: String },
+        signerIp:   { type: String },
+        method:     { type: String, default: "typed" },
+      },
+      default: undefined,
+    },
+    offerReminderConfig: {
+      type: {
+        enabled:            { type: Boolean, default: true },
+        delayDays:          { type: Number, default: 2 },
+        frequencyDays:      { type: Number, default: 2 },
+        maxReminders:       { type: Number, default: 3 },
+        remindersSent:      { type: Number, default: 0 },
+        lastReminderSentAt: { type: Date },
+      },
+      default: undefined,
+    },
+    offerVersions: {
+      type: [
+        new Schema(
+          {
+            versionNumber: { type: Number, required: true },
+            content:       { type: String, default: "" },
+            template:      { type: String, default: "" },
+            details:       { type: Schema.Types.Mixed, default: {} },
+            editedAt:      { type: Date, default: Date.now },
+            changeSummary: { type: String, default: "" },
+          },
+          { _id: true }
+        ),
+      ],
+      default: [],
+    },
+    offerDetails: {
+      type: {
+        startDate:        { type: String },
+        salary:           { type: String },
+        salaryCurrency:   { type: String },
+        signingBonus:     { type: String },
+        benefits:         { type: String },
+        companyName:      { type: String },
+        hiringManagerName:{ type: String },
+        offerExpiryDate:  { type: String },
+        reportingManager: { type: String },
+      },
+      default: {},
+    },
+    offerLog: {
+      type: [
+        new Schema(
+          {
+            action:    { type: String, required: true },
+            note:      { type: String, default: "" },
+            timestamp: { type: Date, default: Date.now },
+          },
+          { _id: true }
+        ),
+      ],
+      default: [],
+    },
     location: { type: String, default: "" },
     currentStatus: { type: String, default: "" },
     educationLevel: { type: String, default: "" },

@@ -1,0 +1,106 @@
+Please implement a new **AI Offer Letter Generator** feature to automate offer letter drafting while keeping the final approval fully under recruiter control.
+
+# Feature Name
+
+**AI Offer Letter Generator**
+
+## Objective
+
+When a candidate reaches the **Offer** stage, the AI Agent should automatically generate a complete offer letter draft using the job and candidate information already available in the system.
+
+**Important:** The AI should **never send an offer automatically**. It should only generate a draft. The recruiter must review, edit (if needed), approve, and then send the offer.
+
+---
+
+# Workflow
+
+Candidate reaches **Offer** stage
+
+↓
+
+AI automatically generates an Offer Letter Draft
+
+↓
+
+Recruiter reviews and edits (if required)
+
+↓
+
+Recruiter clicks **Approve & Send**
+
+↓
+
+Offer Letter PDF is generated and emailed to the candidate
+
+---
+
+# Data to Populate Automatically
+
+The AI should use existing platform data to populate the draft, including:
+
+* Candidate Name
+* Job Title / Role
+* Company Name
+* Employment Type
+* Work Location
+* Salary / CTC (set by recruiter)
+* Joining Date (set by recruiter)
+* Reporting Manager (if available)
+* HR Contact Details
+* Offer Expiry Date (if configured)
+
+The AI must not invent or guess any missing information. If required fields are missing, prompt the recruiter to complete them before generating the final offer.
+
+---
+
+# Recruiter Controls
+
+The recruiter must be able to:
+
+* Review the generated draft
+* Edit any section before approval
+* Regenerate the draft if details change
+* Approve and send the final offer
+* Download the offer as a PDF
+* Save the draft without sending
+
+---
+
+# Templates
+
+Support reusable offer letter templates, such as:
+
+* Full-Time Employee
+* Internship
+* Contract
+* Remote
+* Custom Company Template
+
+The AI should generate the draft using the selected template.
+
+---
+
+# Activity Tracking
+
+Log every action in the Activity Feed/Audit Log, including:
+
+* Offer Draft Generated
+* Offer Edited
+* Offer Approved
+* Offer Sent
+* Offer Accepted / Declined (future-ready)
+
+---
+
+# Acceptance Criteria
+
+1. Automatically generate an offer letter draft when a candidate enters the **Offer** stage.
+2. Use existing candidate, job, and company data to populate the draft.
+3. Never send the offer automatically—recruiter approval is mandatory.
+4. Allow recruiters to edit, regenerate, save, download, approve, and send the offer.
+5. Support multiple reusable offer letter templates.
+6. Generate a professional PDF from the approved draft.
+7. Record all actions in the Activity Feed/Audit Log.
+8. Ensure the implementation integrates cleanly with the existing AI Agent workflow without affecting current hiring functionality.
+
+This feature should significantly reduce manual HR work, maintain consistency across offer letters, and keep recruiters in full control of the final hiring decision.
