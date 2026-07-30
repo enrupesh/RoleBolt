@@ -3416,6 +3416,108 @@ recruitRouter.patch("/jobs/:jobId/candidates/:candidateId/offer-letter/reminder-
   }
 });
 
+// Extend offer expiry date or reactivate an expired offer
+recruitRouter.post("/jobs/:jobId/candidates/:candidateId/offer-letter/extend-expiry", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const { newExpiryDate, sendNotification = false } = req.body as { newExpiryDate: string; sendNotification?: boolean };
+
+    if (!newExpiryDate?.trim()) return res.status(400).json({ error: "newExpiryDate is required." });
+
+    const candidate = await RecruitCandidate.findOne({ _id: req.params.candidateId, jobId: req.params.jobId, uid });
+    if (!candidate) return res.status(404).json({ error: "Candidate not found." });
+    if (!candidate.offerLetter?.trim()) return res.status(400).json({ error: "No offer letter found for this candidate." });
+    if (!["sent", "expired"].includes(candidate.offerStatus as string)) {
+      return res.status(400).json({ error: "Offer must be in 'sent' or 'expired' state to extend or reactivate." });
+    }
+
+    const isReactivating = candidate.offerStatus === "expired";
+    const previousExpiry = (candidate.offerDetails as any)?.offerExpiryDate || "";
+    const prevStatus     = candidate.offerStatus;
+
+    // Save a version snapshot recording the expiry change
+    const versions  = (candidate.offerVersions as any[]) ?? [];
+    const nextNum   = (versions.length ? Math.max(...versions.map((v: any) => v.versionNumber || 0)) : 0) + 1;
+    versions.push({
+      versionNumber: nextNum,
+      content:       candidate.offerLetter,
+      template:      candidate.offerTemplate || "full_time",
+      details:       { ...(candidate.offerDetails || {}), offerExpiryDate: previousExpiry },
+      editedAt:      new Date(),
+      changeSummary: isReactivating
+        ? `Offer reactivated — expiry updated from ${previousExpiry || "none"} to ${newExpiryDate}`
+        : `Expiry extended from ${previousExpiry || "none"} to ${newExpiryDate}`,
+    });
+    candidate.offerVersions = versions as any;
+
+    // Update the expiry date in offerDetails
+    candidate.offerDetails = {
+      ...(candidate.offerDetails as any || {}),
+      offerExpiryDate: newExpiryDate,
+    } as any;
+
+    // If reactivating, restore the offer to sent/pending state
+    if (isReactivating) {
+      candidate.offerStatus = "sent";
+      (candidate as any).offerCandidateStatus = "pending";
+    }
+
+    // Audit log entry
+    const action = isReactivating ? "offer_reactivated" : "offer_expiry_extended";
+    const note   = isReactivating
+      ? `Offer reactivated by recruiter. Previous expiry: ${previousExpiry || "none"}. New expiry: ${newExpiryDate}`
+      : `Expiry extended by recruiter. Previous expiry: ${previousExpiry || "none"}. New expiry: ${newExpiryDate}`;
+    (candidate.offerLog as any[]).push({ action, note, timestamp: new Date() });
+
+    // Optional notification email to candidate
+    let emailEntry: any = null;
+    if (sendNotification && candidate.email?.trim() && (candidate as any).offerToken) {
+      const job = await RecruitJob.findOne({ _id: req.params.jobId, uid }).lean();
+      const jobTitle    = (job as any)?.title       || "";
+      const companyName = (job as any)?.companyName || (candidate.offerDetails as any)?.companyName || "";
+      const offerUrl    = `${FRONTEND_URL}/recruit/offer/${(candidate as any).offerToken}`;
+      const formatted   = new Date(newExpiryDate).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+      const payload     = emailTemplates.offerExtendedEmail(candidate.name, jobTitle, companyName, formatted, offerUrl, isReactivating);
+      const result      = await sendEmail({ to: candidate.email, subject: payload.subject, html: payload.html, text: payload.text, from: CANDIDATE_FROM });
+      const sentAt      = new Date();
+      (candidate.offerLog as any[]).push({
+        action: "offer_extension_notified",
+        note:   result.ok ? "Extension notification email sent to candidate" : `Extension email failed: ${result.error}`,
+        timestamp: sentAt,
+      });
+      emailEntry = {
+        type: "offer_extension",
+        to: candidate.email,
+        subject: payload.subject,
+        body: payload.text,
+        sentAt,
+        status: result.ok ? "sent" : "failed",
+        error: result.error,
+      };
+      if (emailEntry) candidate.emailLog.push(emailEntry as any);
+    }
+
+    await candidate.save();
+
+    return res.json({
+      ok: true,
+      isReactivating,
+      previousExpiry,
+      newExpiry: newExpiryDate,
+      offerStatus:          candidate.offerStatus,
+      offerCandidateStatus: (candidate as any).offerCandidateStatus,
+      offerDetails:         candidate.offerDetails,
+      offerLog:             candidate.offerLog,
+      offerVersions:        candidate.offerVersions,
+      emailEntry,
+    });
+  } catch (err: any) {
+    console.error("[recruit] POST /offer-letter/extend-expiry", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── Public: candidate views offer by secure token ───────────────────────────
 
 recruitPublicRouter.get("/offer/:token", async (req, res) => {

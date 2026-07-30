@@ -401,6 +401,33 @@ export function offerResponseEmail(
 </body></html>`;
 }
 
+// ── 13a. Offer Extended / Reactivated Notification (to candidate) ─────────────
+export function offerExtendedEmail(
+  candidateName: string, jobTitle: string, companyName: string,
+  newExpiryDate: string, offerUrl: string, reactivated = false
+): EmailPayload {
+  const subject = reactivated
+    ? `Your offer for ${jobTitle}${companyName ? ` at ${companyName}` : ''} has been reactivated`
+    : `Your offer deadline has been extended — ${jobTitle}${companyName ? ` at ${companyName}` : ''}`;
+  const intro = reactivated
+    ? `Good news! Your offer for <strong>${esc(jobTitle)}</strong>${companyName ? ` at <strong>${esc(companyName)}</strong>` : ''} has been <strong>reactivated</strong>. You now have additional time to review and respond.`
+    : `We wanted to let you know that the deadline on your offer for <strong>${esc(jobTitle)}</strong>${companyName ? ` at <strong>${esc(companyName)}</strong>` : ''} has been extended.`;
+  const html = shell(candidateName, subject, `
+    <p style='margin:0 0 16px;font-size:15px;color:#333;line-height:1.65;'>${intro}</p>
+    <div style='background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:14px 18px;margin:0 0 20px;text-align:center;'>
+      <p style='margin:0;font-size:13px;color:#166534;font-weight:600;'>📅 New Expiry Date</p>
+      <p style='margin:4px 0 0;font-size:18px;font-weight:700;color:#15803d;'>${esc(newExpiryDate)}</p>
+    </div>
+    <p style='margin:0 0 20px;font-size:14px;color:#555;line-height:1.65;'>
+      Please review the offer and let us know your decision before the new deadline.
+    </p>
+    ${btn('Review & Respond to Offer', offerUrl)}
+    <p style='margin:16px 0 0;font-size:13px;color:#888;'>Or copy this link: <a href='${offerUrl}' style='color:#0a66c2;'>${offerUrl}</a></p>
+  `);
+  const text = `Hi ${candidateName},\n\n${reactivated ? 'Your offer for ' : 'The deadline on your offer for '}${jobTitle}${companyName ? ` at ${companyName}` : ''} has been ${reactivated ? 'reactivated' : 'extended'}.\n\nNew expiry date: ${newExpiryDate}\n\nPlease review and respond: ${offerUrl}`;
+  return { subject, html, text };
+}
+
 // ── 13. Offer Expiry Warning (to recruiter) ───────────────────────────────────
 export function offerExpiryWarning(
   recruiterName: string, candidateName: string, jobTitle: string, daysLeft: number
