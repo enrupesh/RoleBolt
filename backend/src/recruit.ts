@@ -1,6 +1,7 @@
 import express from "express";
 import crypto from "crypto";
 import multer from "multer";
+import PDFDocument from "pdfkit";
 import { connectMongo } from "./db";
 import { RecruitJob } from "./models/RecruitJob";
 import { RecruitCandidate } from "./models/RecruitCandidate";
@@ -3009,6 +3010,23 @@ recruitRouter.patch("/talent-pool/:candidateId", async (req, res) => {
 
 // ─── Offer Letter ─────────────────────────────────────────────────────────────
 
+type OfferTemplate = "full_time" | "internship" | "contract" | "remote" | "custom";
+
+function offerTemplateInstructions(template: OfferTemplate): string {
+  switch (template) {
+    case "internship":
+      return `This is an INTERNSHIP offer. Use appropriate language: refer to compensation as "stipend" (not salary), mention a fixed duration/end date if available, highlight learning opportunities, and keep the tone encouraging and welcoming for an early-career candidate.`;
+    case "contract":
+      return `This is a CONTRACT / FREELANCE engagement. Emphasize the project-based or fixed-term nature, use "engagement" or "contract" instead of "employment", mention deliverables or hourly/project rate language, and avoid permanent employment terms.`;
+    case "remote":
+      return `This is a REMOTE-FIRST offer. Highlight the distributed work environment, home-office flexibility, async communication culture, and any remote-specific perks (home office stipend, internet allowance, etc.) if mentioned in the benefits.`;
+    case "custom":
+      return `Write a general professional offer letter suitable for any employment type. Be clear and warm but keep it broadly applicable.`;
+    default: // full_time
+      return `This is a standard FULL-TIME PERMANENT employment offer. Include standard at-will or permanent employment terms, comprehensive benefits, and a clear acceptance timeline.`;
+  }
+}
+
 async function generateOfferLetter(args: {
   candidateName: string;
   jobTitle: string;
@@ -3019,14 +3037,23 @@ async function generateOfferLetter(args: {
   startDate: string;
   salary: string;
   salaryCurrency: string;
+  template?: OfferTemplate;
   signingBonus?: string;
   benefits?: string;
   companyName?: string;
   hiringManagerName?: string;
+  reportingManager?: string;
+  offerExpiryDate?: string;
 }): Promise<string> {
-  const prompt = `You are an expert HR professional. Write a professional, warm, and legally clear job offer letter.
+  const template = args.template || "full_time";
+  const templateNote = offerTemplateInstructions(template);
 
-DETAILS:
+  const prompt = `You are an expert HR professional. Write a professional, warm, and legally clear offer letter.
+
+TEMPLATE TYPE: ${template.replace("_", " ").toUpperCase()}
+${templateNote}
+
+CANDIDATE & ROLE DETAILS:
 - Candidate Name: ${args.candidateName}
 - Role: ${args.jobTitle}
 - Department: ${args.department || "Not specified"}
@@ -3034,30 +3061,32 @@ DETAILS:
 - Work Mode: ${args.workMode}
 - Seniority: ${args.seniority}
 - Start Date: ${args.startDate}
-- Salary: ${args.salaryCurrency} ${args.salary} per year
+${template === "internship" ? `- Stipend: ${args.salaryCurrency} ${args.salary}` : `- Salary: ${args.salaryCurrency} ${args.salary} per year`}
 ${args.signingBonus ? `- Signing Bonus: ${args.signingBonus}` : ""}
 ${args.benefits ? `- Benefits / Perks: ${args.benefits}` : ""}
 ${args.companyName ? `- Company: ${args.companyName}` : ""}
 ${args.hiringManagerName ? `- Hiring Manager: ${args.hiringManagerName}` : ""}
+${args.reportingManager ? `- Reporting Manager: ${args.reportingManager}` : ""}
+${args.offerExpiryDate ? `- Offer valid until: ${args.offerExpiryDate}` : ""}
 
 Write a complete, ready-to-send offer letter that includes:
-1. A warm congratulatory opening with the candidate's name and role
-2. Job details: title, department, location, work mode, start date
-3. Compensation: base salary${args.signingBonus ? ", signing bonus" : ""}${args.benefits ? ", key benefits" : ""}
-4. At-will employment / standard employment terms statement (one paragraph)
-5. A clear acceptance instruction (e.g., "Please confirm your acceptance by replying to this email within 5 business days")
+1. A warm congratulatory opening addressed to the candidate by name
+2. Role details: title, department, location, work mode, start date
+3. Compensation section appropriate to the template type
+4. Employment/engagement terms paragraph (one paragraph, appropriate to template)
+5. ${args.offerExpiryDate ? `A clear acceptance deadline — offer expires on ${args.offerExpiryDate}` : "A request to confirm acceptance within 5 business days by replying to this email"}
 6. A warm, encouraging close
 
 FORMAT RULES:
-- Write in plain text, no markdown headers or bullet points in the letter body
-- Use professional but human language — not robotic legalese
-- Keep it between 350–500 words
-- Use proper letter formatting with spacing between sections
-- Do NOT include any placeholder text like [Address], [City], [Date] — use only the information provided above
-- If company name is not provided, use "our company"
-- Start the letter directly with the date using today's actual context or the start date year
-- End with a signature block for the hiring manager
-- NEVER include square bracket placeholders in the output`;
+- Plain text only — no markdown headers, no bullet points in the letter body
+- Professional but human language — never robotic legalese
+- 350–500 words
+- Proper letter formatting with spacing between sections
+- Never invent or use placeholder text like [Address], [City] — use only the information provided
+- If company name is not provided, write "the Company"
+- Start directly with the date line (use start date year for context)
+- End with a signature block for ${args.hiringManagerName || "the Hiring Team"}
+- NEVER include square bracket placeholders`;
 
   try {
     return await callMeshChatCompletions({
@@ -3072,10 +3101,11 @@ FORMAT RULES:
     });
   } catch (err) {
     console.error("[recruit] generateOfferLetter: AI call failed, using template:", err);
-    return `Dear ${args.candidateName},\n\nCongratulations! We are pleased to offer you the position of ${args.jobTitle}${args.department ? ` in ${args.department}` : ""} at ${args.companyName || "the Company"}.\n\nRole details:\n- Location: ${args.location}\n- Work Mode: ${args.workMode}\n- Seniority: ${args.seniority}\n- Start Date: ${args.startDate}\n- Compensation: ${args.salaryCurrency} ${args.salary} per year${args.signingBonus ? `\n- Signing Bonus: ${args.signingBonus}` : ""}${args.benefits ? `\n- Benefits: ${args.benefits}` : ""}\n\nThis offer is subject to standard terms of employment, which will be detailed in your employment agreement.\n\nPlease confirm your acceptance by replying to this email.\n\nWe're excited to have you join the team!\n\nBest regards,\n${args.hiringManagerName || "Hiring Team"}`;
+    return `Dear ${args.candidateName},\n\nCongratulations! We are pleased to offer you the position of ${args.jobTitle}${args.department ? ` in ${args.department}` : ""} at ${args.companyName || "the Company"}.\n\nRole details:\n- Location: ${args.location}\n- Work Mode: ${args.workMode}\n- Seniority: ${args.seniority}\n- Start Date: ${args.startDate}\n- Compensation: ${args.salaryCurrency} ${args.salary}${template !== "internship" ? " per year" : ""}\n${args.signingBonus ? `- Signing Bonus: ${args.signingBonus}\n` : ""}${args.benefits ? `- Benefits: ${args.benefits}\n` : ""}\nThis offer is subject to standard terms of employment, which will be detailed in your employment agreement.\n\n${args.offerExpiryDate ? `This offer is valid until ${args.offerExpiryDate}. ` : ""}Please confirm your acceptance by replying to this email${args.offerExpiryDate ? "" : " within 5 business days"}.\n\nWe're excited to have you join the team!\n\nBest regards,\n${args.hiringManagerName || "Hiring Team"}`;
   }
 }
 
+// Generate or regenerate an offer letter draft
 recruitRouter.post("/jobs/:jobId/candidates/:candidateId/offer-letter", async (req, res) => {
   try {
     await connectMongo();
@@ -3087,41 +3117,180 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/offer-letter", async (r
     if (!candidate) return res.status(404).json({ error: "Candidate not found." });
 
     const {
-      startDate, salary, salaryCurrency, signingBonus, benefits, companyName, hiringManagerName, regenerate,
+      startDate, salary, salaryCurrency, signingBonus, benefits, companyName,
+      hiringManagerName, reportingManager, offerExpiryDate, template, regenerate,
     } = req.body;
 
     if (!startDate || !salary) {
       return res.status(400).json({ error: "Start date and salary are required." });
     }
 
-    // Use cached version unless regenerate is requested
-    if (candidate.offerLetter && !regenerate) {
-      return res.json({ offerLetter: candidate.offerLetter });
+    // Return cached draft unless regenerate is explicitly requested
+    if (candidate.offerLetter && candidate.offerStatus && candidate.offerStatus !== "none" && !regenerate) {
+      return res.json({
+        offerLetter: candidate.offerLetter,
+        offerStatus: candidate.offerStatus,
+        offerDetails: candidate.offerDetails,
+        offerLog: candidate.offerLog,
+      });
     }
 
     const letter = await generateOfferLetter({
       candidateName: candidate.name,
-      jobTitle: job.title,
-      department: job.department,
-      location: job.location,
-      workMode: job.workMode,
-      seniority: job.seniority,
+      jobTitle: (job as any).title,
+      department: (job as any).department,
+      location: (job as any).location,
+      workMode: (job as any).workMode,
+      seniority: (job as any).seniority,
       startDate,
       salary,
-      salaryCurrency: salaryCurrency || job.salaryCurrency || "INR",
+      salaryCurrency: salaryCurrency || (job as any).salaryCurrency || "INR",
+      template: template || "full_time",
       signingBonus,
       benefits,
       companyName,
       hiringManagerName,
+      reportingManager,
+      offerExpiryDate,
     });
 
-    candidate.offerLetter = letter;
+    // Persist offer details, letter, and log the generation event
+    const details = { startDate, salary, salaryCurrency: salaryCurrency || (job as any).salaryCurrency || "INR", signingBonus, benefits, companyName, hiringManagerName, reportingManager, offerExpiryDate };
+    candidate.offerLetter  = letter;
+    candidate.offerStatus  = "draft";
+    candidate.offerTemplate = template || "full_time";
+    candidate.offerDetails  = details as any;
+    (candidate.offerLog as any[]).push({ action: "draft_generated", note: regenerate ? "Recruiter regenerated the offer letter draft" : "AI generated offer letter draft", timestamp: new Date() });
     await candidate.save();
 
-    return res.json({ offerLetter: letter });
+    trackEvent("offer_draft_generated", uid, { jobId: req.params.jobId, candidateId: req.params.candidateId, template: template || "full_time" });
+    return res.json({ offerLetter: letter, offerStatus: "draft", offerDetails: details, offerLog: candidate.offerLog });
   } catch (err: any) {
     console.error("[recruit] POST /offer-letter", err);
     return res.status(500).json({ error: err.message });
+  }
+});
+
+// Save edits to an existing draft (without regenerating via AI)
+recruitRouter.patch("/jobs/:jobId/candidates/:candidateId/offer-letter", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const { offerLetter } = req.body as { offerLetter: string };
+    if (!offerLetter?.trim()) return res.status(400).json({ error: "offerLetter body is required." });
+
+    const candidate = await RecruitCandidate.findOne({ _id: req.params.candidateId, jobId: req.params.jobId, uid });
+    if (!candidate) return res.status(404).json({ error: "Candidate not found." });
+
+    candidate.offerLetter = offerLetter.trim();
+    if (!candidate.offerStatus || candidate.offerStatus === "none") candidate.offerStatus = "draft";
+    (candidate.offerLog as any[]).push({ action: "offer_edited", note: "Recruiter edited the offer letter draft", timestamp: new Date() });
+    await candidate.save();
+
+    return res.json({ ok: true, offerLetter: candidate.offerLetter, offerStatus: candidate.offerStatus, offerLog: candidate.offerLog });
+  } catch (err: any) {
+    console.error("[recruit] PATCH /offer-letter", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Approve and send the offer letter to the candidate
+recruitRouter.post("/jobs/:jobId/candidates/:candidateId/offer-letter/send", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+
+    const candidate = await RecruitCandidate.findOne({ _id: req.params.candidateId, jobId: req.params.jobId, uid });
+    if (!candidate) return res.status(404).json({ error: "Candidate not found." });
+    if (!candidate.offerLetter?.trim()) return res.status(400).json({ error: "No offer letter draft found. Generate one first." });
+    if (!candidate.email?.trim()) return res.status(400).json({ error: "This candidate has no email address on file." });
+
+    const job = await RecruitJob.findOne({ _id: req.params.jobId, uid }).lean();
+    const jobTitle    = (job as any)?.title       || "";
+    const companyName = (job as any)?.companyName || (candidate.offerDetails as any)?.companyName || "";
+
+    const payload = emailTemplates.offerEmail(candidate.name, jobTitle, companyName, candidate.offerLetter);
+    const result  = await sendEmail({ to: candidate.email, subject: payload.subject, html: payload.html, text: payload.text, from: CANDIDATE_FROM });
+
+    // Log offer_approved + offer_sent in offerLog
+    (candidate.offerLog as any[]).push({ action: "offer_approved", note: "Recruiter approved the offer letter", timestamp: new Date() });
+    const sentAt = new Date();
+    (candidate.offerLog as any[]).push({ action: "offer_sent", note: result.ok ? "Offer email sent to candidate" : `Email delivery failed: ${result.error}`, timestamp: sentAt });
+
+    // Also log in emailLog for the email history panel
+    const emailEntry = {
+      type: "offer",
+      to: candidate.email,
+      subject: payload.subject,
+      body: payload.text,
+      sentAt,
+      status: (result.ok ? "sent" : "failed") as "sent" | "failed",
+      error: result.error,
+    };
+    candidate.emailLog.push(emailEntry as any);
+    candidate.offerStatus = "sent";
+    await candidate.save();
+
+    trackEvent("offer_sent", uid, { jobId: req.params.jobId, candidateId: req.params.candidateId });
+
+    if (!result.ok) {
+      return res.status(502).json({ error: `Email delivery failed: ${result.error}`, offerLog: candidate.offerLog, emailEntry });
+    }
+    return res.json({ ok: true, sentAt, offerStatus: "sent", offerLog: candidate.offerLog, emailEntry });
+  } catch (err: any) {
+    console.error("[recruit] POST /offer-letter/send", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Download the offer letter as a PDF
+recruitRouter.get("/jobs/:jobId/candidates/:candidateId/offer-letter/pdf", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+
+    const candidate = await RecruitCandidate.findOne({ _id: req.params.candidateId, jobId: req.params.jobId, uid }).lean();
+    if (!candidate) return res.status(404).json({ error: "Candidate not found." });
+    if (!(candidate as any).offerLetter?.trim()) return res.status(400).json({ error: "No offer letter draft found." });
+
+    const job = await RecruitJob.findOne({ _id: req.params.jobId, uid }).lean();
+    const jobTitle = (job as any)?.title || "Offer Letter";
+
+    const filename = `offer-letter-${((candidate as any).name || "candidate").replace(/\s+/g, "-").toLowerCase()}.pdf`;
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+
+    const doc = new PDFDocument({ margin: 72, size: "A4" });
+    doc.pipe(res);
+
+    // Header
+    const company = (candidate as any).offerDetails?.companyName || (job as any)?.companyName || "";
+    if (company) {
+      doc.fontSize(18).font("Helvetica-Bold").text(company, { align: "center" });
+      doc.moveDown(0.4);
+    }
+    doc.fontSize(13).font("Helvetica-Bold").text(`Offer Letter — ${jobTitle}`, { align: "center" });
+    doc.moveDown(0.3);
+    doc.fontSize(10).font("Helvetica").fillColor("#666666").text(`Prepared for: ${(candidate as any).name}`, { align: "center" });
+    doc.moveDown(1.5);
+
+    // Divider
+    doc.moveTo(72, doc.y).lineTo(doc.page.width - 72, doc.y).strokeColor("#cccccc").lineWidth(0.5).stroke();
+    doc.moveDown(1);
+
+    // Body
+    doc.fontSize(11).font("Helvetica").fillColor("#1a1a1a").text((candidate as any).offerLetter, { lineGap: 4, paragraphGap: 8 });
+
+    // Footer
+    doc.moveDown(2);
+    doc.moveTo(72, doc.y).lineTo(doc.page.width - 72, doc.y).strokeColor("#cccccc").lineWidth(0.5).stroke();
+    doc.moveDown(0.5);
+    doc.fontSize(9).fillColor("#888888").text(`Generated by Rolebolt · ${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}`, { align: "center" });
+
+    doc.end();
+  } catch (err: any) {
+    console.error("[recruit] GET /offer-letter/pdf", err);
+    if (!res.headersSent) res.status(500).json({ error: err.message });
   }
 });
 

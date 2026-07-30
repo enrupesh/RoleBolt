@@ -15,3 +15,4 @@
 - [Gemini 2.5 Flash thinking tokens](gemini-thinking-tokens.md) — reasoning tokens count against max_tokens; any JSON-producing call needs max_tokens≥3000 or output is truncated (finish_reason:"length") → scoringFailed.
 - [seeker-getuid-mismatch](seeker-getuid.md) — seeker.ts getUid() must read user.uid (not user._id/user.id); authMiddleware sets req.user={uid,email}.
 - [Review Zone Email feature](review-zone-email.md) — emailReviewZoneCandidates toggle on IAgentMode; review_zone agentAction added; email/agentLog use type "agent_review_zone"; one send per application (new candidate created, sent once in setImmediate).
+- [Offer Letter feature](offer-letter-feature.md) — Full workflow: AI draft → recruiter edits → Approve & Send; new model fields (offerStatus/offerDetails/offerLog); pdfkit for PDF download; auto-opens modal on stage=offer.
