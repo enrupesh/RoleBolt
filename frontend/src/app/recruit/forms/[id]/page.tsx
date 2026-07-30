@@ -38,6 +38,15 @@ type AnswerSignal = {
   note: string;
 };
 
+type QuestionScore = {
+  questionId: string;
+  score: number; // 0-10
+  strengths: string[];
+  weaknesses: string[];
+  feedback: string;
+  confidence: "High" | "Medium" | "Low";
+};
+
 type EmailLogEntry = {
   type: string;
   to: string;
@@ -57,6 +66,7 @@ type FormResponse = {
   strengths: string[];
   redFlags: string[];
   answerSignals: AnswerSignal[];
+  questionScores: QuestionScore[];
   interviewQuestions: string[];
   scoringFailed: boolean;
   stage: Stage;
@@ -566,6 +576,244 @@ function FormResumeSection({ resumeText }: { resumeText: string }) {
   );
 }
 
+// ─── Confidence badge ─────────────────────────────────────────────────────────
+
+function ConfidenceBadge({ confidence }: { confidence: "High" | "Medium" | "Low" }) {
+  if (confidence === "High") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 px-2 py-0.5 text-[10px] font-bold text-emerald-400 shrink-0">
+        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shrink-0" />
+        High confidence
+      </span>
+    );
+  }
+  if (confidence === "Low") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/10 border border-rose-500/25 px-2 py-0.5 text-[10px] font-bold text-rose-400 shrink-0">
+        <span className="h-1.5 w-1.5 rounded-full bg-rose-400 shrink-0" />
+        Low confidence
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 border border-amber-500/25 px-2 py-0.5 text-[10px] font-bold text-amber-400 shrink-0">
+      <span className="h-1.5 w-1.5 rounded-full bg-amber-400 shrink-0" />
+      Medium confidence
+    </span>
+  );
+}
+
+// ─── Question score row ───────────────────────────────────────────────────────
+
+function QuestionScoreRow({
+  idx,
+  answer,
+  qs,
+  signal,
+}: {
+  idx: number;
+  answer: Answer;
+  qs: QuestionScore | undefined;
+  signal: AnswerSignal | undefined;
+}) {
+  const [open, setOpen] = useState(false);
+
+  const scoreColor = !qs
+    ? "text-gray-400"
+    : qs.score >= 8
+    ? "text-emerald-400"
+    : qs.score >= 6
+    ? "text-sky-400"
+    : qs.score >= 4
+    ? "text-amber-400"
+    : "text-rose-400";
+
+  const scoreBg = !qs
+    ? "bg-white/[0.04]"
+    : qs.score >= 8
+    ? "bg-emerald-500/10 border-emerald-500/20"
+    : qs.score >= 6
+    ? "bg-sky-500/10 border-sky-500/20"
+    : qs.score >= 4
+    ? "bg-amber-500/10 border-amber-500/20"
+    : "bg-rose-500/10 border-rose-500/20";
+
+  return (
+    <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] overflow-hidden">
+      {/* Header row — always visible */}
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-start gap-3 p-4 text-left hover:bg-white/[0.03] transition"
+      >
+        {/* Question number */}
+        <span className="shrink-0 mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-white/[0.06] text-[10px] font-bold text-gray-400">
+          {idx}
+        </span>
+
+        <div className="flex-1 min-w-0">
+          {/* Label */}
+          <p className="text-[11px] font-semibold text-gray-300 leading-snug">{answer.label}</p>
+          {/* Answer preview (single line) */}
+          <p className="mt-0.5 text-[10px] text-gray-500 truncate">{answer.value}</p>
+        </div>
+
+        <div className="shrink-0 flex items-center gap-2">
+          {/* Score pill */}
+          {qs && (
+            <span className={`rounded-lg border px-2.5 py-1 text-xs font-bold ${scoreBg} ${scoreColor}`}>
+              {qs.score.toFixed(1)}/10
+            </span>
+          )}
+          {/* Signal (for legacy responses without questionScores) */}
+          {!qs && signal && <SignalBadgeDark signal={signal.signal} note={signal.note} />}
+          {/* Chevron */}
+          <svg
+            className={`w-3.5 h-3.5 text-gray-500 transition-transform ${open ? "rotate-180" : ""}`}
+            fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"
+          >
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </div>
+      </button>
+
+      {/* Expanded body */}
+      {open && (
+        <div className="border-t border-white/[0.06] px-4 pb-4 pt-3 space-y-3">
+          {/* Candidate answer */}
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">Candidate&apos;s Answer</p>
+            <p className="text-xs text-gray-200 leading-5 whitespace-pre-wrap">{answer.value}</p>
+          </div>
+
+          {qs ? (
+            <>
+              {/* Score + confidence */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className={`rounded-lg border px-2.5 py-1 text-sm font-bold ${scoreBg} ${scoreColor}`}>
+                  {qs.score.toFixed(1)} / 10
+                </span>
+                <ConfidenceBadge confidence={qs.confidence} />
+              </div>
+
+              {/* AI Feedback */}
+              {qs.feedback && (
+                <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">AI Feedback</p>
+                  <p className="text-xs text-gray-300 leading-5 italic">&ldquo;{qs.feedback}&rdquo;</p>
+                </div>
+              )}
+
+              {/* Strengths + Weaknesses side by side on larger screens */}
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {qs.strengths.length > 0 && (
+                  <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.05] px-3 py-2.5">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-500/70 mb-1.5">Strengths</p>
+                    <ul className="space-y-1">
+                      {qs.strengths.map((s, i) => (
+                        <li key={i} className="flex items-start gap-1.5 text-[11px] text-emerald-300">
+                          <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-emerald-400" />
+                          {s}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {qs.weaknesses.length > 0 && (
+                  <div className="rounded-xl border border-amber-500/20 bg-amber-500/[0.04] px-3 py-2.5">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400/70 mb-1.5">Areas for Improvement</p>
+                    <ul className="space-y-1">
+                      {qs.weaknesses.map((w, i) => (
+                        <li key={i} className="flex items-start gap-1.5 text-[11px] text-amber-300">
+                          <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-amber-400" />
+                          {w}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : signal?.note ? (
+            // Legacy fallback: show signal note
+            <p className="text-[10px] text-gray-500 italic">{signal.note}</p>
+          ) : null}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Assessment Analysis section ─────────────────────────────────────────────
+
+function AssessmentAnalysisSection({
+  r,
+  textAnswers,
+  signalMap,
+  scoreMap,
+}: {
+  r: FormResponse;
+  textAnswers: Answer[];
+  signalMap: Record<string, AnswerSignal>;
+  scoreMap: Record<string, QuestionScore>;
+}) {
+  const [open, setOpen] = useState(true);
+
+  // Overall score bar stats
+  const scored = (r.questionScores || []).filter(qs => qs.score > 0);
+  const avgScore = scored.length > 0
+    ? scored.reduce((sum, qs) => sum + qs.score, 0) / scored.length
+    : null;
+
+  return (
+    <div className="rounded-2xl border border-violet-500/20 bg-violet-500/[0.04] overflow-hidden">
+      {/* Section header */}
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-violet-500/[0.06] transition"
+      >
+        <div className="flex items-center gap-2">
+          <svg className="w-3.5 h-3.5 text-violet-400 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+            <path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+          </svg>
+          <span className="text-xs font-bold text-violet-300">Assessment Analysis</span>
+          <span className="rounded-full bg-violet-500/20 px-2 py-0.5 text-[10px] font-bold text-violet-400">
+            {textAnswers.length} question{textAnswers.length !== 1 ? "s" : ""}
+          </span>
+          {avgScore !== null && (
+            <span className="rounded-full bg-violet-500/20 px-2 py-0.5 text-[10px] font-bold text-violet-300">
+              avg {avgScore.toFixed(1)}/10
+            </span>
+          )}
+        </div>
+        <svg
+          className={`w-3.5 h-3.5 text-violet-400 transition-transform ${open ? "rotate-180" : ""}`}
+          fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="border-t border-violet-500/15 px-3 pb-3 pt-2 space-y-2">
+          {textAnswers.length === 0 ? (
+            <p className="px-1 py-2 text-xs text-gray-500">No text answers to analyse.</p>
+          ) : (
+            textAnswers.map((a, i) => (
+              <QuestionScoreRow
+                key={a.questionId}
+                idx={i + 1}
+                answer={a}
+                qs={scoreMap[a.questionId]}
+                signal={signalMap[a.questionId]}
+              />
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Info modal ────────────────────────────────────────────────────────────────
 
 function FormResponseInfoModal({ r, onClose }: { r: FormResponse; onClose: () => void }) {
@@ -578,6 +826,9 @@ function FormResponseInfoModal({ r, onClose }: { r: FormResponse; onClose: () =>
 
   const signalMap: Record<string, AnswerSignal> = {};
   for (const s of (r.answerSignals || [])) signalMap[s.questionId] = s;
+
+  const scoreMap: Record<string, QuestionScore> = {};
+  for (const qs of (r.questionScores || [])) scoreMap[qs.questionId] = qs;
 
   function copy(text: string, field: "email" | "phone") {
     navigator.clipboard.writeText(text).catch(() => {});
@@ -709,26 +960,14 @@ function FormResponseInfoModal({ r, onClose }: { r: FormResponse; onClose: () =>
             </div>
           )}
 
-          {/* Form answers with per-answer signals */}
-          {textAnswers.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 px-1">Form Answers</p>
-              {textAnswers.map(a => {
-                const sig = signalMap[a.questionId];
-                return (
-                  <div key={a.questionId} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
-                    <div className="flex items-start justify-between gap-2 mb-1.5">
-                      <p className="text-[10px] font-bold text-gray-500">{a.label}</p>
-                      {sig && <SignalBadgeDark signal={sig.signal} note={sig.note} />}
-                    </div>
-                    <p className="text-xs text-gray-200 leading-5 whitespace-pre-wrap">{a.value}</p>
-                    {sig?.note && (
-                      <p className="mt-1.5 text-[10px] text-gray-500 italic">{sig.note}</p>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+          {/* Assessment Analysis — per-question scores + expandable details */}
+          {!r.scoringFailed && textAnswers.length > 0 && (
+            <AssessmentAnalysisSection
+              r={r}
+              textAnswers={textAnswers}
+              signalMap={signalMap}
+              scoreMap={scoreMap}
+            />
           )}
 
           {/* Resume */}
@@ -845,6 +1084,7 @@ function ResponseCard({ r, token, formId, formTitle, onUpdate, onDelete }: {
         strengths: updated.strengths,
         redFlags: updated.redFlags,
         answerSignals: updated.answerSignals,
+        questionScores: updated.questionScores || [],
         scoringFailed: updated.scoringFailed,
       });
     } catch (e: any) {
