@@ -16,6 +16,7 @@ import { RecruitProfile } from "./models/RecruitProfile";
 import { RecruitImage } from "./models/RecruitImage";
 import { sendEmail, verifySMTP } from "./mailer";
 import * as emailTemplates from "./emailTemplates";
+import { User } from "./models/User";
 
 // ─── Resume parser (in-memory only, no disk storage) ──────────────────────────
 const RESUME_ALLOWED_TYPES = [
@@ -71,6 +72,7 @@ const FRONTEND_URL = (
     : "https://www.rolebolt.tech"
 ).replace(/\/$/, "");
 const CANDIDATE_FROM     = `Rolebolt <${process.env.CANDIDATE_FROM_EMAIL ?? "notification@rolebolt.tech"}>`;
+const NOTIFICATION_FROM  = `Rolebolt <${process.env.NOTIFICATION_FROM_EMAIL ?? "notification@rolebolt.tech"}>`;
 
 function getUid(req: express.Request): string {
   return (req as any).user?.uid ?? "";
@@ -3171,30 +3173,46 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/offer-letter", async (r
   }
 });
 
-// Save edits to an existing draft (without regenerating via AI)
+// Save edits to an existing draft — snapshots current content as a version before overwriting
 recruitRouter.patch("/jobs/:jobId/candidates/:candidateId/offer-letter", async (req, res) => {
   try {
     await connectMongo();
     const uid = getUid(req);
-    const { offerLetter } = req.body as { offerLetter: string };
+    const { offerLetter, changeSummary } = req.body as { offerLetter: string; changeSummary?: string };
     if (!offerLetter?.trim()) return res.status(400).json({ error: "offerLetter body is required." });
 
     const candidate = await RecruitCandidate.findOne({ _id: req.params.candidateId, jobId: req.params.jobId, uid });
     if (!candidate) return res.status(404).json({ error: "Candidate not found." });
 
+    // Snapshot current content as a version before overwriting (only when content actually changed)
+    if (candidate.offerLetter?.trim() && candidate.offerLetter.trim() !== offerLetter.trim()) {
+      const versions = (candidate.offerVersions as any[]) ?? [];
+      const nextNum  = (versions.length ? Math.max(...versions.map((v: any) => v.versionNumber || 0)) : 0) + 1;
+      versions.push({
+        versionNumber: nextNum,
+        content:       candidate.offerLetter,
+        template:      candidate.offerTemplate || "full_time",
+        details:       candidate.offerDetails  || {},
+        editedAt:      new Date(),
+        changeSummary: changeSummary || `Version ${nextNum}`,
+      });
+      candidate.offerVersions = versions as any;
+      (candidate.offerLog as any[]).push({ action: "version_saved", note: `Auto-saved version ${nextNum} before edit`, timestamp: new Date() });
+    }
+
     candidate.offerLetter = offerLetter.trim();
     if (!candidate.offerStatus || candidate.offerStatus === "none") candidate.offerStatus = "draft";
-    (candidate.offerLog as any[]).push({ action: "offer_edited", note: "Recruiter edited the offer letter draft", timestamp: new Date() });
+    (candidate.offerLog as any[]).push({ action: "offer_edited", note: changeSummary ? `Recruiter edited: ${changeSummary}` : "Recruiter edited the offer letter draft", timestamp: new Date() });
     await candidate.save();
 
-    return res.json({ ok: true, offerLetter: candidate.offerLetter, offerStatus: candidate.offerStatus, offerLog: candidate.offerLog });
+    return res.json({ ok: true, offerLetter: candidate.offerLetter, offerStatus: candidate.offerStatus, offerLog: candidate.offerLog, offerVersions: candidate.offerVersions });
   } catch (err: any) {
     console.error("[recruit] PATCH /offer-letter", err);
     return res.status(500).json({ error: err.message });
   }
 });
 
-// Approve and send the offer letter to the candidate
+// Approve and send the offer letter to the candidate (generates secure token for e-sign page)
 recruitRouter.post("/jobs/:jobId/candidates/:candidateId/offer-letter/send", async (req, res) => {
   try {
     await connectMongo();
@@ -3209,7 +3227,14 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/offer-letter/send", asy
     const jobTitle    = (job as any)?.title       || "";
     const companyName = (job as any)?.companyName || (candidate.offerDetails as any)?.companyName || "";
 
-    const payload = emailTemplates.offerEmail(candidate.name, jobTitle, companyName, candidate.offerLetter);
+    // Generate a secure one-time token for the candidate-facing offer page
+    const offerToken = (candidate as any).offerToken || crypto.randomBytes(32).toString("hex");
+    (candidate as any).offerToken = offerToken;
+
+    const offerUrl = `${FRONTEND_URL}/recruit/offer/${offerToken}`;
+
+    // Use the link-based email template so candidate gets a review/sign button
+    const payload = emailTemplates.offerEmailWithLink(candidate.name, jobTitle, companyName, candidate.offerLetter, offerUrl);
     const result  = await sendEmail({ to: candidate.email, subject: payload.subject, html: payload.html, text: payload.text, from: CANDIDATE_FROM });
 
     // Log offer_approved + offer_sent in offerLog
@@ -3228,7 +3253,20 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/offer-letter/send", asy
       error: result.error,
     };
     candidate.emailLog.push(emailEntry as any);
-    candidate.offerStatus = "sent";
+    candidate.offerStatus          = "sent";
+    (candidate as any).offerCandidateStatus = "pending";
+
+    // Initialise reminder config with sensible defaults (preserves any existing settings)
+    if (!(candidate as any).offerReminderConfig) {
+      (candidate as any).offerReminderConfig = {
+        enabled:       true,
+        delayDays:     2,
+        frequencyDays: 2,
+        maxReminders:  3,
+        remindersSent: 0,
+      };
+    }
+
     await candidate.save();
 
     trackEvent("offer_sent", uid, { jobId: req.params.jobId, candidateId: req.params.candidateId });
@@ -3236,7 +3274,7 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/offer-letter/send", asy
     if (!result.ok) {
       return res.status(502).json({ error: `Email delivery failed: ${result.error}`, offerLog: candidate.offerLog, emailEntry });
     }
-    return res.json({ ok: true, sentAt, offerStatus: "sent", offerLog: candidate.offerLog, emailEntry });
+    return res.json({ ok: true, sentAt, offerStatus: "sent", offerCandidateStatus: "pending", offerToken, offerUrl, offerLog: candidate.offerLog, emailEntry });
   } catch (err: any) {
     console.error("[recruit] POST /offer-letter/send", err);
     return res.status(500).json({ error: err.message });
@@ -3291,6 +3329,186 @@ recruitRouter.get("/jobs/:jobId/candidates/:candidateId/offer-letter/pdf", async
   } catch (err: any) {
     console.error("[recruit] GET /offer-letter/pdf", err);
     if (!res.headersSent) res.status(500).json({ error: err.message });
+  }
+});
+
+// List all saved offer letter versions
+recruitRouter.get("/jobs/:jobId/candidates/:candidateId/offer-letter/versions", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const candidate = await RecruitCandidate.findOne({ _id: req.params.candidateId, jobId: req.params.jobId, uid }).lean();
+    if (!candidate) return res.status(404).json({ error: "Candidate not found." });
+    return res.json({ versions: (candidate as any).offerVersions || [] });
+  } catch (err: any) {
+    console.error("[recruit] GET /offer-letter/versions", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Restore a specific offer version
+recruitRouter.post("/jobs/:jobId/candidates/:candidateId/offer-letter/versions/:versionId/restore", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const candidate = await RecruitCandidate.findOne({ _id: req.params.candidateId, jobId: req.params.jobId, uid });
+    if (!candidate) return res.status(404).json({ error: "Candidate not found." });
+
+    const versions = (candidate.offerVersions as any[]) ?? [];
+    const version  = versions.find((v: any) => v._id?.toString() === req.params.versionId);
+    if (!version) return res.status(404).json({ error: "Version not found." });
+
+    // Auto-save current content before restoring so nothing is lost
+    if (candidate.offerLetter?.trim()) {
+      const nextNum = (versions.length ? Math.max(...versions.map((v: any) => v.versionNumber || 0)) : 0) + 1;
+      versions.push({
+        versionNumber: nextNum,
+        content:       candidate.offerLetter,
+        template:      candidate.offerTemplate || "full_time",
+        details:       candidate.offerDetails  || {},
+        editedAt:      new Date(),
+        changeSummary: `Auto-saved before restoring v${version.versionNumber}`,
+      });
+      candidate.offerVersions = versions as any;
+    }
+
+    candidate.offerLetter   = version.content;
+    candidate.offerTemplate = version.template || candidate.offerTemplate;
+    if (version.details && Object.keys(version.details).length) candidate.offerDetails = version.details;
+    if (candidate.offerStatus !== "none" && candidate.offerStatus !== "sent") candidate.offerStatus = "draft";
+    (candidate.offerLog as any[]).push({
+      action: "version_restored",
+      note: `Restored version ${version.versionNumber}: "${version.changeSummary}"`,
+      timestamp: new Date(),
+    });
+    await candidate.save();
+
+    return res.json({ ok: true, offerLetter: candidate.offerLetter, offerStatus: candidate.offerStatus, offerVersions: candidate.offerVersions, offerLog: candidate.offerLog });
+  } catch (err: any) {
+    console.error("[recruit] POST /offer-letter/versions/restore", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Update offer reminder configuration
+recruitRouter.patch("/jobs/:jobId/candidates/:candidateId/offer-letter/reminder-config", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const { enabled, delayDays, frequencyDays, maxReminders } = req.body;
+    const candidate = await RecruitCandidate.findOne({ _id: req.params.candidateId, jobId: req.params.jobId, uid });
+    if (!candidate) return res.status(404).json({ error: "Candidate not found." });
+
+    const cur = (candidate as any).offerReminderConfig || { remindersSent: 0 };
+    (candidate as any).offerReminderConfig = {
+      enabled:       enabled       !== undefined ? !!enabled       : (cur.enabled       ?? true),
+      delayDays:     delayDays     !== undefined ? +delayDays     : (cur.delayDays     ?? 2),
+      frequencyDays: frequencyDays !== undefined ? +frequencyDays : (cur.frequencyDays ?? 2),
+      maxReminders:  maxReminders  !== undefined ? +maxReminders  : (cur.maxReminders  ?? 3),
+      remindersSent:     cur.remindersSent     ?? 0,
+      lastReminderSentAt: cur.lastReminderSentAt,
+    };
+    await candidate.save();
+    return res.json({ ok: true, offerReminderConfig: (candidate as any).offerReminderConfig });
+  } catch (err: any) {
+    console.error("[recruit] PATCH /offer-letter/reminder-config", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Public: candidate views offer by secure token ───────────────────────────
+
+recruitPublicRouter.get("/offer/:token", async (req, res) => {
+  try {
+    await connectMongo();
+    const candidate = await RecruitCandidate.findOne({ offerToken: req.params.token });
+    if (!candidate) return res.status(404).json({ error: "Offer not found." });
+
+    // Mark as viewed if this is their first open
+    if ((candidate as any).offerCandidateStatus === "pending") {
+      (candidate as any).offerCandidateStatus = "viewed";
+      (candidate.offerLog as any[]).push({ action: "offer_viewed", note: "Candidate opened the offer link", timestamp: new Date() });
+      await candidate.save();
+    }
+
+    const job = await RecruitJob.findById(candidate.jobId).lean() as any;
+    return res.json({
+      offerLetter:          (candidate as any).offerLetter,
+      offerStatus:          (candidate as any).offerStatus,
+      offerCandidateStatus: (candidate as any).offerCandidateStatus,
+      offerDetails:         (candidate as any).offerDetails,
+      offerSignature:       (candidate as any).offerSignature,
+      candidateName:        candidate.name,
+      jobTitle:             job?.title || "",
+      companyName:          (candidate as any).offerDetails?.companyName || job?.companyName || "",
+    });
+  } catch (err: any) {
+    console.error("[recruit-public] GET /offer/:token", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Candidate accepts or declines the offer (with typed e-signature)
+recruitPublicRouter.post("/offer/:token/respond", async (req, res) => {
+  try {
+    await connectMongo();
+    const { response, signerName } = req.body as { response: "accepted" | "declined"; signerName?: string };
+
+    if (!["accepted", "declined"].includes(response)) {
+      return res.status(400).json({ error: "response must be 'accepted' or 'declined'." });
+    }
+
+    const candidate = await RecruitCandidate.findOne({ offerToken: req.params.token });
+    if (!candidate) return res.status(404).json({ error: "Offer not found." });
+
+    const currentStatus = (candidate as any).offerCandidateStatus;
+    if (currentStatus === "expired")                              return res.status(410).json({ error: "This offer has expired and can no longer be accepted." });
+    if (currentStatus === "accepted" || currentStatus === "declined") return res.status(409).json({ error: "You have already responded to this offer." });
+
+    (candidate as any).offerCandidateStatus = response;
+
+    if (response === "accepted") {
+      (candidate as any).offerSignature = {
+        signedAt:   new Date(),
+        signerName: signerName || candidate.name,
+        signerIp:   "",
+        method:     "typed",
+      };
+      (candidate.offerLog as any[]).push({
+        action: "offer_accepted",
+        note: `Candidate accepted the offer${signerName ? ` (signed as: ${signerName})` : ""}`,
+        timestamp: new Date(),
+      });
+    } else {
+      (candidate.offerLog as any[]).push({ action: "offer_declined", note: "Candidate declined the offer", timestamp: new Date() });
+    }
+    await candidate.save();
+
+    // Notify recruiter asynchronously
+    setImmediate(async () => {
+      try {
+        const user = await User.findOne({ uid: candidate.uid }).lean() as any;
+        if (!user?.email) return;
+        const job  = await RecruitJob.findById(candidate.jobId).lean() as any;
+        const html = emailTemplates.offerResponseEmail(
+          user.name || user.email, candidate.name, job?.title || "", response, signerName,
+        );
+        await sendEmail({
+          to:      user.email,
+          subject: `${candidate.name} ${response === "accepted" ? "accepted" : "declined"} the offer — ${job?.title || ""}`,
+          html,
+          text:    `${candidate.name} has ${response} the offer for ${job?.title || ""}.`,
+          from:    NOTIFICATION_FROM,
+        });
+      } catch (err) {
+        console.error("[recruit-public] POST /offer/respond notify error:", err);
+      }
+    });
+
+    return res.json({ ok: true, response, offerCandidateStatus: response });
+  } catch (err: any) {
+    console.error("[recruit-public] POST /offer/:token/respond", err);
+    return res.status(500).json({ error: err.message });
   }
 });
 

@@ -488,6 +488,9 @@ function OptLabel() {
   return <span className="text-zinc-700 normal-case tracking-normal font-normal">(optional)</span>;
 }
 
+type OfferVersion = { _id?: string; versionNumber: number; content: string; template: string; details: OfferDetails; editedAt: string; changeSummary: string };
+type ReminderCfg  = { enabled: boolean; delayDays: number; frequencyDays: number; maxReminders: number; remindersSent: number; lastReminderSentAt?: string };
+
 function OfferLetterModal({ candidate, job, token, onClose, onSent, onUpdate }: {
   candidate: Candidate;
   job: Job;
@@ -498,32 +501,48 @@ function OfferLetterModal({ candidate, job, token, onClose, onSent, onUpdate }: 
 }) {
   const saved: OfferDetails = candidate.offerDetails || {};
 
-  // Form state (pre-populated from saved details)
-  const [template, setTemplate]               = useState<OfferTemplate>((candidate.offerTemplate as OfferTemplate) || "full_time");
-  const [startDate, setStartDate]             = useState(saved.startDate || "");
-  const [salary, setSalary]                   = useState(saved.salary || "");
-  const [currency, setCurrency]               = useState(saved.salaryCurrency || "INR");
-  const [signingBonus, setSigningBonus]       = useState(saved.signingBonus || "");
-  const [benefits, setBenefits]               = useState(saved.benefits || "");
-  const [companyName, setCompanyName]         = useState(saved.companyName || "");
-  const [hiringMgr, setHiringMgr]             = useState(saved.hiringManagerName || "");
-  const [reportingMgr, setReportingMgr]       = useState(saved.reportingManager || "");
-  const [expiryDate, setExpiryDate]           = useState(saved.offerExpiryDate || "");
-
-  // Letter / status state
+  // ── Form / letter state ────────────────────────────────────────────────────
+  const [template, setTemplate]     = useState<OfferTemplate>((candidate.offerTemplate as OfferTemplate) || "full_time");
+  const [startDate, setStartDate]   = useState(saved.startDate || "");
+  const [salary, setSalary]         = useState(saved.salary || "");
+  const [currency, setCurrency]     = useState(saved.salaryCurrency || "INR");
+  const [signingBonus, setSigningBonus] = useState(saved.signingBonus || "");
+  const [benefits, setBenefits]     = useState(saved.benefits || "");
+  const [companyName, setCompanyName] = useState(saved.companyName || "");
+  const [hiringMgr, setHiringMgr]   = useState(saved.hiringManagerName || "");
+  const [reportingMgr, setReportingMgr] = useState(saved.reportingManager || "");
+  const [expiryDate, setExpiryDate] = useState(saved.offerExpiryDate || "");
   const [letter, setLetter]         = useState(candidate.offerLetter || "");
   const [showForm, setShowForm]     = useState(!candidate.offerLetter);
   const [offerStatus, setOfferStatus] = useState<string>(candidate.offerStatus || "none");
+  const [candidateStatus, setCandidateStatus] = useState<string>(candidate.offerCandidateStatus || "");
+  const [offerToken, setOfferToken] = useState<string>(candidate.offerToken || "");
   const [offerLog, setOfferLog]     = useState<OfferLogEntry[]>((candidate.offerLog as OfferLogEntry[]) || []);
 
-  // UI state
-  const [loading, setLoading]   = useState(false);
-  const [saving, setSaving]     = useState(false);
-  const [sending, setSending]   = useState(false);
-  const [error, setError]       = useState("");
-  const [saveMsg, setSaveMsg]   = useState("");
-  const [showLog, setShowLog]   = useState(false);
+  // ── Version history state ──────────────────────────────────────────────────
+  const [versions, setVersions]         = useState<OfferVersion[]>((candidate.offerVersions as OfferVersion[]) || []);
+  const [previewVersion, setPreviewVersion] = useState<OfferVersion | null>(null);
+  const [restoring, setRestoring]       = useState<string | null>(null);
 
+  // ── Reminder config state ──────────────────────────────────────────────────
+  const defaultReminder: ReminderCfg = { enabled: true, delayDays: 2, frequencyDays: 2, maxReminders: 3, remindersSent: 0 };
+  const [reminderCfg, setReminderCfg]   = useState<ReminderCfg>((candidate.offerReminderConfig as ReminderCfg) || defaultReminder);
+  const [savingReminder, setSavingReminder] = useState(false);
+  const [reminderMsg, setReminderMsg]   = useState("");
+
+  // ── Tab + UI state ─────────────────────────────────────────────────────────
+  const [activeTab, setActiveTab]       = useState<"draft" | "versions" | "settings">("draft");
+  const [loading, setLoading]           = useState(false);
+  const [saving, setSaving]             = useState(false);
+  const [sending, setSending]           = useState(false);
+  const [error, setError]               = useState("");
+  const [saveMsg, setSaveMsg]           = useState("");
+  const [showLog, setShowLog]           = useState(false);
+  const [copied, setCopied]             = useState(false);
+
+  const offerUrl = offerToken ? `${getFrontendUrl()}/recruit/offer/${offerToken}` : "";
+
+  // ── Actions ────────────────────────────────────────────────────────────────
   async function generate(regenerate = false) {
     if (!startDate.trim() || !salary.trim()) { setError("Start date and salary are required."); return; }
     setLoading(true); setError("");
@@ -538,6 +557,7 @@ function OfferLetterModal({ candidate, job, token, onClose, onSent, onUpdate }: 
       setLetter(data.offerLetter);
       setOfferStatus(data.offerStatus || "draft");
       if (data.offerLog) setOfferLog(data.offerLog);
+      if (data.offerVersions) setVersions(data.offerVersions);
       setShowForm(false);
       onUpdate?.({ offerLetter: data.offerLetter, offerStatus: data.offerStatus, offerTemplate: template, offerDetails: data.offerDetails, offerLog: data.offerLog });
     } catch (e: any) { setError(e.message); }
@@ -556,10 +576,11 @@ function OfferLetterModal({ candidate, job, token, onClose, onSent, onUpdate }: 
       const data = await readApiJson(res);
       if (!res.ok) throw new Error(data.error || "Save failed.");
       setOfferStatus(data.offerStatus || "draft");
-      if (data.offerLog) setOfferLog(data.offerLog);
+      if (data.offerLog)      setOfferLog(data.offerLog);
+      if (data.offerVersions) setVersions(data.offerVersions);
       setSaveMsg("Saved ✓");
       setTimeout(() => setSaveMsg(""), 2500);
-      onUpdate?.({ offerLetter: letter, offerStatus: data.offerStatus, offerLog: data.offerLog });
+      onUpdate?.({ offerLetter: letter, offerStatus: data.offerStatus, offerLog: data.offerLog, offerVersions: data.offerVersions });
     } catch (e: any) { setSaveMsg(`Error: ${e.message}`); }
     finally { setSaving(false); }
   }
@@ -568,7 +589,6 @@ function OfferLetterModal({ candidate, job, token, onClose, onSent, onUpdate }: 
     if (!candidate.email) { setError("No email address on file for this candidate."); return; }
     setSending(true); setError("");
     try {
-      // Save latest edits first, then send
       await fetch(apiUrl(`/recruit/jobs/${job._id}/candidates/${candidate._id}/offer-letter`), {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -582,16 +602,62 @@ function OfferLetterModal({ candidate, job, token, onClose, onSent, onUpdate }: 
       const data = await readApiJson(res);
       if (!res.ok) throw new Error(data.error || "Failed to send offer.");
       setOfferStatus("sent");
-      if (data.offerLog) setOfferLog(data.offerLog);
+      setCandidateStatus("pending");
+      if (data.offerToken) setOfferToken(data.offerToken);
+      if (data.offerLog)   setOfferLog(data.offerLog);
+      // Sync reminder config defaults
+      if (!(candidate.offerReminderConfig as any)?.enabled) {
+        setReminderCfg({ enabled: true, delayDays: 2, frequencyDays: 2, maxReminders: 3, remindersSent: 0 });
+      }
       const entry: EmailLogEntry = {
         type: "offer", to: candidate.email,
         subject: `Job Offer — ${job.title}`, body: letter,
         sentAt: data.sentAt || new Date().toISOString(), status: "sent",
       };
       onSent(entry);
-      onUpdate?.({ offerStatus: "sent", offerLog: data.offerLog });
+      onUpdate?.({ offerStatus: "sent", offerCandidateStatus: "pending", offerToken: data.offerToken, offerLog: data.offerLog });
     } catch (e: any) { setError(e.message); }
     finally { setSending(false); }
+  }
+
+  async function restoreVersion(v: OfferVersion) {
+    if (!v._id) return;
+    setRestoring(v._id);
+    try {
+      const res = await fetch(apiUrl(`/recruit/jobs/${job._id}/candidates/${candidate._id}/offer-letter/versions/${v._id}/restore`), {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await readApiJson(res);
+      if (!res.ok) throw new Error(data.error || "Restore failed.");
+      setLetter(data.offerLetter);
+      setOfferStatus(data.offerStatus || "draft");
+      if (data.offerVersions) setVersions(data.offerVersions);
+      if (data.offerLog)      setOfferLog(data.offerLog);
+      setPreviewVersion(null);
+      setActiveTab("draft");
+      setShowForm(false);
+      onUpdate?.({ offerLetter: data.offerLetter, offerStatus: data.offerStatus, offerVersions: data.offerVersions, offerLog: data.offerLog });
+    } catch (e: any) { alert(e.message); }
+    finally { setRestoring(null); }
+  }
+
+  async function saveReminderConfig() {
+    setSavingReminder(true); setReminderMsg("");
+    try {
+      const res = await fetch(apiUrl(`/recruit/jobs/${job._id}/candidates/${candidate._id}/offer-letter/reminder-config`), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(reminderCfg),
+      });
+      const data = await readApiJson(res);
+      if (!res.ok) throw new Error(data.error || "Failed to save.");
+      if (data.offerReminderConfig) setReminderCfg(data.offerReminderConfig);
+      setReminderMsg("Saved ✓");
+      setTimeout(() => setReminderMsg(""), 2500);
+      onUpdate?.({ offerReminderConfig: data.offerReminderConfig });
+    } catch (e: any) { setReminderMsg(`Error: ${e.message}`); }
+    finally { setSavingReminder(false); }
   }
 
   function downloadPdf() {
@@ -608,29 +674,81 @@ function OfferLetterModal({ candidate, job, token, onClose, onSent, onUpdate }: 
       .catch(e => alert(e.message || "Failed to download PDF."));
   }
 
-  const pill = offerStatusPill(offerStatus);
+  function copyLink() {
+    if (!offerUrl) return;
+    navigator.clipboard.writeText(offerUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  const pill         = offerStatusPill(offerStatus);
+  const candPill     = offerCandidatePill(candidateStatus);
+  const expiry       = offerExpiryCountdown(saved.offerExpiryDate || expiryDate);
+  const hasDraft     = !!letter.trim();
+  const TABS = [
+    { id: "draft",    label: "Draft" },
+    { id: "versions", label: `Versions${versions.length ? ` (${versions.length})` : ""}` },
+    { id: "settings", label: "Reminders" },
+  ] as const;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className="w-full max-w-2xl rounded-[2rem] border border-white/[0.09] bg-[#0a0a0f] shadow-2xl max-h-[90vh] flex flex-col">
 
         {/* ── Header ── */}
-        <div className="flex items-center justify-between border-b border-white/[0.07] px-6 py-4 shrink-0">
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-sm font-semibold text-white">Offer Letter — {candidate.name}</h2>
-              {pill && <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${pill.cls}`}>{pill.label}</span>}
+        <div className="border-b border-white/[0.07] px-6 pt-4 pb-0 shrink-0">
+          <div className="flex items-start justify-between mb-3">
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-sm font-semibold text-white">Offer Letter — {candidate.name}</h2>
+                {pill && <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${pill.cls}`}>{pill.label}</span>}
+                {candPill && <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${candPill.cls}`}>{candPill.label}</span>}
+                {expiry && (
+                  <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${expiry.urgent ? "border-amber-500/30 bg-amber-500/10 text-amber-400" : "border-white/10 text-gray-500"}`}>
+                    ⏰ {expiry.label}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-gray-400 mt-0.5">{job.title} · AI-generated, recruiter-approved before sending</p>
             </div>
-            <p className="text-xs text-gray-400 mt-0.5">{job.title} · AI-generated, recruiter-approved before sending</p>
+            <button onClick={onClose} className="text-gray-400 hover:text-white transition shrink-0 ml-3"><XIcon /></button>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-white transition"><XIcon /></button>
+
+          {/* ── Offer URL banner (when sent) ── */}
+          {offerStatus === "sent" && offerUrl && (
+            <div className="flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.06] px-3 py-2 mb-3">
+              <span className="text-[10px] text-emerald-400 font-semibold shrink-0">Offer Link:</span>
+              <span className="text-[10px] text-gray-400 truncate flex-1 font-mono">{offerUrl}</span>
+              <button onClick={copyLink} className="shrink-0 rounded-lg border border-white/10 px-2 py-0.5 text-[10px] text-gray-400 hover:text-white hover:border-white/25 transition">
+                {copied ? "Copied ✓" : "Copy"}
+              </button>
+              <a href={offerUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 text-[10px] text-indigo-400 hover:text-indigo-300 transition">Preview ↗</a>
+            </div>
+          )}
+
+          {/* ── Tab bar (shown once there's a draft) ── */}
+          {hasDraft && !showForm && (
+            <div className="flex gap-1 -mb-px">
+              {TABS.map(t => (
+                <button key={t.id} onClick={() => setActiveTab(t.id)}
+                  className={`rounded-t-xl px-4 py-2 text-[11px] font-semibold transition border-b-2 ${
+                    activeTab === t.id
+                      ? "border-indigo-500 text-indigo-300 bg-indigo-500/[0.06]"
+                      : "border-transparent text-gray-500 hover:text-gray-300"
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* ── Body ── */}
         {showForm ? (
-          /* Phase 1: Details form */
+          /* ── Phase 1: Details form ── */
           <div className="p-6 overflow-y-auto flex-1 space-y-5">
-            {/* Template selector */}
             <div>
               <label className="block text-[11px] font-semibold uppercase tracking-[0.15em] text-gray-400 mb-2">Letter Template</label>
               <div className="flex gap-2 flex-wrap">
@@ -641,78 +759,61 @@ function OfferLetterModal({ candidate, job, token, onClose, onSent, onUpdate }: 
                         ? "border-indigo-500/60 bg-indigo-500/15 text-indigo-300"
                         : "border-white/[0.08] bg-white/[0.03] text-gray-400 hover:text-white hover:border-white/20"
                     }`}
-                  >
-                    <span>{t.emoji}</span>{t.label}
-                  </button>
+                  ><span>{t.emoji}</span>{t.label}</button>
                 ))}
               </div>
             </div>
-
-            {/* Required */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-[11px] font-semibold uppercase tracking-[0.15em] text-gray-400 mb-1.5">Start Date *</label>
-                <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
-                  className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white outline-none focus:border-indigo-500/50" />
+                <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white outline-none focus:border-indigo-500/50" />
               </div>
               <div>
                 <label className="block text-[11px] font-semibold uppercase tracking-[0.15em] text-gray-400 mb-1.5">Currency</label>
-                <select value={currency} onChange={e => setCurrency(e.target.value)}
-                  className="w-full rounded-xl border border-white/[0.08] bg-[#0a0a0f] px-3 py-2 text-sm text-white outline-none focus:border-indigo-500/50">
+                <select value={currency} onChange={e => setCurrency(e.target.value)} className="w-full rounded-xl border border-white/[0.08] bg-[#0a0a0f] px-3 py-2 text-sm text-white outline-none focus:border-indigo-500/50">
                   {["INR","USD","GBP","EUR","AED","SGD","AUD","CAD"].map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
             </div>
             <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-[0.15em] text-gray-400 mb-1.5">
-                {template === "internship" ? "Stipend" : "Annual Salary"} *
-              </label>
-              <input type="text" value={salary} onChange={e => setSalary(e.target.value)}
-                placeholder={template === "internship" ? "e.g. 20,000 per month" : "e.g. 12,00,000 or 80,000"}
-                className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white placeholder-zinc-600 outline-none focus:border-indigo-500/50" />
+              <label className="block text-[11px] font-semibold uppercase tracking-[0.15em] text-gray-400 mb-1.5">{template === "internship" ? "Stipend" : "Annual Salary"} *</label>
+              <input type="text" value={salary} onChange={e => setSalary(e.target.value)} placeholder={template === "internship" ? "e.g. 20,000 per month" : "e.g. 12,00,000 or 80,000"} className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white placeholder-zinc-600 outline-none focus:border-indigo-500/50" />
             </div>
-
-            {/* Optional grid */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-[11px] font-semibold uppercase tracking-[0.15em] text-gray-400 mb-1.5">Company Name <OptLabel /></label>
-                <input type="text" value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder="Your company name"
-                  className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white placeholder-zinc-600 outline-none focus:border-indigo-500/50" />
+                <input type="text" value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder="Your company name" className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white placeholder-zinc-600 outline-none focus:border-indigo-500/50" />
               </div>
               <div>
                 <label className="block text-[11px] font-semibold uppercase tracking-[0.15em] text-gray-400 mb-1.5">Hiring Manager <OptLabel /></label>
-                <input type="text" value={hiringMgr} onChange={e => setHiringMgr(e.target.value)} placeholder="Name on signature"
-                  className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white placeholder-zinc-600 outline-none focus:border-indigo-500/50" />
+                <input type="text" value={hiringMgr} onChange={e => setHiringMgr(e.target.value)} placeholder="Name on signature" className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white placeholder-zinc-600 outline-none focus:border-indigo-500/50" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-[11px] font-semibold uppercase tracking-[0.15em] text-gray-400 mb-1.5">Reporting Manager <OptLabel /></label>
-                <input type="text" value={reportingMgr} onChange={e => setReportingMgr(e.target.value)} placeholder="Direct manager name"
-                  className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white placeholder-zinc-600 outline-none focus:border-indigo-500/50" />
+                <input type="text" value={reportingMgr} onChange={e => setReportingMgr(e.target.value)} placeholder="Direct manager name" className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white placeholder-zinc-600 outline-none focus:border-indigo-500/50" />
               </div>
               <div>
                 <label className="block text-[11px] font-semibold uppercase tracking-[0.15em] text-gray-400 mb-1.5">Signing Bonus <OptLabel /></label>
-                <input type="text" value={signingBonus} onChange={e => setSigningBonus(e.target.value)} placeholder="e.g. 50,000"
-                  className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white placeholder-zinc-600 outline-none focus:border-indigo-500/50" />
+                <input type="text" value={signingBonus} onChange={e => setSigningBonus(e.target.value)} placeholder="e.g. 50,000" className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white placeholder-zinc-600 outline-none focus:border-indigo-500/50" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-[11px] font-semibold uppercase tracking-[0.15em] text-gray-400 mb-1.5">Key Benefits <OptLabel /></label>
-                <input type="text" value={benefits} onChange={e => setBenefits(e.target.value)} placeholder="Health, PTO, flexible hours…"
-                  className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white placeholder-zinc-600 outline-none focus:border-indigo-500/50" />
+                <input type="text" value={benefits} onChange={e => setBenefits(e.target.value)} placeholder="Health, PTO, flexible hours…" className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white placeholder-zinc-600 outline-none focus:border-indigo-500/50" />
               </div>
               <div>
                 <label className="block text-[11px] font-semibold uppercase tracking-[0.15em] text-gray-400 mb-1.5">Offer Expiry Date <OptLabel /></label>
-                <input type="date" value={expiryDate} onChange={e => setExpiryDate(e.target.value)}
-                  className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white outline-none focus:border-indigo-500/50" />
+                <input type="date" value={expiryDate} onChange={e => setExpiryDate(e.target.value)} className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white outline-none focus:border-indigo-500/50" />
               </div>
             </div>
             {error && <p className="text-xs text-rose-400">{error}</p>}
           </div>
-        ) : (
-          /* Phase 2: Letter view / edit */
+
+        ) : activeTab === "draft" ? (
+          /* ── Tab: Draft editor ── */
           <div className="p-6 overflow-y-auto flex-1 space-y-4">
             <textarea
               value={letter}
@@ -721,12 +822,9 @@ function OfferLetterModal({ candidate, job, token, onClose, onSent, onUpdate }: 
               className="w-full rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5 text-[13px] text-gray-300 leading-7 font-mono resize-none outline-none focus:border-indigo-500/30 transition"
               spellCheck={false}
             />
-            {/* Activity Log */}
             {offerLog.length > 0 && (
               <div>
-                <button onClick={() => setShowLog(v => !v)}
-                  className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-gray-300 transition"
-                >
+                <button onClick={() => setShowLog(v => !v)} className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-gray-300 transition">
                   Activity Log ({offerLog.length}) <span className="ml-0.5 text-[9px]">{showLog ? "▲" : "▼"}</span>
                 </button>
                 {showLog && (
@@ -736,8 +834,7 @@ function OfferLetterModal({ candidate, job, token, onClose, onSent, onUpdate }: 
                         <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-400/50" />
                         <span className="text-gray-300 flex-1">{offerActionLabel(entry.action)}</span>
                         <span className="shrink-0 text-gray-600">
-                          {new Date(entry.timestamp).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                          {" "}
+                          {new Date(entry.timestamp).toLocaleDateString("en-US", { month: "short", day: "numeric" })}{" "}
                           {new Date(entry.timestamp).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
                         </span>
                       </div>
@@ -747,6 +844,131 @@ function OfferLetterModal({ candidate, job, token, onClose, onSent, onUpdate }: 
               </div>
             )}
             {error && <p className="text-xs text-rose-400">{error}</p>}
+          </div>
+
+        ) : activeTab === "versions" ? (
+          /* ── Tab: Version history ── */
+          <div className="p-6 overflow-y-auto flex-1">
+            {versions.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="w-10 h-10 rounded-full bg-white/[0.04] flex items-center justify-center mb-3">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-gray-600"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                </div>
+                <p className="text-xs text-gray-500">No saved versions yet.</p>
+                <p className="text-[11px] text-gray-600 mt-1">Versions are automatically saved each time you edit and save the draft.</p>
+              </div>
+            ) : previewVersion ? (
+              /* Version preview */
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-semibold text-white">Version {previewVersion.versionNumber}</p>
+                    <p className="text-[10px] text-gray-500 mt-0.5">{previewVersion.changeSummary} · {new Date(previewVersion.editedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => setPreviewVersion(null)} className="rounded-xl border border-white/[0.08] px-3 py-1.5 text-[10px] text-gray-400 hover:text-white transition">← Back</button>
+                    <button
+                      onClick={() => restoreVersion(previewVersion)}
+                      disabled={!!restoring}
+                      className="rounded-xl bg-indigo-500 px-3 py-1.5 text-[10px] font-semibold text-white hover:bg-indigo-400 disabled:opacity-50 transition"
+                    >
+                      {restoring === previewVersion._id ? "Restoring…" : "Restore This Version"}
+                    </button>
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5 text-[12px] text-gray-400 leading-6 font-mono whitespace-pre-wrap max-h-80 overflow-y-auto">
+                  {previewVersion.content}
+                </div>
+              </div>
+            ) : (
+              /* Version list */
+              <div className="space-y-2">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-3">Saved Versions — click to preview and restore</p>
+                {[...versions].reverse().map((v) => (
+                  <button
+                    key={v._id || v.versionNumber}
+                    onClick={() => setPreviewVersion(v)}
+                    className="w-full text-left rounded-xl border border-white/[0.07] bg-white/[0.02] px-4 py-3 hover:border-indigo-500/30 hover:bg-indigo-500/[0.04] transition group"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-xs font-semibold text-white group-hover:text-indigo-300 transition">
+                          v{v.versionNumber} — {v.changeSummary}
+                        </span>
+                        <p className="text-[10px] text-gray-500 mt-0.5">
+                          {new Date(v.editedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}{" "}
+                          {new Date(v.editedAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                          {v.template && v.template !== "full_time" && ` · ${v.template}`}
+                        </p>
+                      </div>
+                      <span className="text-[10px] text-gray-600 group-hover:text-indigo-400 transition">Preview →</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+        ) : (
+          /* ── Tab: Reminder settings ── */
+          <div className="p-6 overflow-y-auto flex-1 space-y-5">
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-1">Automatic Reminder Emails</h3>
+              <p className="text-[11px] text-gray-500">Configure how the system follows up with candidates who haven't responded to the offer.</p>
+            </div>
+
+            {/* Enabled toggle */}
+            <div className="flex items-center justify-between rounded-xl border border-white/[0.07] bg-white/[0.02] px-4 py-3">
+              <div>
+                <p className="text-xs font-semibold text-white">Enable reminders</p>
+                <p className="text-[10px] text-gray-500 mt-0.5">Automatically email the candidate if they haven't responded</p>
+              </div>
+              <button
+                onClick={() => setReminderCfg(c => ({ ...c, enabled: !c.enabled }))}
+                className={`relative w-10 h-5 rounded-full transition-colors ${reminderCfg.enabled ? "bg-indigo-500" : "bg-white/[0.1]"}`}
+              >
+                <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${reminderCfg.enabled ? "translate-x-5" : "translate-x-0.5"}`} />
+              </button>
+            </div>
+
+            {reminderCfg.enabled && (
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-400 mb-1.5">First reminder after</label>
+                  <div className="flex items-center gap-2">
+                    <input type="number" min="1" max="14" value={reminderCfg.delayDays} onChange={e => setReminderCfg(c => ({ ...c, delayDays: +e.target.value }))}
+                      className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white outline-none focus:border-indigo-500/50" />
+                    <span className="text-xs text-gray-500 shrink-0">days</span>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-400 mb-1.5">Repeat every</label>
+                  <div className="flex items-center gap-2">
+                    <input type="number" min="1" max="14" value={reminderCfg.frequencyDays} onChange={e => setReminderCfg(c => ({ ...c, frequencyDays: +e.target.value }))}
+                      className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white outline-none focus:border-indigo-500/50" />
+                    <span className="text-xs text-gray-500 shrink-0">days</span>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-400 mb-1.5">Max reminders</label>
+                  <input type="number" min="1" max="10" value={reminderCfg.maxReminders} onChange={e => setReminderCfg(c => ({ ...c, maxReminders: +e.target.value }))}
+                    className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white outline-none focus:border-indigo-500/50" />
+                </div>
+              </div>
+            )}
+
+            {reminderCfg.remindersSent > 0 && (
+              <div className="rounded-xl border border-sky-500/20 bg-sky-500/[0.05] px-4 py-3">
+                <p className="text-xs text-sky-400 font-medium">{reminderCfg.remindersSent} of {reminderCfg.maxReminders} reminders sent</p>
+                {reminderCfg.lastReminderSentAt && (
+                  <p className="text-[10px] text-gray-500 mt-0.5">Last sent: {new Date(reminderCfg.lastReminderSentAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</p>
+                )}
+              </div>
+            )}
+
+            {reminderMsg && (
+              <p className={`text-xs ${reminderMsg.startsWith("Error") ? "text-rose-400" : "text-emerald-400"}`}>{reminderMsg}</p>
+            )}
           </div>
         )}
 
@@ -758,11 +980,28 @@ function OfferLetterModal({ candidate, job, token, onClose, onSent, onUpdate }: 
               <button onClick={() => generate(false)} disabled={loading || !startDate || !salary}
                 className="flex items-center gap-2 rounded-xl bg-indigo-500 px-5 py-2 text-xs font-bold text-white hover:bg-indigo-400 disabled:opacity-50 transition"
               >
-                {loading
-                  ? <><svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Generating…</>
-                  : <><SparkIcon /> Generate Offer Letter</>
-                }
+                {loading ? <><svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Generating…</> : <><SparkIcon /> Generate Offer Letter</>}
               </button>
+            </>
+          ) : activeTab === "settings" ? (
+            <>
+              <button onClick={onClose} className="rounded-xl border border-white/[0.08] px-4 py-2 text-xs text-gray-400 hover:text-white transition">Close</button>
+              <button onClick={saveReminderConfig} disabled={savingReminder}
+                className="rounded-xl bg-indigo-500 px-5 py-2 text-xs font-bold text-white hover:bg-indigo-400 disabled:opacity-50 transition"
+              >
+                {savingReminder ? "Saving…" : "Save Settings"}
+              </button>
+            </>
+          ) : activeTab === "versions" ? (
+            <>
+              <button onClick={onClose} className="rounded-xl border border-white/[0.08] px-4 py-2 text-xs text-gray-400 hover:text-white transition">Close</button>
+              {previewVersion && (
+                <button onClick={() => restoreVersion(previewVersion)} disabled={!!restoring}
+                  className="rounded-xl bg-indigo-500 px-5 py-2 text-xs font-bold text-white hover:bg-indigo-400 disabled:opacity-50 transition"
+                >
+                  {restoring ? "Restoring…" : "Restore This Version"}
+                </button>
+              )}
             </>
           ) : (
             <>
@@ -770,22 +1009,14 @@ function OfferLetterModal({ candidate, job, token, onClose, onSent, onUpdate }: 
                 Edit Details
               </button>
               <div className="flex items-center gap-2 flex-wrap">
-                <button onClick={() => generate(true)} disabled={loading}
-                  className="rounded-xl border border-white/[0.08] px-3 py-2 text-xs text-gray-400 hover:text-white transition disabled:opacity-50"
-                >
+                <button onClick={() => generate(true)} disabled={loading} className="rounded-xl border border-white/[0.08] px-3 py-2 text-xs text-gray-400 hover:text-white transition disabled:opacity-50">
                   {loading ? "Generating…" : "Regenerate"}
                 </button>
-                <button onClick={saveDraft} disabled={saving}
-                  className="rounded-xl border border-amber-500/20 bg-amber-500/[0.07] px-3 py-2 text-xs text-amber-400 hover:bg-amber-500/15 transition disabled:opacity-50"
-                >
+                <button onClick={saveDraft} disabled={saving} className="rounded-xl border border-amber-500/20 bg-amber-500/[0.07] px-3 py-2 text-xs text-amber-400 hover:bg-amber-500/15 transition disabled:opacity-50">
                   {saveMsg || (saving ? "Saving…" : "Save Draft")}
                 </button>
-                <button onClick={downloadPdf}
-                  className="flex items-center gap-1.5 rounded-xl border border-white/[0.08] px-3 py-2 text-xs text-gray-300 hover:text-white hover:border-white/20 transition"
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-                  </svg>
+                <button onClick={downloadPdf} className="flex items-center gap-1.5 rounded-xl border border-white/[0.08] px-3 py-2 text-xs text-gray-300 hover:text-white hover:border-white/20 transition">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                   PDF
                 </button>
                 {offerStatus === "sent" ? (
@@ -796,10 +1027,7 @@ function OfferLetterModal({ candidate, job, token, onClose, onSent, onUpdate }: 
                   <button onClick={approveAndSend} disabled={sending || !candidate.email || !letter.trim()}
                     className="flex items-center gap-1.5 rounded-xl bg-indigo-500 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-400 disabled:opacity-50 transition"
                   >
-                    {sending
-                      ? <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                      : <MailIcon />
-                    }
+                    {sending ? <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> : <MailIcon />}
                     {sending ? "Sending…" : "Approve & Send"}
                   </button>
                 )}
