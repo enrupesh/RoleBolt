@@ -8,6 +8,7 @@ import Link from "next/link";
 import { trackEvent } from "@/lib/trackEvent";
 import { apiUrl, readApiJson } from "@/lib/api";
 import { formatJobDescription } from "@/lib/jobDescription";
+import AssessmentAnalyticsTab from "./AssessmentAnalyticsTab";
 
 function getFrontendUrl(): string {
   if (typeof window !== "undefined" && window.location?.origin) return window.location.origin;
@@ -2451,7 +2452,7 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<"pipeline" | "jd" | "rubric" | "post" | "rules" | "performance" | "agent-log">("pipeline");
+  const [activeTab, setActiveTab] = useState<"pipeline" | "jd" | "rubric" | "post" | "rules" | "performance" | "agent-log" | "assessment-analytics">("pipeline");
   const [pipelineRules, setPipelineRules] = useState<PipelineRule[]>([]);
   const [perfAlerts, setPerfAlerts] = useState<PerformanceAlert[]>([]);
   const [agentLogCount, setAgentLogCount] = useState(0);
@@ -2749,7 +2750,7 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
         </div>
 
         <div className="mb-6 flex gap-1 border-b border-[var(--border)] overflow-x-auto">
-          {(["pipeline", "jd", "rubric", "post", "rules", "performance", "agent-log"] as const).map(tab => (
+          {(["pipeline", "jd", "rubric", "post", "rules", "performance", "agent-log", "assessment-analytics"] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -2788,6 +2789,11 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
                         {agentLogCount}
                       </span>
                     )}
+                  </span>
+                ) : tab === "assessment-analytics" ? (
+                  <span className="flex items-center gap-1.5">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+                    Assessment Analytics
                   </span>
                 ) : "Pipeline"}
             </button>
@@ -2929,6 +2935,14 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
             token={token!}
             agentEnabled={job.agentMode?.enabled ?? false}
             onCountChange={setAgentLogCount}
+          />
+        )}
+
+        {activeTab === "assessment-analytics" && (
+          <AssessmentAnalyticsTab
+            jobId={id}
+            token={token!}
+            jobTitle={job.title}
           />
         )}
       </main>

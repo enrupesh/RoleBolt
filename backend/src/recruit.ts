@@ -2950,6 +2950,196 @@ recruitRouter.get("/analytics", async (req, res) => {
   }
 });
 
+// ─── Assessment Analytics (per-job) ──────────────────────────────────────────
+
+recruitRouter.get("/jobs/:jobId/assessment-analytics", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "Unauthorized" });
+
+    const job = await RecruitJob.findOne({ _id: req.params.jobId, uid }).lean();
+    if (!job) return res.status(404).json({ error: "Job not found." });
+
+    // Optional date range (ISO strings)
+    const { from, to } = req.query as { from?: string; to?: string };
+    const fromDate = from ? new Date(from) : null;
+    const toDate   = to   ? new Date(to)   : null;
+    if (toDate) toDate.setHours(23, 59, 59, 999); // include the full to-day
+
+    function inRange(date: Date | undefined | null): boolean {
+      if (!fromDate && !toDate) return true;
+      if (!date) return false;
+      const d = new Date(date);
+      if (fromDate && d < fromDate) return false;
+      if (toDate   && d > toDate)   return false;
+      return true;
+    }
+
+    // Fetch all candidates for this job (only needed fields)
+    const allCandidates = await RecruitCandidate.find({ jobId: req.params.jobId, uid })
+      .select("name email totalScore maxScore assessmentStatus assessmentSentAt assessmentCompletedAt assessmentAnswers hiringDecision stage createdAt updatedAt")
+      .lean();
+
+    // ── Segment by assessment status + date filter ────────────────────────────
+    const allSent      = allCandidates.filter(c => c.assessmentStatus !== "not_sent");
+    const allCompleted = allCandidates.filter(c => c.assessmentStatus === "completed");
+    const allTaking    = allCandidates.filter(c => c.assessmentStatus === "sent");
+    const allAwaiting  = allCandidates.filter(c => c.assessmentStatus === "not_sent");
+
+    // Date-filtered variants (used for metrics & charts)
+    const filtSent      = allSent.filter(c  => inRange(c.assessmentSentAt));
+    const filtCompleted = allCompleted.filter(c => inRange(c.assessmentCompletedAt));
+    const filtTaking    = allTaking.filter(c => inRange(c.assessmentSentAt));
+    const filtAwaiting  = allAwaiting.filter(c => inRange(c.createdAt));
+
+    // ── Score helpers ─────────────────────────────────────────────────────────
+    function scorePct(c: { totalScore?: number; maxScore?: number }): number | null {
+      if (!c.maxScore || c.maxScore <= 0) return null;
+      return Math.round(((c.totalScore ?? 0) / c.maxScore) * 100);
+    }
+
+    const completedScores = filtCompleted
+      .map(c => scorePct(c))
+      .filter((s): s is number => s !== null);
+
+    const avgScore     = completedScores.length > 0 ? Math.round(completedScores.reduce((a, b) => a + b, 0) / completedScores.length) : null;
+    const highestScore = completedScores.length > 0 ? Math.max(...completedScores) : null;
+    const lowestScore  = completedScores.length > 0 ? Math.min(...completedScores) : null;
+
+    // ── Time taken ────────────────────────────────────────────────────────────
+    const timeTotals = filtCompleted
+      .map(c => ((c.assessmentAnswers as any[]) || []).reduce((s: number, a: any) => s + (Number(a.timeTakenSeconds) || 0), 0))
+      .filter(t => t > 0);
+    const avgTimeTakenSeconds = timeTotals.length > 0
+      ? Math.round(timeTotals.reduce((a, b) => a + b, 0) / timeTotals.length)
+      : null;
+
+    // ── Hiring decisions ──────────────────────────────────────────────────────
+    const passCount  = filtCompleted.filter(c => c.hiringDecision === "strong_yes").length;
+    const maybeCount = filtCompleted.filter(c => c.hiringDecision === "maybe").length;
+    const failCount  = filtCompleted.filter(c => c.hiringDecision === "no").length;
+    const passRate   = filtCompleted.length > 0 ? Math.round((passCount  / filtCompleted.length) * 100) : null;
+    const failRate   = filtCompleted.length > 0 ? Math.round((failCount  / filtCompleted.length) * 100) : null;
+
+    // ── Completion Trend (daily sent + completed) ─────────────────────────────
+    const trendMap: Record<string, { sent: number; completed: number }> = {};
+    for (const c of filtSent) {
+      if (!c.assessmentSentAt) continue;
+      const day = new Date(c.assessmentSentAt).toISOString().slice(0, 10);
+      if (!trendMap[day]) trendMap[day] = { sent: 0, completed: 0 };
+      trendMap[day].sent++;
+    }
+    for (const c of filtCompleted) {
+      if (!c.assessmentCompletedAt) continue;
+      const day = new Date(c.assessmentCompletedAt).toISOString().slice(0, 10);
+      if (!trendMap[day]) trendMap[day] = { sent: 0, completed: 0 };
+      trendMap[day].completed++;
+    }
+    const completionTrend = Object.entries(trendMap)
+      .map(([date, v]) => ({ date, ...v }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    // ── Score Distribution ────────────────────────────────────────────────────
+    const buckets = [
+      { range: "0–20",   min: 0,  max: 20,  count: 0 },
+      { range: "21–40",  min: 21, max: 40,  count: 0 },
+      { range: "41–60",  min: 41, max: 60,  count: 0 },
+      { range: "61–80",  min: 61, max: 80,  count: 0 },
+      { range: "81–100", min: 81, max: 100, count: 0 },
+    ];
+    for (const s of completedScores) {
+      const b = buckets.find(bk => s >= bk.min && s <= bk.max);
+      if (b) b.count++;
+    }
+
+    // ── Avg Score Over Time ───────────────────────────────────────────────────
+    const avgScoreMap: Record<string, { total: number; count: number }> = {};
+    for (const c of filtCompleted) {
+      const sp = scorePct(c);
+      if (sp === null || !c.assessmentCompletedAt) continue;
+      const day = new Date(c.assessmentCompletedAt).toISOString().slice(0, 10);
+      if (!avgScoreMap[day]) avgScoreMap[day] = { total: 0, count: 0 };
+      avgScoreMap[day].total += sp;
+      avgScoreMap[day].count++;
+    }
+    const avgScoreOverTime = Object.entries(avgScoreMap)
+      .map(([date, { total, count }]) => ({ date, avgScore: Math.round(total / count), count }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    // ── Candidate lists for drill-down ────────────────────────────────────────
+    function mapC(c: any) {
+      return {
+        _id: String(c._id),
+        name: c.name,
+        email: c.email,
+        scorePct: scorePct(c),
+        assessmentStatus: c.assessmentStatus,
+        assessmentSentAt:      c.assessmentSentAt      ?? null,
+        assessmentCompletedAt: c.assessmentCompletedAt ?? null,
+        hiringDecision: c.hiringDecision ?? null,
+        stage: c.stage,
+        timeTakenSeconds: ((c.assessmentAnswers as any[]) || []).reduce((s: number, a: any) => s + (Number(a.timeTakenSeconds) || 0), 0),
+      };
+    }
+
+    const bySP = (a: any, b: any) => {
+      const as = a.maxScore > 0 ? a.totalScore / a.maxScore : 0;
+      const bs = b.maxScore > 0 ? b.totalScore / b.maxScore : 0;
+      return bs - as; // highest first
+    };
+
+    // Recent activity feed (last 20 assessment events across all candidates)
+    const activityEvents: Array<{ type: string; candidateName: string; candidateId: string; timestamp: string; scorePct?: number | null; hiringDecision?: string | null }> = [];
+    for (const c of allCandidates) {
+      if (c.assessmentSentAt) {
+        activityEvents.push({ type: "sent", candidateName: c.name, candidateId: String(c._id), timestamp: new Date(c.assessmentSentAt).toISOString(), scorePct: null });
+      }
+      if (c.assessmentCompletedAt) {
+        activityEvents.push({ type: "completed", candidateName: c.name, candidateId: String(c._id), timestamp: new Date(c.assessmentCompletedAt).toISOString(), scorePct: scorePct(c), hiringDecision: c.hiringDecision ?? null });
+      }
+    }
+    activityEvents.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+    return res.json({
+      metrics: {
+        totalSent:         filtSent.length,
+        totalCompleted:    filtCompleted.length,
+        completionRate:    filtSent.length > 0 ? Math.round((filtCompleted.length / filtSent.length) * 100) : 0,
+        avgScore,
+        highestScore,
+        lowestScore,
+        avgTimeTakenSeconds,
+        passCount,
+        maybeCount,
+        failCount,
+        passRate,
+        failRate,
+        awaitingCount: filtAwaiting.length,
+        takingCount:   filtTaking.length,
+        totalCandidates: allCandidates.length,
+      },
+      charts: {
+        completionTrend,
+        scoreDistribution: buckets.map(({ min: _m, max: _x, ...rest }) => rest),
+        decisionBreakdown: { strongYes: passCount, maybe: maybeCount, no: failCount },
+        avgScoreOverTime,
+      },
+      candidates: {
+        topScorers:  [...filtCompleted].filter(c => c.maxScore > 0).sort(bySP).slice(0, 8).map(mapC),
+        lowScorers:  [...filtCompleted].filter(c => c.maxScore > 0).sort((a, b) => bySP(b, a)).slice(0, 8).map(mapC),
+        incomplete:  filtTaking.sort((a, b) => new Date(a.assessmentSentAt ?? 0).getTime() - new Date(b.assessmentSentAt ?? 0).getTime()).slice(0, 10).map(mapC),
+        taking:      filtTaking.slice(0, 10).map(mapC),
+        awaiting:    filtAwaiting.slice(0, 10).map(mapC),
+      },
+      activityFeed: activityEvents.slice(0, 20),
+    });
+  } catch (err: any) {
+    console.error("[recruit] GET /assessment-analytics", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── Talent Pool ─────────────────────────────────────────────────────────────
 
 // Single source of truth for "silver-medal" auto-eligibility, mirrored in the
