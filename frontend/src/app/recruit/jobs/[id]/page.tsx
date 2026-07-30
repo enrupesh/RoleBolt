@@ -71,6 +71,7 @@ type AgentMode = {
   autoEmailShortlist: boolean;
   autoEmailReject: boolean;
   autoSendAssessment: boolean;
+  emailReviewZoneCandidates: boolean;
 };
 
 type PerformanceAlert = {
@@ -714,7 +715,7 @@ function AgentModeToggle({ job, token, onUpdate }: {
   token: string;
   onUpdate: (agentMode: AgentMode) => void;
 }) {
-  const am = job.agentMode ?? { enabled: false, shortlistThreshold: 75, rejectThreshold: 40, autoEmailShortlist: true, autoEmailReject: false, autoSendAssessment: false };
+  const am = job.agentMode ?? { enabled: false, shortlistThreshold: 75, rejectThreshold: 40, autoEmailShortlist: true, autoEmailReject: false, autoSendAssessment: false, emailReviewZoneCandidates: false };
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [localSettings, setLocalSettings] = useState<AgentMode>(am);
@@ -895,6 +896,24 @@ function AgentModeToggle({ job, token, onUpdate }: {
                 >
                   <span className={`absolute h-3 w-3 rounded-full bg-white shadow transition-transform ${
                     localSettings.autoEmailReject ? "translate-x-4" : "translate-x-0.5"
+                  }`} />
+                </button>
+              </label>
+
+              {/* Review zone email */}
+              <label className="flex items-center justify-between cursor-pointer">
+                <div>
+                  <p className="text-[12px] text-[var(--text-secondary)]">Email review zone candidates</p>
+                  <p className="text-[10px] text-[var(--text-muted)]">&quot;Your application is under review&quot;</p>
+                </div>
+                <button
+                  onClick={() => setLocalSettings(s => ({ ...s, emailReviewZoneCandidates: !s.emailReviewZoneCandidates }))}
+                  className={`relative flex h-4.5 w-8 shrink-0 items-center rounded-full transition-colors ${
+                    localSettings.emailReviewZoneCandidates ? "bg-amber-500" : "bg-gray-400/30"
+                  }`}
+                >
+                  <span className={`absolute h-3 w-3 rounded-full bg-white shadow transition-transform ${
+                    localSettings.emailReviewZoneCandidates ? "translate-x-4" : "translate-x-0.5"
                   }`} />
                 </button>
               </label>

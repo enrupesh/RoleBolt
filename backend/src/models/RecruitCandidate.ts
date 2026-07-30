@@ -49,7 +49,7 @@ export interface IEmailLogEntry {
 }
 
 export interface IAgentActionEntry {
-  action: "shortlisted" | "rejected";
+  action: "shortlisted" | "rejected" | "review_zone";
   score: number;          // 0–100 percentage
   reason: string;         // e.g. "Score 82% ≥ shortlist threshold 75%"
   emailSent: boolean;

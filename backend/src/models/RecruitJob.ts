@@ -13,12 +13,13 @@ export interface IJobReport {
 }
 
 export interface IAgentMode {
-  enabled: boolean;              // false = Manual Mode, true = AI Agent Mode
-  shortlistThreshold: number;    // score% >= this → auto-shortlist (default 75)
-  rejectThreshold: number;       // score% < this → auto-reject (default 40)
-  autoEmailShortlist: boolean;   // send screened email automatically (default true)
-  autoEmailReject: boolean;      // send rejection email automatically (default false)
-  autoSendAssessment: boolean;   // auto-send assessment to shortlisted (default false)
+  enabled: boolean;                    // false = Manual Mode, true = AI Agent Mode
+  shortlistThreshold: number;          // score% >= this → auto-shortlist (default 75)
+  rejectThreshold: number;             // score% < this → auto-reject (default 40)
+  autoEmailShortlist: boolean;         // send screened email automatically (default true)
+  autoEmailReject: boolean;            // send rejection email automatically (default false)
+  autoSendAssessment: boolean;         // auto-send assessment to shortlisted (default false)
+  emailReviewZoneCandidates: boolean;  // send "under review" email to review zone candidates (default false)
 }
 
 export interface IPerformanceAlert {
@@ -127,12 +128,13 @@ const PipelineRuleSchema = new Schema<IPipelineRule>(
 
 const AgentModeSchema = new Schema<IAgentMode>(
   {
-    enabled:             { type: Boolean, default: false },
-    shortlistThreshold:  { type: Number,  default: 75 },
-    rejectThreshold:     { type: Number,  default: 40 },
-    autoEmailShortlist:  { type: Boolean, default: true },
-    autoEmailReject:     { type: Boolean, default: false },
-    autoSendAssessment:  { type: Boolean, default: false },
+    enabled:                    { type: Boolean, default: false },
+    shortlistThreshold:         { type: Number,  default: 75 },
+    rejectThreshold:            { type: Number,  default: 40 },
+    autoEmailShortlist:         { type: Boolean, default: true },
+    autoEmailReject:            { type: Boolean, default: false },
+    autoSendAssessment:         { type: Boolean, default: false },
+    emailReviewZoneCandidates:  { type: Boolean, default: false },
   },
   { _id: false }
 );
