@@ -1743,6 +1743,111 @@ recruitRouter.get("/jobs/:jobId/agent-log", async (req, res) => {
   }
 });
 
+// ── AI Agent Stats ────────────────────────────────────────────────────────────
+// GET /recruit/jobs/:jobId/agent-stats?period=week
+// period: today | week | month | all
+recruitRouter.get("/jobs/:jobId/agent-stats", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const job = await RecruitJob.findOne({ _id: req.params.jobId, uid }).lean();
+    if (!job) return res.status(404).json({ error: "Job not found." });
+
+    const period = (req.query.period as string) || "week";
+    let since: Date | null = null;
+    const now = new Date();
+    if (period === "today") {
+      since = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    } else if (period === "week") {
+      since = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    } else if (period === "month") {
+      since = new Date(now.getFullYear(), now.getMonth(), 1);
+    }
+    // "all" → since = null (no date filter)
+
+    // Pull candidates with agentLog entries for this job
+    const candidates = await RecruitCandidate.find(
+      { jobId: req.params.jobId, uid, "agentLog.0": { $exists: true } },
+      { agentLog: 1, emailLog: 1, totalScore: 1, maxScore: 1 }
+    ).lean();
+
+    let shortlisted = 0;
+    let rejected = 0;
+    let reviewZone = 0;
+    let emailsSent = 0;
+    let scoreSum = 0;
+    let scoreCount = 0;
+
+    for (const c of candidates) {
+      const agentLog: any[] = (c as any).agentLog ?? [];
+      const emailLog: any[] = (c as any).emailLog ?? [];
+
+      for (const entry of agentLog) {
+        const ts = entry.timestamp ? new Date(entry.timestamp) : null;
+        if (since && ts && ts < since) continue;
+
+        if (entry.action === "shortlisted") shortlisted++;
+        else if (entry.action === "rejected") rejected++;
+        else if (entry.action === "review_zone") reviewZone++;
+
+        if (typeof entry.score === "number") {
+          scoreSum += entry.score;
+          scoreCount++;
+        }
+      }
+
+      // Count agent emails sent in the period
+      for (const e of emailLog) {
+        if (!["agent_shortlisted", "agent_rejected", "agent_review_zone"].includes(e.type)) continue;
+        if (e.status !== "sent") continue;
+        const ts = e.sentAt ? new Date(e.sentAt) : null;
+        if (since && ts && ts < since) continue;
+        emailsSent++;
+      }
+    }
+
+    const avgScore = scoreCount > 0 ? Math.round(scoreSum / scoreCount) : null;
+    const totalProcessed = shortlisted + rejected + reviewZone;
+
+    // Simple rule-based AI recommendations
+    const insights: string[] = [];
+    const agentMode = (job as any).agentMode ?? {};
+    const shortlistThreshold = agentMode.shortlistThreshold ?? 75;
+    const rejectThreshold = agentMode.rejectThreshold ?? 40;
+
+    if (totalProcessed > 0) {
+      const reviewPct = Math.round((reviewZone / totalProcessed) * 100);
+      const shortlistPct = Math.round((shortlisted / totalProcessed) * 100);
+      const rejectPct = Math.round((rejected / totalProcessed) * 100);
+
+      if (reviewPct >= 70) {
+        insights.push(`${reviewPct}% of candidates are in the Review zone. Consider adjusting your shortlist threshold (currently ${shortlistThreshold}%).`);
+      }
+      if (shortlistPct <= 10 && totalProcessed >= 5) {
+        insights.push(`Very few candidates are being shortlisted (${shortlistPct}%). Your scoring criteria may be too strict.`);
+      }
+      if (shortlistPct >= 70 && totalProcessed >= 5) {
+        insights.push(`Most candidates are being shortlisted (${shortlistPct}%). Consider increasing the shortlist threshold (currently ${shortlistThreshold}%).`);
+      }
+      if (rejectPct >= 80 && totalProcessed >= 5) {
+        insights.push(`High rejection rate (${rejectPct}%). Consider reviewing your rubric or lowering the reject threshold (currently ${rejectThreshold}%).`);
+      }
+      if (avgScore !== null && avgScore < rejectThreshold + 10 && totalProcessed >= 3) {
+        insights.push(`Average AI score is ${avgScore}%, close to your reject threshold. Your job description may need clearer requirements.`);
+      }
+    }
+
+    return res.json({
+      ok: true,
+      period,
+      stats: { shortlisted, rejected, reviewZone, emailsSent, avgScore, totalProcessed },
+      insights,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // ── AI Agent Mode settings ────────────────────────────────────────────────────
 recruitRouter.patch("/jobs/:jobId/agent-mode", async (req, res) => {
   try {

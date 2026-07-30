@@ -2231,6 +2231,11 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
             token={token!}
             alerts={perfAlerts}
             checking={checkingPerf}
+            agentEnabled={job.agentMode?.enabled ?? false}
+            onGoToStage={(stage) => {
+              setStageFilter(stage);
+              setActiveTab("pipeline");
+            }}
             onDismiss={(alertId) => setPerfAlerts(a => a.filter(x => x.id !== alertId))}
             onApplied={(newJD) => setJob(j => j ? { ...j, generatedJD: newJD } : j)}
             onRefresh={async () => {
@@ -2709,6 +2714,183 @@ function JDTab({
   );
 }
 
+// ── AI Agent Stats Card ───────────────────────────────────────────────────────
+type AgentStatsPeriod = "today" | "week" | "month" | "all";
+type AgentStatsData = {
+  shortlisted: number;
+  rejected: number;
+  reviewZone: number;
+  emailsSent: number;
+  avgScore: number | null;
+  totalProcessed: number;
+};
+
+function AgentStatsCard({
+  jobId, token, agentEnabled, onGoToStage,
+}: {
+  jobId: string;
+  token: string;
+  agentEnabled: boolean;
+  onGoToStage: (stage: CandidateStage | "all") => void;
+}) {
+  const [period, setPeriod] = useState<AgentStatsPeriod>("week");
+  const [stats, setStats]   = useState<AgentStatsData | null>(null);
+  const [insights, setInsights] = useState<string[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState<string | null>(null);
+
+  const PERIOD_LABELS: Record<AgentStatsPeriod, string> = {
+    today: "Today", week: "This Week", month: "This Month", all: "All Time",
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      setError(null);
+      try {
+        const res  = await fetch(apiUrl(`/recruit/jobs/${jobId}/agent-stats?period=${period}`), {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (!cancelled) {
+          setStats(data.stats ?? null);
+          setInsights(data.insights ?? []);
+        }
+      } catch {
+        if (!cancelled) setError("Could not load stats.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [jobId, token, period]);
+
+  if (!agentEnabled) {
+    return (
+      <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface-muted)] px-6 py-8 text-center mb-5">
+        <p className="text-2xl mb-2">⚡</p>
+        <p className="text-sm font-semibold text-[var(--foreground)]">AI Agent Stats</p>
+        <p className="mt-1 text-xs text-[var(--text-muted)]">Enable the AI Agent to start tracking agent performance stats.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface-muted)] p-5 mb-5 space-y-4">
+      {/* Header + period filter */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <p className="text-sm font-bold text-[var(--foreground)]">⚡ AI Agent Stats</p>
+          <p className="text-[11px] text-[var(--text-muted)] mt-0.5">Agent performance for this job</p>
+        </div>
+        <div className="flex items-center gap-1 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-0.5">
+          {(["today", "week", "month", "all"] as AgentStatsPeriod[]).map(p => (
+            <button
+              key={p}
+              onClick={() => setPeriod(p)}
+              className={`rounded-lg px-3 py-1 text-[11px] font-semibold transition ${
+                period === p
+                  ? "bg-indigo-500 text-white shadow"
+                  : "text-[var(--text-muted)] hover:text-[var(--foreground)]"
+              }`}
+            >
+              {PERIOD_LABELS[p]}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Stats grid */}
+      {loading ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="h-16 rounded-2xl rb-skeleton" />
+          ))}
+        </div>
+      ) : error ? (
+        <div className="rounded-2xl border border-rose-400/30 bg-rose-500/5 px-4 py-3 text-xs text-rose-500">{error}</div>
+      ) : !stats || stats.totalProcessed === 0 ? (
+        <div className="rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface)] px-4 py-8 text-center">
+          <p className="text-2xl mb-1">📭</p>
+          <p className="text-xs font-semibold text-[var(--text-secondary)]">No agent activity {period === "all" ? "yet" : `for ${PERIOD_LABELS[period].toLowerCase()}`}</p>
+          <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">Stats will appear once the AI Agent processes candidates.</p>
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+            {/* Shortlisted */}
+            <button
+              onClick={() => onGoToStage("screened")}
+              className="group flex flex-col gap-1 rounded-2xl border border-emerald-400/20 bg-emerald-500/5 px-4 py-3 text-left transition hover:border-emerald-400/40 hover:bg-emerald-500/10"
+              title="View shortlisted candidates"
+            >
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600">✅ Shortlisted</span>
+              <span className="text-2xl font-bold text-emerald-600">{stats.shortlisted}</span>
+            </button>
+
+            {/* Rejected */}
+            <button
+              onClick={() => onGoToStage("rejected")}
+              className="group flex flex-col gap-1 rounded-2xl border border-rose-400/20 bg-rose-500/5 px-4 py-3 text-left transition hover:border-rose-400/40 hover:bg-rose-500/10"
+              title="View rejected candidates"
+            >
+              <span className="text-[11px] font-bold uppercase tracking-wider text-rose-600">❌ Rejected</span>
+              <span className="text-2xl font-bold text-rose-600">{stats.rejected}</span>
+            </button>
+
+            {/* In Review */}
+            <button
+              onClick={() => onGoToStage("applied")}
+              className="group flex flex-col gap-1 rounded-2xl border border-amber-400/20 bg-amber-500/5 px-4 py-3 text-left transition hover:border-amber-400/40 hover:bg-amber-500/10"
+              title="View candidates in review"
+            >
+              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-700">⏳ In Review</span>
+              <span className="text-2xl font-bold text-amber-700">{stats.reviewZone}</span>
+            </button>
+
+            {/* Emails Sent */}
+            <button
+              onClick={() => onGoToStage("all")}
+              className="group flex flex-col gap-1 rounded-2xl border border-indigo-400/20 bg-indigo-500/5 px-4 py-3 text-left transition hover:border-indigo-400/40 hover:bg-indigo-500/10"
+              title="View all candidates"
+            >
+              <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-600">📧 Emails Sent</span>
+              <span className="text-2xl font-bold text-indigo-600">{stats.emailsSent}</span>
+            </button>
+
+            {/* Avg Score */}
+            <div className="flex flex-col gap-1 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">⚡ Avg Score</span>
+              <span className="text-2xl font-bold text-[var(--foreground)]">
+                {stats.avgScore !== null ? `${stats.avgScore}%` : "—"}
+              </span>
+            </div>
+          </div>
+
+          <p className="text-[11px] text-[var(--text-muted)]">
+            {stats.totalProcessed} candidate{stats.totalProcessed !== 1 ? "s" : ""} processed — click a metric to view in Pipeline
+          </p>
+
+          {/* AI Insights */}
+          {insights.length > 0 && (
+            <div className="space-y-2 border-t border-[var(--border)] pt-3">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">🤖 AI Insights</p>
+              {insights.map((insight, i) => (
+                <div key={i} className="flex items-start gap-2.5 rounded-2xl border border-indigo-400/20 bg-indigo-500/5 px-4 py-2.5">
+                  <span className="mt-0.5 text-indigo-400 shrink-0">💡</span>
+                  <p className="text-xs text-[var(--text-secondary)] leading-relaxed">{insight}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 const ALERT_META: Record<PerformanceAlert["type"], { label: string; color: string; icon: string }> = {
   low_applications: { label: "Low Applications",  color: "border-amber-400/40 bg-amber-500/5",  icon: "📉" },
   no_hire_14_days:  { label: "No Hire (14+ days)", color: "border-orange-400/40 bg-orange-500/5", icon: "⏳" },
@@ -2716,7 +2898,7 @@ const ALERT_META: Record<PerformanceAlert["type"], { label: string; color: strin
 };
 
 function PerformanceTab({
-  jobId, token, alerts, checking, onDismiss, onApplied, onRefresh,
+  jobId, token, alerts, checking, onDismiss, onApplied, onRefresh, agentEnabled, onGoToStage,
 }: {
   jobId: string;
   token: string;
@@ -2725,6 +2907,8 @@ function PerformanceTab({
   onDismiss: (alertId: string) => void;
   onApplied: (newJD: string) => void;
   onRefresh: () => Promise<void>;
+  agentEnabled: boolean;
+  onGoToStage: (stage: CandidateStage | "all") => void;
 }) {
   const [applyingMap, setApplyingMap]   = useState<Record<string, boolean>>({});
   const [dismissingId, setDismissingId] = useState<string | null>(null);
@@ -2768,6 +2952,14 @@ function PerformanceTab({
 
   return (
     <div className="space-y-5 py-2">
+      {/* AI Agent Stats Card */}
+      <AgentStatsCard
+        jobId={jobId}
+        token={token}
+        agentEnabled={agentEnabled}
+        onGoToStage={onGoToStage}
+      />
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
