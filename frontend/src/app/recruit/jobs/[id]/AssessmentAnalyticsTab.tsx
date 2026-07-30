@@ -42,12 +42,35 @@ type DrillCandidate = {
 };
 
 type ActivityEvent = {
-  type: "sent" | "completed";
+  type: "sent" | "completed" | "alert";
   candidateName: string;
   candidateId: string;
   timestamp: string;
   scorePct?: number | null;
   hiringDecision?: string | null;
+  // alert-specific
+  completionRate?: number;
+  threshold?: number;
+};
+
+type AlertLogEntry = {
+  triggeredAt: string;
+  completionRate: number;
+  threshold: number;
+  totalSent: number;
+  totalCompleted: number;
+};
+
+type AssessmentAlertData = {
+  enabled: boolean;
+  threshold: number;
+  alertActive: boolean;
+  bannerDismissed: boolean;
+  alertFired: boolean;
+  allTimeCompletionRate: number;
+  allTimeSent: number;
+  allTimeCompleted: number;
+  alertLog: AlertLogEntry[];
 };
 
 type AnalyticsData = {
@@ -66,6 +89,7 @@ type AnalyticsData = {
     awaiting: DrillCandidate[];
   };
   activityFeed: ActivityEvent[];
+  assessmentAlert: AssessmentAlertData;
 };
 
 type DatePreset = "today" | "week" | "month" | "all" | "custom";
@@ -454,19 +478,32 @@ function ActivityFeed({ events }: { events: ActivityEvent[] }) {
                 <span className="mt-0.5 shrink-0 flex h-5 w-5 items-center justify-center rounded-full bg-violet-500/15 text-violet-400">
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
                 </span>
+              ) : e.type === "alert" ? (
+                <span className="mt-0.5 shrink-0 flex h-5 w-5 items-center justify-center rounded-full bg-amber-500/15 text-amber-400">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                </span>
               ) : (
                 <span className="mt-0.5 shrink-0 flex h-5 w-5 items-center justify-center rounded-full bg-sky-500/15 text-sky-400">
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
                 </span>
               )}
               <div className="flex-1 min-w-0">
-                <p className="text-xs text-gray-200">
-                  <span className="font-semibold">{e.candidateName}</span>
-                  {e.type === "sent" ? " was sent an assessment" : " completed the assessment"}
-                  {e.type === "completed" && e.scorePct !== null && e.scorePct !== undefined && (
-                    <span className={` — ${e.scorePct >= 75 ? "text-emerald-400" : e.scorePct >= 50 ? "text-amber-400" : "text-rose-400"} font-bold`}> {e.scorePct}%</span>
-                  )}
-                </p>
+                {e.type === "alert" ? (
+                  <p className="text-xs text-amber-300">
+                    <span className="font-semibold">Completion rate alert triggered</span>
+                    {e.completionRate !== undefined && e.threshold !== undefined && (
+                      <span className="text-amber-400/80"> — {e.completionRate}% dropped below {e.threshold}% threshold</span>
+                    )}
+                  </p>
+                ) : (
+                  <p className="text-xs text-gray-200">
+                    <span className="font-semibold">{e.candidateName}</span>
+                    {e.type === "sent" ? " was sent an assessment" : " completed the assessment"}
+                    {e.type === "completed" && e.scorePct !== null && e.scorePct !== undefined && (
+                      <span className={` — ${e.scorePct >= 75 ? "text-emerald-400" : e.scorePct >= 50 ? "text-amber-400" : "text-rose-400"} font-bold`}> {e.scorePct}%</span>
+                    )}
+                  </p>
+                )}
                 <p className="text-[10px] text-gray-500 mt-0.5">{fmtDateTime(e.timestamp)}</p>
               </div>
               {e.type === "completed" && e.hiringDecision && hiringDecisionBadge(e.hiringDecision)}
@@ -791,6 +828,12 @@ export default function AssessmentAnalyticsTab({
   const [exporting, setExporting]   = useState<"pdf" | "csv" | null>(null);
   const exportRef                   = useRef<HTMLDivElement>(null);
 
+  // Alert settings UI state
+  const [alertEnabled, setAlertEnabled]   = useState(false);
+  const [alertThreshold, setAlertThreshold] = useState(50);
+  const [alertSaving, setAlertSaving]     = useState(false);
+  const [alertSettingsDirty, setAlertSettingsDirty] = useState(false);
+
   const fetchAnalytics = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -824,6 +867,15 @@ export default function AssessmentAnalyticsTab({
 
   useEffect(() => { fetchAnalytics(); }, [fetchAnalytics]);
 
+  // Sync alert settings from loaded data
+  useEffect(() => {
+    if (data?.assessmentAlert) {
+      setAlertEnabled(data.assessmentAlert.enabled);
+      setAlertThreshold(data.assessmentAlert.threshold);
+      setAlertSettingsDirty(false);
+    }
+  }, [data?.assessmentAlert]);
+
   // Close export dropdown on outside click
   useEffect(() => {
     function handle(e: MouseEvent) {
@@ -850,6 +902,37 @@ export default function AssessmentAnalyticsTab({
       return `${new Date(customFrom).toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${new Date(customTo).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
     }
     return "Custom";
+  }
+
+  async function handleDismissBanner() {
+    try {
+      await fetch(apiUrl(`/recruit/jobs/${jobId}/assessment-alert/dismiss-banner`), {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      // Optimistically update local state
+      if (data) {
+        setData({ ...data, assessmentAlert: { ...data.assessmentAlert, bannerDismissed: true } });
+      }
+    } catch {}
+  }
+
+  async function handleSaveAlertSettings() {
+    setAlertSaving(true);
+    try {
+      const res = await fetch(apiUrl(`/recruit/jobs/${jobId}/assessment-alert`), {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: alertEnabled, threshold: alertThreshold }),
+      });
+      if (res.ok) {
+        setAlertSettingsDirty(false);
+        // Refresh data to get updated alertActive state
+        fetchAnalytics();
+      }
+    } catch {} finally {
+      setAlertSaving(false);
+    }
   }
 
   async function handleExportCSV() {
@@ -1069,6 +1152,82 @@ export default function AssessmentAnalyticsTab({
             />
           </div>
         )}
+      </div>
+
+      {/* ── Completion Rate Alert Banner ── */}
+      {data.assessmentAlert?.alertActive && !data.assessmentAlert?.bannerDismissed && (
+        <div className="flex items-start gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/[0.07] p-4">
+          <span className="mt-0.5 shrink-0 flex h-8 w-8 items-center justify-center rounded-xl bg-amber-500/15 text-amber-400">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-amber-300">Low Assessment Completion Rate</p>
+            <p className="text-xs text-amber-400/80 mt-0.5 leading-relaxed">
+              The all-time completion rate is <span className="font-bold text-amber-300">{data.assessmentAlert.allTimeCompletionRate}%</span> — below your configured threshold of <span className="font-bold">{data.assessmentAlert.threshold}%</span>.{" "}
+              {data.assessmentAlert.allTimeSent > 0 && (
+                <span>{data.assessmentAlert.allTimeCompleted} of {data.assessmentAlert.allTimeSent} assessments completed.</span>
+              )}{" "}
+              Consider sending reminder emails or reviewing the assessment experience.
+            </p>
+          </div>
+          <button
+            onClick={handleDismissBanner}
+            className="shrink-0 rounded-lg p-1.5 text-amber-500/60 hover:text-amber-300 hover:bg-amber-500/10 transition"
+            title="Dismiss"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
+      )}
+
+      {/* ── Completion Rate Alert Settings ── */}
+      <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-4">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => { setAlertEnabled(e => !e); setAlertSettingsDirty(true); }}
+              className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${alertEnabled ? "bg-amber-500" : "bg-white/10"}`}
+            >
+              <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${alertEnabled ? "translate-x-4.5" : "translate-x-0.5"}`} />
+            </button>
+            <div>
+              <p className="text-xs font-semibold text-[var(--text-secondary)]">Completion Rate Alert</p>
+              <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
+                {alertEnabled ? `Alert when rate drops below ${alertThreshold}%` : "Enable to get notified of low completion rates"}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 flex-wrap">
+            {alertEnabled && (
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Threshold</span>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={alertThreshold}
+                    onChange={e => { setAlertThreshold(Math.min(100, Math.max(1, Number(e.target.value)))); setAlertSettingsDirty(true); }}
+                    className="w-16 rounded-xl border border-[var(--border-strong)] bg-[var(--surface-muted)] px-2 py-1.5 text-center text-xs font-bold text-[var(--foreground)] outline-none focus:border-amber-400"
+                  />
+                  <span className="text-xs text-gray-500">%</span>
+                </div>
+              </div>
+            )}
+            {alertSettingsDirty && (
+              <button
+                onClick={handleSaveAlertSettings}
+                disabled={alertSaving}
+                className="flex items-center gap-1.5 rounded-xl bg-amber-500/15 border border-amber-500/30 px-3 py-1.5 text-[11px] font-bold text-amber-400 hover:bg-amber-500/25 transition disabled:opacity-50"
+              >
+                {alertSaving ? "Saving…" : "Save"}
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* ── Metrics grid ── */}

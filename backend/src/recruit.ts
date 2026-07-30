@@ -2950,6 +2950,83 @@ recruitRouter.get("/analytics", async (req, res) => {
   }
 });
 
+// ─── Assessment Completion Rate Alert ────────────────────────────────────────
+
+async function checkAssessmentCompletionRateAlert(
+  jobId: string,
+  uid: string,
+  allTimeSent: number,
+  allTimeCompleted: number,
+  jobTitle: string,
+): Promise<void> {
+  await connectMongo();
+  const job = await RecruitJob.findOne({ _id: jobId, uid }).select("assessmentAlert").lean() as any;
+  if (!job) return;
+
+  const a = job.assessmentAlert ?? { enabled: false, threshold: 50, alertFired: false, lastCompletionRate: null, bannerDismissed: false, alertLog: [] };
+  const currentRate = allTimeSent > 0 ? Math.round((allTimeCompleted / allTimeSent) * 100) : 100;
+
+  // Rate is at or above threshold → reset episode so next drop re-triggers
+  if (currentRate >= a.threshold) {
+    if (a.alertFired) {
+      await RecruitJob.updateOne({ _id: jobId }, {
+        $set: {
+          "assessmentAlert.alertFired":        false,
+          "assessmentAlert.bannerDismissed":   false,
+          "assessmentAlert.lastCompletionRate": currentRate,
+        },
+      });
+    }
+    return;
+  }
+
+  // Rate is below threshold
+  if (!a.enabled) return;
+  if (a.alertFired) return; // already alerted for this episode — wait for recovery
+
+  // New episode below threshold — send email + record log entry
+  const user = await User.findById(uid).lean() as any;
+  if (!user?.email) return;
+
+  const generatedAt = new Date().toLocaleString("en-US", {
+    month: "long", day: "numeric", year: "numeric",
+    hour: "numeric", minute: "2-digit",
+  });
+
+  const dashboardUrl = `${FRONTEND_URL}/recruit/jobs/${jobId}`;
+  const { subject, html, text } = emailTemplates.assessmentCompletionAlertEmail(
+    user.name || user.email.split("@")[0],
+    jobTitle,
+    currentRate,
+    a.threshold,
+    allTimeSent,
+    allTimeCompleted,
+    generatedAt,
+    dashboardUrl,
+  );
+
+  await sendEmail({ to: user.email, subject, html, text, from: NOTIFICATION_FROM });
+
+  const logEntry = {
+    triggeredAt:    new Date(),
+    completionRate: currentRate,
+    threshold:      a.threshold,
+    totalSent:      allTimeSent,
+    totalCompleted: allTimeCompleted,
+  };
+
+  await RecruitJob.updateOne({ _id: jobId }, {
+    $set: {
+      "assessmentAlert.alertFired":         true,
+      "assessmentAlert.lastCompletionRate": currentRate,
+      "assessmentAlert.bannerDismissed":    false,
+    },
+    $push: { "assessmentAlert.alertLog": logEntry },
+  });
+
+  console.log(`[assessment-alert] Fired for job ${jobId} — rate ${currentRate}% < threshold ${a.threshold}%`);
+}
+
 // ─── Assessment Analytics (per-job) ──────────────────────────────────────────
 
 recruitRouter.get("/jobs/:jobId/assessment-analytics", async (req, res) => {
@@ -3101,6 +3178,36 @@ recruitRouter.get("/jobs/:jobId/assessment-analytics", async (req, res) => {
     }
     activityEvents.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
+    // ── Assessment completion rate alert ──────────────────────────────────────
+    const jobAny       = job as any;
+    const alertCfg     = jobAny.assessmentAlert ?? { enabled: false, threshold: 50, alertFired: false, lastCompletionRate: null, bannerDismissed: false, alertLog: [] };
+    const allTimeSent      = allSent.length;
+    const allTimeCompleted = allCompleted.length;
+    const allTimeRate      = allTimeSent > 0 ? Math.round((allTimeCompleted / allTimeSent) * 100) : 100;
+    const alertActive      = alertCfg.enabled && allTimeRate < alertCfg.threshold;
+
+    // Inject alert log entries into the activity feed
+    const alertLogEvents: typeof activityEvents = (alertCfg.alertLog ?? []).map((e: any) => ({
+      type: "alert",
+      candidateName: "",
+      candidateId:   "",
+      timestamp:     new Date(e.triggeredAt).toISOString(),
+      completionRate: e.completionRate,
+      threshold:      e.threshold,
+    }));
+    const mergedFeed = [...activityEvents, ...alertLogEvents]
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, 30);
+
+    // Trigger non-blocking alert check (won't block the response)
+    const jobTitle   = (job as any).title ?? "";
+    const jobIdStr   = req.params.jobId;
+    const uidForAlert = uid;
+    setImmediate(() => {
+      checkAssessmentCompletionRateAlert(jobIdStr, uidForAlert, allTimeSent, allTimeCompleted, jobTitle)
+        .catch(e => console.error("[assessment-alert] check failed:", e));
+    });
+
     return res.json({
       metrics: {
         totalSent:         filtSent.length,
@@ -3132,10 +3239,76 @@ recruitRouter.get("/jobs/:jobId/assessment-analytics", async (req, res) => {
         taking:      filtTaking.slice(0, 10).map(mapC),
         awaiting:    filtAwaiting.slice(0, 10).map(mapC),
       },
-      activityFeed: activityEvents.slice(0, 20),
+      activityFeed: mergedFeed,
+      assessmentAlert: {
+        enabled:              alertCfg.enabled,
+        threshold:            alertCfg.threshold,
+        alertActive,
+        bannerDismissed:      alertCfg.bannerDismissed,
+        alertFired:           alertCfg.alertFired,
+        allTimeCompletionRate: allTimeRate,
+        allTimeSent,
+        allTimeCompleted,
+        alertLog:             (alertCfg.alertLog ?? []).map((e: any) => ({
+          triggeredAt:    new Date(e.triggeredAt).toISOString(),
+          completionRate: e.completionRate,
+          threshold:      e.threshold,
+          totalSent:      e.totalSent,
+          totalCompleted: e.totalCompleted,
+        })),
+      },
     });
   } catch (err: any) {
     console.error("[recruit] GET /assessment-analytics", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Assessment Alert Settings ───────────────────────────────────────────────
+
+recruitRouter.patch("/jobs/:jobId/assessment-alert", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "Unauthorized" });
+
+    const { enabled, threshold } = req.body as { enabled?: boolean; threshold?: number };
+    const job = await RecruitJob.findOne({ _id: req.params.jobId, uid }).lean() as any;
+    if (!job) return res.status(404).json({ error: "Job not found." });
+
+    const update: Record<string, unknown> = {};
+    if (enabled !== undefined) update["assessmentAlert.enabled"] = Boolean(enabled);
+    if (threshold !== undefined) {
+      const t = Math.min(100, Math.max(1, Math.round(Number(threshold))));
+      update["assessmentAlert.threshold"] = t;
+      // Threshold changed — reset alertFired so the new threshold is checked fresh
+      update["assessmentAlert.alertFired"] = false;
+    }
+
+    const updated = await RecruitJob.findOneAndUpdate(
+      { _id: req.params.jobId, uid },
+      { $set: update },
+      { returnDocument: "after" }
+    ).lean() as any;
+
+    return res.json({ ok: true, assessmentAlert: updated?.assessmentAlert });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+recruitRouter.post("/jobs/:jobId/assessment-alert/dismiss-banner", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "Unauthorized" });
+
+    await RecruitJob.updateOne(
+      { _id: req.params.jobId, uid },
+      { $set: { "assessmentAlert.bannerDismissed": true } }
+    );
+    return res.json({ ok: true });
+  } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 });
