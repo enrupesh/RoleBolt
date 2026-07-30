@@ -1602,7 +1602,52 @@ recruitPublicRouter.post("/jobs/:jobId/apply", async (req, res) => {
             console.log(`[agent] Auto-shortlisted & emailed: ${candidate.name} (${scorePct}% ≥ ${shortlistThreshold}%)`);
           } else if (agentAction === "shortlisted") {
             emailStatus = "disabled"; // autoEmailShortlist is off
-          } else if (agentAction === "rejected" && agentMode.autoEmailReject === true && email?.trim()) {
+          }
+
+          // ── Auto-send Assessment to shortlisted candidates ────────────────
+          if (agentAction === "shortlisted" && agentMode.autoSendAssessment === true) {
+            try {
+              // Re-fetch to avoid acting on stale assessmentStatus
+              const freshCandidate = await RecruitCandidate.findById(candidate._id).lean();
+              const alreadySent = (freshCandidate as any)?.assessmentStatus !== "not_sent";
+              if (!alreadySent) {
+                const questions = await generateAssessmentQuestions({
+                  jobTitle:            (job as any).title,
+                  rubric:              (job as any).rubric,
+                  jd:                  (job as any).generatedJD,
+                  niche:               (job as any).niche,
+                  nicheDetails:        (job as any).nicheDetails,
+                  languageRequirement: (job as any).languageRequirement,
+                });
+                const assessmentToken = generateToken();
+                await RecruitCandidate.findByIdAndUpdate(candidate._id, {
+                  assessmentToken,
+                  assessmentQuestions: questions,
+                  assessmentStatus: "sent",
+                  assessmentSentAt: new Date(),
+                  previousResumeScore: candidate.totalScore,
+                });
+                const assessmentUrl = `${FRONTEND_URL}/recruit/assessment/${assessmentToken}`;
+                if (email?.trim()) {
+                  const payload = emailTemplates.assessment(candidate.name, (job as any).title, (job as any).companyName ?? "", assessmentUrl);
+                  const assessResult = await sendEmail({ to: email, subject: payload.subject, html: payload.html, text: payload.text, from: CANDIDATE_FROM });
+                  await RecruitCandidate.updateOne({ _id: candidate._id }, {
+                    $push: {
+                      emailLog: {
+                        type: "agent_assessment", to: email, subject: payload.subject, body: payload.text,
+                        sentAt: new Date(), status: assessResult.ok ? "sent" : "failed", error: assessResult.error,
+                      }
+                    }
+                  });
+                  console.log(`[agent] Auto-sent assessment to shortlisted candidate: ${candidate.name} (email ${assessResult.ok ? "ok" : "failed"})`);
+                }
+              }
+            } catch (e) {
+              console.error("[agent] Auto-send assessment failed:", e);
+            }
+          }
+
+          if (agentAction === "rejected" && agentMode.autoEmailReject === true && email?.trim()) {
             const rejBody = `Hi ${candidate.name.split(" ")[0]},\n\nThank you for applying for the ${job.title} role${job.companyName ? ` at ${job.companyName}` : ""}. After reviewing your application, we've decided to move forward with other candidates at this time.\n\nWe appreciate your interest and wish you the best in your search.\n\nWarm regards,\nThe Hiring Team`;
             const tpl = emailTemplates.rejectionEmailHtml(candidate.name, job.title, job.companyName || "", rejBody);
             const result = await sendEmail({ to: email, subject: tpl.subject, html: tpl.html, text: tpl.text });
