@@ -31,6 +31,23 @@ export interface IPerformanceAlert {
   dismissed: boolean;
 }
 
+export interface IAssessmentAlertLogEntry {
+  triggeredAt: Date;
+  completionRate: number;
+  threshold: number;
+  totalSent: number;
+  totalCompleted: number;
+}
+
+export interface IAssessmentAlert {
+  enabled: boolean;
+  threshold: number;          // 0–100, e.g. 50
+  alertFired: boolean;        // true = email sent for current "below" episode
+  lastCompletionRate: number | null;
+  bannerDismissed: boolean;
+  alertLog: IAssessmentAlertLogEntry[];
+}
+
 export interface IPipelineRule {
   id: string;
   condition: "score_above" | "score_below" | "assessment_passed" | "assessment_failed" | "stage_age_days";
@@ -79,6 +96,7 @@ export interface IRecruitJob extends Document {
   agentMode: IAgentMode;
   pipelineRules: IPipelineRule[];
   performanceAlerts: IPerformanceAlert[];
+  assessmentAlert: IAssessmentAlert;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -122,6 +140,29 @@ const PipelineRuleSchema = new Schema<IPipelineRule>(
     action:       { type: String, required: true },
     enabled:      { type: Boolean, default: true },
     triggerCount: { type: Number, default: 0 },
+  },
+  { _id: false }
+);
+
+const AssessmentAlertLogEntrySchema = new Schema<IAssessmentAlertLogEntry>(
+  {
+    triggeredAt:    { type: Date,   default: Date.now },
+    completionRate: { type: Number, required: true },
+    threshold:      { type: Number, required: true },
+    totalSent:      { type: Number, required: true },
+    totalCompleted: { type: Number, required: true },
+  },
+  { _id: false }
+);
+
+const AssessmentAlertSchema = new Schema<IAssessmentAlert>(
+  {
+    enabled:              { type: Boolean, default: false },
+    threshold:            { type: Number,  default: 50 },
+    alertFired:           { type: Boolean, default: false },
+    lastCompletionRate:   { type: Number,  default: null },
+    bannerDismissed:      { type: Boolean, default: false },
+    alertLog:             { type: [AssessmentAlertLogEntrySchema], default: [] },
   },
   { _id: false }
 );
@@ -178,6 +219,7 @@ const RecruitJobSchema = new Schema<IRecruitJob>(
     agentMode: { type: AgentModeSchema, default: () => ({}) },
     pipelineRules: { type: [PipelineRuleSchema], default: [] },
     performanceAlerts: { type: [PerformanceAlertSchema], default: [] },
+    assessmentAlert: { type: AssessmentAlertSchema, default: () => ({}) },
   },
   { timestamps: true }
 );

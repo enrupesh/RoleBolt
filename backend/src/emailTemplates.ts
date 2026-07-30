@@ -462,3 +462,63 @@ export function offerExpiryWarning(
   </table>
 </body></html>`;
 }
+
+// ── 14. Assessment Completion Rate Alert (to recruiter) ───────────────────────
+export function assessmentCompletionAlertEmail(
+  recruiterName: string,
+  jobTitle: string,
+  completionRate: number,
+  threshold: number,
+  totalSent: number,
+  totalCompleted: number,
+  generatedAt: string,
+  dashboardUrl: string,
+): EmailPayload {
+  const subject = `⚠️ Low assessment completion rate — ${jobTitle}`;
+  const html = `<!DOCTYPE html><html><body style='margin:0;padding:0;background:#f0f2f5;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial,sans-serif;'>
+  <table width='100%' cellpadding='0' cellspacing='0' style='background:#f0f2f5;padding:40px 16px;'>
+    <tr><td align='center'>
+      <table width='100%' style='max-width:540px;background:#ffffff;border-radius:16px;border:1px solid #e2e8f0;overflow:hidden;'>
+        <tr><td style='background:#0a66c2;padding:22px 36px;text-align:center;'>
+          <span style='display:inline-block;background:#ffffff;border-radius:12px;padding:8px 14px;'>
+            <span style='font-size:18px;font-weight:900;color:#0a66c2;letter-spacing:-0.5px;'>Rolebolt</span>
+          </span>
+        </td></tr>
+        <tr><td style='padding:28px 36px;'>
+          <p style='margin:0 0 16px;font-size:15px;color:#0f172a;'>Hi <strong>${esc(recruiterName || 'Recruiter')}</strong>,</p>
+          <div style='background:#fffbeb;border:1px solid #fbbf2430;border-radius:12px;padding:18px 20px;margin:0 0 20px;'>
+            <p style='margin:0;font-size:16px;font-weight:700;color:#d97706;'>⚠️ Assessment Completion Rate Alert</p>
+            <p style='margin:8px 0 0;font-size:14px;color:#475569;line-height:1.6;'>
+              The assessment completion rate for <strong>${esc(jobTitle)}</strong> has dropped to
+              <strong style='color:#dc2626;'>${completionRate}%</strong>, which is below your
+              configured threshold of <strong>${threshold}%</strong>.
+            </p>
+          </div>
+          <table width='100%' cellpadding='0' cellspacing='0' style='border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;margin:0 0 20px;'>
+            <tr style='background:#f8fafc;'>
+              <td style='padding:10px 16px;font-size:12px;font-weight:600;color:#64748b;border-bottom:1px solid #e2e8f0;'>Metric</td>
+              <td style='padding:10px 16px;font-size:12px;font-weight:600;color:#64748b;border-bottom:1px solid #e2e8f0;text-align:right;'>Value</td>
+            </tr>
+            <tr><td style='padding:10px 16px;font-size:13px;color:#374151;border-bottom:1px solid #f1f5f9;'>Completion Rate</td><td style='padding:10px 16px;font-size:13px;font-weight:700;color:#dc2626;text-align:right;'>${completionRate}%</td></tr>
+            <tr style='background:#fafafa;'><td style='padding:10px 16px;font-size:13px;color:#374151;border-bottom:1px solid #f1f5f9;'>Configured Threshold</td><td style='padding:10px 16px;font-size:13px;font-weight:700;color:#d97706;text-align:right;'>${threshold}%</td></tr>
+            <tr><td style='padding:10px 16px;font-size:13px;color:#374151;border-bottom:1px solid #f1f5f9;'>Assessments Sent</td><td style='padding:10px 16px;font-size:13px;color:#374151;text-align:right;'>${totalSent}</td></tr>
+            <tr style='background:#fafafa;'><td style='padding:10px 16px;font-size:13px;color:#374151;border-bottom:1px solid #f1f5f9;'>Assessments Completed</td><td style='padding:10px 16px;font-size:13px;color:#374151;text-align:right;'>${totalCompleted}</td></tr>
+            <tr><td style='padding:10px 16px;font-size:12px;color:#94a3b8;'>Report Generated</td><td style='padding:10px 16px;font-size:12px;color:#94a3b8;text-align:right;'>${esc(generatedAt)}</td></tr>
+          </table>
+          <p style='margin:0 0 20px;font-size:14px;color:#475569;line-height:1.65;'>
+            You may want to review the assessment experience, send reminder emails to candidates, or evaluate whether the assessment is too long or difficult.
+          </p>
+          <table cellpadding='0' cellspacing='0'><tr><td style='background:#0a66c2;border-radius:12px;padding:12px 28px;'>
+            <a href='${esc(dashboardUrl)}' style='color:#fff;font-size:14px;font-weight:700;text-decoration:none;'>View Assessment Analytics →</a>
+          </td></tr></table>
+        </td></tr>
+        <tr><td style='border-top:1px solid #f1f5f9;padding:18px 36px;background:#fafafa;text-align:center;'>
+          <p style='margin:0;font-size:12px;color:#94a3b8;'>You received this because you configured an assessment completion rate alert in Rolebolt. To change your settings, visit the Assessment Analytics dashboard.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+  const text = `Hi ${recruiterName || 'Recruiter'},\n\nAssessment Completion Rate Alert for ${jobTitle}\n\nCurrent Rate: ${completionRate}% (threshold: ${threshold}%)\nSent: ${totalSent} | Completed: ${totalCompleted}\nGenerated: ${generatedAt}\n\nYou may want to review the assessment experience or send reminder emails to candidates.\n\nView dashboard: ${dashboardUrl}`;
+  return { subject, html, text };
+}
