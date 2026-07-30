@@ -33,6 +33,7 @@
     "multer": "^2.2.0",
     "node-cron": "^4.6.0",
     "pdf-parse": "^1.1.1",
+    "pdfkit": "^0.19.1",
     "resend": "^6.18.0",
     "stripe": "^22.3.2",
     "tsx": "^4.21.0",
@@ -40,6 +41,7 @@
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
-    "@types/jsonwebtoken": "^9.0.10"
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/pdfkit": "^0.17.6"
   }
 }

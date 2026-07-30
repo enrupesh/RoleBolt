@@ -267,7 +267,132 @@ export function dailyBriefing(
                   { label: "Awaiting Review", value: stats.pendingReview, color: "#7c3aed", bg: "#f5f3ff" },
                   { label: "In Interview", value: stats.inInterview, color: "#059669", bg: "#ecfdf5" },
                   { label: "Active Jobs", value: stats.activeJobs, color: "#d97706", bg: "#fffbeb" },
-                ].map(s => `
+ // ── 10. Offer Reminder (to candidate) ────────────────────────────────────────
+export function offerReminderEmail(
+  candidateName: string, jobTitle: string, companyName: string,
+  offerUrl: string, daysLeft?: number
+): EmailPayload {
+  const subject = `Reminder: Your offer from ${companyName || "us"} is waiting`;
+  const expiryLine = daysLeft !== undefined && daysLeft > 0
+    ? `<p style="margin:0 0 16px;font-size:13.5px;color:#b45309;font-weight:600;">⏳ This offer expires in <strong>${daysLeft} day${daysLeft === 1 ? "" : "s"}</strong>. Please respond before it expires.</p>`
+    : "";
+  const html = shell(candidateName, subject, `
+    <p style="margin:0 0 16px;font-size:15px;color:#333;line-height:1.65;">
+      This is a friendly reminder that your offer for <strong>${esc(jobTitle)}</strong>${companyName ? ` at <strong>${esc(companyName)}</strong>` : ""} is still awaiting your response.
+    </p>
+    ${expiryLine}
+    <p style="margin:0 0 20px;font-size:14px;color:#555;line-height:1.65;">
+      Please take a moment to review the offer and let us know your decision by clicking the button below.
+    </p>
+    ${btn("Review & Respond to Offer", offerUrl)}
+    <p style="margin:20px 0 0;font-size:13px;color:#888;">Or copy this link: <a href="${offerUrl}" style="color:#0a66c2;">${offerUrl}</a></p>
+  `);
+  const text = `Hi ${candidateName},\n\nThis is a reminder that your offer for ${jobTitle}${companyName ? ` at ${companyName}` : ""} is still awaiting your response.\n${daysLeft ? `\nThis offer expires in ${daysLeft} day${daysLeft === 1 ? "" : "s"}.\n` : ""}\nPlease review and respond: ${offerUrl}`;
+  return { subject, html, text };
+}
+
+// ── 11. Offer Email with Review Link (to candidate) ───────────────────────────
+export function offerEmailWithLink(
+  candidateName: string, jobTitle: string, companyName: string,
+  offerBody: string, offerUrl: string
+): EmailPayload {
+  const subject = `Job Offer — ${jobTitle}${companyName ? ` at ${companyName}` : ""}`;
+  const html = shell(candidateName, subject, `
+    <p style="margin:0 0 20px;font-size:15px;color:#333;line-height:1.65;">
+      We are pleased to extend you an offer for <strong>${esc(jobTitle)}</strong>${companyName ? ` at <strong>${esc(companyName)}</strong>` : ""}. Please review the letter below and use the button to officially accept or decline.
+    </p>
+    <div style="background:#f8f8ff;border-left:3px solid #4f46e5;border-radius:6px;padding:20px 24px;margin:0 0 20px;">
+      <p style="margin:0;font-size:13.5px;color:#333;line-height:1.9;white-space:pre-wrap;font-family:Georgia,serif;">${nl2br(offerBody)}</p>
+    </div>
+    ${btn("Review & Sign Offer", offerUrl)}
+    <p style="margin:16px 0 0;font-size:13px;color:#666;">Or copy this link: <a href="${offerUrl}" style="color:#0a66c2;">${offerUrl}</a></p>
+  `);
+  const text = `Hi ${candidateName},\n\nWe are pleased to extend you an offer for ${jobTitle}${companyName ? ` at ${companyName}` : ""}.\n\n${offerBody}\n\nReview and respond here: ${offerUrl}`;
+  return { subject, html, text };
+}
+
+// ── 12. Offer Response Notification (to recruiter) ────────────────────────────
+export function offerResponseEmail(
+  recruiterName: string, candidateName: string, jobTitle: string,
+  response: "accepted" | "declined", signerName?: string
+): string {
+  const accepted = response === "accepted";
+  const color = accepted ? "#059669" : "#dc2626";
+  const bg    = accepted ? "#f0fdf4" : "#fef2f2";
+  const icon  = accepted ? "✅" : "❌";
+  const label = accepted ? "Accepted" : "Declined";
+  return `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f0f2f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f2f5;padding:40px 16px;">
+    <tr><td align="center">
+      <table width="100%" style="max-width:520px;background:#ffffff;border-radius:16px;border:1px solid #e2e8f0;overflow:hidden;">
+        <tr><td style="background:#0a66c2;padding:22px 36px;text-align:center;">
+          <span style="display:inline-block;background:#ffffff;border-radius:12px;padding:8px 14px;">
+            <span style="font-size:18px;font-weight:900;color:#0a66c2;letter-spacing:-0.5px;">Rolebolt</span>
+          </span>
+        </td></tr>
+        <tr><td style="padding:28px 36px;">
+          <p style="margin:0 0 16px;font-size:15px;color:#0f172a;">Hi <strong>${esc(recruiterName || "Recruiter")}</strong>,</p>
+          <div style="background:${bg};border:1px solid ${color}30;border-radius:12px;padding:18px 20px;margin:0 0 20px;text-align:center;">
+            <p style="margin:0 0 8px;font-size:28px;">${icon}</p>
+            <p style="margin:0;font-size:17px;font-weight:700;color:${color};">${esc(candidateName)} has <strong>${label}</strong> the offer</p>
+            <p style="margin:6px 0 0;font-size:13px;color:#64748b;">${esc(jobTitle)}</p>
+            ${signerName && accepted ? `<p style="margin:8px 0 0;font-size:12px;color:#64748b;">Signed as: <strong>${esc(signerName)}</strong></p>` : ""}
+          </div>
+          <p style="margin:0 0 20px;font-size:14px;color:#475569;line-height:1.65;">
+            ${accepted
+              ? "Great news! The candidate has accepted the offer and signed digitally. You can proceed with onboarding."
+              : "The candidate has declined the offer. You may want to review other candidates or reach out for feedback."
+            }
+          </p>
+          <table cellpadding="0" cellspacing="0"><tr><td style="background:#0a66c2;border-radius:12px;padding:12px 28px;">
+            <a href="https://www.rolebolt.tech/recruit/dashboard" style="color:#fff;font-size:14px;font-weight:700;text-decoration:none;">Open Dashboard →</a>
+          </td></tr></table>
+        </td></tr>
+        <tr><td style="border-top:1px solid #f1f5f9;padding:18px 36px;background:#fafafa;text-align:center;">
+          <p style="margin:0;font-size:12px;color:#94a3b8;">You received this because a candidate responded to an offer sent through Rolebolt.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+}
+
+// ── 13. Offer Expiry Warning (to recruiter) ───────────────────────────────────
+export function offerExpiryWarning(
+  recruiterName: string, candidateName: string, jobTitle: string, daysLeft: number
+): string {
+  const urgent = daysLeft <= 1;
+  const color  = urgent ? "#dc2626" : "#d97706";
+  return `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f0f2f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f2f5;padding:40px 16px;">
+    <tr><td align="center">
+      <table width="100%" style="max-width:520px;background:#ffffff;border-radius:16px;border:1px solid #e2e8f0;overflow:hidden;">
+        <tr><td style="background:#0a66c2;padding:22px 36px;text-align:center;">
+          <span style="display:inline-block;background:#ffffff;border-radius:12px;padding:8px 14px;">
+            <span style="font-size:18px;font-weight:900;color:#0a66c2;letter-spacing:-0.5px;">Rolebolt</span>
+          </span>
+        </td></tr>
+        <tr><td style="padding:28px 36px;">
+          <p style="margin:0 0 16px;font-size:15px;color:#0f172a;">Hi <strong>${esc(recruiterName || "Recruiter")}</strong>,</p>
+          <div style="background:${urgent ? "#fef2f2" : "#fffbeb"};border:1px solid ${color}30;border-radius:12px;padding:16px 20px;margin:0 0 20px;">
+            <p style="margin:0;font-size:16px;font-weight:700;color:${color};">⏰ Offer expiring ${daysLeft === 0 ? "today" : `in ${daysLeft} day${daysLeft === 1 ? "" : "s"}`}</p>
+            <p style="margin:6px 0 0;font-size:13px;color:#64748b;">${esc(candidateName)} · ${esc(jobTitle)}</p>
+          </div>
+          <p style="margin:0 0 20px;font-size:14px;color:#475569;line-height:1.65;">The offer for <strong>${esc(candidateName)}</strong> is set to expire ${daysLeft === 0 ? "today" : `in ${daysLeft} day${daysLeft === 1 ? "" : "s"}`} and the candidate has not yet responded. You may want to follow up or extend the deadline.</p>
+          <table cellpadding="0" cellspacing="0"><tr><td style="background:#0a66c2;border-radius:12px;padding:12px 28px;">
+            <a href="https://www.rolebolt.tech/recruit/dashboard" style="color:#fff;font-size:14px;font-weight:700;text-decoration:none;">View in Dashboard →</a>
+          </td></tr></table>
+        </td></tr>
+        <tr><td style="border-top:1px solid #f1f5f9;padding:18px 36px;background:#fafafa;text-align:center;">
+          <p style="margin:0;font-size:12px;color:#94a3b8;">You received this because you have an active offer in Rolebolt that is approaching expiry.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+}
+
+               ].map(s => `
                 <td width="25%" style="padding:0 4px;">
                   <div style="background:${s.bg};border-radius:10px;padding:12px 10px;text-align:center;">
                     <p style="margin:0;font-size:22px;font-weight:800;color:${s.color};line-height:1;">${s.value}</p>

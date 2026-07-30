@@ -9,6 +9,7 @@ import { copilotRouter } from "./recruitCopilot";
 import { siteGuideRouter } from "./siteGuideChat";
 import { connectMongo } from "./db";
 import { startDailyBriefingJob } from "./jobs/dailyBriefing";
+import { startOfferManagementJob } from "./jobs/offerManagement";
 import { seekerRouter } from "./seeker";
 import { billingRouter, handleStripeWebhook } from "./billing";
 
@@ -459,6 +460,7 @@ connectMongo()
 
 if (process.env.CRON_ENABLED === "true") {
   startDailyBriefingJob();
+  startOfferManagementJob();
 }
 
 app.listen(PORT, () => {
