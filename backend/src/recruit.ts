@@ -3332,6 +3332,29 @@ recruitRouter.get("/jobs/:jobId/candidates/:candidateId/offer-letter/pdf", async
   }
 });
 
+// Lightweight poll endpoint — returns offer statuses for all offer/hired stage candidates in one cheap query
+recruitRouter.get("/jobs/:jobId/offer-statuses", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const candidates = await RecruitCandidate.find(
+      { jobId: req.params.jobId, uid, stage: { $in: ["offer", "hired"] } },
+      { _id: 1, offerStatus: 1, offerCandidateStatus: 1, offerDetails: 1, offerLog: 1 }
+    ).lean();
+    const statuses = candidates.map((c: any) => ({
+      _id:                  c._id.toString(),
+      offerStatus:          c.offerStatus          || "none",
+      offerCandidateStatus: c.offerCandidateStatus || "",
+      offerExpiryDate:      c.offerDetails?.offerExpiryDate || "",
+      lastLogAction:        c.offerLog?.length ? c.offerLog[c.offerLog.length - 1].action : "",
+    }));
+    return res.json({ statuses });
+  } catch (err: any) {
+    console.error("[recruit] GET /offer-statuses", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // List all saved offer letter versions
 recruitRouter.get("/jobs/:jobId/candidates/:candidateId/offer-letter/versions", async (req, res) => {
   try {
