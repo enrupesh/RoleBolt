@@ -34,6 +34,12 @@ export function apiUrl(path: string): string {
   return `${API_BASE_URL}${normalizedPath}`;
 }
 
+/** Routes that go through the public (unauthenticated) prefix */
+export function apiPublicUrl(path: string): string {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `${API_BASE_URL}/recruit-public${normalizedPath}`;
+}
+
 export async function readApiJson<T = any>(res: Response): Promise<T> {
   const text = await res.text();
   if (!text) return {} as T;
