@@ -1,0 +1,87 @@
+Please add an **Export Assessment Analytics** feature to the Assessment Analytics Dashboard.
+
+## Objective
+
+Allow recruiters to export assessment analytics and reports in **PDF** and **CSV** formats so they can easily share hiring insights with hiring managers, HR leaders, or clients.
+
+## Export Formats
+
+Support:
+
+* PDF Report
+* CSV Export
+
+---
+
+## PDF Report
+
+Generate a professional report that includes:
+
+* Job Details
+* Report Generation Date
+* Total Assessments Sent
+* Total Assessments Completed
+* Completion Rate
+* Average Assessment Score
+* Highest Score
+* Lowest Score
+* Pass Rate
+* Fail Rate
+* Average Time Taken
+* Assessment Trend Charts
+* Score Distribution Charts
+* Top Performing Candidates
+* Candidates Awaiting Assessment
+* Candidates with Incomplete Assessments
+
+The report should be well-formatted, printable, and suitable for management or client sharing.
+
+---
+
+## CSV Export
+
+Export candidate-level assessment data, including:
+
+* Candidate Name
+* Assessment Status
+* Assessment Score
+* Pass / Fail Status
+* Time Taken
+* Assessment Completion Date
+* Current Pipeline Stage
+
+The CSV should be compatible with Microsoft Excel and Google Sheets.
+
+---
+
+## Filters
+
+Exports should respect the currently selected filters, including:
+
+* Today
+* This Week
+* This Month
+* Custom Date Range
+
+Only the filtered data should be exported.
+
+---
+
+## Export Options
+
+Provide an **Export** button on the Assessment Analytics Dashboard with options:
+
+* Export as PDF
+* Export as CSV
+
+---
+
+## Acceptance Criteria
+
+1. Support exporting assessment analytics as both PDF and CSV.
+2. Generate professional PDF reports with charts and summary metrics.
+3. Export detailed candidate-level data in CSV format.
+4. Respect all active dashboard filters during export.
+5. Ensure exports are fast, accurate, and suitable for sharing with hiring managers, HR leadership, and clients.
+
+This feature will make it easy for recruiters to share assessment insights, hiring progress, and candidate performance outside the platform without manually compiling reports.

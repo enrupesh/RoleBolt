@@ -3140,6 +3140,80 @@ recruitRouter.get("/jobs/:jobId/assessment-analytics", async (req, res) => {
   }
 });
 
+// ─── Assessment Analytics Export ────────────────────────────────────────────
+
+recruitRouter.get("/jobs/:jobId/assessment-analytics/export", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "Unauthorized" });
+
+    const job = await RecruitJob.findOne({ _id: req.params.jobId, uid }).lean();
+    if (!job) return res.status(404).json({ error: "Job not found." });
+
+    const { from, to } = req.query as { from?: string; to?: string };
+    const fromDate = from ? new Date(from) : null;
+    const toDate   = to   ? new Date(to)   : null;
+    if (toDate) toDate.setHours(23, 59, 59, 999);
+
+    function inRange(date: Date | undefined | null): boolean {
+      if (!fromDate && !toDate) return true;
+      if (!date) return false;
+      const d = new Date(date);
+      if (fromDate && d < fromDate) return false;
+      if (toDate   && d > toDate)   return false;
+      return true;
+    }
+
+    const allCandidates = await RecruitCandidate.find({ jobId: req.params.jobId, uid })
+      .select("name email totalScore maxScore assessmentStatus assessmentSentAt assessmentCompletedAt assessmentAnswers hiringDecision stage createdAt")
+      .lean();
+
+    function scorePct(c: { totalScore?: number; maxScore?: number }): number | null {
+      if (!c.maxScore || c.maxScore <= 0) return null;
+      return Math.round(((c.totalScore ?? 0) / c.maxScore) * 100);
+    }
+
+    function timeTaken(c: { assessmentAnswers?: any[] }): number {
+      return ((c.assessmentAnswers as any[]) || []).reduce((s: number, a: any) => s + (Number(a.timeTakenSeconds) || 0), 0);
+    }
+
+    function passFailLabel(c: { hiringDecision?: string | null; assessmentStatus?: string }): string {
+      if (c.assessmentStatus !== "completed") return "—";
+      if (c.hiringDecision === "strong_yes") return "Pass";
+      if (c.hiringDecision === "no") return "Fail";
+      if (c.hiringDecision === "maybe") return "Maybe";
+      return "Pending";
+    }
+
+    // Filter candidates: use assessmentSentAt for sent/completed, createdAt for not_sent
+    const filtered = allCandidates.filter(c => {
+      if (c.assessmentStatus === "completed") return inRange(c.assessmentCompletedAt);
+      if (c.assessmentStatus === "sent")      return inRange(c.assessmentSentAt);
+      return inRange(c.createdAt);
+    });
+
+    const candidates = filtered.map(c => ({
+      name:               c.name,
+      email:              c.email ?? "",
+      assessmentStatus:   c.assessmentStatus === "completed" ? "Completed"
+                        : c.assessmentStatus === "sent"      ? "Sent (Incomplete)"
+                        : "Not Sent",
+      scorePct:           scorePct(c),
+      passFailStatus:     passFailLabel(c),
+      timeTakenSeconds:   timeTaken(c),
+      assessmentCompletedAt: c.assessmentCompletedAt ? new Date(c.assessmentCompletedAt).toISOString() : null,
+      stage:              c.stage ?? "",
+      hiringDecision:     c.hiringDecision ?? null,
+    }));
+
+    return res.json({ jobTitle: (job as any).title ?? "", candidates });
+  } catch (err: any) {
+    console.error("[recruit] GET /assessment-analytics/export", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── Talent Pool ─────────────────────────────────────────────────────────────
 
 // Single source of truth for "silver-medal" auto-eligibility, mirrored in the
