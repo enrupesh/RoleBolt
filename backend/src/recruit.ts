@@ -1570,40 +1570,72 @@ recruitPublicRouter.post("/jobs/:jobId/apply", async (req, res) => {
 
     await RecruitJob.updateOne({ _id: job._id }, { $inc: { candidateCount: 1 } });
 
-    // ── AI Agent: send emails non-blocking ───────────────────────────────────
-    if (agentEnabled && email?.trim() && agentAction) {
+    // ── AI Agent: send emails + write agentLog (non-blocking) ────────────────
+    if (agentEnabled && agentAction) {
+      const _agentReason = agentAction === "shortlisted"
+        ? `Score ${scorePct}% ≥ shortlist threshold ${shortlistThreshold}%`
+        : `Score ${scorePct}% < reject threshold ${rejectThreshold}%`;
+
       setImmediate(async () => {
+        let emailSent = false;
+        let emailStatus: "sent" | "failed" | "skipped" | "disabled" = "disabled";
+
         try {
-          if (agentAction === "shortlisted" && agentMode.autoEmailShortlist !== false) {
-            const tpl = emailTemplates.screened(
-              candidate.name, job.title, job.companyName || ""
-            );
+          if (agentAction === "shortlisted" && agentMode.autoEmailShortlist !== false && email?.trim()) {
+            const tpl = emailTemplates.screened(candidate.name, job.title, job.companyName || "");
             const result = await sendEmail({ to: email, subject: tpl.subject, html: tpl.html, text: tpl.text });
+            emailSent = result.ok;
+            emailStatus = result.ok ? "sent" : "failed";
             await RecruitCandidate.updateOne({ _id: candidate._id }, {
               $push: {
                 emailLog: {
                   type: "agent_shortlisted", to: email, subject: tpl.subject, body: tpl.text,
-                  sentAt: new Date(), status: result.ok ? "sent" : "failed", error: result.error,
+                  sentAt: new Date(), status: emailStatus, error: result.error,
                 }
               }
             });
             console.log(`[agent] Auto-shortlisted & emailed: ${candidate.name} (${scorePct}% ≥ ${shortlistThreshold}%)`);
-          } else if (agentAction === "rejected" && agentMode.autoEmailReject === true) {
+          } else if (agentAction === "shortlisted") {
+            emailStatus = "disabled"; // autoEmailShortlist is off
+          } else if (agentAction === "rejected" && agentMode.autoEmailReject === true && email?.trim()) {
             const rejBody = `Hi ${candidate.name.split(" ")[0]},\n\nThank you for applying for the ${job.title} role${job.companyName ? ` at ${job.companyName}` : ""}. After reviewing your application, we've decided to move forward with other candidates at this time.\n\nWe appreciate your interest and wish you the best in your search.\n\nWarm regards,\nThe Hiring Team`;
             const tpl = emailTemplates.rejectionEmailHtml(candidate.name, job.title, job.companyName || "", rejBody);
             const result = await sendEmail({ to: email, subject: tpl.subject, html: tpl.html, text: tpl.text });
+            emailSent = result.ok;
+            emailStatus = result.ok ? "sent" : "failed";
             await RecruitCandidate.updateOne({ _id: candidate._id }, {
               $push: {
                 emailLog: {
                   type: "agent_rejected", to: email, subject: tpl.subject, body: tpl.text,
-                  sentAt: new Date(), status: result.ok ? "sent" : "failed", error: result.error,
+                  sentAt: new Date(), status: emailStatus, error: result.error,
                 }
               }
             });
             console.log(`[agent] Auto-rejected & emailed: ${candidate.name} (${scorePct}% < ${rejectThreshold}%)`);
+          } else if (agentAction === "rejected") {
+            emailStatus = "disabled"; // autoEmailReject is off
           }
         } catch (e) {
           console.error("[agent] Email dispatch failed:", e);
+          emailStatus = "failed";
+        }
+
+        // ── Write agentLog entry ──────────────────────────────────────────────
+        try {
+          await RecruitCandidate.updateOne({ _id: candidate._id }, {
+            $push: {
+              agentLog: {
+                action: agentAction,
+                score: scorePct,
+                reason: _agentReason,
+                emailSent,
+                emailStatus,
+                timestamp: new Date(),
+              }
+            }
+          });
+        } catch (e) {
+          console.error("[agent] agentLog write failed:", e);
         }
       });
     }
@@ -1631,6 +1663,59 @@ recruitRouter.delete("/jobs/:jobId", async (req, res) => {
     await RecruitJob.deleteOne({ _id: req.params.jobId, uid });
     await RecruitCandidate.deleteMany({ jobId: req.params.jobId, uid });
     return res.json({ ok: true });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── AI Agent Activity Log ─────────────────────────────────────────────────────
+recruitRouter.get("/jobs/:jobId/agent-log", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    // Verify job belongs to this recruiter
+    const job = await RecruitJob.findOne({ _id: req.params.jobId, uid }).lean();
+    if (!job) return res.status(404).json({ error: "Job not found." });
+
+    // Pull all candidates with agentLog entries
+    const candidates = await RecruitCandidate.find(
+      { jobId: req.params.jobId, uid, "agentLog.0": { $exists: true } },
+      { _id: 1, name: 1, email: 1, agentLog: 1 }
+    ).lean();
+
+    // Flatten + annotate with candidateId/name/email, sort newest first
+    const entries: {
+      candidateId: string;
+      candidateName: string;
+      candidateEmail: string;
+      action: string;
+      score: number;
+      reason: string;
+      emailSent: boolean;
+      emailStatus: string;
+      timestamp: string;
+    }[] = [];
+
+    for (const c of candidates) {
+      const log = (c as any).agentLog ?? [];
+      for (const entry of log) {
+        entries.push({
+          candidateId:    String(c._id),
+          candidateName:  (c as any).name,
+          candidateEmail: (c as any).email || "",
+          action:         entry.action,
+          score:          entry.score,
+          reason:         entry.reason,
+          emailSent:      entry.emailSent,
+          emailStatus:    entry.emailStatus,
+          timestamp:      entry.timestamp ? new Date(entry.timestamp).toISOString() : new Date().toISOString(),
+        });
+      }
+    }
+
+    entries.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+    return res.json({ ok: true, entries, total: entries.length });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }

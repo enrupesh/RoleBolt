@@ -48,6 +48,15 @@ export interface IEmailLogEntry {
   error?: string;
 }
 
+export interface IAgentActionEntry {
+  action: "shortlisted" | "rejected";
+  score: number;          // 0–100 percentage
+  reason: string;         // e.g. "Score 82% ≥ shortlist threshold 75%"
+  emailSent: boolean;
+  emailStatus: "sent" | "failed" | "skipped" | "disabled";
+  timestamp: Date;
+}
+
 export interface IRecruitCandidate extends Document {
   jobId: mongoose.Types.ObjectId;
   uid: string;
@@ -82,6 +91,7 @@ export interface IRecruitCandidate extends Document {
   talentPoolNote?: string;
   stageMovedAt?: Date;
   emailLog: IEmailLogEntry[];
+  agentLog: IAgentActionEntry[];
   offerLetter?: string;
   location?: string;
   currentStatus?: string;
@@ -190,6 +200,22 @@ const RecruitCandidateSchema = new Schema<IRecruitCandidate>(
             error:   { type: String },
           },
           { _id: true }
+        ),
+      ],
+      default: [],
+    },
+    agentLog: {
+      type: [
+        new Schema(
+          {
+            action:      { type: String, enum: ["shortlisted", "rejected"], required: true },
+            score:       { type: Number, required: true },
+            reason:      { type: String, default: "" },
+            emailSent:   { type: Boolean, default: false },
+            emailStatus: { type: String, enum: ["sent", "failed", "skipped", "disabled"], default: "disabled" },
+            timestamp:   { type: Date, default: Date.now },
+          },
+          { _id: false }
         ),
       ],
       default: [],
