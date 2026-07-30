@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { apiUrl } from "@/lib/api";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -486,6 +486,288 @@ function ActivityFeed({ events }: { events: ActivityEvent[] }) {
   );
 }
 
+// ── Export helpers ────────────────────────────────────────────────────────────
+
+type ExportCandidate = {
+  name: string;
+  email: string;
+  assessmentStatus: string;
+  scorePct: number | null;
+  passFailStatus: string;
+  timeTakenSeconds: number;
+  assessmentCompletedAt: string | null;
+  stage: string;
+  hiringDecision: string | null;
+};
+
+async function fetchExportCandidates(
+  jobId: string,
+  token: string,
+  range: { from: string; to: string } | null,
+): Promise<{ jobTitle: string; candidates: ExportCandidate[] }> {
+  const params = new URLSearchParams();
+  if (range) { params.set("from", range.from); params.set("to", range.to); }
+  const res = await fetch(apiUrl(`/recruit/jobs/${jobId}/assessment-analytics/export?${params}`), {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("Failed to fetch export data");
+  return res.json();
+}
+
+function buildCSV(candidates: ExportCandidate[]): string {
+  const headers = [
+    "Candidate Name",
+    "Email",
+    "Assessment Status",
+    "Assessment Score (%)",
+    "Pass / Fail Status",
+    "Time Taken",
+    "Assessment Completion Date",
+    "Current Pipeline Stage",
+  ];
+
+  function fmtTime(s: number): string {
+    if (s <= 0) return "—";
+    const m = Math.floor(s / 60);
+    const rem = s % 60;
+    return rem > 0 ? `${m}m ${rem}s` : `${m}m`;
+  }
+
+  function escapeCSV(val: string | number | null | undefined): string {
+    const str = val === null || val === undefined ? "" : String(val);
+    if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+      return `"${str.replace(/"/g, '""')}"`;
+    }
+    return str;
+  }
+
+  const rows = candidates.map(c => [
+    escapeCSV(c.name),
+    escapeCSV(c.email),
+    escapeCSV(c.assessmentStatus),
+    escapeCSV(c.scorePct !== null ? c.scorePct : "—"),
+    escapeCSV(c.passFailStatus),
+    escapeCSV(fmtTime(c.timeTakenSeconds)),
+    escapeCSV(c.assessmentCompletedAt
+      ? new Date(c.assessmentCompletedAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
+      : "—"),
+    escapeCSV(c.stage || "—"),
+  ].join(","));
+
+  return [headers.join(","), ...rows].join("\r\n");
+}
+
+async function exportPDF(
+  jobId: string,
+  token: string,
+  jobTitle: string,
+  data: AnalyticsData,
+  range: { from: string; to: string } | null,
+  presetLabel: string,
+): Promise<void> {
+  const { default: jsPDF } = await import("jspdf");
+  const autoTable = (await import("jspdf-autotable")).default;
+
+  const { metrics, charts } = data;
+  const { candidates } = await fetchExportCandidates(jobId, token, range);
+
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const margin = 18;
+  let y = margin;
+
+  // ── Header ──────────────────────────────────────────────────────────────────
+  doc.setFillColor(15, 10, 30);
+  doc.rect(0, 0, pageW, 40, "F");
+
+  doc.setFontSize(18);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(255, 255, 255);
+  doc.text("Assessment Analytics Report", margin, 18);
+
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(180, 160, 220);
+  doc.text(`Job: ${jobTitle}`, margin, 27);
+  doc.text(`Period: ${presetLabel}   ·   Generated: ${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}`, margin, 34);
+
+  y = 50;
+
+  // ── Summary Metrics ──────────────────────────────────────────────────────────
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(40, 20, 80);
+  doc.text("Summary Metrics", margin, y);
+  y += 5;
+
+  const metricRows: [string, string][] = [
+    ["Total Assessments Sent",      String(metrics.totalSent)],
+    ["Total Assessments Completed", String(metrics.totalCompleted)],
+    ["Completion Rate",             `${metrics.completionRate}%`],
+    ["Average Score",               metrics.avgScore !== null ? `${metrics.avgScore}%` : "—"],
+    ["Highest Score",               metrics.highestScore !== null ? `${metrics.highestScore}%` : "—"],
+    ["Lowest Score",                metrics.lowestScore !== null ? `${metrics.lowestScore}%` : "—"],
+    ["Pass Rate (Strong Yes)",      metrics.passRate !== null ? `${metrics.passRate}%` : "—"],
+    ["Fail Rate",                   metrics.failRate !== null ? `${metrics.failRate}%` : "—"],
+    ["Average Time Taken",          metrics.avgTimeTakenSeconds !== null
+      ? (() => { const m = Math.floor(metrics.avgTimeTakenSeconds! / 60); const s = metrics.avgTimeTakenSeconds! % 60; return m > 0 ? `${m}m ${s}s` : `${s}s`; })()
+      : "—"],
+    ["Awaiting Assessment",         String(metrics.awaitingCount)],
+    ["Incomplete Assessments",      String(metrics.takingCount)],
+    ["Total Candidates",            String(metrics.totalCandidates)],
+  ];
+
+  autoTable(doc, {
+    startY: y,
+    head: [["Metric", "Value"]],
+    body: metricRows,
+    margin: { left: margin, right: margin },
+    styles: { fontSize: 9, cellPadding: 3 },
+    headStyles: { fillColor: [80, 40, 160], textColor: 255, fontStyle: "bold" },
+    alternateRowStyles: { fillColor: [248, 245, 255] },
+    columnStyles: { 0: { fontStyle: "bold", cellWidth: 90 }, 1: { cellWidth: 60 } },
+  });
+
+  y = (doc as any).lastAutoTable.finalY + 10;
+
+  // ── Score Distribution ───────────────────────────────────────────────────────
+  if (y + 50 > pageH - 20) { doc.addPage(); y = margin; }
+
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(40, 20, 80);
+  doc.text("Score Distribution", margin, y);
+  y += 5;
+
+  autoTable(doc, {
+    startY: y,
+    head: [["Score Range", "Number of Candidates"]],
+    body: charts.scoreDistribution.map(b => [b.range, String(b.count)]),
+    margin: { left: margin, right: margin },
+    styles: { fontSize: 9, cellPadding: 3 },
+    headStyles: { fillColor: [80, 40, 160], textColor: 255, fontStyle: "bold" },
+    alternateRowStyles: { fillColor: [248, 245, 255] },
+  });
+
+  y = (doc as any).lastAutoTable.finalY + 10;
+
+  // ── Assessment Completion Trend ──────────────────────────────────────────────
+  if (charts.completionTrend.length > 0) {
+    if (y + 50 > pageH - 20) { doc.addPage(); y = margin; }
+
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(40, 20, 80);
+    doc.text("Assessment Completion Trend", margin, y);
+    y += 5;
+
+    autoTable(doc, {
+      startY: y,
+      head: [["Date", "Sent", "Completed"]],
+      body: charts.completionTrend.map(p => [
+        new Date(p.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+        String(p.sent),
+        String(p.completed),
+      ]),
+      margin: { left: margin, right: margin },
+      styles: { fontSize: 9, cellPadding: 3 },
+      headStyles: { fillColor: [80, 40, 160], textColor: 255, fontStyle: "bold" },
+      alternateRowStyles: { fillColor: [248, 245, 255] },
+    });
+
+    y = (doc as any).lastAutoTable.finalY + 10;
+  }
+
+  // ── Average Score Over Time ──────────────────────────────────────────────────
+  if (charts.avgScoreOverTime.length > 0) {
+    if (y + 50 > pageH - 20) { doc.addPage(); y = margin; }
+
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(40, 20, 80);
+    doc.text("Average Score Over Time", margin, y);
+    y += 5;
+
+    autoTable(doc, {
+      startY: y,
+      head: [["Date", "Avg Score (%)", "Assessments"]],
+      body: charts.avgScoreOverTime.map(p => [
+        new Date(p.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+        String(p.avgScore),
+        String(p.count),
+      ]),
+      margin: { left: margin, right: margin },
+      styles: { fontSize: 9, cellPadding: 3 },
+      headStyles: { fillColor: [80, 40, 160], textColor: 255, fontStyle: "bold" },
+      alternateRowStyles: { fillColor: [248, 245, 255] },
+    });
+
+    y = (doc as any).lastAutoTable.finalY + 10;
+  }
+
+  // ── Candidate Details ────────────────────────────────────────────────────────
+  if (candidates.length > 0) {
+    if (y + 50 > pageH - 20) { doc.addPage(); y = margin; }
+
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(40, 20, 80);
+    doc.text("Candidate Assessment Details", margin, y);
+    y += 5;
+
+    function fmtTime(s: number): string {
+      if (s <= 0) return "—";
+      const m = Math.floor(s / 60);
+      const rem = s % 60;
+      return rem > 0 ? `${m}m ${rem}s` : `${m}m`;
+    }
+
+    autoTable(doc, {
+      startY: y,
+      head: [["Candidate", "Status", "Score", "Pass/Fail", "Time Taken", "Completed", "Stage"]],
+      body: candidates.map(c => [
+        c.name,
+        c.assessmentStatus,
+        c.scorePct !== null ? `${c.scorePct}%` : "—",
+        c.passFailStatus,
+        fmtTime(c.timeTakenSeconds),
+        c.assessmentCompletedAt
+          ? new Date(c.assessmentCompletedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+          : "—",
+        c.stage || "—",
+      ]),
+      margin: { left: margin, right: margin },
+      styles: { fontSize: 8, cellPadding: 2.5, overflow: "linebreak" },
+      headStyles: { fillColor: [80, 40, 160], textColor: 255, fontStyle: "bold" },
+      alternateRowStyles: { fillColor: [248, 245, 255] },
+      columnStyles: {
+        0: { cellWidth: 38 },
+        1: { cellWidth: 26 },
+        2: { cellWidth: 16 },
+        3: { cellWidth: 18 },
+        4: { cellWidth: 20 },
+        5: { cellWidth: 24 },
+        6: { cellWidth: 28 },
+      },
+    });
+  }
+
+  // ── Footer on each page ──────────────────────────────────────────────────────
+  const pageCount = (doc.internal as any).getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(150, 140, 170);
+    doc.text(`Page ${i} of ${pageCount}`, pageW - margin, pageH - 8, { align: "right" });
+    doc.text("Recruit — Assessment Analytics", margin, pageH - 8);
+  }
+
+  const safeTitle = jobTitle.replace(/[^a-z0-9]/gi, "-").toLowerCase();
+  doc.save(`assessment-analytics-${safeTitle}.pdf`);
+}
+
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function AssessmentAnalyticsTab({
@@ -505,6 +787,9 @@ export default function AssessmentAnalyticsTab({
   const [error, setError]           = useState("");
   const [drill, setDrill]           = useState<DrillType>(null);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exporting, setExporting]   = useState<"pdf" | "csv" | null>(null);
+  const exportRef                   = useRef<HTMLDivElement>(null);
 
   const fetchAnalytics = useCallback(async () => {
     setLoading(true);
@@ -538,6 +823,69 @@ export default function AssessmentAnalyticsTab({
   }, [jobId, token, preset, customFrom, customTo]);
 
   useEffect(() => { fetchAnalytics(); }, [fetchAnalytics]);
+
+  // Close export dropdown on outside click
+  useEffect(() => {
+    function handle(e: MouseEvent) {
+      if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
+        setExportOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handle);
+    return () => document.removeEventListener("mousedown", handle);
+  }, []);
+
+  function getRange(): { from: string; to: string } | null {
+    return preset === "custom"
+      ? (customFrom && customTo ? { from: new Date(customFrom).toISOString(), to: new Date(customTo).toISOString() } : null)
+      : presetRange(preset);
+  }
+
+  function getPresetLabel(): string {
+    if (preset === "today")  return "Today";
+    if (preset === "week")   return "This Week";
+    if (preset === "month")  return "This Month";
+    if (preset === "all")    return "All Time";
+    if (preset === "custom" && customFrom && customTo) {
+      return `${new Date(customFrom).toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${new Date(customTo).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+    }
+    return "Custom";
+  }
+
+  async function handleExportCSV() {
+    if (!data) return;
+    setExportOpen(false);
+    setExporting("csv");
+    try {
+      const { candidates: exportCandidates } = await fetchExportCandidates(jobId, token, getRange());
+      const csv = buildCSV(exportCandidates);
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const safeTitle = jobTitle.replace(/[^a-z0-9]/gi, "-").toLowerCase();
+      a.href = url;
+      a.download = `assessment-analytics-${safeTitle}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      alert("Failed to export CSV. Please try again.");
+    } finally {
+      setExporting(null);
+    }
+  }
+
+  async function handleExportPDF() {
+    if (!data) return;
+    setExportOpen(false);
+    setExporting("pdf");
+    try {
+      await exportPDF(jobId, token, jobTitle, data, getRange(), getPresetLabel());
+    } catch (e) {
+      alert("Failed to export PDF. Please try again.");
+    } finally {
+      setExporting(null);
+    }
+  }
 
   if (loading) {
     return (
@@ -611,15 +959,79 @@ export default function AssessmentAnalyticsTab({
             )}
           </p>
         </div>
-        <button
-          onClick={fetchAnalytics}
-          className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--foreground)] transition"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/>
-          </svg>
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={fetchAnalytics}
+            className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--foreground)] transition"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/>
+            </svg>
+            Refresh
+          </button>
+
+          {/* Export dropdown */}
+          <div className="relative" ref={exportRef}>
+            <button
+              onClick={() => setExportOpen(o => !o)}
+              disabled={exporting !== null}
+              className="flex items-center gap-1.5 rounded-xl border border-violet-500/30 bg-violet-500/10 px-3 py-2 text-xs font-semibold text-violet-400 hover:bg-violet-500/20 transition disabled:opacity-50"
+            >
+              {exporting ? (
+                <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                </svg>
+              ) : (
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+              )}
+              {exporting === "pdf" ? "Generating PDF…" : exporting === "csv" ? "Generating CSV…" : "Export"}
+              {!exporting && (
+                <svg className="w-3 h-3 ml-0.5 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m6 9 6 6 6-6"/>
+                </svg>
+              )}
+            </button>
+
+            {exportOpen && (
+              <div className="absolute right-0 top-full mt-1.5 w-48 rounded-2xl border border-white/[0.1] bg-[#0f0a1e] shadow-2xl overflow-hidden z-30">
+                <div className="px-3 pt-3 pb-1.5">
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-gray-500">Export options</p>
+                </div>
+                <button
+                  onClick={handleExportPDF}
+                  className="flex w-full items-center gap-2.5 px-3 py-2.5 text-xs font-semibold text-gray-200 hover:bg-white/[0.06] transition"
+                >
+                  <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-rose-500/15 text-rose-400">
+                    <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+                    </svg>
+                  </span>
+                  <div className="text-left">
+                    <p className="text-xs font-semibold text-white">Export as PDF</p>
+                    <p className="text-[10px] text-gray-500">Full report with charts</p>
+                  </div>
+                </button>
+                <button
+                  onClick={handleExportCSV}
+                  className="flex w-full items-center gap-2.5 px-3 py-2.5 mb-1.5 text-xs font-semibold text-gray-200 hover:bg-white/[0.06] transition"
+                >
+                  <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-400">
+                    <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/>
+                    </svg>
+                  </span>
+                  <div className="text-left">
+                    <p className="text-xs font-semibold text-white">Export as CSV</p>
+                    <p className="text-[10px] text-gray-500">Candidate-level data</p>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Date filter */}
