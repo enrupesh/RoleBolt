@@ -1,6 +1,7 @@
 import express from "express";
 import crypto from "crypto";
 import multer from "multer";
+import mongoose from "mongoose";
 import { connectMongo } from "./db";
 import { RecruitForm } from "./models/RecruitForm";
 import { RecruitFormResponse } from "./models/RecruitFormResponse";
@@ -19,9 +20,44 @@ export const formRouter = express.Router();       // protected — /recruit/form
 export const formPublicRouter = express.Router(); // public    — /recruit-public/forms
 
 const GEMINI_MESH_KEY = process.env.GEMINI_MESH_KEY ?? "";
+const FORM_FRONTEND_URL = (
+  process.env.FRONTEND_URL &&
+  !process.env.FRONTEND_URL.includes("localhost") &&
+  !process.env.FRONTEND_URL.includes("127.0.0.1")
+    ? process.env.FRONTEND_URL
+    : "https://www.rolebolt.tech"
+).replace(/\/$/, "");
 
 function getUid(req: express.Request): string {
   return (req as any).user?.uid ?? "";
+}
+
+type FormStageActor = "recruiter" | "agent" | "rule" | "system";
+
+async function recordFormStageChange(args: {
+  responseId: any;
+  fromStage: string;
+  toStage: string;
+  actor: FormStageActor;
+  reason?: string;
+  actorUid?: string;
+}): Promise<void> {
+  if (args.fromStage === args.toStage) return;
+  await RecruitFormResponse.updateOne(
+    { _id: args.responseId },
+    {
+      $push: {
+        stageHistory: {
+          fromStage: args.fromStage,
+          toStage: args.toStage,
+          actor: args.actor,
+          actorUid: args.actorUid || "",
+          reason: args.reason || "",
+          timestamp: new Date(),
+        },
+      },
+    },
+  );
 }
 
 function safeJson(raw: string): any {
@@ -37,6 +73,163 @@ function safeJson(raw: string): any {
 
 function clampPct(value: unknown): number {
   return Math.min(100, Math.max(0, Number(value) || 0));
+}
+
+function generateFormAssessmentToken(): string {
+  return `form_${crypto.randomBytes(32).toString("hex")}`;
+}
+
+async function generateFormAssessmentQuestions(args: {
+  formTitle: string;
+  description: string;
+  questions: Array<{ id: string; label: string }>;
+}): Promise<Array<{ id: string; text: string }>> {
+  const sourceQuestions = args.questions
+    .map(q => `${q.id}: ${q.label}`)
+    .join("\n");
+  const prompt = `You are a senior hiring manager creating a written follow-up assessment for "${args.formTitle}".
+Application description:
+${args.description || "(not provided)"}
+
+The candidate already answered these screening questions:
+${sourceQuestions || "(no screening questions)"}
+
+Create exactly 5 concise, job-relevant written assessment questions. They should test depth,
+judgment, practical thinking, and evidence beyond the initial screening answers.
+Do not ask for sensitive personal data. Return ONLY JSON:
+{"questions":[{"id":"assessment_1","text":"..."},{"id":"assessment_2","text":"..."}]}
+Use ids assessment_1 through assessment_5.`;
+
+  const raw = await callMeshChatCompletions({
+    apiKey: GEMINI_MESH_KEY,
+    model: "openai/gpt-4o-mini",
+    fallbackModels: ["google/gemini-2.5-flash-lite", "meta-llama/llama-3.1-8b-instruct"],
+    messages: [{ role: "user", content: prompt }],
+    temperature: 0.35,
+    max_tokens: 2200,
+    retries: 2,
+    responseFormat: "json_object",
+    nvidiaFallback: true,
+  });
+  const parsed = safeJson(raw);
+  const questions = Array.isArray(parsed?.questions)
+    ? parsed.questions
+      .filter((q: any) => typeof q?.text === "string" && q.text.trim())
+      .slice(0, 5)
+      .map((q: any, index: number) => ({
+        id: `assessment_${index + 1}`,
+        text: String(q.text).trim().slice(0, 500),
+      }))
+    : [];
+  if (questions.length < 3) throw new Error("AI returned too few assessment questions.");
+  return questions;
+}
+
+async function scoreFormAssessment(args: {
+  formTitle: string;
+  formDescription: string;
+  screeningScore: number;
+  screeningSummary: string;
+  questions: Array<{ id: string; text: string }>;
+  answers: Array<{ questionId: string; answer: string; timeTakenSeconds: number }>;
+}): Promise<{
+  score: number;
+  summary: string;
+  strengths: string[];
+  weaknesses: string[];
+}> {
+  const answerText = args.questions.map((question, index) => {
+    const answer = args.answers.find(item => item.questionId === question.id);
+    return `Q${index + 1}. ${question.text}\nAnswer: ${answer?.answer || "(blank)"}`;
+  }).join("\n\n");
+  const prompt = `Evaluate a written hiring assessment for "${args.formTitle}".
+Use only the candidate's answers below. Be calibrated and evidence-based; do not invent facts.
+The initial screening score was ${clampPct(args.screeningScore)}% and its summary was:
+${args.screeningSummary || "(no screening summary)"}
+
+${answerText}
+
+Return ONLY JSON:
+{
+  "score": 0,
+  "summary": "2-4 sentence assessment summary",
+  "strengths": ["specific evidence"],
+  "weaknesses": ["specific gap or concern"]
+}
+Score 0-100 based on relevance, specificity, reasoning, and demonstrated capability.
+Do not treat missing information as a definitive weakness; mention incomplete evidence instead.`;
+
+  const raw = await callMeshChatCompletions({
+    apiKey: GEMINI_MESH_KEY,
+    model: "openai/gpt-4o-mini",
+    fallbackModels: ["google/gemini-2.5-flash-lite", "meta-llama/llama-3.1-8b-instruct"],
+    messages: [{ role: "user", content: prompt }],
+    temperature: 0.2,
+    max_tokens: 3000,
+    retries: 2,
+    responseFormat: "json_object",
+    nvidiaFallback: true,
+  });
+  const parsed = safeJson(raw);
+  if (!parsed || typeof parsed.summary !== "string" || !parsed.summary.trim()) {
+    throw new Error("AI returned an invalid assessment score.");
+  }
+  return {
+    score: clampPct(parsed.score),
+    summary: parsed.summary.trim().slice(0, 1500),
+    strengths: cleanSummaryList(parsed.strengths, 6),
+    weaknesses: cleanSummaryList(parsed.weaknesses, 6),
+  };
+}
+
+async function processFormAssessmentScore(responseId: any, runKey: string): Promise<void> {
+  try {
+    const [form, response] = await Promise.all([
+      RecruitForm.findById((await RecruitFormResponse.findById(responseId).select("formId").lean())?.formId).lean(),
+      RecruitFormResponse.findOne({ _id: responseId, assessmentRunKey: runKey }).lean(),
+    ]);
+    if (!form || !response || response.assessmentScoringStatus !== "pending") return;
+
+    const scored = await scoreFormAssessment({
+      formTitle: form.title,
+      formDescription: form.description,
+      screeningScore: response.aiScore,
+      screeningSummary: response.aiSummary,
+      questions: response.assessmentQuestions,
+      answers: response.assessmentAnswers,
+    });
+    const updated = await RecruitFormResponse.updateOne(
+      { _id: responseId, assessmentRunKey: runKey, assessmentScoringStatus: "pending" },
+      {
+        $set: {
+          assessmentScore: scored.score,
+          assessmentSummary: scored.summary,
+          assessmentStrengths: scored.strengths,
+          assessmentWeaknesses: scored.weaknesses,
+          assessmentScoringStatus: "completed",
+        },
+      },
+    );
+    if (updated.modifiedCount === 1) {
+      const current = await RecruitFormResponse.findById(responseId).select("stage").lean();
+      if (String((current as any)?.stage || "") === "assessment") {
+        await moveFormResponseStage({
+          responseId,
+          fromStage: "assessment",
+          toStage: "scored",
+          actor: "system",
+          reason: "Assessment scoring completed",
+        });
+      }
+      await evaluateFormPipelineRules(String(form._id), String(responseId));
+    }
+  } catch (error) {
+    console.error("[forms] async assessment scoring failed:", error);
+    await RecruitFormResponse.updateOne(
+      { _id: responseId, assessmentRunKey: runKey, assessmentScoringStatus: "pending" },
+      { $set: { assessmentScoringStatus: "failed" } },
+    ).catch(updateError => console.error("[forms] assessment failure update failed:", updateError));
+  }
 }
 
 function generateSlug(length = 10): string {
@@ -302,7 +495,7 @@ export type FormAgentAction = "shortlisted" | "rejected" | "review_zone";
 
 interface FormAgentDecision {
   action: FormAgentAction;
-  stage: "new" | "shortlisted" | "rejected";
+  stage: "review_zone" | "shortlisted" | "rejected";
   reason: string;
 }
 
@@ -336,9 +529,37 @@ export function decideFormAgentAction(
   }
   return {
     action: "review_zone",
-    stage: "new",
+    stage: "review_zone",
     reason: `Score ${aiScore}% is in review zone (${rejectThreshold}%–${shortlistThreshold}%)`,
   };
+}
+
+async function moveFormResponseStage(args: {
+  responseId: any;
+  fromStage: string;
+  toStage: string;
+  actor: FormStageActor;
+  actorUid?: string;
+  reason: string;
+}): Promise<boolean> {
+  if (args.fromStage === args.toStage) return false;
+  const result = await RecruitFormResponse.updateOne(
+    { _id: args.responseId, stage: args.fromStage },
+    { $set: { stage: args.toStage, stageMovedAt: new Date() } },
+  );
+  if (result.modifiedCount !== 1) return false;
+  await recordFormStageChange(args);
+  return true;
+}
+
+async function markFormResponseScored(responseId: any): Promise<void> {
+  await moveFormResponseStage({
+    responseId,
+    fromStage: "new",
+    toStage: "scored",
+    actor: "system",
+    reason: "AI scoring completed",
+  });
 }
 
 /**
@@ -357,15 +578,30 @@ async function runFormAgent(args: {
   const decision = decideFormAgentAction(args.agentMode, args.aiScore, args.scoringFailed);
   if (!decision) return;
 
+  // Claim this action before any stage mutation or email send. This makes
+  // background scoring/retry calls idempotent even when they overlap.
+  const runKey = `agent:${decision.action}`;
+  const claim = await RecruitFormResponse.updateOne(
+    { _id: args.responseId, agentRunKeys: { $ne: runKey } },
+    { $addToSet: { agentRunKeys: runKey } },
+  );
+  if (claim.modifiedCount !== 1) {
+    console.log(`[forms][agent] skipped duplicate action ${runKey} for ${args.responseId}`);
+    return;
+  }
+
   const name = args.candidateName || "Applicant";
   const email = args.candidateEmail?.trim() || "";
 
-  if (decision.stage !== "new") {
-    await RecruitFormResponse.updateOne(
-      { _id: args.responseId },
-      { $set: { stage: decision.stage, stageMovedAt: new Date() } }
-    );
-  }
+  const current = await RecruitFormResponse.findById(args.responseId).select("stage").lean();
+  const fromStage = String((current as any)?.stage || "new");
+  await moveFormResponseStage({
+    responseId: args.responseId,
+    fromStage,
+    toStage: decision.stage,
+    actor: "agent",
+    reason: decision.reason,
+  });
 
   let emailSent = false;
   let emailStatus: "sent" | "failed" | "skipped" | "disabled" = "disabled";
@@ -416,6 +652,7 @@ async function runFormAgent(args: {
         reason: decision.reason,
         emailSent,
         emailStatus,
+        runKey,
         timestamp: new Date(),
       },
     },
@@ -427,10 +664,50 @@ async function runFormAgent(args: {
 // ─── Pipeline Rules ───────────────────────────────────────────────────────────
 
 const FORM_RULE_STAGE_MAP: Record<string, string> = {
+  move_to_scored:       "scored",
+  move_to_review_zone:  "review_zone",
   move_to_shortlisted: "shortlisted",
+  move_to_assessment:   "assessment",
   move_to_interview:   "interview",
+  move_to_offer:        "offer",
+  move_to_hired:        "hired",
+  move_to_withdrawn:    "withdrawn",
   move_to_rejected:    "rejected",
 };
+
+function parseOptionalNumber(value: unknown, min = 0): number | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= min ? parsed : undefined;
+}
+
+function normalizeFormJobDetails(raw: any): Record<string, any> {
+  const details = raw && typeof raw === "object" ? raw : {};
+  const workMode = ["remote", "onsite", "hybrid"].includes(String(details.workMode))
+    ? String(details.workMode)
+    : "remote";
+  const normalized: Record<string, any> = {
+    companyName: String(details.companyName || "").trim().slice(0, 160),
+    jobType: String(details.jobType || "").trim().slice(0, 80),
+    department: String(details.department || "").trim().slice(0, 120),
+    seniority: String(details.seniority || "").trim().slice(0, 80),
+    location: String(details.location || "").trim().slice(0, 160),
+    workMode,
+    salaryCurrency: String(details.salaryCurrency || "INR").trim().slice(0, 8).toUpperCase(),
+  };
+  const numericFields: [string, number][] = [
+    ["salaryMin", 0], ["salaryMax", 0], ["experienceMin", 0], ["experienceMax", 0], ["openings", 1],
+  ];
+  for (const [key, min] of numericFields) {
+    const value = parseOptionalNumber(details[key], min);
+    if (value !== undefined) normalized[key] = value;
+  }
+  if (details.applicationDeadline) {
+    const date = new Date(String(details.applicationDeadline));
+    if (!Number.isNaN(date.getTime())) normalized.applicationDeadline = date;
+  }
+  return normalized;
+}
 
 /**
  * Evaluates a form's pipeline rules against one response. Call non-blocking —
@@ -447,7 +724,9 @@ async function evaluateFormPipelineRules(formId: string, responseId: string): Pr
     const rules: any[] = ((form as any).pipelineRules ?? []).filter((r: any) => r.enabled);
     if (!rules.length) return;
 
-    const score = (response as any).aiScore ?? 0;
+    const score = (response as any).assessmentScoringStatus === "completed"
+      ? clampPct((response as any).assessmentScore)
+      : clampPct((response as any).aiScore);
     const movedAt = (response as any).stageMovedAt ?? (response as any).createdAt;
     const daysInStage = movedAt ? (Date.now() - new Date(movedAt).getTime()) / 86400000 : 0;
 
@@ -470,6 +749,13 @@ async function evaluateFormPipelineRules(formId: string, responseId: string): Pr
         { _id: responseId },
         { $set: { stage: nextStage, stageMovedAt: new Date() } }
       );
+      await recordFormStageChange({
+        responseId,
+        fromStage: currentStage,
+        toStage: nextStage,
+        actor: "rule",
+        reason: `${rule.condition} → ${rule.action}`,
+      });
       await RecruitForm.updateOne(
         { _id: formId, "pipelineRules.id": rule.id },
         { $inc: { "pipelineRules.$.triggerCount": 1 } }
@@ -491,10 +777,11 @@ formRouter.post("/", async (req, res) => {
     const uid = getUid(req);
     if (!uid) return res.status(401).json({ error: "Unauthorized" });
 
-    const { title, description, questions } = req.body as {
+    const { title, description, questions, jobDetails } = req.body as {
       title?: string;
       description?: string;
       questions?: any[];
+      jobDetails?: any;
     };
 
     if (!title?.trim()) return res.status(400).json({ error: "Form title is required." });
@@ -514,6 +801,7 @@ formRouter.post("/", async (req, res) => {
       title: title.trim(),
       description: (description || "").trim(),
       slug,
+      jobDetails: normalizeFormJobDetails(jobDetails),
       questions: (questions || []).map((q: any, idx: number) => ({
         id: q.id || `q_${idx}_${Date.now()}`,
         label: String(q.label || "").trim(),
@@ -548,7 +836,171 @@ formRouter.get("/", async (req, res) => {
 });
 
 // GET /recruit/forms/:formId — get one form (with questions)
-formRouter.get("/:formId", async (req, res) => {
+async function getOwnedForm(formId: string, uid: string) {
+  if (!mongoose.isValidObjectId(formId)) return null;
+  return RecruitForm.findOne({ _id: formId, uid }).lean();
+}
+
+function cleanSummaryList(value: unknown, limit = 6): string[] {
+  return Array.isArray(value)
+    ? value
+      .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+      .map(item => item.trim().slice(0, 300))
+      .slice(0, limit)
+    : [];
+}
+
+// GET /recruit/forms/:formId/ai-summary — return the last saved AI summary
+formRouter.get("/:formId/ai-summary", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "Unauthorized" });
+    const form = await getOwnedForm(req.params.formId, uid);
+    if (!form) return res.status(404).json({ error: "Form not found." });
+    return res.json({ summary: (form as any).aiHiringSummary ?? null });
+  } catch (err: any) {
+    console.error("[forms] GET /ai-summary:", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /recruit/forms/:formId/ai-summary/refresh — generate and persist AI hiring insights
+formRouter.post("/:formId/ai-summary/refresh", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "Unauthorized" });
+    const form = await getOwnedForm(req.params.formId, uid);
+    if (!form) return res.status(404).json({ error: "Form not found." });
+
+    const responses = await RecruitFormResponse.find({ formId: form._id, uid })
+      .select("submittedName aiScore scoringFailed stage aiSummary strengths redFlags questionScores answerSignals createdAt")
+      .sort({ aiScore: -1, createdAt: -1 })
+      .lean();
+    const rows = responses as any[];
+    const scored = rows.filter(r => !r.scoringFailed && (r.aiSummary || r.questionScores?.length || Number(r.aiScore) > 0));
+    const averageScore = scored.length
+      ? Math.round(scored.reduce((sum, r) => sum + clampPct(r.aiScore), 0) / scored.length)
+      : 0;
+    const stageCounts = rows.reduce<Record<string, number>>((counts, row) => {
+      const stage = String(row.stage || "new");
+      counts[stage] = (counts[stage] || 0) + 1;
+      return counts;
+    }, {});
+    const questionMap = new Map<string, { label: string; answered: number; strong: number; thin: number; scoreTotal: number; scoreCount: number }>();
+    for (const row of rows) {
+      for (const score of row.questionScores ?? []) {
+        const item = questionMap.get(String(score.questionId)) ?? { label: String(score.questionId), answered: 0, strong: 0, thin: 0, scoreTotal: 0, scoreCount: 0 };
+        item.answered += 1;
+        item.scoreTotal += Number(score.score) || 0;
+        item.scoreCount += 1;
+        questionMap.set(String(score.questionId), item);
+      }
+      for (const signal of row.answerSignals ?? []) {
+        const item = questionMap.get(String(signal.questionId)) ?? { label: String(signal.questionId), answered: 0, strong: 0, thin: 0, scoreTotal: 0, scoreCount: 0 };
+        if (signal.signal === "strong") item.strong += 1;
+        if (signal.signal === "thin") item.thin += 1;
+        questionMap.set(String(signal.questionId), item);
+      }
+    }
+    const questionInsights = Array.from(questionMap.entries()).map(([questionId, item]) => ({
+      questionId,
+      averageScore: item.scoreCount ? Math.round((item.scoreTotal / item.scoreCount) * 10) / 10 : 0,
+      strongRate: item.answered ? Math.round((item.strong / item.answered) * 100) : 0,
+      thinRate: item.answered ? Math.round((item.thin / item.answered) * 100) : 0,
+    }));
+    const evidence = {
+      formTitle: form.title,
+      totalResponses: rows.length,
+      scoredResponses: scored.length,
+      scoringFailures: rows.filter(r => r.scoringFailed).length,
+      averageScore,
+      stageCounts,
+      questionInsights,
+      topCandidates: scored.slice(0, 5).map(r => ({
+        responseId: String(r._id),
+        name: r.submittedName || "Candidate",
+        score: clampPct(r.aiScore),
+        stage: r.stage || "new",
+        summary: String(r.aiSummary || "").slice(0, 500),
+        strengths: cleanSummaryList(r.strengths, 3),
+        redFlags: cleanSummaryList(r.redFlags, 3),
+      })),
+    };
+
+    const prompt = `You are an evidence-based hiring operations analyst for a custom application form titled "${form.title}".
+Use ONLY the supplied metrics and candidate evidence. Do not invent counts, names, scores, or facts.
+Return ONLY valid JSON:
+{
+  "summary": "2-4 sentence hiring funnel summary",
+  "strengths": ["evidence-based pattern"],
+  "risks": ["evidence-based risk or limitation"],
+  "recommendations": ["specific next action for the recruiter"],
+  "highSignalQuestions": ["question id with why it is high signal"],
+  "lowSignalQuestions": ["question id with why it may be low signal"],
+  "priorityCandidates": [{"responseId": "exact id from topCandidates", "reason": "specific evidence"}]
+}
+If there are fewer than 3 scored responses, explicitly say the sample is small and keep recommendations cautious.
+
+DATA:
+${JSON.stringify(evidence)}`;
+
+    const raw = await callMeshChatCompletions({
+      apiKey: GEMINI_MESH_KEY,
+      model: "openai/gpt-4o-mini",
+      retries: 2,
+      fallbackModels: ["google/gemini-2.5-flash-lite", "meta-llama/llama-3.1-8b-instruct"],
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.2,
+      max_tokens: 2200,
+      nvidiaFallback: true,
+    });
+    const parsed = safeJson(raw);
+    if (!parsed || typeof parsed.summary !== "string" || !parsed.summary.trim()) {
+      throw new Error("AI returned an invalid hiring summary.");
+    }
+
+    const validIds = new Set(evidence.topCandidates.map(candidate => candidate.responseId));
+    const priorityCandidates = Array.isArray(parsed.priorityCandidates)
+      ? parsed.priorityCandidates
+        .filter((item: any) => validIds.has(String(item?.responseId)))
+        .map((item: any) => ({ responseId: String(item.responseId), reason: String(item.reason || "").trim().slice(0, 300) }))
+        .slice(0, 5)
+      : [];
+    const summary = {
+      generatedAt: new Date(),
+      summary: parsed.summary.trim().slice(0, 1500),
+      strengths: cleanSummaryList(parsed.strengths),
+      risks: cleanSummaryList(parsed.risks),
+      recommendations: cleanSummaryList(parsed.recommendations),
+      highSignalQuestions: cleanSummaryList(parsed.highSignalQuestions),
+      lowSignalQuestions: cleanSummaryList(parsed.lowSignalQuestions),
+      priorityCandidates,
+    };
+    const updated = await RecruitForm.findOneAndUpdate(
+      { _id: form._id, uid },
+      { $set: { aiHiringSummary: summary } },
+      { returnDocument: "after" },
+    ).lean();
+    return res.json({ summary: (updated as any)?.aiHiringSummary ?? summary });
+  } catch (err: any) {
+    console.error("[forms] POST /ai-summary/refresh:", err);
+    const uid = getUid(req);
+    const existing = uid ? await getOwnedForm(req.params.formId, uid).catch(() => null) : null;
+    if ((existing as any)?.aiHiringSummary) {
+      return res.status(503).json({
+        error: "AI refresh failed. Showing the last saved summary.",
+        summary: (existing as any).aiHiringSummary,
+      });
+    }
+    return res.status(500).json({ error: "AI hiring summary is temporarily unavailable." });
+  }
+});
+
+formRouter.get("/:formId", async (req, res, next) => {
+  if (req.params.formId === "analysis") return next();
+  if (req.params.formId === "ai-summary") return next();
   try {
     await connectMongo();
     const uid = getUid(req);
@@ -564,6 +1016,297 @@ formRouter.get("/:formId", async (req, res) => {
   }
 });
 
+// GET /recruit/forms/:formId/analysis — server-side Form Job analytics
+formRouter.get("/:formId/analysis", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "Unauthorized" });
+    if (!mongoose.isValidObjectId(req.params.formId)) {
+      return res.status(400).json({ error: "Invalid form id." });
+    }
+
+    const form = await RecruitForm.findOne({ _id: req.params.formId, uid })
+      .select("questions responseCount")
+      .lean();
+    if (!form) return res.status(404).json({ error: "Form not found." });
+
+    const responseRows = await RecruitFormResponse.find({
+      formId: req.params.formId,
+      uid,
+    })
+      .select("stage aiScore aiSummary scoringFailed createdAt stageMovedAt source agentLog answers answerSignals questionScores")
+      .lean();
+
+    const rows = responseRows as any[];
+    const total = rows.length;
+    const failed = rows.filter(r => r.scoringFailed === true).length;
+    const pending = rows.filter(r => !r.scoringFailed && !r.aiSummary && !r.questionScores?.length).length;
+    const scoredRows = rows.filter(r => !r.scoringFailed && (r.aiSummary || r.questionScores?.length || Number(r.aiScore) > 0));
+    const scores = scoredRows.map(r => clampPct(r.aiScore)).sort((a, b) => a - b);
+    const averageScore = scores.length
+      ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length)
+      : 0;
+    const medianScore = scores.length
+      ? scores.length % 2 === 1
+        ? scores[Math.floor(scores.length / 2)]
+        : Math.round((scores[scores.length / 2 - 1] + scores[scores.length / 2]) / 2)
+      : 0;
+
+    const stageOrder = ["new", "shortlisted", "interview", "hired", "rejected"];
+    const stages = stageOrder.map(stage => ({
+      stage,
+      count: rows.filter(r => (r.stage || "new") === stage).length,
+    }));
+    const scoreDistribution = [
+      { label: "0–39", min: 0, max: 39, count: scores.filter(s => s < 40).length },
+      { label: "40–59", min: 40, max: 59, count: scores.filter(s => s >= 40 && s < 60).length },
+      { label: "60–79", min: 60, max: 79, count: scores.filter(s => s >= 60 && s < 80).length },
+      { label: "80–100", min: 80, max: 100, count: scores.filter(s => s >= 80).length },
+    ];
+
+    const sourceMap = new Map<string, { source: string; applications: number; scored: number; scoreTotal: number }>();
+    for (const row of rows) {
+      const source = String(row.source || "Form");
+      const item = sourceMap.get(source) ?? { source, applications: 0, scored: 0, scoreTotal: 0 };
+      item.applications += 1;
+      if (!row.scoringFailed && (row.aiSummary || row.questionScores?.length || Number(row.aiScore) > 0)) {
+        item.scored += 1;
+        item.scoreTotal += clampPct(row.aiScore);
+      }
+      sourceMap.set(source, item);
+    }
+    const sources = Array.from(sourceMap.values())
+      .map(item => ({
+        source: item.source,
+        applications: item.applications,
+        averageScore: item.scored ? Math.round(item.scoreTotal / item.scored) : null,
+      }))
+      .sort((a, b) => b.applications - a.applications);
+
+    const timelineMap = new Map<string, { date: string; applications: number; scored: number; scoreTotal: number }>();
+    for (const row of rows) {
+      const date = row.createdAt
+        ? new Date(row.createdAt).toISOString().slice(0, 10)
+        : "unknown";
+      const item = timelineMap.get(date) ?? { date, applications: 0, scored: 0, scoreTotal: 0 };
+      item.applications += 1;
+      if (!row.scoringFailed && (row.aiSummary || row.questionScores?.length || Number(row.aiScore) > 0)) {
+        item.scored += 1;
+        item.scoreTotal += clampPct(row.aiScore);
+      }
+      timelineMap.set(date, item);
+    }
+    const timeline = Array.from(timelineMap.values())
+      .map(item => ({
+        date: item.date,
+        applications: item.applications,
+        averageScore: item.scored ? Math.round(item.scoreTotal / item.scored) : null,
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(-30);
+
+    const agentActions = { shortlisted: 0, rejected: 0, review_zone: 0, emailsSent: 0, failed: 0 };
+    for (const row of rows) {
+      for (const entry of row.agentLog ?? []) {
+        if (entry.action === "shortlisted") agentActions.shortlisted += 1;
+        if (entry.action === "rejected") agentActions.rejected += 1;
+        if (entry.action === "review_zone") agentActions.review_zone += 1;
+        if (entry.emailSent) agentActions.emailsSent += 1;
+        if (entry.emailStatus === "failed") agentActions.failed += 1;
+      }
+    }
+
+    const questionMap = new Map<string, {
+      questionId: string;
+      label: string;
+      answered: number;
+      strong: number;
+      thin: number;
+      scoreTotal: number;
+      scoreCount: number;
+    }>();
+    const questionLabels = new Map<string, string>(
+      ((form as any).questions ?? []).map((q: any) => [q.id, q.label])
+    );
+    for (const row of rows) {
+      for (const answer of row.answers ?? []) {
+        const value = String(answer.value ?? "").trim();
+        if (!value || value === "__file_uploaded__") continue;
+        const questionId = String(answer.questionId);
+        const item = questionMap.get(questionId) ?? {
+          questionId,
+          label: questionLabels.get(questionId) || String(answer.label || "Question"),
+          answered: 0,
+          strong: 0,
+          thin: 0,
+          scoreTotal: 0,
+          scoreCount: 0,
+        };
+        item.answered += 1;
+        questionMap.set(questionId, item);
+      }
+      for (const signal of row.answerSignals ?? []) {
+        const item = questionMap.get(String(signal.questionId));
+        if (!item) continue;
+        if (signal.signal === "strong") item.strong += 1;
+        if (signal.signal === "thin") item.thin += 1;
+      }
+      for (const score of row.questionScores ?? []) {
+        const item = questionMap.get(String(score.questionId));
+        if (!item) continue;
+        item.scoreTotal += Math.min(10, Math.max(0, Number(score.score) || 0));
+        item.scoreCount += 1;
+      }
+    }
+    const questionPerformance = Array.from(questionMap.values())
+      .map(item => ({
+        questionId: item.questionId,
+        label: item.label,
+        answered: item.answered,
+        strongSignals: item.strong,
+        thinSignals: item.thin,
+        averageScore: item.scoreCount ? Math.round((item.scoreTotal / item.scoreCount) * 10) / 10 : null,
+        signalRate: item.answered ? Math.round((item.strong / item.answered) * 100) : 0,
+      }))
+      .sort((a, b) => b.answered - a.answered);
+
+    const now = Date.now();
+    const stageAging = stageOrder
+      .map(stage => {
+        const activeRows = rows.filter(r => (r.stage || "new") === stage && r.stageMovedAt);
+        const averageDays = activeRows.length
+          ? Math.round((activeRows.reduce((sum, r) => sum + Math.max(0, now - new Date(r.stageMovedAt).getTime()), 0) / activeRows.length / 86400000) * 10) / 10
+          : 0;
+        return { stage, candidates: activeRows.length, averageDays };
+      })
+      .filter(item => item.candidates > 0);
+
+    return res.json({
+      analysis: {
+        generatedAt: new Date().toISOString(),
+        overview: {
+          total,
+          scored: scoredRows.length,
+          pending,
+          failed,
+          averageScore,
+          medianScore,
+          shortlistRate: total ? Math.round((rows.filter(r => r.stage === "shortlisted").length / total) * 100) : 0,
+          interviewRate: total ? Math.round((rows.filter(r => r.stage === "interview").length / total) * 100) : 0,
+          hireRate: total ? Math.round((rows.filter(r => r.stage === "hired").length / total) * 100) : 0,
+        },
+        funnel: stages,
+        scoreDistribution,
+        timeline,
+        sources,
+        agentActions,
+        questionPerformance,
+        stageAging,
+      },
+    });
+  } catch (err: any) {
+    console.error("[forms] GET /recruit/forms/:formId/analysis:", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /recruit/forms/:formId/assessment-analytics
+formRouter.get("/:formId/assessment-analytics", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "Unauthorized" });
+    const form = await RecruitForm.findOne({ _id: req.params.formId, uid }).select("title").lean();
+    if (!form) return res.status(404).json({ error: "Form not found." });
+
+    const responses = await RecruitFormResponse.find({ formId: req.params.formId, uid })
+      .select("stage assessmentStatus assessmentScoringStatus assessmentScore assessmentQuestions assessmentAnswers assessmentSentAt assessmentStartedAt assessmentCompletedAt")
+      .lean();
+    const rows = responses as any[];
+    const sent = rows.filter(row => row.assessmentStatus && row.assessmentStatus !== "not_sent").length;
+    const started = rows.filter(row => ["in_progress", "completed"].includes(row.assessmentStatus)).length;
+    const completed = rows.filter(row => row.assessmentStatus === "completed").length;
+    const scored = rows.filter(row => row.assessmentScoringStatus === "completed");
+    const scoringPending = rows.filter(row => row.assessmentStatus === "completed" && row.assessmentScoringStatus === "pending").length;
+    const scoringFailed = rows.filter(row => row.assessmentScoringStatus === "failed").length;
+    const passThreshold = 70;
+    const passed = scored.filter(row => clampPct(row.assessmentScore) >= passThreshold).length;
+    const durations = rows
+      .filter(row => row.assessmentStartedAt && row.assessmentCompletedAt)
+      .map(row => Math.max(0, new Date(row.assessmentCompletedAt).getTime() - new Date(row.assessmentStartedAt).getTime()) / 60000);
+    const averageCompletionMinutes = durations.length
+      ? Math.round((durations.reduce((sum, value) => sum + value, 0) / durations.length) * 10) / 10
+      : null;
+
+    const questionMap = new Map<string, {
+      questionId: string;
+      text: string;
+      shown: number;
+      answered: number;
+      timeTotal: number;
+      timeCount: number;
+    }>();
+    for (const row of rows) {
+      const answerMap = new Map<string, {
+        questionId: string;
+        answer: string;
+        timeTakenSeconds: number;
+      }>((row.assessmentAnswers || []).map((answer: any) => [String(answer.questionId), answer]));
+      for (const question of row.assessmentQuestions || []) {
+        const item = questionMap.get(String(question.id)) || {
+          questionId: String(question.id),
+          text: String(question.text || "Question"),
+          shown: 0,
+          answered: 0,
+          timeTotal: 0,
+          timeCount: 0,
+        };
+        item.shown += 1;
+        const answer = answerMap.get(String(question.id));
+        if (answer?.answer?.trim()) item.answered += 1;
+        const timeTakenSeconds = Number(answer?.timeTakenSeconds);
+        if (Number.isFinite(timeTakenSeconds) && timeTakenSeconds > 0) {
+          item.timeTotal += timeTakenSeconds;
+          item.timeCount += 1;
+        }
+        questionMap.set(item.questionId, item);
+      }
+    }
+    const questionPerformance = Array.from(questionMap.values()).map(item => ({
+      questionId: item.questionId,
+      text: item.text,
+      shown: item.shown,
+      answered: item.answered,
+      answerRate: item.shown ? Math.round((item.answered / item.shown) * 100) : 0,
+      averageTimeSeconds: item.timeCount ? Math.round(item.timeTotal / item.timeCount) : null,
+    }));
+
+    return res.json({
+      analytics: {
+        formTitle: form.title,
+        totalResponses: rows.length,
+        sent,
+        started,
+        completed,
+        pending: rows.filter(row => ["sent", "in_progress"].includes(row.assessmentStatus)).length,
+        scoringPending,
+        scoringFailed,
+        passThreshold,
+        passed,
+        passRate: scored.length ? Math.round((passed / scored.length) * 100) : 0,
+        completionRate: sent ? Math.round((completed / sent) * 100) : 0,
+        assessmentToInterviewRate: completed ? Math.round((rows.filter(row => row.assessmentStatus === "completed" && ["interview", "offer", "hired"].includes(row.stage)).length / completed) * 100) : 0,
+        averageCompletionMinutes,
+        questionPerformance,
+      },
+    });
+  } catch (err: any) {
+    console.error("[forms] GET assessment-analytics:", err);
+    return res.status(500).json({ error: err.message || "Could not load assessment analytics." });
+  }
+});
+
 // PATCH /recruit/forms/:formId — update form
 formRouter.patch("/:formId", async (req, res) => {
   try {
@@ -571,11 +1314,12 @@ formRouter.patch("/:formId", async (req, res) => {
     const uid = getUid(req);
     if (!uid) return res.status(401).json({ error: "Unauthorized" });
 
-    const { title, description, questions, status } = req.body;
+    const { title, description, questions, status, jobDetails } = req.body;
     const update: Record<string, any> = {};
     if (title !== undefined) update.title = String(title).trim();
     if (description !== undefined) update.description = String(description).trim();
     if (status !== undefined) update.status = status;
+    if (jobDetails !== undefined) update.jobDetails = normalizeFormJobDetails(jobDetails);
     if (questions !== undefined) {
       update.questions = questions.map((q: any, idx: number) => ({
         id: q.id || `q_${idx}_${Date.now()}`,
@@ -629,7 +1373,11 @@ formRouter.delete("/:formId/responses/:responseId", async (req, res) => {
     const form = await RecruitForm.findOne({ _id: req.params.formId, uid }).lean();
     if (!form) return res.status(404).json({ error: "Form not found." });
 
-    await RecruitFormResponse.deleteOne({ _id: req.params.responseId, formId: req.params.formId });
+    await RecruitFormResponse.deleteOne({
+      _id: req.params.responseId,
+      formId: req.params.formId,
+      uid,
+    });
     return res.json({ ok: true });
   } catch (err: any) {
     console.error("[forms] DELETE /recruit/forms/:formId/responses/:responseId:", err);
@@ -647,7 +1395,7 @@ formRouter.get("/:formId/responses", async (req, res) => {
     const form = await RecruitForm.findOne({ _id: req.params.formId, uid }).lean();
     if (!form) return res.status(404).json({ error: "Form not found." });
 
-    const responses = await RecruitFormResponse.find({ formId: req.params.formId })
+    const responses = await RecruitFormResponse.find({ formId: req.params.formId, uid })
       .sort({ createdAt: -1 })
       .lean();
 
@@ -677,6 +1425,13 @@ formRouter.patch("/:formId/responses/:responseId", async (req, res) => {
     const update: Record<string, any> = {};
     if (stage !== undefined) update.stage = stage;
     if (notes !== undefined) update.notes = String(notes).slice(0, 5000);
+    const allowedStages = [
+      "new", "scored", "review_zone", "shortlisted", "assessment",
+      "interview", "offer", "hired", "rejected", "withdrawn",
+    ];
+    if (stage !== undefined && !allowedStages.includes(String(stage))) {
+      return res.status(400).json({ error: "Invalid response stage." });
+    }
     if (stage && stage !== (existing as any).stage) update.stageMovedAt = new Date();
 
     const response = await RecruitFormResponse.findOneAndUpdate(
@@ -689,6 +1444,16 @@ formRouter.patch("/:formId/responses/:responseId", async (req, res) => {
     // Auto-send stage-change emails only on actual transition (prevent duplicates on re-save)
     const AUTO_EMAIL_STAGES = ["shortlisted", "interview", "hired"];
     const stageChanged = stage && stage !== (existing as any).stage;
+    if (stageChanged) {
+      await recordFormStageChange({
+        responseId: response._id,
+        fromStage: String((existing as any).stage || "new"),
+        toStage: String(stage),
+        actor: "recruiter",
+        actorUid: uid,
+        reason: typeof req.body.reason === "string" ? req.body.reason.slice(0, 300) : "Manual stage change",
+      });
+    }
     if (stageChanged && AUTO_EMAIL_STAGES.includes(stage) && response.submittedEmail) {
       const resId      = response._id;
       const candName   = response.submittedName || "Applicant";
@@ -730,6 +1495,130 @@ formRouter.patch("/:formId/responses/:responseId", async (req, res) => {
   } catch (err: any) {
     console.error("[forms] PATCH response:", err);
     return res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /recruit/forms/:formId/responses/:responseId/assessment/send
+// Generate and send a written assessment for a Form response.
+formRouter.post("/:formId/responses/:responseId/assessment/send", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "Unauthorized" });
+
+    const form = await RecruitForm.findOne({ _id: req.params.formId, uid }).lean();
+    if (!form) return res.status(404).json({ error: "Form not found." });
+
+    const response = await RecruitFormResponse.findOne({
+      _id: req.params.responseId,
+      formId: req.params.formId,
+      uid,
+    });
+    if (!response) return res.status(404).json({ error: "Response not found." });
+    if (response.assessmentStatus === "completed") {
+      return res.status(400).json({ error: "Assessment already completed by this applicant." });
+    }
+
+    // Sending is idempotent while an assessment is pending.
+    if (
+      response.assessmentToken &&
+      response.assessmentQuestions?.length &&
+      ["sent", "in_progress"].includes(response.assessmentStatus)
+    ) {
+      return res.json({
+        ok: true,
+        assessmentUrl: `${FORM_FRONTEND_URL}/recruit/assessment/${response.assessmentToken}?form=1`,
+        status: response.assessmentStatus,
+        questions: response.assessmentQuestions,
+        candidateName: response.submittedName,
+        candidateEmail: response.submittedEmail,
+        emailSent: false,
+      });
+    }
+
+    const questions = await generateFormAssessmentQuestions({
+      formTitle: form.title,
+      description: form.description,
+      questions: (form.questions || []).map((question: any) => ({
+        id: String(question.id),
+        label: String(question.label),
+      })),
+    });
+    const token = generateFormAssessmentToken();
+    const previousStage = String(response.stage || "new");
+
+    response.assessmentToken = token;
+    response.assessmentQuestions = questions;
+    response.assessmentAnswers = [];
+    response.assessmentStatus = "sent";
+    response.assessmentScoringStatus = "not_started";
+    response.assessmentRunKey = "";
+    response.assessmentSentAt = new Date();
+    response.assessmentStartedAt = undefined;
+    response.assessmentCompletedAt = undefined;
+    response.assessmentCurrentQuestionIndex = 0;
+    await response.save();
+
+    if (previousStage !== "assessment") {
+      await moveFormResponseStage({
+        responseId: response._id,
+        fromStage: previousStage,
+        toStage: "assessment",
+        actor: "recruiter",
+        actorUid: uid,
+        reason: "Assessment sent",
+      });
+    }
+
+    const assessmentUrl = `${FORM_FRONTEND_URL}/recruit/assessment/${token}?form=1`;
+    let emailSent = false;
+    if (response.submittedEmail) {
+      const responseId = response._id;
+      const candidateName = response.submittedName || "Applicant";
+      const candidateEmail = response.submittedEmail;
+      const companyName = String((form as any).jobDetails?.companyName || "");
+      setImmediate(async () => {
+        try {
+          const payload = emailTemplates.assessment(candidateName, form.title, companyName, assessmentUrl);
+          const result = await sendEmail({
+            to: candidateEmail,
+            subject: payload.subject,
+            html: payload.html,
+            text: payload.text,
+            from: CANDIDATE_FROM,
+          });
+          await RecruitFormResponse.findByIdAndUpdate(responseId, {
+            $push: {
+              emailLog: {
+                type: "assessment",
+                to: candidateEmail,
+                subject: payload.subject,
+                body: payload.text,
+                sentAt: new Date(),
+                status: result.ok ? "sent" : "failed",
+                error: result.error,
+              },
+            },
+          });
+        } catch (error) {
+          console.error("[forms] assessment email failed:", error);
+        }
+      });
+      emailSent = true;
+    }
+
+    return res.json({
+      ok: true,
+      assessmentUrl,
+      status: response.assessmentStatus,
+      questions,
+      candidateName: response.submittedName,
+      candidateEmail: response.submittedEmail,
+      emailSent,
+    });
+  } catch (err: any) {
+    console.error("[forms] POST assessment/send:", err);
+    return res.status(500).json({ error: err.message || "Could not send assessment." });
   }
 });
 
@@ -978,11 +1867,12 @@ formRouter.post("/:formId/responses/:responseId/retry-score", async (req, res) =
 
     // A retried score is the first trustworthy score for this response, so let the
     // agent act on it — but only while the recruiter hasn't already triaged it.
-    if (!scored.scoringFailed && (response as any).stage === "new") {
+    if (!scored.scoringFailed && ["new", "scored"].includes(String((response as any).stage))) {
       const _formId = req.params.formId;
       const _responseId = String(response._id);
       setImmediate(async () => {
         try {
+          await markFormResponseScored(response._id);
           await runFormAgent({
             responseId: response._id,
             formTitle: form.title,
@@ -1003,6 +1893,53 @@ formRouter.post("/:formId/responses/:responseId/retry-score", async (req, res) =
   } catch (err: any) {
     console.error("[forms] POST retry-score:", err);
     return res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /recruit/forms/:formId/responses/:responseId/assessment/retry-score
+// Re-runs assessment scoring after a transient AI failure.
+formRouter.post("/:formId/responses/:responseId/assessment/retry-score", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "Unauthorized" });
+
+    const form = await RecruitForm.findOne({ _id: req.params.formId, uid }).lean();
+    if (!form) return res.status(404).json({ error: "Form not found." });
+
+    const response = await RecruitFormResponse.findOne({
+      _id: req.params.responseId,
+      formId: req.params.formId,
+      uid,
+      assessmentStatus: "completed",
+      assessmentScoringStatus: "failed",
+    });
+    if (!response) {
+      return res.status(400).json({ error: "This assessment is not eligible for scoring retry." });
+    }
+
+    const runKey = `assessment:${String(response._id)}:retry:${Date.now()}`;
+    response.assessmentScoringStatus = "pending";
+    response.assessmentRunKey = runKey;
+    await response.save();
+
+    setImmediate(() => {
+      processFormAssessmentScore(response._id, runKey).catch(error =>
+        console.error("[forms] assessment retry worker crashed:", error)
+      );
+    });
+
+    return res.json({
+      ok: true,
+      response: {
+        _id: response._id,
+        assessmentScoringStatus: response.assessmentScoringStatus,
+        assessmentRunKey: response.assessmentRunKey,
+      },
+    });
+  } catch (err: any) {
+    console.error("[forms] POST assessment retry-score:", err);
+    return res.status(500).json({ error: err.message || "Could not retry assessment scoring." });
   }
 });
 
@@ -1141,7 +2078,17 @@ formRouter.get("/:formId/agent-stats", async (req, res) => {
 // ─── Pipeline rules routes ────────────────────────────────────────────────────
 
 const FORM_RULE_CONDITIONS = ["score_above", "score_below", "stage_age_days"];
-const FORM_RULE_ACTIONS = ["move_to_shortlisted", "move_to_interview", "move_to_rejected"];
+const FORM_RULE_ACTIONS = [
+  "move_to_scored",
+  "move_to_review_zone",
+  "move_to_shortlisted",
+  "move_to_assessment",
+  "move_to_interview",
+  "move_to_offer",
+  "move_to_hired",
+  "move_to_withdrawn",
+  "move_to_rejected",
+];
 
 formRouter.get("/:formId/pipeline-rules", async (req, res) => {
   try {
@@ -1329,12 +2276,123 @@ formRouter.get("/:formId/export", async (req, res) => {
 
 // ─── Public routes (/recruit-public/forms) ────────────────────────────────────
 
+// GET /recruit-public/forms/assessment/:token
+formPublicRouter.get("/assessment/:token", async (req, res) => {
+  try {
+    await connectMongo();
+    const response = await RecruitFormResponse.findOne({
+      assessmentToken: req.params.token,
+    }).lean();
+    if (!response) return res.status(404).json({ error: "Assessment not found or no longer available." });
+
+    const form = await RecruitForm.findOne({ _id: response.formId, status: { $in: ["active", "closed"] } })
+      .select("title description jobDetails")
+      .lean();
+    if (!form) return res.status(404).json({ error: "Application form not found." });
+
+    return res.json({
+      completed: response.assessmentStatus === "completed",
+      candidateName: response.submittedName || "Applicant",
+      formTitle: form.title,
+      formDescription: form.description,
+      jobDetails: (form as any).jobDetails ?? {},
+      assessmentStatus: response.assessmentStatus,
+      questions: response.assessmentQuestions ?? [],
+      currentQuestionIndex: response.assessmentCurrentQuestionIndex ?? 0,
+    });
+  } catch (err: any) {
+    console.error("[forms] GET public assessment:", err);
+    return res.status(500).json({ error: "Could not load assessment." });
+  }
+});
+
+// POST /recruit-public/forms/assessment/:token/progress
+formPublicRouter.post("/assessment/:token/progress", async (req, res) => {
+  try {
+    await connectMongo();
+    const questionIndex = Math.max(0, Math.floor(Number(req.body?.questionIndex) || 0));
+    const response = await RecruitFormResponse.findOneAndUpdate(
+      {
+        assessmentToken: req.params.token,
+        assessmentStatus: { $in: ["sent", "in_progress"] },
+      },
+      {
+        $set: {
+          assessmentStatus: "in_progress",
+          assessmentCurrentQuestionIndex: questionIndex,
+          assessmentStartedAt: new Date(),
+        },
+      },
+      { returnDocument: "after" },
+    ).lean();
+    if (!response) return res.status(404).json({ error: "Assessment not found or already submitted." });
+    return res.json({ ok: true, currentQuestionIndex: response.assessmentCurrentQuestionIndex });
+  } catch (err: any) {
+    console.error("[forms] POST public assessment progress:", err);
+    return res.status(500).json({ error: "Could not save assessment progress." });
+  }
+});
+
+// POST /recruit-public/forms/assessment/:token/submit
+formPublicRouter.post("/assessment/:token/submit", async (req, res) => {
+  try {
+    await connectMongo();
+    const response = await RecruitFormResponse.findOne({
+      assessmentToken: req.params.token,
+    });
+    if (!response) return res.status(404).json({ error: "Assessment not found or no longer available." });
+    if (response.assessmentStatus === "completed") {
+      return res.status(400).json({ error: "This assessment has already been submitted." });
+    }
+
+    const submittedAnswers = Array.isArray(req.body?.answers) ? req.body.answers : [];
+    const answerMap = new Map(
+      submittedAnswers.map((answer: any) => [
+        String(answer?.questionId || ""),
+        {
+          questionId: String(answer?.questionId || ""),
+          answer: String(answer?.answer || "").trim().slice(0, 5000),
+          timeTakenSeconds: Math.max(0, Math.floor(Number(answer?.timeTakenSeconds) || 0)),
+        },
+      ]),
+    );
+    const answers = (response.assessmentQuestions ?? []).map((question: { id: string }) => answerMap.get(question.id)).filter(Boolean) as {
+      questionId: string;
+      answer: string;
+      timeTakenSeconds: number;
+    }[];
+    if (answers.length !== response.assessmentQuestions.length || answers.some(answer => !answer.answer)) {
+      return res.status(400).json({ error: "Please answer every assessment question before submitting." });
+    }
+
+    response.assessmentAnswers = answers;
+    response.assessmentStatus = "completed";
+    response.assessmentCompletedAt = new Date();
+    response.assessmentScoringStatus = "pending";
+    response.assessmentRunKey = `assessment:${String(response._id)}:${response.assessmentCompletedAt.getTime()}`;
+    response.assessmentCurrentQuestionIndex = Math.max(0, response.assessmentQuestions.length - 1);
+    await response.save();
+
+    const responseId = response._id;
+    setImmediate(() => {
+      processFormAssessmentScore(responseId, response.assessmentRunKey).catch(error =>
+        console.error("[forms] assessment worker crashed:", error)
+      );
+    });
+
+    return res.json({ ok: true, message: "Assessment submitted successfully." });
+  } catch (err: any) {
+    console.error("[forms] POST public assessment submit:", err);
+    return res.status(500).json({ error: "Could not submit assessment." });
+  }
+});
+
 // GET /recruit-public/forms/:slug — get public form (questions only, no responses)
 formPublicRouter.get("/:slug", async (req, res) => {
   try {
     await connectMongo();
     const form = await RecruitForm.findOne({ slug: req.params.slug, status: "active" })
-      .select("title description questions slug status")
+      .select("title description jobDetails questions slug status")
       .lean();
 
     if (!form) return res.status(404).json({ error: "Form not found or no longer accepting responses." });
@@ -1437,6 +2495,14 @@ formPublicRouter.post(
           ? req.body.source.trim().slice(0, 80)
           : "Form",
         stageMovedAt: new Date(),
+        stageHistory: [{
+          fromStage: "",
+          toStage: "new",
+          actor: "system",
+          actorUid: "",
+          reason: "Application received",
+          timestamp: new Date(),
+        }],
       });
 
       // ── 2. Increment counter (fire-and-forget; OK to drift by ±1 rarely) ─
@@ -1470,6 +2536,10 @@ formPublicRouter.post(
               scoringFailed: scored.scoringFailed,
             },
           });
+
+          if (!scored.scoringFailed) {
+            await markFormResponseScored(response._id);
+          }
 
           // AI Agent Mode acts on the fresh score, then pipeline rules run on the result.
           await runFormAgent({

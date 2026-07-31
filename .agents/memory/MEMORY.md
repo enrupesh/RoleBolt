@@ -20,3 +20,4 @@
 - [emailTemplates.ts corruption fix](email-templates-corruption.md) — offerReminderEmail/offerEmailWithLink/offerResponseEmail/offerExpiryWarning were embedded inside dailyBriefing template literal; fixed by extracting to end of file; use node -e script (not python3) for line manipulation.
 - [Bulk Resume Import](bulk-resume-import.md) — SSE streaming route; reuses resumeUpload multer instance with .array(); extractResumeText helper shared; max 50 files.
 - [Collaboration access boundary](collaboration-access-boundary.md) — existing recruiter actions must resolve job-scoped collaboration access before reading or mutating owner-owned candidates.
+- [Form assessment architecture](form-assessment-architecture.md) — Form assessments use separate tokenized routes, async idempotent scoring, explicit failures, and owner-scoped recruiter actions.

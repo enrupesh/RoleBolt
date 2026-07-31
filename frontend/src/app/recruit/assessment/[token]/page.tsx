@@ -1,11 +1,15 @@
 "use client";
 
 import { useState, useEffect, useCallback, use, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { apiUrl, readApiJson } from "@/lib/api";
 
 // Fire-and-forget: ping the backend with the candidate's current question index
-function pingProgress(token: string, questionIndex: number) {
-  fetch(apiUrl(`/recruit-public/assessment/${token}/progress`), {
+function pingProgress(token: string, questionIndex: number, formMode: boolean) {
+  const path = formMode
+    ? `/recruit-public/forms/assessment/${token}/progress`
+    : `/recruit-public/assessment/${token}/progress`;
+  fetch(apiUrl(path), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ questionIndex }),
@@ -20,6 +24,14 @@ type AssessmentData = {
   jobTitle?: string;
   jobDepartment?: string;
   jobLocation?: string;
+  formTitle?: string;
+  formDescription?: string;
+  jobDetails?: {
+    companyName?: string;
+    department?: string;
+    location?: string;
+    workMode?: string;
+  };
   questions?: Question[];
 };
 
@@ -34,6 +46,8 @@ function Spinner({ size = 4 }: { size?: number }) {
 
 export default function AssessmentPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = use(params);
+  const searchParams = useSearchParams();
+  const formMode = searchParams.get("form") === "1";
   const [data, setData] = useState<AssessmentData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -49,12 +63,22 @@ export default function AssessmentPage({ params }: { params: Promise<{ token: st
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch(apiUrl(`/recruit-public/assessment/${token}`));
+        const path = formMode
+          ? `/recruit-public/forms/assessment/${token}`
+          : `/recruit-public/assessment/${token}`;
+        const res = await fetch(apiUrl(path));
         const json = await readApiJson(res);
         if (!res.ok) throw new Error(json.error || "Assessment not found.");
-        setData(json);
+        setData(formMode
+          ? {
+              ...json,
+              jobTitle: json.formTitle,
+              jobDepartment: json.jobDetails?.department,
+              jobLocation: json.jobDetails?.location,
+            }
+          : json);
         // Ping backend that assessment has started (question 0)
-        pingProgress(token, 0);
+        pingProgress(token, 0, formMode);
       } catch (e: any) {
         setError(e.message || "Failed to load assessment.");
       } finally {
@@ -62,7 +86,7 @@ export default function AssessmentPage({ params }: { params: Promise<{ token: st
       }
     }
     load();
-  }, [token]);
+  }, [token, formMode]);
 
   useEffect(() => {
     questionStartRef.current = Date.now();
@@ -81,7 +105,7 @@ export default function AssessmentPage({ params }: { params: Promise<{ token: st
     setTimings(prev => ({ ...prev, [q.id]: elapsed }));
     const nextQ = Math.min(currentQ + 1, questions.length - 1);
     setCurrentQ(nextQ);
-    pingProgress(token, nextQ);
+    pingProgress(token, nextQ, formMode);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -116,7 +140,10 @@ export default function AssessmentPage({ params }: { params: Promise<{ token: st
     setSubmitError("");
 
     try {
-      const res = await fetch(apiUrl(`/recruit-public/assessment/${token}/submit`), {
+      const path = formMode
+        ? `/recruit-public/forms/assessment/${token}/submit`
+        : `/recruit-public/assessment/${token}/submit`;
+      const res = await fetch(apiUrl(path), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ answers: answerPayload }),
