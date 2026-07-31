@@ -20,3 +20,4 @@
 - [emailTemplates.ts corruption fix](email-templates-corruption.md) — offerReminderEmail/offerEmailWithLink/offerResponseEmail/offerExpiryWarning were embedded inside dailyBriefing template literal; fixed by extracting to end of file; use node -e script (not python3) for line manipulation.
 - [Bulk Resume Import](bulk-resume-import.md) — SSE streaming route; reuses resumeUpload multer instance with .array(); extractResumeText helper shared; max 50 files.
 - [Collaboration access boundary](collaboration-access-boundary.md) — existing recruiter actions must resolve job-scoped collaboration access before reading or mutating owner-owned candidates.
+- [Universal seeker job workspace](universal-job-workspace.md) — jobs from any public URL or pasted JD persist independently and feed matching, resume, cover-letter, and interview flows.

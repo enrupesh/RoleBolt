@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { RecruitGuard } from "@/components/RecruitGuard";
 import { SeekerHeader } from "@/components/SeekerHeader";
@@ -21,6 +21,19 @@ function CoverLetterContent() {
   const [result, setResult]                 = useState<{ coverLetter: string; wordCount: number } | null>(null);
   const [error, setError]                   = useState("");
   const [copied, setCopied]                 = useState(false);
+
+  useEffect(() => {
+    const workspaceId = new URLSearchParams(window.location.search).get("workspaceId");
+    if (!workspaceId || !sessionToken) return;
+    fetch(apiUrl(`/recruit/seeker/workspace/${encodeURIComponent(workspaceId)}`), {
+      headers: { Authorization: `Bearer ${sessionToken}` },
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.workspace?.jobDescription) setJobDescription(data.workspace.jobDescription);
+      })
+      .catch(() => undefined);
+  }, [sessionToken]);
 
   async function handleGenerate(e: React.FormEvent) {
     e.preventDefault();
