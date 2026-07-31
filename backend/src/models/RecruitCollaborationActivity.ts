@@ -13,6 +13,7 @@ export type CollaborationActivityType =
   | "candidate_stage_changed"
   | "offer_approved"
   | "interview_feedback"
+  | "interview_feedback_all_completed"
   | "ai_hiring_summary_generated"
   | "recruiter_final_decision";
 
