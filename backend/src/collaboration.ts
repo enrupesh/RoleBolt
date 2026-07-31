@@ -459,6 +459,18 @@ collaborationRouter.post("/jobs/:jobId/candidates/:candidateId/ai-synthesis", as
 
     const job = await RecruitJob.findById(jobId).lean() as any;
     const collaboration = await RecruitCandidateCollaboration.findOne({ jobId, candidateId }).lean() as any;
+
+    // Validate: interview feedback is required before generating an AI hiring recommendation
+    const feedbackEntries: Array<{ author?: { name: string } }> = collaboration?.interviewFeedback ?? [];
+    if (feedbackEntries.length === 0) {
+      return res.status(422).json({
+        error: "AI Hiring Recommendation is unavailable because the required interview feedback has not yet been submitted.",
+        interviewFeedbackRequired: true,
+        feedbackCount: 0,
+        submittedBy: [],
+      });
+    }
+
     const actorInfo = await actorForUid(uid);
 
     const synthesis = await generateAiHiringSynthesis({
