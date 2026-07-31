@@ -12,6 +12,7 @@ import { startDailyBriefingJob } from "./jobs/dailyBriefing";
 import { startOfferManagementJob } from "./jobs/offerManagement";
 import { seekerRouter } from "./seeker";
 import { billingRouter, handleStripeWebhook } from "./billing";
+import { collaborationRouter } from "./collaboration";
 
 dotenv.config();
 
@@ -65,6 +66,7 @@ app.use("/recruit-public/site-guide", siteGuideRouter);
 // ── Protected routes (JWT required) ──────────────────────────────────────────
 app.use("/recruit/copilot", requireAuth, copilotRouter);
 app.use("/recruit/seeker", requireAuth, seekerRouter);
+app.use("/recruit/collaboration", requireAuth, collaborationRouter);
 app.use("/recruit", requireAuth, recruitRouter);
 app.use("/recruit/forms", requireAuth, formRouter);
 app.use("/billing", requireAuth, billingRouter);

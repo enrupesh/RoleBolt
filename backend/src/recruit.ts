@@ -17,6 +17,8 @@ import { RecruitImage } from "./models/RecruitImage";
 import { sendEmail, verifySMTP } from "./mailer";
 import * as emailTemplates from "./emailTemplates";
 import { User } from "./models/User";
+import { getCollaborationAccess, hasPermission, recordCollaborationActivity } from "./collaboration";
+import { RecruitCandidateCollaboration } from "./models/RecruitCandidateCollaboration";
 
 // ─── Resume parser (in-memory only, no disk storage) ──────────────────────────
 const RESUME_ALLOWED_TYPES = [
@@ -76,6 +78,16 @@ const NOTIFICATION_FROM  = `Rolebolt <${process.env.NOTIFICATION_FROM_EMAIL ?? "
 
 function getUid(req: express.Request): string {
   return (req as any).user?.uid ?? "";
+}
+
+async function getJobWithCollaborationPermission(
+  jobId: string,
+  uid: string,
+  permission: Parameters<typeof hasPermission>[1],
+) {
+  const access = await getCollaborationAccess(jobId, uid);
+  if (!access || !hasPermission(access, permission)) return null;
+  return access;
 }
 
 // ── AI Pipeline Rules: evaluate rules against a candidate (call non-blocking) ─
@@ -1305,8 +1317,9 @@ recruitRouter.get("/jobs/:jobId", async (req, res) => {
   try {
     await connectMongo();
     const uid = getUid(req);
-    const job = await RecruitJob.findOne({ _id: req.params.jobId, uid }).lean();
-    if (!job) return res.status(404).json({ error: "Job not found." });
+    const access = await getCollaborationAccess(req.params.jobId, uid);
+    if (!access) return res.status(404).json({ error: "Job not found." });
+    const job = access.job;
     return res.json({ job: serializeRecruitJob(job) });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
@@ -1317,6 +1330,8 @@ recruitRouter.patch("/jobs/:jobId", async (req, res) => {
   try {
     await connectMongo();
     const uid = getUid(req);
+    const access = await getCollaborationAccess(req.params.jobId, uid);
+    if (!access || !hasPermission(access, "configure_job")) return res.status(403).json({ error: "You do not have permission to configure this job." });
     const allowed = [
       "status", "title", "niche", "companyName", "companyType", "jobType",
       "department", "location", "workMode", "salaryMin", "salaryMax",
@@ -1347,7 +1362,7 @@ recruitRouter.patch("/jobs/:jobId", async (req, res) => {
     }
     const companyProfileForPatch = await RecruitCompanyProfile.findOne({ uid }).lean();
     update.verifiedCompany = (companyProfileForPatch as any)?.verificationStatus === "verified";
-    const job = await RecruitJob.findOneAndUpdate({ _id: req.params.jobId, uid }, update, { returnDocument: "after" }).lean();
+    const job = await RecruitJob.findOneAndUpdate({ _id: req.params.jobId, uid: access.job.uid }, update, { returnDocument: "after" }).lean();
     if (!job) return res.status(404).json({ error: "Job not found." });
     return res.json({ job: serializeRecruitJob(job) });
   } catch (err: any) {
@@ -1730,8 +1745,10 @@ recruitRouter.delete("/jobs/:jobId", async (req, res) => {
   try {
     await connectMongo();
     const uid = getUid(req);
-    await RecruitJob.deleteOne({ _id: req.params.jobId, uid });
-    await RecruitCandidate.deleteMany({ jobId: req.params.jobId, uid });
+    const access = await getCollaborationAccess(req.params.jobId, uid);
+    if (!access || !hasPermission(access, "delete_job")) return res.status(403).json({ error: "You do not have permission to delete this job." });
+    await RecruitJob.deleteOne({ _id: req.params.jobId, uid: access.job.uid });
+    await RecruitCandidate.deleteMany({ jobId: req.params.jobId, uid: access.job.uid });
     return res.json({ ok: true });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
@@ -2525,7 +2542,16 @@ recruitRouter.get("/jobs/:jobId/candidates", async (req, res) => {
   try {
     await connectMongo();
     const uid = getUid(req);
-    const candidates = await RecruitCandidate.find({ jobId: req.params.jobId, uid })
+    const access = await getCollaborationAccess(req.params.jobId, uid);
+    if (!access) return res.status(404).json({ error: "Job not found." });
+    const filter: any = { jobId: req.params.jobId, uid: access.job.uid };
+    if (!access.owner && access.permissions.includes("view_assigned_candidates")) {
+      const assigned = await RecruitCandidateCollaboration.find({ jobId: req.params.jobId, "assignedTo.uid": uid }).select("candidateId").lean();
+      filter._id = { $in: assigned.map(item => item.candidateId) };
+    } else if (!access.owner && !access.permissions.includes("view_candidates")) {
+      return res.status(403).json({ error: "You do not have permission to view candidates." });
+    }
+    const candidates = await RecruitCandidate.find(filter)
       .sort({ totalScore: -1 })
       .lean();
     return res.json({ candidates });
@@ -2538,7 +2564,15 @@ recruitRouter.patch("/jobs/:jobId/candidates/:candidateId", async (req, res) => 
   try {
     await connectMongo();
     const uid = getUid(req);
-    const allowed = ["stage", "notes", "source", "gender", "ageRange", "inTalentPool", "talentPoolNote"];
+    const access = await getCollaborationAccess(req.params.jobId, uid);
+    if (!access) return res.status(404).json({ error: "Job not found." });
+    const allowed = access.owner
+      ? ["stage", "notes", "source", "gender", "ageRange", "inTalentPool", "talentPoolNote"]
+      : [
+          ...(access.permissions.includes("move_pipeline") ? ["stage"] : []),
+          ...(access.permissions.includes("add_notes") ? ["notes"] : []),
+        ];
+    if (!allowed.length) return res.status(403).json({ error: "You do not have permission to update candidates." });
     const update: any = {};
     for (const key of allowed) {
       if (req.body[key] !== undefined) update[key] = req.body[key];
@@ -2547,13 +2581,21 @@ recruitRouter.patch("/jobs/:jobId/candidates/:candidateId", async (req, res) => 
       update.stageMovedAt = new Date();
     }
     const candidate = await RecruitCandidate.findOneAndUpdate(
-      { _id: req.params.candidateId, jobId: req.params.jobId, uid },
+      { _id: req.params.candidateId, jobId: req.params.jobId, uid: access.job.uid },
       update,
       { returnDocument: "after" }
     ).lean();
     if (!candidate) return res.status(404).json({ error: "Candidate not found." });
     if (update.stage) {
       trackEvent("recruiter_stage_changed", uid, { jobId: req.params.jobId, stage: update.stage });
+      setImmediate(() => recordCollaborationActivity(
+        req.params.jobId,
+        uid,
+        "candidate_stage_changed",
+        `Moved ${candidate.name} to ${update.stage}`,
+        { stage: update.stage },
+        req.params.candidateId,
+      ).catch(err => console.error("[collaboration] stage activity failed:", err)));
       // Evaluate pipeline rules after manual stage change (non-blocking)
       setImmediate(() => {
         evaluatePipelineRules(req.params.jobId, req.params.candidateId).catch(e =>
@@ -2604,10 +2646,11 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/retry-score", async (re
   try {
     await connectMongo();
     const uid = getUid(req);
-    const job = await RecruitJob.findOne({ _id: req.params.jobId, uid }).lean();
-    if (!job) return res.status(404).json({ error: "Job not found." });
+    const access = await getJobWithCollaborationPermission(req.params.jobId, uid, "review_candidates");
+    if (!access) return res.status(403).json({ error: "You do not have permission to re-score candidates." });
+    const job = access.job;
 
-    const candidate = await RecruitCandidate.findOne({ _id: req.params.candidateId, jobId: req.params.jobId, uid });
+    const candidate = await RecruitCandidate.findOne({ _id: req.params.candidateId, jobId: req.params.jobId, uid: job.uid });
     if (!candidate) return res.status(404).json({ error: "Candidate not found." });
 
     const scored = await scoreCandidate({
@@ -2641,10 +2684,11 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/brief", async (req, res
   try {
     await connectMongo();
     const uid = getUid(req);
-    const job = await RecruitJob.findOne({ _id: req.params.jobId, uid }).lean();
-    if (!job) return res.status(404).json({ error: "Job not found." });
+    const access = await getJobWithCollaborationPermission(req.params.jobId, uid, "review_candidates");
+    if (!access) return res.status(403).json({ error: "You do not have permission to prepare interview briefs." });
+    const job = access.job;
 
-    const candidate = await RecruitCandidate.findOne({ _id: req.params.candidateId, jobId: req.params.jobId, uid });
+    const candidate = await RecruitCandidate.findOne({ _id: req.params.candidateId, jobId: req.params.jobId, uid: job.uid });
     if (!candidate) return res.status(404).json({ error: "Candidate not found." });
 
     if (candidate.interviewBrief) {
@@ -2689,10 +2733,11 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/assessment/send", async
   try {
     await connectMongo();
     const uid = getUid(req);
-    const job = await RecruitJob.findOne({ _id: req.params.jobId, uid }).lean();
-    if (!job) return res.status(404).json({ error: "Job not found." });
+    const access = await getJobWithCollaborationPermission(req.params.jobId, uid, "send_assessments");
+    if (!access) return res.status(403).json({ error: "You do not have permission to send assessments." });
+    const job = access.job;
 
-    const candidate = await RecruitCandidate.findOne({ _id: req.params.candidateId, jobId: req.params.jobId, uid });
+    const candidate = await RecruitCandidate.findOne({ _id: req.params.candidateId, jobId: req.params.jobId, uid: job.uid });
     if (!candidate) return res.status(404).json({ error: "Candidate not found." });
 
     if (candidate.assessmentStatus === "completed") {
@@ -3805,10 +3850,11 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/offer-letter", async (r
   try {
     await connectMongo();
     const uid = getUid(req);
-    const job = await RecruitJob.findOne({ _id: req.params.jobId, uid }).lean();
-    if (!job) return res.status(404).json({ error: "Job not found." });
+    const access = await getJobWithCollaborationPermission(req.params.jobId, uid, "send_offers");
+    if (!access) return res.status(403).json({ error: "You do not have permission to prepare offers." });
+    const job = access.job;
 
-    const candidate = await RecruitCandidate.findOne({ _id: req.params.candidateId, jobId: req.params.jobId, uid });
+    const candidate = await RecruitCandidate.findOne({ _id: req.params.candidateId, jobId: req.params.jobId, uid: job.uid });
     if (!candidate) return res.status(404).json({ error: "Candidate not found." });
 
     const {
@@ -3871,10 +3917,12 @@ recruitRouter.patch("/jobs/:jobId/candidates/:candidateId/offer-letter", async (
   try {
     await connectMongo();
     const uid = getUid(req);
+    const access = await getJobWithCollaborationPermission(req.params.jobId, uid, "send_offers");
+    if (!access) return res.status(403).json({ error: "You do not have permission to edit offers." });
     const { offerLetter, changeSummary } = req.body as { offerLetter: string; changeSummary?: string };
     if (!offerLetter?.trim()) return res.status(400).json({ error: "offerLetter body is required." });
 
-    const candidate = await RecruitCandidate.findOne({ _id: req.params.candidateId, jobId: req.params.jobId, uid });
+    const candidate = await RecruitCandidate.findOne({ _id: req.params.candidateId, jobId: req.params.jobId, uid: access.job.uid });
     if (!candidate) return res.status(404).json({ error: "Candidate not found." });
 
     // Snapshot current content as a version before overwriting (only when content actually changed)
@@ -3910,13 +3958,15 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/offer-letter/send", asy
   try {
     await connectMongo();
     const uid = getUid(req);
+    const access = await getJobWithCollaborationPermission(req.params.jobId, uid, "send_offers");
+    if (!access) return res.status(403).json({ error: "You do not have permission to approve and send offers." });
 
-    const candidate = await RecruitCandidate.findOne({ _id: req.params.candidateId, jobId: req.params.jobId, uid });
+    const candidate = await RecruitCandidate.findOne({ _id: req.params.candidateId, jobId: req.params.jobId, uid: access.job.uid });
     if (!candidate) return res.status(404).json({ error: "Candidate not found." });
     if (!candidate.offerLetter?.trim()) return res.status(400).json({ error: "No offer letter draft found. Generate one first." });
     if (!candidate.email?.trim()) return res.status(400).json({ error: "This candidate has no email address on file." });
 
-    const job = await RecruitJob.findOne({ _id: req.params.jobId, uid }).lean();
+    const job = access.job;
     const jobTitle    = (job as any)?.title       || "";
     const companyName = (job as any)?.companyName || (candidate.offerDetails as any)?.companyName || "";
 
@@ -3961,6 +4011,14 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/offer-letter/send", asy
     }
 
     await candidate.save();
+    setImmediate(() => recordCollaborationActivity(
+      req.params.jobId,
+      uid,
+      "offer_approved",
+      `Approved and sent an offer to ${candidate.name}`,
+      {},
+      req.params.candidateId,
+    ).catch(err => console.error("[collaboration] offer activity failed:", err)));
 
     trackEvent("offer_sent", uid, { jobId: req.params.jobId, candidateId: req.params.candidateId });
 
@@ -3979,12 +4037,14 @@ recruitRouter.get("/jobs/:jobId/candidates/:candidateId/offer-letter/pdf", async
   try {
     await connectMongo();
     const uid = getUid(req);
+    const access = await getJobWithCollaborationPermission(req.params.jobId, uid, "send_offers");
+    if (!access) return res.status(403).json({ error: "You do not have permission to download offers." });
 
-    const candidate = await RecruitCandidate.findOne({ _id: req.params.candidateId, jobId: req.params.jobId, uid }).lean();
+    const candidate = await RecruitCandidate.findOne({ _id: req.params.candidateId, jobId: req.params.jobId, uid: access.job.uid }).lean();
     if (!candidate) return res.status(404).json({ error: "Candidate not found." });
     if (!(candidate as any).offerLetter?.trim()) return res.status(400).json({ error: "No offer letter draft found." });
 
-    const job = await RecruitJob.findOne({ _id: req.params.jobId, uid }).lean();
+    const job = access.job;
     const jobTitle = (job as any)?.title || "Offer Letter";
 
     const filename = `offer-letter-${((candidate as any).name || "candidate").replace(/\s+/g, "-").toLowerCase()}.pdf`;
@@ -4030,8 +4090,10 @@ recruitRouter.get("/jobs/:jobId/offer-statuses", async (req, res) => {
   try {
     await connectMongo();
     const uid = getUid(req);
+    const access = await getJobWithCollaborationPermission(req.params.jobId, uid, "view_candidates");
+    if (!access) return res.status(403).json({ error: "You do not have permission to view offer statuses." });
     const candidates = await RecruitCandidate.find(
-      { jobId: req.params.jobId, uid, stage: { $in: ["offer", "hired"] } },
+      { jobId: req.params.jobId, uid: access.job.uid, stage: { $in: ["offer", "hired"] } },
       { _id: 1, offerStatus: 1, offerCandidateStatus: 1, offerDetails: 1, offerLog: 1 }
     ).lean();
     const statuses = candidates.map((c: any) => ({
@@ -4053,7 +4115,9 @@ recruitRouter.get("/jobs/:jobId/candidates/:candidateId/offer-letter/versions", 
   try {
     await connectMongo();
     const uid = getUid(req);
-    const candidate = await RecruitCandidate.findOne({ _id: req.params.candidateId, jobId: req.params.jobId, uid }).lean();
+    const access = await getJobWithCollaborationPermission(req.params.jobId, uid, "send_offers");
+    if (!access) return res.status(403).json({ error: "You do not have permission to view offer history." });
+    const candidate = await RecruitCandidate.findOne({ _id: req.params.candidateId, jobId: req.params.jobId, uid: access.job.uid }).lean();
     if (!candidate) return res.status(404).json({ error: "Candidate not found." });
     return res.json({ versions: (candidate as any).offerVersions || [] });
   } catch (err: any) {
@@ -4067,7 +4131,9 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/offer-letter/versions/:
   try {
     await connectMongo();
     const uid = getUid(req);
-    const candidate = await RecruitCandidate.findOne({ _id: req.params.candidateId, jobId: req.params.jobId, uid });
+    const access = await getJobWithCollaborationPermission(req.params.jobId, uid, "send_offers");
+    if (!access) return res.status(403).json({ error: "You do not have permission to restore offer versions." });
+    const candidate = await RecruitCandidate.findOne({ _id: req.params.candidateId, jobId: req.params.jobId, uid: access.job.uid });
     if (!candidate) return res.status(404).json({ error: "Candidate not found." });
 
     const versions = (candidate.offerVersions as any[]) ?? [];
@@ -4111,8 +4177,10 @@ recruitRouter.patch("/jobs/:jobId/candidates/:candidateId/offer-letter/reminder-
   try {
     await connectMongo();
     const uid = getUid(req);
+    const access = await getJobWithCollaborationPermission(req.params.jobId, uid, "send_offers");
+    if (!access) return res.status(403).json({ error: "You do not have permission to configure offer reminders." });
     const { enabled, delayDays, frequencyDays, maxReminders } = req.body;
-    const candidate = await RecruitCandidate.findOne({ _id: req.params.candidateId, jobId: req.params.jobId, uid });
+    const candidate = await RecruitCandidate.findOne({ _id: req.params.candidateId, jobId: req.params.jobId, uid: access.job.uid });
     if (!candidate) return res.status(404).json({ error: "Candidate not found." });
 
     const cur = (candidate as any).offerReminderConfig || { remindersSent: 0 };
@@ -4137,11 +4205,13 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/offer-letter/extend-exp
   try {
     await connectMongo();
     const uid = getUid(req);
+    const access = await getJobWithCollaborationPermission(req.params.jobId, uid, "send_offers");
+    if (!access) return res.status(403).json({ error: "You do not have permission to extend offer expiry." });
     const { newExpiryDate, sendNotification = false } = req.body as { newExpiryDate: string; sendNotification?: boolean };
 
     if (!newExpiryDate?.trim()) return res.status(400).json({ error: "newExpiryDate is required." });
 
-    const candidate = await RecruitCandidate.findOne({ _id: req.params.candidateId, jobId: req.params.jobId, uid });
+    const candidate = await RecruitCandidate.findOne({ _id: req.params.candidateId, jobId: req.params.jobId, uid: access.job.uid });
     if (!candidate) return res.status(404).json({ error: "Candidate not found." });
     if (!candidate.offerLetter?.trim()) return res.status(400).json({ error: "No offer letter found for this candidate." });
     if (!["sent", "expired"].includes(candidate.offerStatus as string)) {
