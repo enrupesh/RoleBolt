@@ -2380,6 +2380,147 @@ recruitRouter.post("/jobs/:jobId/candidates", async (req, res) => {
   }
 });
 
+// ── Helper: extract text from a multer file buffer (shared by bulk route) ────
+async function extractResumeText(file: Express.Multer.File): Promise<string> {
+  const { mimetype, buffer } = file;
+  let text = "";
+
+  if (mimetype === "application/pdf") {
+    const pdfParse = require("pdf-parse/lib/pdf-parse");
+    const data = await pdfParse(buffer);
+    text = data.text ?? "";
+    if (!text.trim()) throw new Error("PDF appears to be a scanned image with no text layer.");
+  } else if (mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+    const mammoth = require("mammoth");
+    const result = await mammoth.extractRawText({ buffer });
+    text = result.value ?? "";
+    if (!text.trim()) throw new Error("Could not extract text from DOCX.");
+  } else if (mimetype === "text/plain") {
+    text = buffer.toString("utf-8");
+  } else {
+    throw new Error("Unsupported file type. Use PDF, DOCX, or TXT.");
+  }
+
+  text = text
+    .replace(/\r\n/g, "\n").replace(/\r/g, "\n")
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
+    .replace(/[^\S\n]+/g, " ")
+    .replace(/^ +$/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  if (text.length < 40) throw new Error("Not enough text could be extracted from this file.");
+  return text;
+}
+
+// ── Bulk resume import (SSE streaming progress) ───────────────────────────────
+recruitRouter.post(
+  "/jobs/:jobId/candidates/bulk",
+  (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    resumeUpload.array("resumes", 50)(req, res, (err: any) => {
+      if (err) {
+        const status = err.code === "LIMIT_FILE_SIZE" ? 413 : 400;
+        return res.status(status).json({ error: err.message || "File upload error." });
+      }
+      next();
+    });
+  },
+  async (req: express.Request, res: express.Response) => {
+    try {
+      await connectMongo();
+      const uid = getUid(req);
+      if (!uid) return res.status(401).json({ error: "Unauthorized" });
+
+      const job = await RecruitJob.findOne({ _id: req.params.jobId, uid });
+      if (!job) return res.status(404).json({ error: "Job not found." });
+
+      const files = (req.files as Express.Multer.File[]) ?? [];
+      if (files.length === 0) return res.status(400).json({ error: "No files uploaded." });
+
+      // Switch to SSE streaming
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+      res.flushHeaders();
+
+      const sendEvent = (payload: object) => {
+        res.write(`data: ${JSON.stringify(payload)}\n\n`);
+      };
+
+      sendEvent({ type: "start", total: files.length });
+
+      let succeeded = 0;
+      let failed = 0;
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const filename = file.originalname;
+
+        sendEvent({ type: "file", index: i, total: files.length, filename, status: "processing" });
+
+        try {
+          const resumeText = await extractResumeText(file);
+          const scored = await scoreCandidate({ resumeText, jobTitle: job.title, rubric: job.rubric });
+
+          const candidate = await RecruitCandidate.create({
+            jobId: job._id,
+            uid,
+            name: scored.name || filename.replace(/\.[^.]+$/, ""),
+            email: scored.email || "",
+            resumeText,
+            totalScore: scored.totalScore,
+            maxScore: scored.maxScore,
+            scoreBreakdown: scored.scoreBreakdown,
+            aiSummary: scored.aiSummary,
+            redFlags: scored.redFlags,
+            strengths: scored.strengths,
+            stage: "applied",
+            assessmentStatus: "not_sent",
+            previousResumeScore: scored.totalScore,
+            scoringFailed: scored.scoringFailed,
+            source: "bulk_import",
+          });
+
+          await RecruitJob.updateOne({ _id: job._id }, { $inc: { candidateCount: 1 } });
+
+          const scorePct = scored.maxScore > 0
+            ? Math.round((scored.totalScore / scored.maxScore) * 100)
+            : 0;
+
+          succeeded++;
+          sendEvent({
+            type: "file",
+            index: i,
+            total: files.length,
+            filename,
+            status: "done",
+            candidateId: String(candidate._id),
+            name: candidate.name,
+            email: candidate.email,
+            scorePct,
+            totalScore: scored.totalScore,
+            maxScore: scored.maxScore,
+            hiringDecision: scored.scoringFailed ? null : null, // set by pipeline rules
+            aiSummary: scored.aiSummary,
+            strengths: scored.strengths,
+            redFlags: scored.redFlags,
+            scoringFailed: scored.scoringFailed,
+          });
+        } catch (fileErr: any) {
+          failed++;
+          sendEvent({ type: "file", index: i, total: files.length, filename, status: "failed", error: fileErr.message });
+        }
+      }
+
+      sendEvent({ type: "complete", total: files.length, succeeded, failed });
+      res.end();
+    } catch (err: any) {
+      console.error("[recruit] POST /candidates/bulk", err);
+      try { res.write(`data: ${JSON.stringify({ type: "error", error: err.message })}\n\n`); res.end(); } catch {}
+    }
+  }
+);
+
 recruitRouter.get("/jobs/:jobId/candidates", async (req, res) => {
   try {
     await connectMongo();

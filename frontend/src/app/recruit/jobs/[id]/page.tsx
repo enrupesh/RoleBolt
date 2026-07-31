@@ -10,6 +10,7 @@ import { apiUrl, readApiJson } from "@/lib/api";
 import { formatJobDescription } from "@/lib/jobDescription";
 import AssessmentAnalyticsTab from "./AssessmentAnalyticsTab";
 import LiveAssessmentProgressTab from "./LiveAssessmentProgressTab";
+import BulkImportModal from "./BulkImportModal";
 
 function getFrontendUrl(): string {
   if (typeof window !== "undefined" && window.location?.origin) return window.location.origin;
@@ -2454,6 +2455,7 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [activeTab, setActiveTab] = useState<"pipeline" | "jd" | "rubric" | "post" | "rules" | "performance" | "agent-log" | "assessment-analytics" | "live">("pipeline");
+  const [showBulkModal, setShowBulkModal] = useState(false);
   const [pipelineRules, setPipelineRules] = useState<PipelineRule[]>([]);
   const [perfAlerts, setPerfAlerts] = useState<PerformanceAlert[]>([]);
   const [agentLogCount, setAgentLogCount] = useState(0);
@@ -2630,6 +2632,23 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
     <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
       
 
+      {showBulkModal && job && (
+        <BulkImportModal
+          jobId={id}
+          token={token!}
+          jobTitle={job.title}
+          onClose={() => setShowBulkModal(false)}
+          onImported={(count) => {
+            setShowBulkModal(false);
+            // Refresh candidate list
+            fetch(apiUrl(`/recruit/jobs/${id}/candidates`), { headers: { Authorization: `Bearer ${token}` } })
+              .then(r => r.json())
+              .then(d => { if (d.candidates) setCandidates(d.candidates); })
+              .catch(() => {});
+          }}
+        />
+      )}
+
       {showAddModal && (
         <AddCandidateModal
           jobId={id}
@@ -2693,6 +2712,13 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
             {token && (
               <AgentModeToggle job={job} token={token} onUpdate={handleAgentModeUpdate} />
             )}
+            <button
+              onClick={() => setShowBulkModal(true)}
+              className="flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-2 text-xs font-bold text-[var(--text-secondary)] transition hover:text-[var(--foreground)] hover:border-indigo-500/40"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+              Bulk Import
+            </button>
             <button
               onClick={() => setShowAddModal(true)}
               className="flex items-center gap-1.5 rounded-full bg-indigo-500 px-4 py-2 text-xs font-bold text-white shadow-lg shadow-indigo-500/20 transition hover:bg-indigo-400"
