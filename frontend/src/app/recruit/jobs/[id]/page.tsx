@@ -13,6 +13,7 @@ import LiveAssessmentProgressTab from "./LiveAssessmentProgressTab";
 import BulkImportModal from "./BulkImportModal";
 import CollaborationTab from "./CollaborationTab";
 import AiHiringSummaryTab from "./AiHiringSummaryTab";
+import JobAnalysisTab from "./JobAnalysisTab";
 
 function getFrontendUrl(): string {
   if (typeof window !== "undefined" && window.location?.origin) return window.location.origin;
@@ -2599,7 +2600,7 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<"pipeline" | "jd" | "rubric" | "post" | "rules" | "performance" | "agent-log" | "assessment-analytics" | "live" | "collaboration" | "ai-hiring">("pipeline");
+  const [activeTab, setActiveTab] = useState<"pipeline" | "jd" | "rubric" | "post" | "rules" | "performance" | "agent-log" | "assessment-analytics" | "live" | "collaboration" | "ai-hiring" | "job-analysis">("pipeline");
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [pipelineRules, setPipelineRules] = useState<PipelineRule[]>([]);
   const [perfAlerts, setPerfAlerts] = useState<PerformanceAlert[]>([]);
@@ -2948,7 +2949,7 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
         </div>
 
         <div className="mb-6 flex gap-1 border-b border-[var(--border)] overflow-x-auto">
-          {(["pipeline", "jd", "rubric", "post", "rules", "performance", "agent-log", "assessment-analytics", "live", "collaboration", "ai-hiring"] as const).map(tab => (
+          {(["pipeline", "jd", "rubric", "post", "rules", "performance", "agent-log", "assessment-analytics", "live", "collaboration", "ai-hiring", "job-analysis"] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -3007,6 +3008,11 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
                   <span className="flex items-center gap-1.5">
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.46 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z"/></svg>
                     AI Hiring
+                  </span>
+                ) : tab === "job-analysis" ? (
+                  <span className="flex items-center gap-1.5">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+                    Job Analysis
                   </span>
                 ) : "Pipeline"}
             </button>
@@ -3199,6 +3205,15 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
           <AiHiringSummaryTab
             jobId={id}
             token={token}
+            candidates={candidates}
+          />
+        )}
+
+        {activeTab === "job-analysis" && token && (
+          <JobAnalysisTab
+            jobId={id}
+            token={token}
+            jobTitle={job.title}
             candidates={candidates}
           />
         )}
