@@ -1,102 +1,53 @@
-# RoleBolt — AI-Native Hiring Platform
+# Recruit — Standalone ATS Project
 
-## Project Overview
-RoleBolt is a full-stack AI-powered hiring platform built for the Google Gemini XPRIZE Hackathon (deadline: Aug 17, 2026). It has two sides: a recruiter dashboard for managing jobs and candidates, and a job seeker portal with AI tools.
+## Overview
+A standalone extraction of the "Recruit" tool from the main Rolebolt app. Self-contained two-part project:
 
-**Live URLs:**
-- Frontend (production): https://www.rolebolt.tech/
-- Backend (production): https://back-mp9k.onrender.com/
-
-## Tech Stack
-- **Frontend:** Next.js 16 (App Router, Turbopack), TypeScript, Tailwind CSS, Framer Motion — port 5000
-- **Backend:** Express.js, TypeScript, MongoDB (Mongoose), Resend email — port 8080
-- **Auth:** Custom JWT (`rb_token` cookie + localStorage), Firebase for social auth (Google/GitHub/phone)
-- **AI:** Google Gemini (primary) → Mesh API (fallback) → NVIDIA NIM (last fallback)
-- **Payments:** Stripe subscriptions (Pro $49/mo, Agency $149/mo, Seeker Pro $9/mo)
+- `backend/` — Express + MongoDB + Firebase Admin API server (recruit routes only)
+- `frontend/` — Next.js app with `/recruit` and `/recruit-public` pages
 
 ## How to Run
-```bash
-# Backend (port 8080)
-cd backend && npm install && npm run dev
 
-# Frontend (port 5000)
-cd frontend && npm install && npm run dev
-```
+### Backend
+- Workflow: `Backend` → `cd backend && npm run dev` (port 8080)
+- Requires env vars: `MONGODB_URI`, `FIREBASE_SERVICE_ACCOUNT_JSON`, `GEMINI_MESH_KEY`, `GEMINI_PRIMARY_KEY`, `GEMINI_FALLBACK_KEY`, `CORS_ORIGIN`
+- Optional: `RECAPTCHA_SECRET_KEY` for bot protection
 
-## Project Structure
-```
-backend/src/
-  index.ts           — Express app entry, registers all routers
-  recruit.ts         — Main recruiter router (3000+ lines)
-  seeker.ts          — Seeker router (mounted at /recruit/seeker)
-  billing.ts         — Stripe billing router
-  auth.ts            — Auth router
-  recruitForms.ts    — Custom screening forms
-  recruitCopilot.ts  — AI Copilot (SSE streaming)
-  siteGuideChat.ts   — Site guide chatbot
-  jobs/
-    dailyBriefing.ts — Cron job (8AM UTC) + sendJobAlerts
-  models/            — All Mongoose models
-  ai/                — geminiClient, meshClient, nvidiaClient
+### Frontend
+- Workflow: `Start application` → `cd frontend && npm run dev` (port 5000)
+- Requires env vars: `BACKEND_URL`, Firebase client keys
+- Optional: `NEXT_PUBLIC_RECAPTCHA_SITE_KEY`
 
-frontend/src/
-  app/
-    recruit/         — Recruiter pages (login, dashboard, jobs, analytics, etc.)
-    seeker/          — Seeker pages (dashboard, profile, resume, cover-letter, etc.)
-    f/[slug]/        — Public custom form submission
-  components/
-    RecruitGuard.tsx — Auth protection (requiredRole: "creator" | "seeker")
-    RecruitHeader.tsx — Recruiter nav (creator role)
-    SeekerHeader.tsx  — Seeker nav
-  contexts/
-    RecruitAuthContext.tsx — Auth state
-  lib/
-    api.ts           — apiUrl() helper (defaults to https://back-mp9k.onrender.com)
-```
+## Stack
+- **Backend**: Node.js, Express, TypeScript, MongoDB/Mongoose, Firebase Admin SDK, Gemini AI (via `callGeminiChain`)
+- **Frontend**: Next.js 16 (App Router), React 19, Tailwind CSS v4, Recharts, jsPDF, Lucide React
+- **Auth**: Custom JWT (signup/login/email verify), Firebase social auth (Google, GitHub, phone OTP)
 
-## Key Routes
-- `/` → redirects to `/recruit` (landing page)
-- `/recruit/*` — Recruiter pages (most protected by RecruitGuard requiredRole="creator")
-- `/seeker/*` — Seeker pages (protected by RecruitGuard requiredRole="seeker")
-- `/recruit/opportunities` — Public job board
-- `/recruit/opportunities/[id]` — Public job detail with AI match score
-- `/f/[slug]` — Public custom form submission
+## Key Features
+- Standard job postings with AI-powered resume scoring
+- Candidate pipeline (applied → screened → assessed → interview → offer → hired)
+- AI Agent mode (auto-shortlist/reject based on score thresholds)
+- Assessment system with AI scoring and decisions
+- **Job Analysis** tab — comprehensive analytics with health score, pipeline funnel, quality tiers, timeline charts, source breakdown, assessment metrics, and AI-generated insights
+- Pipeline Rules (auto-move candidates based on conditions)
+- Offer letter workflow with e-sign
+- Collaboration (job-scoped team access)
+- Daily briefing emails (cron job at 8AM UTC, `CRON_ENABLED=true`)
+- Bulk resume import (up to 50 files via SSE streaming)
 
-## Environment Secrets Required
-Backend (on Render):
-- `MONGODB_URI` — MongoDB Atlas connection string
-- `SESSION_SECRET` — JWT signing secret (set in Replit secrets)
-- `RESEND_API_KEY` — Email sending
-- `GEMINI_MESH_KEY` — Mesh API key
-- `GEMINI_PRIMARY_KEY` — Direct Gemini API key
-- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRO_PRICE_ID`, etc.
-- `CRON_ENABLED=true` — Enables daily briefing cron
+## Route Structure
 
-Frontend:
-- `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` — reCAPTCHA v3 (optional)
+### Backend (`/recruit/...`)
+- `GET /jobs/:id/job-analysis` — Comprehensive job analysis with AI health score
+- `GET /jobs/:id/assessment-analytics` — Assessment-specific analytics
+- `GET /analytics` — Aggregate recruiter analytics
+- Full CRUD for jobs, candidates, pipeline rules, offers, collaboration, etc.
 
-## Implementation Status (as of July 29, 2026)
-| Feature | Status |
-|---------|--------|
-| 1.1 AI Agent Mode Toggle | ✅ Complete |
-| 1.2 AI Pipeline Rules | ✅ Complete |
-| 1.3 AI Daily Briefing | ✅ Complete |
-| 1.4 AI Job Performance Monitor | ✅ Complete |
-| 2.1 Seeker Account System | ✅ Complete |
-| 2.2 AI Resume Builder | ✅ Complete |
-| 2.3 AI Job Match Score | ✅ Complete |
-| 2.4 AI Cover Letter Generator | ✅ Complete |
-| 2.5 AI Interview Prep | ✅ Complete |
-| 2.6 AI Profile Optimizer | ✅ Complete |
-| 2.7 Smart Job Alerts | ✅ Complete |
-| 3.1 Stripe Subscriptions | ✅ Complete |
-| 1.5 JD Generator Enhancement | ⏳ Pending |
-| 1.6 Salary Benchmarking | ⏳ Pending |
-| 4.1 Gemini API Verification | ⏳ Pending |
-| 4.2 Google Cloud Run Deployment | ⏳ Pending |
-| 5.1-5.3 Hackathon Submission | ⏳ Pending |
+### Frontend (`/recruit/...`)
+- `/recruit/dashboard` — Recruiter dashboard
+- `/recruit/jobs/[id]` — Job detail with tabs: Pipeline, JD, Rubric, Rules, Performance, Agent Log, Assessment Analytics, Live Progress, Collaboration, AI Hiring, **Job Analysis**
+- `/recruit/analytics` — Aggregate analytics page
+- `/recruit-public/jobs/[id]` — Public job application form
 
 ## User Preferences
-- Fix bugs immediately rather than just reporting them
-- Full end-to-end verification after every change
-- TypeScript must be clean (zero errors) at all times
+- Keep existing project structure and stack; do not restructure or migrate
