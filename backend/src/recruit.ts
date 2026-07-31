@@ -19,6 +19,9 @@ import * as emailTemplates from "./emailTemplates";
 import { User } from "./models/User";
 import { getCollaborationAccess, hasPermission, recordCollaborationActivity } from "./collaboration";
 import { RecruitCandidateCollaboration } from "./models/RecruitCandidateCollaboration";
+import { RecruitForm } from "./models/RecruitForm";
+import { RecruitFormResponse } from "./models/RecruitFormResponse";
+import { verifyRecaptcha, RECAPTCHA_REJECTION_MESSAGE } from "./publicSubmissionGuard";
 
 // ─── Resume parser (in-memory only, no disk storage) ──────────────────────────
 const RESUME_ALLOWED_TYPES = [
@@ -79,6 +82,16 @@ const NOTIFICATION_FROM  = `Rolebolt <${process.env.NOTIFICATION_FROM_EMAIL ?? "
 function getUid(req: express.Request): string {
   return (req as any).user?.uid ?? "";
 }
+
+// Form Jobs use a shorter stage list than Standard Jobs; this projects a form
+// response onto the candidate funnel so org-wide numbers cover both job types.
+const FORM_STAGE_TO_CANDIDATE_STAGE: Record<string, string> = {
+  new:         "applied",
+  shortlisted: "screened",
+  interview:   "interview",
+  hired:       "hired",
+  rejected:    "rejected",
+};
 
 async function getJobWithCollaborationPermission(
   jobId: string,
@@ -1483,31 +1496,6 @@ recruitPublicRouter.get("/jobs/:jobId", async (req, res) => {
   }
 });
 
-// ── reCAPTCHA v3 helper ────────────────────────────────────────────────────────
-async function verifyRecaptcha(token: string): Promise<{ ok: boolean; score: number }> {
-  const secret = process.env.RECAPTCHA_SECRET_KEY;
-  if (!secret) {
-    // Key not configured — skip verification (graceful degradation)
-    console.warn("[recaptcha] RECAPTCHA_SECRET_KEY not set — skipping bot check.");
-    return { ok: true, score: 1 };
-  }
-  if (!token) return { ok: false, score: 0 };
-  try {
-    const res = await fetch("https://www.google.com/recaptcha/api/siteverify", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: `secret=${encodeURIComponent(secret)}&response=${encodeURIComponent(token)}`,
-    });
-    const data: any = await res.json();
-    const score: number = data?.score ?? 0;
-    console.log(`[recaptcha] success=${data?.success} score=${score} action=${data?.action}`);
-    return { ok: data?.success === true && score >= 0.5, score };
-  } catch (err: any) {
-    console.warn("[recaptcha] Verification request failed:", err?.message);
-    return { ok: true, score: 1 }; // network failure → allow (don't block real users)
-  }
-}
-
 recruitPublicRouter.post("/jobs/:jobId/apply", async (req, res) => {
   try {
     await connectMongo();
@@ -1523,9 +1511,7 @@ recruitPublicRouter.post("/jobs/:jobId/apply", async (req, res) => {
     // ── Google reCAPTCHA v3 bot check ─────────────────────────────────────────
     const captcha = await verifyRecaptcha(recaptchaToken ?? "");
     if (!captcha.ok) {
-      return res.status(403).json({
-        error: "Our spam filter flagged this submission as automated. Please refresh the page and try again.",
-      });
+      return res.status(403).json({ error: RECAPTCHA_REJECTION_MESSAGE });
     }
     if (!name?.trim()) return res.status(400).json({ error: "Name is required." });
     if (!email?.trim()) return res.status(400).json({ error: "Email is required." });
@@ -3038,14 +3024,19 @@ recruitRouter.get("/analytics", async (req, res) => {
     await connectMongo();
     const uid = getUid(req);
 
-    const [jobs, allCandidates] = await Promise.all([
+    const [jobs, allCandidates, forms, formResponses] = await Promise.all([
       RecruitJob.find({ uid }).lean(),
       RecruitCandidate.find({ uid }).lean(),
+      RecruitForm.find({ uid }).lean(),
+      RecruitFormResponse.find({ uid }).lean(),
     ]);
 
     const totalJobs = jobs.length;
     const activeJobs = jobs.filter(j => j.status === "active").length;
-    const totalCandidates = allCandidates.length;
+    const totalStandardCandidates = allCandidates.length;
+    const totalFormResponses = formResponses.length;
+    // Form applicants are real applicants — the org-wide funnel counts both.
+    const totalCandidates = totalStandardCandidates + totalFormResponses;
 
     // Stage funnel (all candidates across all jobs)
     const STAGES = ["applied", "screened", "assessed", "interview", "offer", "hired", "rejected"] as const;
@@ -3054,10 +3045,14 @@ recruitRouter.get("/analytics", async (req, res) => {
     for (const c of allCandidates) {
       if (stageCounts[c.stage] !== undefined) stageCounts[c.stage]++;
     }
+    for (const r of formResponses as any[]) {
+      const mapped = FORM_STAGE_TO_CANDIDATE_STAGE[r.stage];
+      if (mapped && stageCounts[mapped] !== undefined) stageCounts[mapped]++;
+    }
 
     // Drop-off rates: % who made it through each stage (excluding rejected)
     const activeStages = STAGES.filter(s => s !== "rejected");
-    const funnelDropoff = activeStages.map((stage, i) => {
+    const funnelDropoff = activeStages.map((stage) => {
       const count = stageCounts[stage] || 0;
       const dropoffPct = totalCandidates > 0 ? Math.round((count / totalCandidates) * 100) : 0;
       return { stage, count, dropoffPct };
@@ -3084,8 +3079,12 @@ recruitRouter.get("/analytics", async (req, res) => {
       const src = c.source?.trim() || "Not specified";
       sourceCounts[src] = (sourceCounts[src] || 0) + 1;
     }
+    for (const r of formResponses as any[]) {
+      const src = r.source?.trim() || "Form";
+      sourceCounts[src] = (sourceCounts[src] || 0) + 1;
+    }
     const sourceBreakdown = Object.entries(sourceCounts)
-      .map(([source, count]) => ({ source, count, pct: Math.round((count / totalCandidates) * 100) }))
+      .map(([source, count]) => ({ source, count, pct: totalCandidates > 0 ? Math.round((count / totalCandidates) * 100) : 0 }))
       .sort((a, b) => b.count - a.count);
 
     // Bias detection: gender & age distribution (from voluntarily provided data only)
@@ -3140,10 +3139,32 @@ recruitRouter.get("/analytics", async (req, res) => {
       };
     });
 
+    // Per-form stats (mirrors jobStats so the dashboard can show both side by side)
+    const formStats = (forms as any[]).map(form => {
+      const fResponses = (formResponses as any[]).filter(r => String(r.formId) === String(form._id));
+      const scored = fResponses.filter(r => !r.scoringFailed);
+      return {
+        formId: form._id,
+        title: form.title,
+        status: form.status,
+        agentEnabled: form.agentMode?.enabled === true,
+        totalResponses: fResponses.length,
+        avgScorePct: scored.length
+          ? Math.round(scored.reduce((s, r) => s + (r.aiScore ?? 0), 0) / scored.length)
+          : 0,
+        hired: fResponses.filter(r => r.stage === "hired").length,
+        rejected: fResponses.filter(r => r.stage === "rejected").length,
+        createdAt: form.createdAt,
+      };
+    });
+
     return res.json({
       totalJobs,
       activeJobs,
       totalCandidates,
+      totalStandardCandidates,
+      totalFormResponses,
+      totalForms: forms.length,
       stageCounts,
       funnelDropoff,
       avgTimeToHireDays,
@@ -3152,6 +3173,7 @@ recruitRouter.get("/analytics", async (req, res) => {
       ageBreakdown,
       biasStageData,
       jobStats,
+      formStats,
     });
   } catch (err: any) {
     console.error("[recruit] GET /analytics", err);
@@ -5693,7 +5715,7 @@ recruitRouter.get("/pipeline-summary", async (req: express.Request, res: express
     const uid = getUid(req);
     if (!uid) return res.status(401).json({ error: "Unauthorized" });
 
-    const [stageCounts, sourceBreakdown] = await Promise.all([
+    const [stageCounts, sourceCounts, formStageCounts, formSourceCounts] = await Promise.all([
       RecruitCandidate.aggregate([
         { $match: { uid } },
         { $group: { _id: "$stage", count: { $sum: 1 } } },
@@ -5701,8 +5723,14 @@ recruitRouter.get("/pipeline-summary", async (req: express.Request, res: express
       RecruitCandidate.aggregate([
         { $match: { uid, source: { $exists: true, $ne: "" } } },
         { $group: { _id: "$source", count: { $sum: 1 } } },
-        { $sort: { count: -1 } },
-        { $limit: 5 },
+      ]),
+      RecruitFormResponse.aggregate([
+        { $match: { uid } },
+        { $group: { _id: "$stage", count: { $sum: 1 } } },
+      ]),
+      RecruitFormResponse.aggregate([
+        { $match: { uid } },
+        { $group: { _id: { $ifNull: ["$source", "Form"] }, count: { $sum: 1 } } },
       ]),
     ]);
 
@@ -5710,6 +5738,20 @@ recruitRouter.get("/pipeline-summary", async (req: express.Request, res: express
     for (const s of stageCounts as Array<{ _id: string; count: number }>) {
       stages[s._id] = s.count;
     }
+    for (const s of formStageCounts as Array<{ _id: string; count: number }>) {
+      const mapped = FORM_STAGE_TO_CANDIDATE_STAGE[s._id];
+      if (mapped) stages[mapped] = (stages[mapped] || 0) + s.count;
+    }
+
+    const sourceTotals: Record<string, number> = {};
+    for (const s of [...sourceCounts, ...formSourceCounts] as Array<{ _id: string; count: number }>) {
+      const key = s._id || "Form";
+      sourceTotals[key] = (sourceTotals[key] || 0) + s.count;
+    }
+    const sourceBreakdown = Object.entries(sourceTotals)
+      .map(([source, count]) => ({ source, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
 
     const shortlisted = (stages["screened"] || 0) + (stages["assessed"] || 0);
     const interview = stages["interview"] || 0;
@@ -5724,7 +5766,7 @@ recruitRouter.get("/pipeline-summary", async (req: express.Request, res: express
       hired,
       offer,
       stages,
-      sourceBreakdown: (sourceBreakdown as Array<{ _id: string; count: number }>).map(s => ({ source: s._id, count: s.count })),
+      sourceBreakdown,
     });
   } catch (err: any) {
     console.error("[recruit] GET /pipeline-summary", err);

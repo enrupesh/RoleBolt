@@ -30,6 +30,15 @@ export interface IEmailLogEntry {
   error?: string;
 }
 
+export interface IAgentActionEntry {
+  action: "shortlisted" | "rejected" | "review_zone";
+  score: number;   // 0–100 aiScore at the time the agent acted
+  reason: string;
+  emailSent: boolean;
+  emailStatus: "sent" | "failed" | "skipped" | "disabled";
+  timestamp: Date;
+}
+
 export interface IRecruitFormResponse extends Document {
   formId: mongoose.Types.ObjectId;
   uid: string; // owner of the form (recruiter)
@@ -48,6 +57,10 @@ export interface IRecruitFormResponse extends Document {
   submittedEmail: string;
   submittedPhone: string;
   emailLog: IEmailLogEntry[];
+  agentLog: IAgentActionEntry[];
+  notes: string;
+  source: string;
+  stageMovedAt: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -94,6 +107,18 @@ const EmailLogEntrySchema = new Schema<IEmailLogEntry>(
   { _id: false }
 );
 
+const AgentActionEntrySchema = new Schema<IAgentActionEntry>(
+  {
+    action:      { type: String, enum: ["shortlisted", "rejected", "review_zone"], required: true },
+    score:       { type: Number, default: 0 },
+    reason:      { type: String, default: "" },
+    emailSent:   { type: Boolean, default: false },
+    emailStatus: { type: String, enum: ["sent", "failed", "skipped", "disabled"], default: "disabled" },
+    timestamp:   { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
 const RecruitFormResponseSchema = new Schema<IRecruitFormResponse>(
   {
     formId: { type: Schema.Types.ObjectId, required: true, ref: "RecruitForm", index: true },
@@ -117,6 +142,10 @@ const RecruitFormResponseSchema = new Schema<IRecruitFormResponse>(
     submittedEmail: { type: String, default: "" },
     submittedPhone: { type: String, default: "" },
     emailLog: { type: [EmailLogEntrySchema], default: [] },
+    agentLog: { type: [AgentActionEntrySchema], default: [] },
+    notes: { type: String, default: "" },
+    source: { type: String, default: "Form" },
+    stageMovedAt: { type: Date, default: Date.now },
   },
   { timestamps: true }
 );

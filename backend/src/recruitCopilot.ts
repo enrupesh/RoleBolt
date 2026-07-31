@@ -21,7 +21,9 @@ import { RecruitCompanyProfile } from "./models/RecruitCompanyProfile";
 import { callMeshChatCompletions, streamMeshChatCompletions } from "./ai/meshClient";
 import { buildCopilotPrompt } from "./ai/buildCopilotPrompt";
 import type { ChatMessage } from "./ai/meshClient";
-import type { GlobalCandidateSummary } from "./ai/buildCopilotPrompt";
+import type { GlobalCandidateSummary, FormResponseSummary } from "./ai/buildCopilotPrompt";
+import { RecruitForm } from "./models/RecruitForm";
+import { RecruitFormResponse } from "./models/RecruitFormResponse";
 import { computeGlobalHiringStats, globalStatsToPromptText } from "./ai/globalHiringStats";
 import type { JobPipelineStat } from "./ai/globalHiringStats";
 
@@ -225,6 +227,7 @@ interface ContextData {
   allCandidates?: GlobalCandidateSummary[];
   globalStatsText?: string;
   pipelines?: JobPipelineStat[];
+  formResponses?: FormResponseSummary[];
 }
 
 /** Fields needed for org-wide reasoning — deliberately excludes heavy fields
@@ -232,6 +235,10 @@ interface ContextData {
  * global prompt within a sane token budget across potentially many candidates. */
 const GLOBAL_CANDIDATE_SELECT =
   "name email jobId totalScore maxScore stage hiringDecision assessmentStatus strengths redFlags scoreBreakdown location availability createdAt stageMovedAt";
+
+/** Same idea for Form Job applicants — excludes resumeText and per-answer detail. */
+const GLOBAL_FORM_RESPONSE_SELECT =
+  "submittedName submittedEmail formId aiScore scoringFailed stage strengths redFlags createdAt";
 
 async function loadContextData(
   uid: string,
@@ -266,10 +273,27 @@ async function loadContextData(
   }
 
   // ── Global — Organization Intelligence ────────────────────────────────────
-  const [allJobs, rawCandidates] = await Promise.all([
+  const [allJobs, rawCandidates, allForms, rawFormResponses] = await Promise.all([
     RecruitJob.find({ uid }).sort({ createdAt: -1 }).lean(),
     RecruitCandidate.find({ uid }).select(GLOBAL_CANDIDATE_SELECT).lean(),
+    RecruitForm.find({ uid }).select("title").lean(),
+    RecruitFormResponse.find({ uid }).select(GLOBAL_FORM_RESPONSE_SELECT).lean(),
   ]);
+
+  const formTitleById = new Map(allForms.map((f: any) => [String(f._id), f.title as string]));
+  const formResponses: FormResponseSummary[] = rawFormResponses.map((r: any) => ({
+    _id: r._id,
+    name: r.submittedName,
+    email: r.submittedEmail,
+    formId: r.formId,
+    formTitle: formTitleById.get(String(r.formId)) || "Unknown form",
+    aiScore: r.aiScore ?? 0,
+    scoringFailed: r.scoringFailed,
+    stage: r.stage,
+    strengths: r.strengths,
+    redFlags: r.redFlags,
+    submittedAt: r.createdAt,
+  }));
 
   const jobTitleById = new Map(allJobs.map((j: any) => [String(j._id), j.title as string]));
   const allCandidates: GlobalCandidateSummary[] = rawCandidates.map((c: any) => ({
@@ -301,6 +325,7 @@ async function loadContextData(
     allCandidates,
     globalStatsText,
     pipelines,
+    formResponses,
   };
 }
 
@@ -483,7 +508,7 @@ copilotRouter.post("/chat", async (req, res) => {
     }
 
     // ── 2. Load context data ─────────────────────────────────────────────────
-    const { job, candidates, candidate, recruiterName, companyName, allJobs, allCandidates, globalStatsText, pipelines } =
+    const { job, candidates, candidate, recruiterName, companyName, allJobs, allCandidates, globalStatsText, pipelines, formResponses } =
       await loadContextData(uid, context);
     if (context.level === "job" && context.jobId && !job) {
       return res.status(404).json({ error: "Job not found" });
@@ -505,6 +530,7 @@ copilotRouter.post("/chat", async (req, res) => {
       allCandidates,
       globalStats: globalStatsText,
       pipelines,
+      formResponses,
     });
 
     const aiMessages = buildMessageHistory(systemPrompt, conversation, message.trim());
@@ -606,7 +632,7 @@ copilotRouter.post("/chat/stream", async (req, res) => {
     }
 
     // ── 2. Load context data ─────────────────────────────────────────────────
-    const { job, candidates, candidate, recruiterName, companyName, allJobs, allCandidates, globalStatsText, pipelines } =
+    const { job, candidates, candidate, recruiterName, companyName, allJobs, allCandidates, globalStatsText, pipelines, formResponses } =
       await loadContextData(uid, context);
     if (context.level === "job" && context.jobId && !job) {
       sendEvent({ type: "error", error: "Job not found" });
@@ -630,6 +656,7 @@ copilotRouter.post("/chat/stream", async (req, res) => {
       allCandidates,
       globalStats: globalStatsText,
       pipelines,
+      formResponses,
     });
 
     const aiMessages = buildMessageHistory(systemPrompt, conversation, message.trim());
@@ -877,7 +904,7 @@ copilotRouter.post("/insights", async (req, res) => {
   if (!apiKey) return res.status(500).json({ error: "AI service not configured (GEMINI_MESH_KEY missing)" });
 
   try {
-    const { allJobs, allCandidates, globalStatsText, pipelines, recruiterName, companyName } =
+    const { allJobs, allCandidates, globalStatsText, pipelines, formResponses, recruiterName, companyName } =
       await loadContextData(uid, { level: "global" });
 
     const conversation = await RecruitCopilotConversation.create({
@@ -896,6 +923,7 @@ copilotRouter.post("/insights", async (req, res) => {
       allCandidates,
       globalStats: globalStatsText,
       pipelines,
+      formResponses,
       syntheticInstruction:
         "The recruiter just opened their Organization Overview — they have not asked a question yet. " +
         "Proactively greet them by time of day and generate a short 'Here's today's hiring overview' card: " +

@@ -4,6 +4,8 @@ import { User } from "../models/User";
 import { RecruitJob } from "../models/RecruitJob";
 import { RecruitCandidate } from "../models/RecruitCandidate";
 import { RecruitJobAlert } from "../models/RecruitJobAlert";
+import { RecruitForm } from "../models/RecruitForm";
+import { RecruitFormResponse } from "../models/RecruitFormResponse";
 import { sendEmail } from "../mailer";
 import { callGeminiChain } from "../ai/geminiClient";
 import { callMeshChatCompletions } from "../ai/meshClient";
@@ -34,17 +36,32 @@ export async function generateBriefingForUser(userId: string): Promise<void> {
   const user = await User.findById(userId).lean() as any;
   if (!user || !user.isVerified || !user.email) return;
 
-  const jobs = await RecruitJob.find({ uid: userId, status: "active" }).lean() as any[];
-  if (jobs.length === 0) return;
+  const [jobs, forms] = await Promise.all([
+    RecruitJob.find({ uid: userId, status: "active" }).lean() as Promise<any[]>,
+    RecruitForm.find({ uid: userId, status: "active" }).lean() as Promise<any[]>,
+  ]);
+  if (jobs.length === 0 && forms.length === 0) return;
 
   const jobIds = jobs.map((j: any) => j._id);
+  const formIds = forms.map((f: any) => f._id);
   const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-  const [newApps, pendingReview, inInterview] = await Promise.all([
+  const [
+    newJobApps, pendingJobReview, inJobInterview,
+    newFormApps, pendingFormReview, inFormInterview,
+  ] = await Promise.all([
     RecruitCandidate.countDocuments({ jobId: { $in: jobIds }, createdAt: { $gte: yesterday } }),
     RecruitCandidate.countDocuments({ jobId: { $in: jobIds }, stage: "applied" }),
     RecruitCandidate.countDocuments({ jobId: { $in: jobIds }, stage: "interview" }),
+    RecruitFormResponse.countDocuments({ formId: { $in: formIds }, createdAt: { $gte: yesterday } }),
+    RecruitFormResponse.countDocuments({ formId: { $in: formIds }, stage: "new" }),
+    RecruitFormResponse.countDocuments({ formId: { $in: formIds }, stage: "interview" }),
   ]);
+
+  // Form applicants are applicants — the briefing counts both job types.
+  const newApps = newJobApps + newFormApps;
+  const pendingReview = pendingJobReview + pendingFormReview;
+  const inInterview = inJobInterview + inFormInterview;
 
   // Stale jobs: active but < 3 applications in last 14 days
   const staleJobs: string[] = [];
@@ -62,8 +79,9 @@ export async function generateBriefingForUser(userId: string): Promise<void> {
 
 DATA:
 - Recruiter name: ${name}
-- Active jobs: ${jobs.length} (${jobs.map((j: any) => j.title).join(", ")})
-- New applications in last 24h: ${newApps}
+- Active jobs: ${jobs.length} (${jobs.map((j: any) => j.title).join(", ") || "none"})
+- Active application forms: ${forms.length} (${forms.map((f: any) => f.title).join(", ") || "none"})
+- New applications in last 24h: ${newApps}${forms.length > 0 ? ` (${newFormApps} via application forms)` : ""}
 - Candidates awaiting review: ${pendingReview}
 - Candidates in interview stage: ${inInterview}
 - Stale jobs (low applications in 14 days): ${staleJobs.length > 0 ? staleJobs.join(", ") : "none"}
@@ -79,7 +97,7 @@ Rules: Under 200 words total. Conversational tone, not robotic. No bullet points
   try {
     briefingText = await callAI(prompt);
   } catch {
-    briefingText = `Good morning ${name}! Here's your hiring summary for today: you have ${newApps} new application${newApps !== 1 ? "s" : ""} in the last 24 hours and ${pendingReview} candidate${pendingReview !== 1 ? "s" : ""} awaiting your review across ${jobs.length} active job${jobs.length !== 1 ? "s" : ""}. ${inInterview > 0 ? `${inInterview} candidate${inInterview !== 1 ? "s are" : " is"} currently in the interview stage — worth following up on today.` : ""} ${staleJobs.length > 0 ? `Consider refreshing these listings to attract more applicants: ${staleJobs.join(", ")}.` : "Your active jobs are receiving healthy interest."}`;
+    briefingText = `Good morning ${name}! Here's your hiring summary for today: you have ${newApps} new application${newApps !== 1 ? "s" : ""} in the last 24 hours and ${pendingReview} candidate${pendingReview !== 1 ? "s" : ""} awaiting your review across ${jobs.length} active job${jobs.length !== 1 ? "s" : ""}${forms.length > 0 ? ` and ${forms.length} active form${forms.length !== 1 ? "s" : ""}` : ""}. ${inInterview > 0 ? `${inInterview} candidate${inInterview !== 1 ? "s are" : " is"} currently in the interview stage — worth following up on today.` : ""} ${staleJobs.length > 0 ? `Consider refreshing these listings to attract more applicants: ${staleJobs.join(", ")}.` : "Your active jobs are receiving healthy interest."}`;
   }
 
   const html = emailTemplates.dailyBriefing(name, briefingText, {
