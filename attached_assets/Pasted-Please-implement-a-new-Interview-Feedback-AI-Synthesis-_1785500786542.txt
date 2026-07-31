@@ -1,0 +1,133 @@
+Please implement a new **Interview Feedback → AI Synthesis** feature to enhance the hiring decision process.
+
+## Objective
+
+After interviews are completed, the platform should use AI to combine interview feedback with the candidate's existing evaluation data and generate an intelligent hiring recommendation for the recruiter.
+
+The AI should assist in decision-making but **must never make the final hiring decision**. The recruiter or hiring manager must always remain in control.
+
+---
+
+# Feature Name
+
+**Interview Feedback → AI Synthesis**
+
+## Structured Interview Feedback
+
+Instead of only free-text notes, each interviewer should complete a structured evaluation form.
+
+The form should include configurable rating categories such as:
+
+* Technical Skills
+* Communication Skills
+* Problem Solving
+* Culture Fit
+* Leadership (optional)
+* Role-Specific Skills
+* Overall Recommendation
+* Additional Comments
+
+Each category should support both a numeric rating and optional written feedback.
+
+---
+
+## AI Synthesis
+
+Once all required interview feedback has been submitted, the AI should analyze and combine:
+
+* Resume Score
+* Resume Analysis
+* Assessment Score
+* Assessment Insights
+* Interview Ratings
+* Interviewer Comments
+* Job Requirements
+* Job Scoring Rubric
+* Candidate's overall hiring journey
+
+Using this information, the AI should generate a comprehensive hiring recommendation.
+
+---
+
+## AI Recommendation
+
+The AI should provide one of the following recommendations:
+
+* ✅ Hire
+* ⏳ Hold
+* ❌ Pass
+
+Each recommendation should include:
+
+* Executive Summary
+* Candidate Strengths
+* Candidate Weaknesses
+* Risk Factors
+* Key Reasons Behind the Recommendation
+* Overall Hiring Fit
+* Suggested Next Step
+
+Example recommendations:
+
+* Hire – Strong technical performance, excellent communication, and high alignment with job requirements.
+* Hold – Good technical skills but concerns around communication; recommend one additional interview.
+* Pass – Assessment and interview performance do not meet the required standards.
+
+---
+
+## Recruiter Decision
+
+The AI recommendation should be advisory only.
+
+Recruiters should always be able to:
+
+* Accept the recommendation
+* Ignore the recommendation
+* Make a different hiring decision
+
+The platform must never automatically hire or reject a candidate based on the AI recommendation.
+
+---
+
+## Recruiter UI
+
+Create a dedicated **AI Hiring Summary** section showing:
+
+* Resume Summary
+* Assessment Summary
+* Interview Summary
+* AI Hiring Recommendation
+* AI Explanation
+* Candidate Strengths
+* Candidate Weaknesses
+* Overall Hiring Timeline
+
+This should provide recruiters with a complete hiring overview in one place.
+
+---
+
+## Activity Feed
+
+Record all events, including:
+
+* Interview Feedback Submitted
+* AI Hiring Summary Generated
+* AI Recommendation Updated
+* Recruiter Final Decision
+
+Include timestamps and the responsible user for every action.
+
+---
+
+## Acceptance Criteria
+
+1. Introduce structured interview feedback forms for interviewers.
+2. Automatically generate an AI hiring recommendation after all required interview feedback is submitted.
+3. Combine resume analysis, assessment results, interview feedback, and the job rubric into a single AI evaluation.
+4. Display a clear recommendation: Hire, Hold, or Pass, along with detailed reasoning.
+5. Keep the final hiring decision entirely under recruiter control.
+6. Add a dedicated AI Hiring Summary section to the recruiter interface.
+7. Record all related actions in the Activity Feed and Audit Log.
+8. Integrate seamlessly with the existing AI Agent, ATS workflow, assessment engine, interview workflow, and offer management system.
+
+This feature will transform the platform into an enterprise-grade AI Hiring Decision Support System by providing recruiters with a unified, data-driven summary of every candidate while ensuring that all final hiring decisions remain with human recruiters.
