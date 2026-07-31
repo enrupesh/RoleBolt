@@ -271,7 +271,8 @@ collaborationRouter.post("/jobs/:jobId/candidates/:candidateId/interview-feedbac
     await connectMongo();
     const jobId = String(req.params.jobId);
     const candidateId = String(req.params.candidateId);
-    const context = await candidateContext(jobId, candidateId, uidOf(req));
+    const uid = uidOf(req);
+    const context = await candidateContext(jobId, candidateId, uid);
     if (!context || !hasPermission(context.access, "submit_feedback")) {
       return res.status(403).json({ error: "You do not have permission to submit interview feedback." });
     }
@@ -299,11 +300,12 @@ collaborationRouter.post("/jobs/:jobId/candidates/:candidateId/interview-feedbac
     const hasRatings = Object.keys(ratings).length > 0;
     if (!body && !hasRatings) return res.status(400).json({ error: "At least one rating or a comment is required." });
 
+    const actorInfo = await actorForUid(uid);
     const entry = {
       body,
       ...(rating === undefined ? {} : { rating }),
       ...(hasRatings ? { ratings } : {}),
-      author: await actorForUid(uidOf(req)),
+      author: actorInfo,
       createdAt: new Date(),
       updatedAt: new Date(),
       editHistory: [],
@@ -313,15 +315,75 @@ collaborationRouter.post("/jobs/:jobId/candidates/:candidateId/interview-feedbac
       { $setOnInsert: { ownerUid: context.access.job.uid }, $push: { interviewFeedback: entry } },
       { upsert: true },
     );
+
     // Compute average of structured ratings for activity metadata
     const ratingValues = Object.values(ratings);
     const avgRating = hasRatings ? +(ratingValues.reduce((a, b) => a + b, 0) / ratingValues.length).toFixed(1) : (rating ?? null);
     await addActivity(
-      jobId, uidOf(req), "interview_feedback",
-      `Submitted structured interview feedback for ${context.candidate.name}`,
+      jobId, uid, "interview_feedback",
+      `${actorInfo.name} submitted interview feedback for ${context.candidate.name}`,
       { rating: avgRating, categories: Object.keys(ratings) },
       candidateId,
     );
+
+    // Post-submission: notify reviewers and check if all interviewers have submitted
+    setImmediate(async () => {
+      try {
+        const collaboration = await RecruitCandidateCollaboration.findOne({ jobId, candidateId }).lean() as any;
+        const submittedUids: Set<string> = new Set(
+          (collaboration?.interviewFeedback ?? []).map((f: any) => f.author?.uid).filter(Boolean)
+        );
+
+        // All active team members who have submit_feedback permission
+        const teamMembers = await RecruitTeamMember.find({ jobId, status: "active" }).lean();
+        const feedbackMembers = teamMembers.filter(m => m.permissions.includes("submit_feedback" as any));
+        const allSubmitted = feedbackMembers.length > 0 && feedbackMembers.every(m => m.memberUid && submittedUids.has(m.memberUid));
+
+        // Notify reviewers (review_candidates permission) and owner
+        const reviewers = teamMembers.filter(m => m.memberUid && m.memberUid !== uid && m.permissions.includes("review_candidates" as any));
+        const ownerUid = context.access.job.uid;
+
+        const notifyUids = new Set<string>([...reviewers.map(m => m.memberUid as string), ownerUid].filter(u => u && u !== uid));
+        for (const notifyUid of notifyUids) {
+          await notify(notifyUid, {
+            type: "activity",
+            title: "Interview feedback submitted",
+            body: `${actorInfo.name} submitted interview feedback for ${context.candidate.name}.`,
+            jobId,
+            candidateId,
+          });
+        }
+
+        // Notify owner if all required feedback is now in
+        if (allSubmitted) {
+          await addActivity(
+            jobId, uid, "interview_feedback_all_completed",
+            `All required interview feedback received for ${context.candidate.name} — AI Hiring Summary is ready to generate`,
+            { candidateName: context.candidate.name, feedbackCount: collaboration?.interviewFeedback?.length ?? 0 },
+            candidateId,
+          );
+          await notify(ownerUid, {
+            type: "activity",
+            title: "All interview feedback received",
+            body: `All interviewers have submitted feedback for ${context.candidate.name}. The AI Hiring Summary is ready to generate.`,
+            jobId,
+            candidateId,
+          });
+          // Email notification to owner
+          const ownerUser = await User.findById(ownerUid).select("email name").lean() as any;
+          if (ownerUser?.email) {
+            sendEmail({
+              to: ownerUser.email,
+              subject: `All interview feedback received for ${context.candidate.name}`,
+              html: `<p>All required interviewers have submitted their feedback for <strong>${context.candidate.name}</strong>.</p><p>You can now generate the AI Hiring Summary in your hiring dashboard.</p>`,
+            }).catch(() => {});
+          }
+        }
+      } catch (e) {
+        console.error("[collaboration] post-feedback notifications failed:", e);
+      }
+    });
+
     const collaboration = await RecruitCandidateCollaboration.findOne({ jobId, candidateId }).lean();
     return res.status(201).json({ collaboration });
   } catch (err: any) {
@@ -567,10 +629,38 @@ collaborationRouter.patch("/jobs/:jobId/candidates/:candidateId/comments/:commen
 collaborationRouter.get("/jobs/:jobId/candidates/:candidateId/collaboration", async (req, res) => {
   try {
     await connectMongo();
-    const context = await candidateContext(req.params.jobId, req.params.candidateId, uidOf(req));
+    const uid = uidOf(req);
+    const context = await candidateContext(req.params.jobId, req.params.candidateId, uid);
     if (!context) return res.status(404).json({ error: "Candidate not found or not assigned to you." });
-    const collaboration = await RecruitCandidateCollaboration.findOne({ jobId: req.params.jobId, candidateId: req.params.candidateId }).lean();
-    return res.json({ collaboration: collaboration ?? { comments: [], internalNotes: [], assignedTo: null } });
+    const collaboration = await RecruitCandidateCollaboration.findOne({ jobId: req.params.jobId, candidateId: req.params.candidateId }).lean() as any;
+    const base = collaboration ?? { comments: [], internalNotes: [], interviewFeedback: [], assignedTo: null };
+
+    // Feedback visibility: owners and users with review_candidates can always see all feedback.
+    // Interviewers (submit_feedback only, no review_candidates) must submit their own feedback first.
+    const canReview = context.access.owner || hasPermission(context.access, "review_candidates");
+    const allFeedback: any[] = base.interviewFeedback ?? [];
+
+    let visibleFeedback: any[];
+    let feedbackLocked = false;
+
+    if (canReview) {
+      visibleFeedback = allFeedback;
+    } else {
+      // Check if this user has already submitted their own feedback
+      const hasSubmitted = allFeedback.some((f: any) => f.author?.uid === uid);
+      if (hasSubmitted) {
+        visibleFeedback = allFeedback;
+      } else {
+        visibleFeedback = [];
+        feedbackLocked = true;
+      }
+    }
+
+    return res.json({
+      collaboration: { ...base, interviewFeedback: visibleFeedback },
+      feedbackLocked,
+      feedbackCount: allFeedback.length,
+    });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }

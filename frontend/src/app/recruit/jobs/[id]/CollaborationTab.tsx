@@ -6,11 +6,14 @@ import ReactMarkdown from "react-markdown";
 import {
   Activity,
   Check,
+  CheckCircle2,
   ClipboardList,
+  Lock,
   MessageSquare,
   Plus,
   RefreshCw,
   ShieldCheck,
+  Star,
   Trash2,
   UserPlus,
   Users,
@@ -40,6 +43,8 @@ type TeamMember = {
   name?: string;
   email: string;
   role: TeamRole;
+  permissions?: string[];
+  memberUid?: string;
   status?: "active" | "pending" | "revoked" | "invited" | "inactive";
   joinedAt?: string;
   assignedCandidateIds?: string[];
@@ -74,10 +79,21 @@ type CollaborationData = {
   collaborations?: Assignment[];
 };
 
+type FeedbackEntry = {
+  id?: string;
+  _id?: string;
+  body?: string;
+  rating?: number;
+  ratings?: Record<string, number>;
+  author?: { name?: string; email?: string; uid?: string };
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 type CandidateCollaboration = {
   comments?: Array<{ id?: string; _id?: string; body: string; author?: { name?: string; email?: string }; authorName?: string; createdAt?: string; updatedAt?: string; editHistory?: Array<{ body: string; editedAt?: string }> }>;
   internalNotes?: Array<{ id?: string; _id?: string; body: string; author?: { name?: string; email?: string }; authorName?: string; createdAt?: string; updatedAt?: string; editHistory?: Array<{ body: string; editedAt?: string }> }>;
-  interviewFeedback?: Array<{ id?: string; _id?: string; body: string; rating?: number; author?: { name?: string; email?: string }; createdAt?: string; updatedAt?: string }>;
+  interviewFeedback?: FeedbackEntry[];
   commentsCount?: number;
   notesCount?: number;
 };
@@ -107,6 +123,16 @@ const ROLE_OPTIONS: Array<{ value: TeamRole; label: string; summary: string }> =
   { value: "admin", label: "Admin", summary: "Full access to this hiring workspace" },
 ];
 
+const RATING_LABELS: Record<string, string> = {
+  technicalSkills: "Technical Skills",
+  communicationSkills: "Communication",
+  problemSolving: "Problem Solving",
+  cultureFit: "Culture Fit",
+  leadership: "Leadership",
+  roleSpecificSkills: "Role-Specific Skills",
+  overallRecommendation: "Overall",
+};
+
 function roleLabel(role: TeamRole) {
   return ROLE_OPTIONS.find((option) => option.value === role)?.label ?? role;
 }
@@ -131,6 +157,21 @@ function formatDate(value?: string) {
   return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(date);
 }
 
+function RatingDots({ value, max = 5 }: { value: number; max?: number }) {
+  return (
+    <div className="flex items-center gap-0.5">
+      {Array.from({ length: max }, (_, i) => (
+        <Star
+          key={i}
+          size={11}
+          className={i < value ? "fill-amber-400 text-amber-400" : "fill-slate-200 text-slate-200"}
+        />
+      ))}
+      <span className="ml-1 text-[10px] text-slate-500">{value}/{max}</span>
+    </div>
+  );
+}
+
 function Skeleton() {
   return (
     <div className="space-y-4" aria-label="Loading collaboration workspace">
@@ -143,6 +184,163 @@ function Skeleton() {
   );
 }
 
+/* ─── Interview Feedback Section ─────────────────────────────────────────────*/
+function InterviewFeedbackSection({
+  feedback,
+  feedbackLocked,
+  feedbackCount,
+  members,
+  isOwner,
+  permissions,
+}: {
+  feedback: FeedbackEntry[];
+  feedbackLocked: boolean;
+  feedbackCount: number;
+  members: TeamMember[];
+  isOwner?: boolean;
+  permissions?: string[];
+}) {
+  const canReview = isOwner || permissions?.includes("review_candidates");
+
+  // Build status list: team members with submit_feedback permission
+  const interviewers = members.filter(m =>
+    m.status === "active" &&
+    (m.permissions?.includes("submit_feedback") || m.role === "interviewer" || m.role === "hiring_manager")
+  );
+  const submittedUids = new Set(feedback.map(f => f.author?.uid).filter(Boolean));
+
+  if (feedbackLocked) {
+    return (
+      <div className="rb-card overflow-hidden">
+        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+          <div className="flex items-center gap-2">
+            <ClipboardList size={16} className="text-indigo-600" />
+            <h3 className="font-bold text-slate-900">Interview Feedback</h3>
+          </div>
+          <span className="rb-badge rb-badge-slate">{feedbackCount} submitted</span>
+        </div>
+        <div className="flex flex-col items-center justify-center gap-3 px-5 py-10 text-center">
+          <div className="rounded-xl bg-amber-50 p-3 text-amber-500">
+            <Lock size={20} />
+          </div>
+          <p className="text-sm font-semibold text-slate-800">Submit your feedback first</p>
+          <p className="max-w-xs text-xs leading-5 text-slate-500">
+            To prevent bias, you cannot view other interviewers' feedback until you have submitted your own evaluation for this candidate.
+          </p>
+          {feedbackCount > 0 && (
+            <p className="text-xs text-indigo-600 font-medium">{feedbackCount} interviewer{feedbackCount !== 1 ? "s have" : " has"} already submitted — yours will unlock the full view.</p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rb-card overflow-hidden">
+      <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+        <div className="flex items-center gap-2">
+          <ClipboardList size={16} className="text-indigo-600" />
+          <h3 className="font-bold text-slate-900">Interview Feedback</h3>
+        </div>
+        <div className="flex items-center gap-2">
+          {feedback.length > 0 && (
+            <span className="rb-badge rb-badge-blue">{feedback.length} submitted</span>
+          )}
+        </div>
+      </div>
+
+      {/* Interviewer status roster */}
+      {interviewers.length > 0 && (
+        <div className="border-b border-slate-100 px-5 py-3">
+          <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">Interviewer Status</p>
+          <div className="flex flex-wrap gap-2">
+            {interviewers.map(m => {
+              const uid = m.memberUid ?? m.id ?? m._id ?? "";
+              const submitted = submittedUids.has(uid);
+              return (
+                <span
+                  key={m.id || m._id}
+                  className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium ${
+                    submitted
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                      : "border-slate-200 bg-slate-50 text-slate-500"
+                  }`}
+                >
+                  {submitted
+                    ? <CheckCircle2 size={11} className="text-emerald-500" />
+                    : <div className="h-2.5 w-2.5 rounded-full border-2 border-slate-300" />
+                  }
+                  {m.name || m.email}
+                  <span className={`text-[10px] ${submitted ? "text-emerald-600" : "text-slate-400"}`}>
+                    · {submitted ? "Submitted" : "Pending"}
+                  </span>
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Feedback entries */}
+      {feedback.length === 0 ? (
+        <div className="flex flex-col items-center justify-center gap-2 px-5 py-10 text-center">
+          <ClipboardList size={24} className="text-slate-300" />
+          <p className="text-sm font-semibold text-slate-700">No feedback submitted yet</p>
+          <p className="text-xs text-slate-500">Submitted interview feedback will appear here.</p>
+        </div>
+      ) : (
+        <div className="divide-y divide-slate-100">
+          {feedback.map((item, i) => (
+            <div key={item._id || item.id || i} className="px-5 py-4">
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-xs font-bold text-indigo-700">
+                    {(item.author?.name || "?").split(/\s+/).slice(0, 2).map(p => p[0]?.toUpperCase()).join("")}
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">{item.author?.name || "Team member"}</p>
+                    <p className="text-[10px] text-slate-400">{formatDate(item.createdAt)}</p>
+                  </div>
+                </div>
+                <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                  <CheckCircle2 size={10} /> Submitted
+                </span>
+              </div>
+
+              {/* Structured ratings */}
+              {item.ratings && Object.keys(item.ratings).length > 0 && (
+                <div className="mb-3 grid grid-cols-2 gap-x-6 gap-y-1.5 rounded-xl bg-slate-50 px-4 py-3">
+                  {Object.entries(item.ratings).map(([key, val]) => (
+                    <div key={key} className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] text-slate-600 truncate">{RATING_LABELS[key] ?? key}</span>
+                      <RatingDots value={val} />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Overall rating */}
+              {item.rating && !item.ratings && (
+                <div className="mb-3">
+                  <RatingDots value={item.rating} />
+                </div>
+              )}
+
+              {/* Written comments */}
+              {item.body ? (
+                <p className="text-sm leading-6 text-slate-700 whitespace-pre-wrap">{item.body}</p>
+              ) : (
+                <p className="text-xs italic text-slate-400">No written comments.</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── Main Component ─────────────────────────────────────────────────────────*/
 export default function CollaborationTab({ jobId, token, candidates, initialData, onRefresh }: CollaborationTabProps) {
   const [data, setData] = useState<CollaborationData | null>(initialData ?? null);
   const [loading, setLoading] = useState(!initialData);
@@ -153,6 +351,8 @@ export default function CollaborationTab({ jobId, token, candidates, initialData
   const [candidateRoleFilter, setCandidateRoleFilter] = useState("all");
   const [selectedMember, setSelectedMember] = useState("");
   const [candidateDetails, setCandidateDetails] = useState<CandidateCollaboration | null>(null);
+  const [feedbackLocked, setFeedbackLocked] = useState(false);
+  const [feedbackCount, setFeedbackCount] = useState(0);
   const [detailLoading, setDetailLoading] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteName, setInviteName] = useState("");
@@ -220,11 +420,13 @@ export default function CollaborationTab({ jobId, token, candidates, initialData
   useEffect(() => { void loadNotifications(); }, [loadNotifications]);
 
   const loadCandidateDetails = useCallback(async (candidateId: string) => {
-    if (!candidateId) { setCandidateDetails(null); return; }
+    if (!candidateId) { setCandidateDetails(null); setFeedbackLocked(false); setFeedbackCount(0); return; }
     setDetailLoading(true);
     try {
       const result = await request(`/candidates/${candidateId}/collaboration`);
       setCandidateDetails((result.collaboration ?? result) as CandidateCollaboration);
+      setFeedbackLocked(Boolean(result.feedbackLocked));
+      setFeedbackCount(Number(result.feedbackCount ?? 0));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load candidate collaboration.");
     } finally { setDetailLoading(false); }
@@ -298,7 +500,7 @@ export default function CollaborationTab({ jobId, token, candidates, initialData
       });
       setFeedbackRatings({});
       setFeedbackComment("");
-      setNotice("Structured interview feedback submitted.");
+      setNotice("Structured interview feedback submitted. You can now view all feedback for this candidate.");
       await loadCandidateDetails(selectedCandidate); await load(); await onRefresh?.();
     } catch (e) { setError(e instanceof Error ? e.message : "Could not save interview feedback."); }
     finally { setBusy(""); }
@@ -397,6 +599,111 @@ export default function CollaborationTab({ jobId, token, candidates, initialData
         </div>
       </div>
 
+      {/* ── Interview Feedback (dedicated section) ───────────────────────────── */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-bold text-slate-900">Interview Feedback</h3>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Interviewers submit independently — feedback is hidden until each person has submitted their own.
+            </p>
+          </div>
+        </div>
+
+        {/* Candidate selector for this section */}
+        <div className="rb-card p-4">
+          <label className="block text-xs font-semibold text-slate-600 mb-1.5">Select candidate to view feedback</label>
+          <select
+            value={selectedCandidate}
+            onChange={(e) => setSelectedCandidate(e.target.value)}
+            className="rb-input w-full max-w-sm"
+            data-testid="select-feedback-candidate"
+          >
+            <option value="">Choose a candidate ({candidates.length})</option>
+            {candidates.map((candidate) => (
+              <option key={getId(candidate)} value={getId(candidate)}>
+                {candidate.name || candidate.email || "Unnamed candidate"}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {selectedCandidate && (
+          <>
+            {detailLoading ? (
+              <div className="rb-card p-8 text-center text-xs text-slate-400">Loading feedback…</div>
+            ) : (
+              <InterviewFeedbackSection
+                feedback={candidateDetails?.interviewFeedback ?? []}
+                feedbackLocked={feedbackLocked}
+                feedbackCount={feedbackCount}
+                members={activeMembers}
+                isOwner={data?.isOwner}
+                permissions={data?.permissions}
+              />
+            )}
+
+            {/* Submit feedback form */}
+            {(data?.permissions?.includes("submit_feedback") || data?.isOwner) && (
+              <div className="rb-card p-5">
+                <div className="mb-4 flex items-start gap-3">
+                  <div className="rounded-xl bg-indigo-50 p-2 text-indigo-600"><ClipboardList size={17} /></div>
+                  <div>
+                    <h3 className="font-bold text-slate-900">Submit your interview feedback</h3>
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      Rate each dimension independently. Your feedback is hidden from other interviewers until they submit their own.
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-2 rounded-xl border border-indigo-100 bg-indigo-50/30 p-3 mb-3">
+                  {([
+                    ["technicalSkills", "Technical Skills"],
+                    ["communicationSkills", "Communication Skills"],
+                    ["problemSolving", "Problem Solving"],
+                    ["cultureFit", "Culture Fit"],
+                    ["leadership", "Leadership (optional)"],
+                    ["roleSpecificSkills", "Role-Specific Skills"],
+                    ["overallRecommendation", "Overall Recommendation"],
+                  ] as const).map(([key, label]) => (
+                    <div key={key} className="flex items-center justify-between gap-3">
+                      <span className="min-w-0 text-xs text-slate-600 shrink-0">{label}</span>
+                      <select
+                        value={feedbackRatings[key] ?? ""}
+                        onChange={e => setFeedbackRatings(prev => ({ ...prev, [key]: e.target.value }))}
+                        disabled={!selectedCandidate}
+                        className="rb-input w-28 shrink-0 py-1 text-xs"
+                      >
+                        <option value="">—</option>
+                        {[1, 2, 3, 4, 5].map(v => <option key={v} value={v}>{v} / 5</option>)}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+                <textarea
+                  value={feedbackComment}
+                  onChange={e => setFeedbackComment(e.target.value)}
+                  disabled={!selectedCandidate}
+                  rows={3}
+                  placeholder="Strengths, areas for improvement, overall impression…"
+                  className="rb-input mb-3 h-auto resize-none border-indigo-200 bg-indigo-50/30 py-3"
+                  data-testid="textarea-interview-feedback"
+                />
+                <button
+                  type="button"
+                  onClick={() => void addInterviewFeedback()}
+                  disabled={!selectedCandidate || busy === "interview-feedback" || (feedbackComment.trim() === "" && !Object.values(feedbackRatings).some(v => v !== ""))}
+                  className="rb-btn rb-btn-secondary rb-btn-sm border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                  data-testid="button-submit-interview-feedback"
+                >
+                  {busy === "interview-feedback" ? "Submitting…" : <><ClipboardList size={14} /> Submit feedback</>}
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* ── Comments & Notes ─────────────────────────────────────────────────── */}
       <div className="grid gap-4 lg:grid-cols-[.95fr_1.05fr]">
         <div className="rb-card p-5">
           <div className="mb-4 flex items-start gap-3"><div className="rounded-xl bg-sky-50 p-2 text-sky-600"><MessageSquare size={17} /></div><div><h3 className="font-bold text-slate-900">Candidate context</h3><p className="mt-0.5 text-xs text-slate-500">Add a visible comment or private hiring note.</p></div></div>
@@ -418,57 +725,8 @@ export default function CollaborationTab({ jobId, token, candidates, initialData
                 <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-amber-600">Private internal notes</p>
                 {(candidateDetails.internalNotes ?? []).length === 0 ? <p className="text-xs text-slate-400">No private notes yet.</p> : <div className="space-y-2">{candidateDetails.internalNotes?.map((item) => <div key={item._id || item.id} className="rounded-xl border border-amber-100 bg-amber-50/50 p-3"><p className="text-xs leading-5 text-slate-700">{item.body}</p><p className="mt-1 text-[10px] text-slate-400">{item.author?.name || item.authorName || "Team member"} · {formatDate(item.updatedAt || item.createdAt)}{item.editHistory?.length ? " · edited" : ""}</p></div>)}</div>}
               </div>
-              <div>
-                <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-indigo-600">Interview feedback</p>
-                {(candidateDetails.interviewFeedback ?? []).length === 0 ? <p className="text-xs text-slate-400">No interview feedback yet.</p> : <div className="space-y-2">{candidateDetails.interviewFeedback?.map((item) => <div key={item._id || item.id} className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-3"><p className="text-xs leading-5 text-slate-700">{item.body}</p><p className="mt-1 text-[10px] text-slate-400">{item.author?.name || "Team member"}{item.rating ? ` · ${item.rating}/5` : ""} · {formatDate(item.updatedAt || item.createdAt)}</p></div>)}</div>}
-              </div>
             </div>
           )}
-          <div className="mt-4 border-t border-slate-100 pt-4">
-            <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-indigo-600">Submit structured interview feedback</p>
-            <div className="space-y-2 rounded-xl border border-indigo-100 bg-indigo-50/30 p-3">
-              {([
-                ["technicalSkills", "Technical Skills"],
-                ["communicationSkills", "Communication Skills"],
-                ["problemSolving", "Problem Solving"],
-                ["cultureFit", "Culture Fit"],
-                ["leadership", "Leadership (optional)"],
-                ["roleSpecificSkills", "Role-Specific Skills"],
-                ["overallRecommendation", "Overall Recommendation"],
-              ] as const).map(([key, label]) => (
-                <div key={key} className="flex items-center justify-between gap-3">
-                  <span className="min-w-0 text-xs text-slate-600 shrink-0">{label}</span>
-                  <select
-                    value={feedbackRatings[key] ?? ""}
-                    onChange={e => setFeedbackRatings(prev => ({ ...prev, [key]: e.target.value }))}
-                    disabled={!selectedCandidate}
-                    className="rb-input w-28 shrink-0 py-1 text-xs"
-                  >
-                    <option value="">—</option>
-                    {[1, 2, 3, 4, 5].map(v => <option key={v} value={v}>{v} / 5</option>)}
-                  </select>
-                </div>
-              ))}
-            </div>
-            <textarea
-              value={feedbackComment}
-              onChange={e => setFeedbackComment(e.target.value)}
-              disabled={!selectedCandidate}
-              rows={3}
-              placeholder="Additional interview observations and notes…"
-              className="rb-input mt-2 mb-2 h-auto resize-none border-indigo-200 bg-indigo-50/30 py-3"
-              data-testid="textarea-interview-feedback"
-            />
-            <button
-              type="button"
-              onClick={() => void addInterviewFeedback()}
-              disabled={!selectedCandidate || busy === "interview-feedback" || (feedbackComment.trim() === "" && !Object.values(feedbackRatings).some(v => v !== "")) || (!data?.permissions?.includes("submit_feedback") && !data?.isOwner)}
-              className="rb-btn rb-btn-secondary rb-btn-sm border-indigo-200 text-indigo-700 hover:bg-indigo-50"
-              data-testid="button-submit-interview-feedback"
-            >
-              {busy === "interview-feedback" ? "Submitting…" : <><ClipboardList size={14} /> Submit feedback</>}
-            </button>
-          </div>
         </div>
 
         <div className="rb-card p-5">
