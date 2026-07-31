@@ -132,6 +132,25 @@ async function sendVerificationEmail(email: string, name: string, token: string)
 // ─── Config (backend base URL for OAuth callbacks) ───────────────────────────
 
 const BACKEND_URL = (process.env.BACKEND_URL || "https://back-mp9k.onrender.com").replace(/\/$/, "");
+type GitHubAuthTarget = "recruit" | "seeker";
+type GitHubAuthIntent = "login" | "signup";
+
+function getGitHubTarget(value: unknown): GitHubAuthTarget {
+  return value === "seeker" ? "seeker" : "recruit";
+}
+
+function getGitHubIntent(value: unknown): GitHubAuthIntent {
+  return value === "login" ? "login" : "signup";
+}
+
+function buildGitHubFrontendCallback(
+  target: GitHubAuthTarget,
+  intent: GitHubAuthIntent,
+  params: Record<string, string>
+): string {
+  const search = new URLSearchParams({ target, intent, ...params });
+  return `${FRONTEND_URL}/recruit/auth/callback?${search.toString()}`;
+}
 
 // ─── POST /auth/social — Firebase social login (Google, Microsoft) ────────────
 
@@ -236,11 +255,14 @@ authRouter.get("/github", (_req, res) => {
   if (!clientId) {
     return res.status(500).send("GitHub OAuth is not configured (missing GITHUB_CLIENT_ID).");
   }
+  const target = getGitHubTarget(_req.query.target);
+  const intent = getGitHubIntent(_req.query.intent);
+  const redirectUri = `${BACKEND_URL}/auth/github/callback?target=${encodeURIComponent(target)}&intent=${encodeURIComponent(intent)}`;
   // Use a short-lived signed JWT as the state — provides CSRF protection without a session store
   const state = signToken({ sub: "oauth-state", email: `gh-${crypto.randomBytes(8).toString("hex")}` });
   const params = new URLSearchParams({
     client_id: clientId,
-    redirect_uri: `${BACKEND_URL}/auth/github/callback`,
+    redirect_uri: redirectUri,
     scope: "user:email",
     state,
   });
@@ -253,18 +275,20 @@ authRouter.get("/github/callback", async (req, res) => {
   const { code, state, error: ghError } = req.query as {
     code?: string; state?: string; error?: string;
   };
+  const target = getGitHubTarget(req.query.target);
+  const intent = getGitHubIntent(req.query.intent);
 
   if (ghError) {
-    return res.redirect(`${FRONTEND_URL}/recruit/signup?error=github_denied`);
+    return res.redirect(buildGitHubFrontendCallback(target, intent, { error: "github_denied" }));
   }
 
   // Verify CSRF state
   if (!state || !verifyToken(state)) {
-    return res.redirect(`${FRONTEND_URL}/recruit/signup?error=invalid_state`);
+    return res.redirect(buildGitHubFrontendCallback(target, intent, { error: "invalid_state" }));
   }
 
   if (!code) {
-    return res.redirect(`${FRONTEND_URL}/recruit/signup?error=no_code`);
+    return res.redirect(buildGitHubFrontendCallback(target, intent, { error: "no_code" }));
   }
 
   const clientId     = process.env.GITHUB_CLIENT_ID     || "";
@@ -279,7 +303,7 @@ authRouter.get("/github/callback", async (req, res) => {
         client_id: clientId,
         client_secret: clientSecret,
         code,
-        redirect_uri: `${BACKEND_URL}/auth/github/callback`,
+        redirect_uri: `${BACKEND_URL}/auth/github/callback?target=${encodeURIComponent(target)}&intent=${encodeURIComponent(intent)}`,
       }),
     });
     const tokenData: any = await tokenRes.json();
@@ -287,7 +311,7 @@ authRouter.get("/github/callback", async (req, res) => {
 
     if (!accessToken) {
       console.error("[auth/github] No access_token in response:", tokenData);
-      return res.redirect(`${FRONTEND_URL}/recruit/signup?error=github_token_failed`);
+      return res.redirect(buildGitHubFrontendCallback(target, intent, { error: "github_token_failed" }));
     }
 
     // Fetch GitHub user profile + emails in parallel
@@ -315,7 +339,7 @@ authRouter.get("/github/callback", async (req, res) => {
     if (!email && githubUser.email) email = githubUser.email;
 
     if (!email) {
-      return res.redirect(`${FRONTEND_URL}/recruit/signup?error=no_github_email`);
+      return res.redirect(buildGitHubFrontendCallback(target, intent, { error: "no_github_email" }));
     }
 
     email = email.trim().toLowerCase();
@@ -345,11 +369,10 @@ authRouter.get("/github/callback", async (req, res) => {
 
     const jwt = signToken({ sub: user._id.toString(), email: user.email });
 
-    // Redirect to frontend callback with token in URL fragment (not query string for security)
-    return res.redirect(`${FRONTEND_URL}/recruit/auth/callback?token=${encodeURIComponent(jwt)}`);
+    return res.redirect(buildGitHubFrontendCallback(target, intent, { token: jwt }));
   } catch (err: any) {
     console.error("[auth/github] callback error:", err?.message);
-    return res.redirect(`${FRONTEND_URL}/recruit/signup?error=github_failed`);
+    return res.redirect(buildGitHubFrontendCallback(target, intent, { error: "github_failed" }));
   }
 });
 
