@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { RecruitGuard } from "@/components/RecruitGuard";
 import { SeekerHeader } from "@/components/SeekerHeader";
@@ -31,6 +31,19 @@ function InterviewContent() {
   const [showBetter, setShowBetter] = useState(false);
   const [loading, setLoading]       = useState(false);
   const [error, setError]           = useState("");
+
+  useEffect(() => {
+    const workspaceId = new URLSearchParams(window.location.search).get("workspaceId");
+    if (!workspaceId || !sessionToken) return;
+    fetch(apiUrl(`/recruit/seeker/workspace/${encodeURIComponent(workspaceId)}`), {
+      headers: { Authorization: `Bearer ${sessionToken}` },
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.workspace?.jobDescription) setJobDesc(data.workspace.jobDescription);
+      })
+      .catch(() => undefined);
+  }, [sessionToken]);
 
   async function handleStart(e: React.FormEvent) {
     e.preventDefault();

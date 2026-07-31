@@ -7,6 +7,7 @@ import { RoleboltLogo } from "@/components/RoleboltLogo";
 
 const NAV = [
   { href: "/seeker/dashboard",     label: "Dashboard" },
+  { href: "/seeker/workspace",     label: "Job Workspace" },
   { href: "/seeker/applications",  label: "My Applications" },
   { href: "/seeker/profile",       label: "My Profile" },
   { href: "/recruit/opportunities",label: "Browse Jobs" },
