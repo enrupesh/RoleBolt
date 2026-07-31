@@ -139,6 +139,22 @@ export interface IRecruitCandidate extends Document {
     note: string;
     timestamp: Date;
   }>;
+  aiHiringSynthesis?: {
+    recommendation: "hire" | "hold" | "pass";
+    executiveSummary: string;
+    strengths: string[];
+    weaknesses: string[];
+    riskFactors: string[];
+    keyReasons: string[];
+    overallFit: string;
+    suggestedNextStep: string;
+    generatedAt: Date;
+    generatedBy: string;
+    recruiterDecision?: "accepted" | "overridden" | "ignored";
+    recruiterDecisionNote?: string;
+    recruiterDecisionAt?: Date;
+    recruiterDecisionBy?: string;
+  };
   location?: string;
   currentStatus?: string;
   educationLevel?: string;
@@ -338,6 +354,25 @@ const RecruitCandidateSchema = new Schema<IRecruitCandidate>(
         ),
       ],
       default: [],
+    },
+    aiHiringSynthesis: {
+      type: {
+        recommendation:       { type: String, enum: ["hire", "hold", "pass"], required: true },
+        executiveSummary:     { type: String, default: "" },
+        strengths:            { type: [String], default: [] },
+        weaknesses:           { type: [String], default: [] },
+        riskFactors:          { type: [String], default: [] },
+        keyReasons:           { type: [String], default: [] },
+        overallFit:           { type: String, default: "" },
+        suggestedNextStep:    { type: String, default: "" },
+        generatedAt:          { type: Date, default: Date.now },
+        generatedBy:          { type: String, default: "" },
+        recruiterDecision:    { type: String, enum: ["accepted", "overridden", "ignored"] },
+        recruiterDecisionNote:{ type: String, default: "" },
+        recruiterDecisionAt:  { type: Date },
+        recruiterDecisionBy:  { type: String, default: "" },
+      },
+      default: undefined,
     },
     location: { type: String, default: "" },
     currentStatus: { type: String, default: "" },
