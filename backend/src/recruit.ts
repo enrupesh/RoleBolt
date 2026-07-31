@@ -2766,6 +2766,29 @@ recruitPublicRouter.get("/assessment/:token", async (req, res) => {
   }
 });
 
+// ── Live assessment progress ping (fire-and-forget from candidate browser) ──
+recruitPublicRouter.post("/assessment/:token/progress", async (req, res) => {
+  try {
+    await connectMongo();
+    const { questionIndex } = req.body as { questionIndex: number };
+    if (typeof questionIndex !== "number") return res.json({ ok: false });
+
+    const candidate = await RecruitCandidate.findOne({
+      assessmentToken: req.params.token,
+      assessmentStatus: "sent",
+    }).select("_id assessmentStartedAt");
+    if (!candidate) return res.json({ ok: false });
+
+    const update: Record<string, any> = { currentQuestionIndex: questionIndex };
+    if (!candidate.assessmentStartedAt) update.assessmentStartedAt = new Date();
+
+    await RecruitCandidate.updateOne({ _id: candidate._id }, { $set: update });
+    return res.json({ ok: true });
+  } catch {
+    return res.json({ ok: false });
+  }
+});
+
 recruitPublicRouter.post("/assessment/:token/submit", async (req, res) => {
   try {
     await connectMongo();
@@ -3383,6 +3406,98 @@ recruitRouter.get("/jobs/:jobId/assessment-analytics/export", async (req, res) =
     return res.json({ jobTitle: (job as any).title ?? "", candidates });
   } catch (err: any) {
     console.error("[recruit] GET /assessment-analytics/export", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Live Assessment Progress ────────────────────────────────────────────────
+recruitRouter.get("/jobs/:jobId/live-assessment-progress", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "Unauthorized" });
+
+    const job = await RecruitJob.findOne({ _id: req.params.jobId, uid }).select("title").lean();
+    if (!job) return res.status(404).json({ error: "Job not found." });
+
+    const now = Date.now();
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+
+    const [inProgressRaw, completedTodayRaw, awaitingCount] = await Promise.all([
+      RecruitCandidate.find({ jobId: req.params.jobId, uid, assessmentStatus: "sent" })
+        .select("name email stage assessmentSentAt assessmentStartedAt currentQuestionIndex assessmentQuestions")
+        .lean(),
+      RecruitCandidate.find({
+        jobId: req.params.jobId, uid,
+        assessmentStatus: "completed",
+        assessmentCompletedAt: { $gte: todayStart },
+      }).select("name email stage assessmentSentAt assessmentStartedAt assessmentCompletedAt totalScore maxScore hiringDecision").lean(),
+      RecruitCandidate.countDocuments({ jobId: req.params.jobId, uid, assessmentStatus: "not_sent" }),
+    ]);
+
+    const inProgress = inProgressRaw.map((c: any) => {
+      const totalQ = (c.assessmentQuestions ?? []).length;
+      const curIdx = c.currentQuestionIndex ?? null;
+      const startedMs = c.assessmentStartedAt ? new Date(c.assessmentStartedAt).getTime() : null;
+      const elapsedSeconds = startedMs ? Math.floor((now - startedMs) / 1000) : null;
+      const progressPct = (curIdx !== null && totalQ > 0) ? Math.round(((curIdx + 1) / totalQ) * 100) : null;
+      return {
+        _id: String(c._id),
+        name: c.name,
+        email: c.email,
+        stage: c.stage,
+        assessmentSentAt: c.assessmentSentAt ?? null,
+        assessmentStartedAt: c.assessmentStartedAt ?? null,
+        currentQuestionIndex: curIdx,
+        totalQuestions: totalQ,
+        elapsedSeconds,
+        progressPct,
+        started: c.assessmentStartedAt != null,
+      };
+    });
+
+    const completedToday = completedTodayRaw.map((c: any) => {
+      const scorePct = (c.maxScore ?? 0) > 0 ? Math.round((c.totalScore / c.maxScore) * 100) : null;
+      const startedMs = c.assessmentStartedAt ? new Date(c.assessmentStartedAt).getTime() : null;
+      const completedMs = c.assessmentCompletedAt ? new Date(c.assessmentCompletedAt).getTime() : null;
+      const durationSeconds = (startedMs && completedMs) ? Math.floor((completedMs - startedMs) / 1000) : null;
+      return {
+        _id: String(c._id),
+        name: c.name,
+        email: c.email,
+        stage: c.stage,
+        assessmentSentAt: c.assessmentSentAt ?? null,
+        assessmentStartedAt: c.assessmentStartedAt ?? null,
+        assessmentCompletedAt: c.assessmentCompletedAt ?? null,
+        scorePct,
+        hiringDecision: c.hiringDecision,
+        durationSeconds,
+      };
+    });
+
+    const started = inProgress.filter(c => c.started && c.progressPct !== null);
+    const avgProgress = started.length > 0
+      ? Math.round(started.reduce((s, c) => s + (c.progressPct ?? 0), 0) / started.length)
+      : null;
+    const avgDuration = completedToday.filter(c => c.durationSeconds).length > 0
+      ? Math.round(completedToday.filter(c => c.durationSeconds).reduce((s, c) => s + (c.durationSeconds ?? 0), 0) / completedToday.filter(c => c.durationSeconds).length)
+      : null;
+
+    return res.json({
+      jobTitle: (job as any).title,
+      inProgress,
+      completedToday,
+      summary: {
+        inProgressCount: inProgress.length,
+        completedTodayCount: completedToday.length,
+        awaitingCount,
+        avgCurrentProgress: avgProgress,
+        avgCompletionSeconds: avgDuration,
+      },
+      lastUpdated: new Date().toISOString(),
+    });
+  } catch (err: any) {
+    console.error("[recruit] GET /live-assessment-progress", err);
     return res.status(500).json({ error: err.message });
   }
 });
