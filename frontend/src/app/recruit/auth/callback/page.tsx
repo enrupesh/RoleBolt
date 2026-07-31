@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
+import { apiUrl } from "@/lib/api";
 
 function Spinner() {
   return (
@@ -25,6 +26,16 @@ function OAuthCallbackInner() {
   const [status, setStatus] = useState<"loading" | "error">("loading");
   const [errMsg, setErrMsg] = useState("");
 
+  const target = params.get("target") === "seeker" ? "seeker" : "recruit";
+  const intent = params.get("intent") === "login" ? "login" : "signup";
+  const destination = target === "seeker"
+    ? intent === "signup" ? "/seeker/profile?onboarding=1" : "/seeker/dashboard"
+    : "/recruit/dashboard";
+  const retryHref = target === "seeker"
+    ? intent === "signup" ? "/seeker/signup" : "/seeker/login"
+    : intent === "login" ? "/recruit/login" : "/recruit/signup";
+  const retryLabel = intent === "signup" ? "Back to sign up" : "Back to sign in";
+
   useEffect(() => {
     const token = params.get("token");
     const error = params.get("error");
@@ -43,15 +54,40 @@ function OAuthCallbackInner() {
       return;
     }
 
-    signInWithToken(token).then((result) => {
-      if (result.error) {
-        setErrMsg(result.error);
+    (async () => {
+      try {
+        if (target === "seeker") {
+          const headers = { Authorization: `Bearer ${token}` };
+          const meRes = await fetch(apiUrl("/auth/me"), { headers });
+          const me = meRes.ok ? await meRes.json() : null;
+
+          await fetch(apiUrl("/recruit/auth/profile"), {
+            method: "PATCH",
+            headers: { ...headers, "Content-Type": "application/json" },
+            body: JSON.stringify({ role: "seeker", name: me?.name, email: me?.email }),
+          });
+
+          await fetch(apiUrl("/recruit/seeker/profile"), {
+            method: "PUT",
+            headers: { ...headers, "Content-Type": "application/json" },
+            body: JSON.stringify({ name: me?.name, email: me?.email }),
+          });
+        }
+
+        const result = await signInWithToken(token);
+        if (result.error) {
+          setErrMsg(result.error);
+          setStatus("error");
+          return;
+        }
+
+        router.replace(destination);
+      } catch {
+        setErrMsg("Something went wrong while completing sign-in. Please try again.");
         setStatus("error");
-      } else {
-        router.replace("/recruit/dashboard");
       }
-    });
-  }, [params, signInWithToken, router]);
+    })();
+  }, [params, signInWithToken, router, target, destination]);
 
   if (status === "error") {
     return (
@@ -65,10 +101,10 @@ function OAuthCallbackInner() {
           <h1 className="text-lg font-bold text-slate-900 mb-2">Sign-in failed</h1>
           <p className="text-sm text-slate-500 mb-6">{errMsg}</p>
           <a
-            href="/recruit/signup"
+            href={retryHref}
             className="inline-flex w-full items-center justify-center rounded-xl bg-[#0a66c2] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#004182] transition-all"
           >
-            Back to sign up
+            {retryLabel}
           </a>
         </div>
       </div>
