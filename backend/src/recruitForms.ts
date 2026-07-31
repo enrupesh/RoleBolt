@@ -15,8 +15,162 @@ export const formPublicRouter = express.Router(); // public    — /recruit-publ
 
 const GEMINI_MESH_KEY = process.env.GEMINI_MESH_KEY ?? "";
 
+const FORM_STAGE_VALUES = ["new", "shortlisted", "interview", "hired", "rejected"] as const;
+type FormStage = typeof FORM_STAGE_VALUES[number];
+
+type FormActor = {
+  uid: string;
+  name: string;
+  email: string;
+};
+
+type FormActivityType =
+  | "submitted"
+  | "stage_changed"
+  | "ai_auto_decision"
+  | "email_sent"
+  | "email_failed"
+  | "note_added"
+  | "score_retried";
+
+type FormAgentMode = {
+  enabled: boolean;
+  shortlistThreshold: number;
+  rejectThreshold: number;
+  autoEmailShortlist: boolean;
+  autoEmailReject: boolean;
+};
+
 function getUid(req: express.Request): string {
   return (req as any).user?.uid ?? "";
+}
+
+function actorOf(req: express.Request): FormActor {
+  const user = (req as any).user ?? {};
+  return {
+    uid: getUid(req),
+    name: user.name || user.email?.split("@")[0] || "Recruiter",
+    email: user.email || "",
+  };
+}
+
+function buildActivity(type: FormActivityType, message: string, actor?: FormActor) {
+  return {
+    type,
+    message,
+    ...(actor ? { actor } : {}),
+    createdAt: new Date(),
+  };
+}
+
+function stageLabel(stage: FormStage): string {
+  const labels: Record<FormStage, string> = {
+    new: "New",
+    shortlisted: "Shortlisted",
+    interview: "Interview",
+    hired: "Hired",
+    rejected: "Rejected",
+  };
+  return labels[stage];
+}
+
+function normalizeAgentMode(input: any): FormAgentMode {
+  const shortlistThreshold = Math.min(100, Math.max(0, Number(input?.shortlistThreshold) || 75));
+  const rejectThreshold = Math.min(shortlistThreshold, Math.max(0, Number(input?.rejectThreshold) || 40));
+  return {
+    enabled: Boolean(input?.enabled),
+    shortlistThreshold,
+    rejectThreshold,
+    autoEmailShortlist: input?.autoEmailShortlist !== false,
+    autoEmailReject: Boolean(input?.autoEmailReject),
+  };
+}
+
+function decideAgentStage(aiScore: number, agentMode: FormAgentMode): FormStage | null {
+  if (!agentMode.enabled) return null;
+  if (aiScore >= agentMode.shortlistThreshold) return "shortlisted";
+  if (aiScore <= agentMode.rejectThreshold) return "rejected";
+  return null;
+}
+
+async function deliverFormStageEmail(args: {
+  responseId: string;
+  stage: FormStage;
+  candidateName: string;
+  candidateEmail: string;
+  formTitle: string;
+}) {
+  let payload: emailTemplates.EmailPayload | null = null;
+  if (args.stage === "shortlisted") payload = emailTemplates.screened(args.candidateName, args.formTitle, "");
+  if (args.stage === "interview") payload = emailTemplates.interview(args.candidateName, args.formTitle, "");
+  if (args.stage === "hired") payload = emailTemplates.hired(args.candidateName, args.formTitle, "");
+  if (!payload) return;
+
+  const result = await sendEmail({
+    to: args.candidateEmail,
+    subject: payload.subject,
+    html: payload.html,
+    text: payload.text,
+    from: CANDIDATE_FROM,
+  });
+
+  await RecruitFormResponse.findByIdAndUpdate(args.responseId, {
+    $push: {
+      emailLog: {
+        type: args.stage,
+        to: args.candidateEmail,
+        subject: payload.subject,
+        body: payload.text,
+        sentAt: new Date(),
+        status: result.ok ? "sent" : "failed",
+        error: result.error,
+      },
+      activityLog: buildActivity(
+        result.ok ? "email_sent" : "email_failed",
+        result.ok
+          ? `${stageLabel(args.stage)} email sent automatically`
+          : `${stageLabel(args.stage)} email failed to send`,
+      ),
+    },
+  });
+}
+
+async function deliverAgentRejectEmail(args: {
+  responseId: string;
+  candidateName: string;
+  candidateEmail: string;
+  formTitle: string;
+}) {
+  const body = await generateRejectionEmailText({
+    candidateName: args.candidateName,
+    formTitle: args.formTitle,
+    stage: "rejected",
+  });
+  const payload = emailTemplates.rejectionEmailHtml(args.candidateName, args.formTitle, "", body);
+  const result = await sendEmail({
+    to: args.candidateEmail,
+    subject: payload.subject,
+    html: payload.html,
+    text: payload.text,
+    from: CANDIDATE_FROM,
+  });
+  await RecruitFormResponse.findByIdAndUpdate(args.responseId, {
+    $push: {
+      emailLog: {
+        type: "rejected",
+        to: args.candidateEmail,
+        subject: payload.subject,
+        body: payload.text,
+        sentAt: new Date(),
+        status: result.ok ? "sent" : "failed",
+        error: result.error,
+      },
+      activityLog: buildActivity(
+        result.ok ? "email_sent" : "email_failed",
+        result.ok ? "Rejection email sent automatically" : "Automatic rejection email failed to send",
+      ),
+    },
+  });
 }
 
 function safeJson(raw: string): any {
@@ -296,10 +450,11 @@ formRouter.post("/", async (req, res) => {
     const uid = getUid(req);
     if (!uid) return res.status(401).json({ error: "Unauthorized" });
 
-    const { title, description, questions } = req.body as {
+    const { title, description, questions, agentMode } = req.body as {
       title?: string;
       description?: string;
       questions?: any[];
+      agentMode?: any;
     };
 
     if (!title?.trim()) return res.status(400).json({ error: "Form title is required." });
@@ -328,6 +483,7 @@ formRouter.post("/", async (req, res) => {
         placeholder: String(q.placeholder || ""),
       })),
       status: "active",
+      agentMode: normalizeAgentMode(agentMode),
     });
 
     return res.status(201).json({ form });
@@ -376,7 +532,7 @@ formRouter.patch("/:formId", async (req, res) => {
     const uid = getUid(req);
     if (!uid) return res.status(401).json({ error: "Unauthorized" });
 
-    const { title, description, questions, status } = req.body;
+    const { title, description, questions, status, agentMode } = req.body;
     const update: Record<string, any> = {};
     if (title !== undefined) update.title = String(title).trim();
     if (description !== undefined) update.description = String(description).trim();
@@ -391,6 +547,7 @@ formRouter.patch("/:formId", async (req, res) => {
         placeholder: String(q.placeholder || ""),
       }));
     }
+    if (agentMode !== undefined) update.agentMode = normalizeAgentMode(agentMode);
 
     const form = await RecruitForm.findOneAndUpdate(
       { _id: req.params.formId, uid },
@@ -463,6 +620,55 @@ formRouter.get("/:formId/responses", async (req, res) => {
   }
 });
 
+// POST /recruit/forms/:formId/responses/bulk-update — bulk stage updates
+formRouter.post("/:formId/responses/bulk-update", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "Unauthorized" });
+
+    const stage = String(req.body?.stage ?? "") as FormStage;
+    const responseIds = Array.isArray(req.body?.responseIds)
+      ? req.body.responseIds.map((id: unknown) => String(id)).filter(Boolean)
+      : [];
+
+    if (!FORM_STAGE_VALUES.includes(stage)) {
+      return res.status(400).json({ error: "A valid stage is required." });
+    }
+    if (responseIds.length === 0) {
+      return res.status(400).json({ error: "Select at least one response." });
+    }
+
+    const form = await RecruitForm.findOne({ _id: req.params.formId, uid }).lean();
+    if (!form) return res.status(404).json({ error: "Form not found." });
+
+    const actor = actorOf(req);
+    const responses = await RecruitFormResponse.find({
+      _id: { $in: responseIds },
+      formId: req.params.formId,
+      uid,
+    }).select("_id stage").lean();
+
+    const changedIds = responses.filter(r => r.stage !== stage).map(r => r._id);
+    if (changedIds.length === 0) return res.json({ ok: true, updatedCount: 0 });
+
+    await RecruitFormResponse.updateMany(
+      { _id: { $in: changedIds } },
+      {
+        $set: { stage, decisionSource: "manual" },
+        $push: {
+          activityLog: buildActivity("stage_changed", `Moved to ${stageLabel(stage)} in bulk`, actor),
+        },
+      }
+    );
+
+    return res.json({ ok: true, updatedCount: changedIds.length });
+  } catch (err: any) {
+    console.error("[forms] POST bulk-update:", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // PATCH /recruit/forms/:formId/responses/:responseId — update stage
 formRouter.patch("/:formId/responses/:responseId", async (req, res) => {
   try {
@@ -470,7 +676,10 @@ formRouter.patch("/:formId/responses/:responseId", async (req, res) => {
     const uid = getUid(req);
     if (!uid) return res.status(401).json({ error: "Unauthorized" });
 
-    const { stage } = req.body;
+    const stage = String(req.body?.stage ?? "") as FormStage;
+    if (!FORM_STAGE_VALUES.includes(stage)) {
+      return res.status(400).json({ error: "A valid stage is required." });
+    }
 
     // Fetch current stage before update so we can detect actual transition
     const existing = await RecruitFormResponse.findOne(
@@ -481,7 +690,20 @@ formRouter.patch("/:formId/responses/:responseId", async (req, res) => {
 
     const response = await RecruitFormResponse.findOneAndUpdate(
       { _id: req.params.responseId, formId: req.params.formId, uid },
-      { $set: { stage } },
+      {
+        $set: { stage, decisionSource: "manual" },
+        ...(stage !== (existing as any).stage
+          ? {
+              $push: {
+                activityLog: buildActivity(
+                  "stage_changed",
+                  `Stage changed from ${stageLabel((existing as any).stage || "new")} to ${stageLabel(stage)}`,
+                  actorOf(req)
+                ),
+              },
+            }
+          : {}),
+      },
       { returnDocument: "after" }
     );
     if (!response) return res.status(404).json({ error: "Response not found." });
@@ -498,19 +720,12 @@ formRouter.patch("/:formId/responses/:responseId", async (req, res) => {
         try {
           const form = await RecruitForm.findById(formId).lean();
           const formTitle = (form as any)?.title || "";
-          let payload: emailTemplates.EmailPayload | null = null;
-          if (stage === "shortlisted") payload = emailTemplates.screened(candName, formTitle, "");
-          if (stage === "interview")   payload = emailTemplates.interview(candName, formTitle, "");
-          if (stage === "hired")       payload = emailTemplates.hired(candName, formTitle, "");
-          if (!payload) return;
-          const result = await sendEmail({ to: candEmail, subject: payload.subject, html: payload.html, text: payload.text, from: CANDIDATE_FROM });
-          await RecruitFormResponse.findByIdAndUpdate(resId, {
-            $push: {
-              emailLog: {
-                type: stage, to: candEmail, subject: payload.subject, body: payload.text,
-                sentAt: new Date(), status: result.ok ? "sent" : "failed", error: result.error,
-              },
-            },
+          await deliverFormStageEmail({
+            responseId: String(resId),
+            stage,
+            candidateName: candName,
+            candidateEmail: candEmail,
+            formTitle,
           });
         } catch (err) { console.error("[forms] auto stage-change email failed:", err); }
       });
@@ -519,6 +734,37 @@ formRouter.patch("/:formId/responses/:responseId", async (req, res) => {
     return res.json({ response });
   } catch (err: any) {
     console.error("[forms] PATCH response:", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /recruit/forms/:formId/responses/:responseId/notes
+formRouter.post("/:formId/responses/:responseId/notes", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "Unauthorized" });
+
+    const body = String(req.body?.body ?? "").trim();
+    if (!body) return res.status(400).json({ error: "Note body is required." });
+    if (body.length > 5000) return res.status(400).json({ error: "Note is too long." });
+
+    const actor = actorOf(req);
+    const response = await RecruitFormResponse.findOneAndUpdate(
+      { _id: req.params.responseId, formId: req.params.formId, uid },
+      {
+        $push: {
+          internalNotes: { body, author: actor, createdAt: new Date() },
+          activityLog: buildActivity("note_added", "Added an internal note", actor),
+        },
+      },
+      { returnDocument: "after" }
+    ).lean();
+
+    if (!response) return res.status(404).json({ error: "Response not found." });
+    return res.status(201).json({ response });
+  } catch (err: any) {
+    console.error("[forms] POST note:", err);
     return res.status(500).json({ error: err.message });
   }
 });
@@ -604,6 +850,13 @@ formRouter.post("/:formId/responses/:responseId/send-email", async (req, res) =>
     };
 
     response.emailLog.push(logEntry as any);
+    response.activityLog.push(
+      buildActivity(
+        result.ok ? "email_sent" : "email_failed",
+        result.ok ? `Sent ${type || "custom"} email` : `Failed to send ${type || "custom"} email`,
+        actorOf(req)
+      ) as any
+    );
     await response.save();
 
     if (!result.ok) {
@@ -762,6 +1015,9 @@ formRouter.post("/:formId/responses/:responseId/retry-score", async (req, res) =
           questionScores: scored.questionScores,
           scoringFailed: scored.scoringFailed,
         },
+        $push: {
+          activityLog: buildActivity("score_retried", "AI scoring was retried", actorOf(req)),
+        },
       },
       { returnDocument: "after" }
     ).lean();
@@ -862,11 +1118,16 @@ formPublicRouter.post(
         strengths: [],
         redFlags: [],
         answerSignals: [],
+        questionScores: [],
+        interviewQuestions: [],
         scoringFailed: true, // will be patched after async scoring
         stage: "new",
+        decisionSource: "manual",
         submittedName,
         submittedEmail,
         submittedPhone,
+        internalNotes: [],
+        activityLog: [buildActivity("submitted", "Application submitted")],
       });
 
       // ── 2. Increment counter (fire-and-forget; OK to drift by ±1 rarely) ─
@@ -884,22 +1145,58 @@ formPublicRouter.post(
 
       setImmediate(async () => {
         try {
+          const agentMode = normalizeAgentMode((form as any).agentMode);
           const scored = await scoreFormResponse({
             formTitle: form.title,
             answers: textAnswers,
             resumeText: resumeText || undefined,
           });
+          const agentStage = scored.scoringFailed ? null : decideAgentStage(scored.aiScore, agentMode);
+          const setFields: Record<string, unknown> = {
+            aiSummary: scored.aiSummary,
+            aiScore: scored.aiScore,
+            strengths: scored.strengths,
+            redFlags: scored.redFlags,
+            answerSignals: scored.answerSignals,
+            questionScores: scored.questionScores,
+            scoringFailed: scored.scoringFailed,
+          };
+          const pushFields: Record<string, unknown> = {};
+
+          if (agentStage) {
+            setFields.stage = agentStage;
+            setFields.decisionSource = "ai_agent";
+            pushFields.activityLog = buildActivity(
+              "ai_auto_decision",
+              agentStage === "shortlisted"
+                ? `AI agent auto-shortlisted this applicant at ${scored.aiScore}%`
+                : `AI agent auto-rejected this applicant at ${scored.aiScore}%`,
+            );
+          }
+
           await RecruitFormResponse.findByIdAndUpdate(response._id, {
-            $set: {
-              aiSummary: scored.aiSummary,
-              aiScore: scored.aiScore,
-              strengths: scored.strengths,
-              redFlags: scored.redFlags,
-              answerSignals: scored.answerSignals,
-              questionScores: scored.questionScores,
-              scoringFailed: scored.scoringFailed,
-            },
+            $set: setFields,
+            ...(pushFields.activityLog ? { $push: pushFields } : {}),
           });
+
+          if (agentStage === "shortlisted" && agentMode.autoEmailShortlist && submittedEmail) {
+            await deliverFormStageEmail({
+              responseId: String(response._id),
+              stage: "shortlisted",
+              candidateName: submittedName || "Applicant",
+              candidateEmail: submittedEmail,
+              formTitle: form.title,
+            });
+          }
+
+          if (agentStage === "rejected" && agentMode.autoEmailReject && submittedEmail) {
+            await deliverAgentRejectEmail({
+              responseId: String(response._id),
+              candidateName: submittedName || "Applicant",
+              candidateEmail: submittedEmail,
+              formTitle: form.title,
+            });
+          }
         } catch (e) {
           console.error("[forms] background scoring failed (non-fatal):", e);
         }

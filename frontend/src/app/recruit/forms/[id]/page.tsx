@@ -56,6 +56,27 @@ type EmailLogEntry = {
   error?: string;
 };
 
+type FormInternalNote = {
+  body: string;
+  author: { uid: string; name: string; email: string };
+  createdAt: string;
+};
+
+type FormActivityLogEntry = {
+  type: "submitted" | "stage_changed" | "ai_auto_decision" | "email_sent" | "email_failed" | "note_added" | "score_retried";
+  message: string;
+  actor?: { uid: string; name: string; email: string };
+  createdAt: string;
+};
+
+type FormAgentMode = {
+  enabled: boolean;
+  shortlistThreshold: number;
+  rejectThreshold: number;
+  autoEmailShortlist: boolean;
+  autoEmailReject: boolean;
+};
+
 type FormResponse = {
   _id: string;
   formId: string;
@@ -69,11 +90,14 @@ type FormResponse = {
   interviewQuestions: string[];
   scoringFailed: boolean;
   stage: Stage;
+  decisionSource: "manual" | "ai_agent";
   submittedName: string;
   submittedEmail: string;
   submittedPhone: string;
   resumeText?: string;
   emailLog: EmailLogEntry[];
+  internalNotes: FormInternalNote[];
+  activityLog: FormActivityLogEntry[];
   createdAt: string;
 };
 
@@ -85,6 +109,7 @@ type Form = {
   status: "active" | "closed";
   responseCount: number;
   questions: FormQuestion[];
+  agentMode: FormAgentMode;
   createdAt: string;
 };
 
@@ -111,6 +136,15 @@ function timeAgo(dateStr: string) {
   const days = Math.floor(hours / 24);
   if (days < 30) return `${days}d ago`;
   return new Date(dateStr).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+}
+
+function formatDateTime(dateStr: string) {
+  return new Date(dateStr).toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function SparkIcon() {
@@ -282,6 +316,122 @@ function ScoringCriteriaCard({ questions, formTitle }: { questions: FormQuestion
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function AutomationSettingsCard({
+  agentMode,
+  saving,
+  onChange,
+  onSave,
+}: {
+  agentMode: FormAgentMode;
+  saving: boolean;
+  onChange: (patch: Partial<FormAgentMode>) => void;
+  onSave: () => void;
+}) {
+  return (
+    <div className="rounded-3xl border border-indigo-200 bg-white shadow-sm overflow-hidden">
+      <div className="border-b border-indigo-100 bg-indigo-50/70 px-5 py-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest text-indigo-500">AI Automation</p>
+            <h3 className="mt-1 text-sm font-bold text-slate-900">Bring Standard Job auto-triage into this Form Job</h3>
+            <p className="mt-1 text-xs text-slate-500">Automatically move strong applicants to shortlist and low-fit applicants to rejected once AI scoring finishes.</p>
+          </div>
+          <button
+            onClick={onSave}
+            disabled={saving}
+            className="shrink-0 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 transition disabled:opacity-60"
+          >
+            {saving ? "Saving..." : "Save"}
+          </button>
+        </div>
+      </div>
+
+      <div className="p-5 space-y-4">
+        <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <input
+            type="checkbox"
+            checked={agentMode.enabled}
+            onChange={e => onChange({ enabled: e.target.checked })}
+            className="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+          />
+          <div>
+            <p className="text-sm font-semibold text-slate-800">Enable AI auto-triage</p>
+            <p className="text-xs text-slate-500 mt-0.5">Candidates who cross your thresholds get moved automatically after scoring.</p>
+          </div>
+        </label>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Shortlist Threshold</p>
+              <span className="text-sm font-bold text-emerald-600">{agentMode.shortlistThreshold}%</span>
+            </div>
+            <input
+              type="range"
+              min={50}
+              max={100}
+              value={agentMode.shortlistThreshold}
+              onChange={e => onChange({ shortlistThreshold: Number(e.target.value) })}
+              className="mt-3 w-full accent-emerald-500"
+            />
+            <p className="mt-2 text-[11px] text-slate-500">Applicants at or above this score are auto-shortlisted.</p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Reject Threshold</p>
+              <span className="text-sm font-bold text-rose-600">{agentMode.rejectThreshold}%</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={Math.max(0, agentMode.shortlistThreshold)}
+              value={agentMode.rejectThreshold}
+              onChange={e => onChange({ rejectThreshold: Number(e.target.value) })}
+              className="mt-3 w-full accent-rose-500"
+            />
+            <p className="mt-2 text-[11px] text-slate-500">Applicants at or below this score are auto-rejected.</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <input
+              type="checkbox"
+              checked={agentMode.autoEmailShortlist}
+              onChange={e => onChange({ autoEmailShortlist: e.target.checked })}
+              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+            />
+            <div>
+              <p className="text-sm font-semibold text-slate-800">Auto-email shortlisted candidates</p>
+              <p className="text-xs text-slate-500 mt-0.5">Send the same shortlist confirmation Standard Jobs already use.</p>
+            </div>
+          </label>
+
+          <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <input
+              type="checkbox"
+              checked={agentMode.autoEmailReject}
+              onChange={e => onChange({ autoEmailReject: e.target.checked })}
+              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+            />
+            <div>
+              <p className="text-sm font-semibold text-slate-800">Auto-email rejected candidates</p>
+              <p className="text-xs text-slate-500 mt-0.5">Send a polite rejection automatically when the AI rejects a response.</p>
+            </div>
+          </label>
+        </div>
+
+        <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3">
+          <p className="text-[11px] font-semibold text-slate-600">
+            Current logic: `{agentMode.rejectThreshold}% and below → Reject`, `{agentMode.rejectThreshold + 1}% to {Math.max(agentMode.shortlistThreshold - 1, agentMode.rejectThreshold + 1)}% → Review`, `{agentMode.shortlistThreshold}% and above → Shortlist`.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
@@ -965,8 +1115,10 @@ function FormResponseInfoModal({ r, onClose }: { r: FormResponse; onClose: () =>
 
 // ─── Response card ─────────────────────────────────────────────────────────────
 
-function ResponseCard({ r, token, formId, formTitle, onUpdate, onDelete }: {
+function ResponseCard({ r, token, formId, formTitle, selected, onToggleSelect, onUpdate, onDelete }: {
   r: FormResponse; token: string; formId: string; formTitle: string;
+  selected: boolean;
+  onToggleSelect: (checked: boolean) => void;
   onUpdate: (id: string, patch: Partial<FormResponse>) => void;
   onDelete: (id: string) => void;
 }) {
@@ -987,6 +1139,9 @@ function ResponseCard({ r, token, formId, formTitle, onUpdate, onDelete }: {
   const [rejectionDraft, setRejectionDraft] = useState("");
   const [loadingReject, setLoadingReject] = useState(false);
   const [deleteMode, setDeleteMode] = useState(false);
+  const [noteBody, setNoteBody] = useState("");
+  const [savingNote, setSavingNote] = useState(false);
+  const [noteError, setNoteError] = useState("");
 
   async function updateStage(stage: Stage) {
     try {
@@ -1065,6 +1220,30 @@ function ResponseCard({ r, token, formId, formTitle, onUpdate, onDelete }: {
     }
   }
 
+  async function addNote() {
+    if (!noteBody.trim()) return;
+    setSavingNote(true);
+    setNoteError("");
+    try {
+      const res = await fetch(apiUrl(`/recruit/forms/${formId}/responses/${r._id}/notes`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ body: noteBody.trim() }),
+      });
+      const data = await readApiJson(res);
+      if (!res.ok) throw new Error(data.error || "Failed to save note.");
+      onUpdate(r._id, {
+        internalNotes: data.response.internalNotes || [],
+        activityLog: data.response.activityLog || [],
+      });
+      setNoteBody("");
+    } catch (e: any) {
+      setNoteError(e.message || "Failed to save note.");
+    } finally {
+      setSavingNote(false);
+    }
+  }
+
   async function generateInterviewQuestions() {
     // If already cached on the response, just toggle display
     if ((r.interviewQuestions || []).length > 0) {
@@ -1111,18 +1290,33 @@ function ResponseCard({ r, token, formId, formTitle, onUpdate, onDelete }: {
       <div className="p-5">
         {/* Top row */}
         <div className="flex items-start justify-between gap-3 mb-3">
-          <div className="flex-1 min-w-0">
+          <div className="flex flex-1 items-start gap-3 min-w-0">
+            <input
+              type="checkbox"
+              checked={selected}
+              onChange={e => onToggleSelect(e.target.checked)}
+              className="mt-1 h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+            />
             <div className="flex items-center gap-2 flex-wrap mb-1">
-              <h3 className="text-sm font-bold text-slate-900 truncate">{displayName}</h3>
-              {r.redFlags.length > 0 && (
-                <span className="flex items-center gap-0.5 text-rose-400 text-[10px] font-semibold">
-                  <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                  {r.redFlags.length} flag{r.redFlags.length > 1 ? "s" : ""}
-                </span>
-              )}
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-sm font-bold text-slate-900 truncate">{displayName}</h3>
+                  {r.decisionSource === "ai_agent" && (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-600">
+                      <SparkIcon /> AI moved
+                    </span>
+                  )}
+                  {r.redFlags.length > 0 && (
+                    <span className="flex items-center gap-0.5 text-rose-400 text-[10px] font-semibold">
+                      <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                      {r.redFlags.length} flag{r.redFlags.length > 1 ? "s" : ""}
+                    </span>
+                  )}
+                </div>
+                {displayEmail && <p className="text-xs text-slate-500">{displayEmail}</p>}
+                <p className="text-[11px] text-slate-400 mt-0.5">{timeAgo(r.createdAt)}</p>
+              </div>
             </div>
-            {displayEmail && <p className="text-xs text-slate-500">{displayEmail}</p>}
-            <p className="text-[11px] text-slate-400 mt-0.5">{timeAgo(r.createdAt)}</p>
           </div>
           {!r.scoringFailed ? (
             <div className="text-right shrink-0">
@@ -1417,6 +1611,70 @@ function ResponseCard({ r, token, formId, formTitle, onUpdate, onDelete }: {
               </div>
             </div>
           )}
+
+          {/* Notes */}
+          <div>
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Internal Notes</p>
+              <span className="text-[10px] text-slate-400">{r.internalNotes?.length || 0} note{(r.internalNotes?.length || 0) !== 1 ? "s" : ""}</span>
+            </div>
+            <div className="space-y-2">
+              {(r.internalNotes || []).length === 0 ? (
+                <p className="text-xs text-slate-400">No internal notes yet.</p>
+              ) : (
+                [...(r.internalNotes || [])].reverse().map((note, idx) => (
+                  <div key={`${note.createdAt}-${idx}`} className="rounded-xl border border-slate-200 bg-white px-3.5 py-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[11px] font-semibold text-slate-700">{note.author?.name || "Recruiter"}</p>
+                      <span className="text-[10px] text-slate-400">{formatDateTime(note.createdAt)}</span>
+                    </div>
+                    <p className="mt-1 text-xs text-slate-600 whitespace-pre-wrap leading-5">{note.body}</p>
+                  </div>
+                ))
+              )}
+              <div className="rounded-xl border border-slate-200 bg-white p-3">
+                <textarea
+                  value={noteBody}
+                  onChange={e => setNoteBody(e.target.value)}
+                  rows={3}
+                  placeholder="Add a private note for your team or future review..."
+                  className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+                />
+                <div className="mt-2 flex items-center justify-between gap-3">
+                  {noteError ? <p className="text-[11px] text-rose-500">{noteError}</p> : <span className="text-[10px] text-slate-400">Notes stay internal to the recruiter workspace.</span>}
+                  <button
+                    onClick={addNote}
+                    disabled={savingNote || !noteBody.trim()}
+                    className="rounded-lg bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-slate-700 transition disabled:opacity-50"
+                  >
+                    {savingNote ? "Saving..." : "Add Note"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Activity */}
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Activity</p>
+            <div className="space-y-2">
+              {(r.activityLog || []).length === 0 ? (
+                <p className="text-xs text-slate-400">No activity yet.</p>
+              ) : (
+                [...(r.activityLog || [])].slice().reverse().map((entry, idx) => (
+                  <div key={`${entry.createdAt}-${idx}`} className="rounded-xl border border-slate-200 bg-white px-3.5 py-2.5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-medium text-slate-700">{entry.message}</p>
+                        {entry.actor?.name && <p className="mt-0.5 text-[10px] text-slate-400">{entry.actor.name}</p>}
+                      </div>
+                      <span className="text-[10px] text-slate-400 shrink-0">{formatDateTime(entry.createdAt)}</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -1426,7 +1684,6 @@ function ResponseCard({ r, token, formId, formTitle, onUpdate, onDelete }: {
 // ─── Page ──────────────────────────────────────────────────────────────────────
 
 function FormResponsesContent({ id }: { id: string }) {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const justSaved = searchParams.get("saved") === "1";
 
@@ -1436,6 +1693,19 @@ function FormResponsesContent({ id }: { id: string }) {
   const [loading, setLoading] = useState(true);
   const [showShare, setShowShare] = useState(justSaved);
   const [stageFilter, setStageFilter] = useState<Stage | "all">("all");
+  const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState<"newest" | "oldest" | "highest_score" | "lowest_score">("newest");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkStage, setBulkStage] = useState<Stage>("shortlisted");
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const [agentModeDraft, setAgentModeDraft] = useState<FormAgentMode>({
+    enabled: false,
+    shortlistThreshold: 75,
+    rejectThreshold: 40,
+    autoEmailShortlist: true,
+    autoEmailReject: false,
+  });
+  const [savingAutomation, setSavingAutomation] = useState(false);
 
   const { sessionToken } = useRecruitAuth();
   useEffect(() => {
@@ -1459,6 +1729,10 @@ function FormResponsesContent({ id }: { id: string }) {
   }, [token, id]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    if (!form?.agentMode) return;
+    setAgentModeDraft(form.agentMode);
+  }, [form]);
 
   function onUpdate(responseId: string, patch: Partial<FormResponse>) {
     setResponses(prev => prev.map(r => r._id === responseId ? { ...r, ...patch } : r));
@@ -1466,16 +1740,114 @@ function FormResponsesContent({ id }: { id: string }) {
 
   function onDelete(responseId: string) {
     setResponses(prev => prev.filter(r => r._id !== responseId));
+    setSelectedIds(prev => prev.filter(id => id !== responseId));
   }
 
-  const filtered = stageFilter === "all" ? responses : responses.filter(r => r.stage === stageFilter);
+  const filtered = responses
+    .filter(r => stageFilter === "all" ? true : r.stage === stageFilter)
+    .filter(r => {
+      const q = search.trim().toLowerCase();
+      if (!q) return true;
+      const haystack = [
+        r.submittedName,
+        r.submittedEmail,
+        r.submittedPhone,
+        r.aiSummary,
+        ...r.answers.map(a => a.value),
+      ].join(" ").toLowerCase();
+      return haystack.includes(q);
+    })
+    .sort((a, b) => {
+      if (sortBy === "oldest") return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      if (sortBy === "highest_score") return (b.aiScore || 0) - (a.aiScore || 0);
+      if (sortBy === "lowest_score") return (a.aiScore || 0) - (b.aiScore || 0);
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+
+  const selectedVisibleCount = filtered.filter(r => selectedIds.includes(r._id)).length;
+  const scoredResponses = responses.filter(r => !r.scoringFailed);
+  const averageScore = scoredResponses.length > 0
+    ? Math.round(scoredResponses.reduce((sum, r) => sum + r.aiScore, 0) / scoredResponses.length)
+    : 0;
+  const scoringCoverage = responses.length > 0 ? Math.round((scoredResponses.length / responses.length) * 100) : 0;
+  const autoMovedCount = responses.filter(r => r.decisionSource === "ai_agent").length;
+  const newThisWeek = responses.filter(r => Date.now() - new Date(r.createdAt).getTime() < 7 * 24 * 60 * 60 * 1000).length;
 
   const stats = [
     { label: "Total", value: responses.length, accent: "text-slate-800" },
+    { label: "Avg Score", value: `${averageScore}%`, accent: "text-violet-600" },
+    { label: "Scored", value: `${scoringCoverage}%`, accent: "text-indigo-600" },
     { label: "Shortlisted", value: responses.filter(r => r.stage === "shortlisted").length, accent: "text-blue-600" },
-    { label: "Interview", value: responses.filter(r => r.stage === "interview").length, accent: "text-amber-600" },
-    { label: "Hired", value: responses.filter(r => r.stage === "hired").length, accent: "text-emerald-600" },
+    { label: "AI Moved", value: autoMovedCount, accent: "text-fuchsia-600" },
+    { label: "New 7d", value: newThisWeek, accent: "text-emerald-600" },
   ];
+
+  function toggleSelected(responseId: string, checked: boolean) {
+    setSelectedIds(prev => checked ? Array.from(new Set([...prev, responseId])) : prev.filter(id => id !== responseId));
+  }
+
+  function toggleSelectAllVisible(checked: boolean) {
+    const visibleIds = filtered.map(r => r._id);
+    setSelectedIds(prev => checked
+      ? Array.from(new Set([...prev, ...visibleIds]))
+      : prev.filter(id => !visibleIds.includes(id))
+    );
+  }
+
+  async function saveAutomation() {
+    if (!token || !form) return;
+    setSavingAutomation(true);
+    try {
+      const normalized = {
+        ...agentModeDraft,
+        rejectThreshold: Math.min(agentModeDraft.rejectThreshold, agentModeDraft.shortlistThreshold),
+      };
+      const res = await fetch(apiUrl(`/recruit/forms/${id}`), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ agentMode: normalized }),
+      });
+      const data = await readApiJson(res);
+      if (!res.ok) throw new Error(data.error || "Failed to save automation.");
+      setForm(data.form);
+    } catch (e: any) {
+      alert(e.message || "Failed to save automation.");
+    } finally {
+      setSavingAutomation(false);
+    }
+  }
+
+  async function applyBulkStage() {
+    if (!token || selectedIds.length === 0) return;
+    setBulkSaving(true);
+    try {
+      const res = await fetch(apiUrl(`/recruit/forms/${id}/responses/bulk-update`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ responseIds: selectedIds, stage: bulkStage }),
+      });
+      const data = await readApiJson(res);
+      if (!res.ok) throw new Error(data.error || "Bulk update failed.");
+      setResponses(prev => prev.map(r => selectedIds.includes(r._id) ? {
+        ...r,
+        stage: bulkStage,
+        decisionSource: "manual",
+        activityLog: [
+          ...(r.activityLog || []),
+          {
+            type: "stage_changed",
+            message: `Moved to ${STAGES.find(s => s.id === bulkStage)?.label ?? bulkStage} in bulk`,
+            createdAt: new Date().toISOString(),
+          },
+        ],
+      } : r));
+      setSelectedIds([]);
+    } catch (e: any) {
+      alert(e.message || "Bulk update failed.");
+    } finally {
+      setBulkSaving(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -1569,7 +1941,7 @@ function FormResponsesContent({ id }: { id: string }) {
 
       <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 space-y-5">
         {/* Stats */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
           {stats.map(s => (
             <div key={s.label} className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
               <p className={`text-2xl font-bold ${s.accent}`}>{s.value}</p>
@@ -1578,27 +1950,90 @@ function FormResponsesContent({ id }: { id: string }) {
           ))}
         </div>
 
+        <AutomationSettingsCard
+          agentMode={agentModeDraft}
+          saving={savingAutomation}
+          onChange={(patch) => setAgentModeDraft(prev => {
+            const next = { ...prev, ...patch };
+            if (next.rejectThreshold > next.shortlistThreshold) next.rejectThreshold = next.shortlistThreshold;
+            return next;
+          })}
+          onSave={saveAutomation}
+        />
+
         {/* Scoring criteria card — only show when there are form questions */}
         {form.questions && form.questions.length > 0 && (
           <ScoringCriteriaCard questions={form.questions} formTitle={form.title} />
         )}
 
-        {/* Filter tabs */}
-        <div className="flex flex-wrap gap-2 items-center">
-          {(["all", ...STAGES.map(s => s.id)] as (Stage | "all")[]).map(f => (
-            <button
-              key={f}
-              onClick={() => setStageFilter(f)}
-              className={`rounded-full px-3.5 py-1.5 text-xs font-semibold capitalize transition ${
-                stageFilter === f
-                  ? "bg-violet-600 text-white shadow"
-                  : "bg-white text-slate-600 border border-slate-200 hover:border-slate-300"
-              }`}
+        <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm space-y-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+            <div className="flex flex-1 flex-wrap gap-2 items-center">
+              {(["all", ...STAGES.map(s => s.id)] as (Stage | "all")[]).map(f => (
+                <button
+                  key={f}
+                  onClick={() => setStageFilter(f)}
+                  className={`rounded-full px-3.5 py-1.5 text-xs font-semibold capitalize transition ${
+                    stageFilter === f
+                      ? "bg-violet-600 text-white shadow"
+                      : "bg-white text-slate-600 border border-slate-200 hover:border-slate-300"
+                  }`}
+                >
+                  {f === "all" ? "All Responses" : STAGES.find(s => s.id === f)?.label ?? f}
+                </button>
+              ))}
+            </div>
+            <span className="text-xs text-slate-400">{filtered.length} response{filtered.length !== 1 ? "s" : ""}</span>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_180px]">
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search by name, email, phone, answer text, or AI summary"
+              className="w-full rounded-2xl border border-slate-200 px-4 py-2.5 text-sm text-slate-700 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+            />
+            <select
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value as typeof sortBy)}
+              className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
             >
-              {f === "all" ? "All Responses" : STAGES.find(s => s.id === f)?.label ?? f}
-            </button>
-          ))}
-          <span className="ml-auto text-xs text-slate-400">{filtered.length} response{filtered.length !== 1 ? "s" : ""}</span>
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+              <option value="highest_score">Highest score</option>
+              <option value="lowest_score">Lowest score</option>
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+            <label className="flex items-center gap-2 text-sm text-slate-600">
+              <input
+                type="checkbox"
+                checked={filtered.length > 0 && selectedVisibleCount === filtered.length}
+                onChange={e => toggleSelectAllVisible(e.target.checked)}
+                className="h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+              />
+              Select all visible
+            </label>
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <span className="text-xs text-slate-500">{selectedIds.length} selected</span>
+              <select
+                value={bulkStage}
+                onChange={e => setBulkStage(e.target.value as Stage)}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+              >
+                {STAGES.map(stage => <option key={stage.id} value={stage.id}>{stage.label}</option>)}
+              </select>
+              <button
+                onClick={applyBulkStage}
+                disabled={bulkSaving || selectedIds.length === 0}
+                className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 transition disabled:opacity-50"
+              >
+                {bulkSaving ? "Updating..." : "Apply To Selected"}
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Response cards */}
@@ -1620,7 +2055,17 @@ function FormResponsesContent({ id }: { id: string }) {
         ) : (
           <div className="space-y-4">
             {filtered.map(r => (
-              <ResponseCard key={r._id} r={r} token={token!} formId={id} formTitle={form.title} onUpdate={onUpdate} onDelete={onDelete} />
+              <ResponseCard
+                key={r._id}
+                r={r}
+                token={token!}
+                formId={id}
+                formTitle={form.title}
+                selected={selectedIds.includes(r._id)}
+                onToggleSelect={(checked) => toggleSelected(r._id, checked)}
+                onUpdate={onUpdate}
+                onDelete={onDelete}
+              />
             ))}
           </div>
         )}

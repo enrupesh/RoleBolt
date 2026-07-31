@@ -30,6 +30,32 @@ export interface IEmailLogEntry {
   error?: string;
 }
 
+export interface IFormActor {
+  uid: string;
+  name: string;
+  email: string;
+}
+
+export interface IFormInternalNote {
+  body: string;
+  author: IFormActor;
+  createdAt: Date;
+}
+
+export interface IFormActivityLogEntry {
+  type:
+    | "submitted"
+    | "stage_changed"
+    | "ai_auto_decision"
+    | "email_sent"
+    | "email_failed"
+    | "note_added"
+    | "score_retried";
+  message: string;
+  actor?: IFormActor;
+  createdAt: Date;
+}
+
 export interface IRecruitFormResponse extends Document {
   formId: mongoose.Types.ObjectId;
   uid: string; // owner of the form (recruiter)
@@ -44,10 +70,13 @@ export interface IRecruitFormResponse extends Document {
   interviewQuestions: string[];
   scoringFailed: boolean;
   stage: "new" | "shortlisted" | "interview" | "hired" | "rejected";
+  decisionSource: "manual" | "ai_agent";
   submittedName: string;
   submittedEmail: string;
   submittedPhone: string;
   emailLog: IEmailLogEntry[];
+  internalNotes: IFormInternalNote[];
+  activityLog: IFormActivityLogEntry[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -94,6 +123,38 @@ const EmailLogEntrySchema = new Schema<IEmailLogEntry>(
   { _id: false }
 );
 
+const FormActorSchema = new Schema<IFormActor>(
+  {
+    uid: { type: String, required: true },
+    name: { type: String, default: "Recruiter" },
+    email: { type: String, default: "" },
+  },
+  { _id: false }
+);
+
+const FormInternalNoteSchema = new Schema<IFormInternalNote>(
+  {
+    body: { type: String, required: true, maxlength: 5000 },
+    author: { type: FormActorSchema, required: true },
+    createdAt: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
+const FormActivityLogEntrySchema = new Schema<IFormActivityLogEntry>(
+  {
+    type: {
+      type: String,
+      enum: ["submitted", "stage_changed", "ai_auto_decision", "email_sent", "email_failed", "note_added", "score_retried"],
+      required: true,
+    },
+    message: { type: String, required: true, maxlength: 500 },
+    actor: { type: FormActorSchema },
+    createdAt: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
 const RecruitFormResponseSchema = new Schema<IRecruitFormResponse>(
   {
     formId: { type: Schema.Types.ObjectId, required: true, ref: "RecruitForm", index: true },
@@ -113,10 +174,17 @@ const RecruitFormResponseSchema = new Schema<IRecruitFormResponse>(
       enum: ["new", "shortlisted", "interview", "hired", "rejected"],
       default: "new",
     },
+    decisionSource: {
+      type: String,
+      enum: ["manual", "ai_agent"],
+      default: "manual",
+    },
     submittedName: { type: String, default: "" },
     submittedEmail: { type: String, default: "" },
     submittedPhone: { type: String, default: "" },
     emailLog: { type: [EmailLogEntrySchema], default: [] },
+    internalNotes: { type: [FormInternalNoteSchema], default: [] },
+    activityLog: { type: [FormActivityLogEntrySchema], default: [] },
   },
   { timestamps: true }
 );
