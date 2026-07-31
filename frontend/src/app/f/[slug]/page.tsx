@@ -19,6 +19,21 @@ type FormData = {
   _id: string;
   title: string;
   description: string;
+  jobDetails?: {
+    companyName?: string;
+    jobType?: string;
+    department?: string;
+    seniority?: string;
+    location?: string;
+    workMode?: "remote" | "onsite" | "hybrid";
+    salaryMin?: number;
+    salaryMax?: number;
+    salaryCurrency?: string;
+    experienceMin?: number;
+    experienceMax?: number;
+    openings?: number;
+    applicationDeadline?: string;
+  };
   slug: string;
   questions: Question[];
 };
@@ -357,6 +372,24 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
           <h1 className="text-xl font-bold text-slate-900">{form!.title}</h1>
           {form!.description && (
             <p className="mt-2 text-sm text-slate-500 leading-relaxed">{form!.description}</p>
+          )}
+          {form!.jobDetails && Object.values(form!.jobDetails).some(Boolean) && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {[
+                form!.jobDetails.companyName,
+                form!.jobDetails.location,
+                form!.jobDetails.workMode && ({ remote: "Remote", hybrid: "Hybrid", onsite: "On-site" } as const)[form!.jobDetails.workMode],
+                form!.jobDetails.jobType,
+                form!.jobDetails.seniority,
+                form!.jobDetails.department,
+                form!.jobDetails.experienceMin !== undefined && `${form!.jobDetails.experienceMin}${form!.jobDetails.experienceMax !== undefined ? `–${form!.jobDetails.experienceMax}` : "+"} years`,
+                form!.jobDetails.openings !== undefined && `${form!.jobDetails.openings} opening${form!.jobDetails.openings === 1 ? "" : "s"}`,
+                (form!.jobDetails.salaryMin !== undefined || form!.jobDetails.salaryMax !== undefined) &&
+                  `${form!.jobDetails.salaryCurrency || ""} ${form!.jobDetails.salaryMin ?? ""}${form!.jobDetails.salaryMax !== undefined ? `–${form!.jobDetails.salaryMax}` : "+"}`,
+              ].filter(Boolean).map((detail, index) => (
+                <span key={index} className="rounded-full border border-violet-100 bg-violet-50 px-3 py-1 text-[11px] font-medium text-violet-700">{detail}</span>
+              ))}
+            </div>
           )}
         </div>
 

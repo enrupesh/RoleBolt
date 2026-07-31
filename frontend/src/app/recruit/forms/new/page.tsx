@@ -30,6 +30,22 @@ type Question = {
   placeholder: string;
 };
 
+type JobDetails = {
+  companyName: string;
+  jobType: string;
+  department: string;
+  seniority: string;
+  location: string;
+  workMode: "remote" | "onsite" | "hybrid";
+  salaryMin: string;
+  salaryMax: string;
+  salaryCurrency: string;
+  experienceMin: string;
+  experienceMax: string;
+  openings: string;
+  applicationDeadline: string;
+};
+
 function genId() {
   return `q_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 }
@@ -252,6 +268,11 @@ function FormBuilderContent() {
   const [token, setToken] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [jobDetails, setJobDetails] = useState<JobDetails>({
+    companyName: "", jobType: "", department: "", seniority: "", location: "",
+    workMode: "remote", salaryMin: "", salaryMax: "", salaryCurrency: "INR",
+    experienceMin: "", experienceMax: "", openings: "", applicationDeadline: "",
+  });
   const [questions, setQuestions] = useState<Question[]>(DEFAULT_QUESTIONS);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -274,6 +295,17 @@ function FormBuilderContent() {
         if (d.form) {
           setTitle(d.form.title || "");
           setDescription(d.form.description || "");
+          const details = d.form.jobDetails || {};
+          setJobDetails(prev => ({
+            ...prev,
+            ...details,
+            salaryMin: details.salaryMin?.toString() || "",
+            salaryMax: details.salaryMax?.toString() || "",
+            experienceMin: details.experienceMin?.toString() || "",
+            experienceMax: details.experienceMax?.toString() || "",
+            openings: details.openings?.toString() || "",
+            applicationDeadline: details.applicationDeadline ? String(details.applicationDeadline).slice(0, 10) : "",
+          }));
           setQuestions(d.form.questions || []);
           setSavedSlug(d.form.slug || null);
         }
@@ -318,7 +350,7 @@ function FormBuilderContent() {
     setError("");
     setSaving(true);
     try {
-      const body = { title: title.trim(), description: description.trim(), questions };
+      const body = { title: title.trim(), description: description.trim(), questions, jobDetails };
       let res: Response;
       if (editId && savedSlug) {
         res = await fetch(apiUrl(`/recruit/forms/${editId}`), {
@@ -344,7 +376,7 @@ function FormBuilderContent() {
     } finally {
       setSaving(false);
     }
-  }, [token, title, description, questions, editId, savedSlug, router]);
+  }, [token, title, description, questions, jobDetails, editId, savedSlug, router]);
 
   if (loadingEdit) {
     return (
@@ -441,6 +473,58 @@ function FormBuilderContent() {
               rows={2}
               className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-[13px] text-slate-700 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 focus:bg-white transition resize-none placeholder:text-slate-400"
             />
+          </div>
+        </div>
+
+        {/* Optional job context */}
+        <div className="rounded-2xl bg-white border border-black/[0.06] p-6 shadow-[0_1px_3px_rgba(0,0,0,0.05),0_4px_16px_rgba(0,0,0,0.04)]">
+          <div className="mb-4">
+            <h2 className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Job details <span className="normal-case font-medium tracking-normal">(optional)</span></h2>
+            <p className="mt-1 text-xs text-slate-500">Add context candidates should see alongside the screening questions.</p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {[
+              ["companyName", "Company name", "e.g. Acme Technologies"],
+              ["department", "Department", "e.g. Engineering"],
+              ["location", "Location", "e.g. Bengaluru or Anywhere"],
+              ["jobType", "Job type", "e.g. Full-time"],
+              ["seniority", "Seniority", "e.g. Mid-level"],
+              ["salaryCurrency", "Currency", "INR"],
+            ].map(([key, label, placeholder]) => (
+              <label key={key} className="block">
+                <span className="mb-1.5 block text-[11px] font-semibold text-slate-600">{label}</span>
+                <input
+                  value={jobDetails[key as keyof JobDetails] as string}
+                  onChange={e => setJobDetails(prev => ({ ...prev, [key]: e.target.value }))}
+                  placeholder={placeholder}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-[13px] text-slate-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 focus:bg-white transition"
+                />
+              </label>
+            ))}
+            <label className="block">
+              <span className="mb-1.5 block text-[11px] font-semibold text-slate-600">Work mode</span>
+              <select value={jobDetails.workMode} onChange={e => setJobDetails(prev => ({ ...prev, workMode: e.target.value as JobDetails["workMode"] }))} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-[13px] text-slate-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 focus:bg-white transition">
+                <option value="remote">Remote</option>
+                <option value="hybrid">Hybrid</option>
+                <option value="onsite">On-site</option>
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-[11px] font-semibold text-slate-600">Application deadline</span>
+              <input type="date" value={jobDetails.applicationDeadline} onChange={e => setJobDetails(prev => ({ ...prev, applicationDeadline: e.target.value }))} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-[13px] text-slate-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 focus:bg-white transition" />
+            </label>
+            {[
+              ["salaryMin", "Minimum salary", "e.g. 800000"],
+              ["salaryMax", "Maximum salary", "e.g. 1400000"],
+              ["experienceMin", "Minimum experience (years)", "e.g. 2"],
+              ["experienceMax", "Maximum experience (years)", "e.g. 6"],
+              ["openings", "Number of openings", "e.g. 2"],
+            ].map(([key, label, placeholder]) => (
+              <label key={key} className="block">
+                <span className="mb-1.5 block text-[11px] font-semibold text-slate-600">{label}</span>
+                <input type="number" min="0" value={jobDetails[key as keyof JobDetails] as string} onChange={e => setJobDetails(prev => ({ ...prev, [key]: e.target.value }))} placeholder={placeholder} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-[13px] text-slate-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 focus:bg-white transition" />
+              </label>
+            ))}
           </div>
         </div>
 

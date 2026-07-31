@@ -20,6 +20,24 @@ export interface IFormQuestion {
   placeholder: string;
 }
 
+export type FormWorkMode = "remote" | "onsite" | "hybrid";
+
+export interface IFormJobDetails {
+  companyName: string;
+  jobType: string;
+  department: string;
+  seniority: string;
+  location: string;
+  workMode: FormWorkMode;
+  salaryMin?: number;
+  salaryMax?: number;
+  salaryCurrency: string;
+  experienceMin?: number;
+  experienceMax?: number;
+  openings?: number;
+  applicationDeadline?: Date;
+}
+
 export interface IFormAgentMode {
   enabled: boolean;                    // false = Manual Mode, true = AI Agent Mode
   shortlistThreshold: number;          // aiScore >= this → auto-shortlist
@@ -31,8 +49,14 @@ export interface IFormAgentMode {
 
 export type FormRuleCondition = "score_above" | "score_below" | "stage_age_days";
 export type FormRuleAction =
+  | "move_to_scored"
+  | "move_to_review_zone"
   | "move_to_shortlisted"
+  | "move_to_assessment"
   | "move_to_interview"
+  | "move_to_offer"
+  | "move_to_hired"
+  | "move_to_withdrawn"
   | "move_to_rejected";
 
 export interface IFormPipelineRule {
@@ -45,16 +69,32 @@ export interface IFormPipelineRule {
   triggerCount: number;
 }
 
+export interface IFormHiringSummary {
+  generatedAt: Date;
+  summary: string;
+  strengths: string[];
+  risks: string[];
+  recommendations: string[];
+  highSignalQuestions: string[];
+  lowSignalQuestions: string[];
+  priorityCandidates: {
+    responseId: string;
+    reason: string;
+  }[];
+}
+
 export interface IRecruitForm extends Document {
   uid: string;
   title: string;
   description: string;
   slug: string;
+  jobDetails: IFormJobDetails;
   questions: IFormQuestion[];
   status: "active" | "closed";
   responseCount: number;
   agentMode: IFormAgentMode;
   pipelineRules: IFormPipelineRule[];
+  aiHiringSummary?: IFormHiringSummary;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -71,6 +111,25 @@ const FormQuestionSchema = new Schema<IFormQuestion>(
     required: { type: Boolean, default: false },
     options: { type: [String], default: [] },
     placeholder: { type: String, default: "" },
+  },
+  { _id: false }
+);
+
+const FormJobDetailsSchema = new Schema<IFormJobDetails>(
+  {
+    companyName: { type: String, default: "" },
+    jobType: { type: String, default: "" },
+    department: { type: String, default: "" },
+    seniority: { type: String, default: "" },
+    location: { type: String, default: "" },
+    workMode: { type: String, enum: ["remote", "onsite", "hybrid"], default: "remote" },
+    salaryMin: { type: Number },
+    salaryMax: { type: Number },
+    salaryCurrency: { type: String, default: "INR" },
+    experienceMin: { type: Number },
+    experienceMax: { type: Number },
+    openings: { type: Number },
+    applicationDeadline: { type: Date },
   },
   { _id: false }
 );
@@ -95,9 +154,37 @@ const FormPipelineRuleSchema = new Schema<IFormPipelineRule>(
     condition:    { type: String, enum: ["score_above", "score_below", "stage_age_days"], required: true },
     threshold:    { type: Number, required: true },
     fromStage:    { type: String, default: "" },
-    action:       { type: String, enum: ["move_to_shortlisted", "move_to_interview", "move_to_rejected"], required: true },
+    action:       {
+      type: String,
+      enum: [
+        "move_to_scored", "move_to_review_zone", "move_to_shortlisted",
+        "move_to_assessment", "move_to_interview", "move_to_offer",
+        "move_to_hired", "move_to_withdrawn", "move_to_rejected",
+      ],
+      required: true,
+    },
     enabled:      { type: Boolean, default: true },
     triggerCount: { type: Number, default: 0 },
+  },
+  { _id: false }
+);
+
+const FormHiringSummarySchema = new Schema<IFormHiringSummary>(
+  {
+    generatedAt: { type: Date, default: Date.now },
+    summary: { type: String, default: "" },
+    strengths: { type: [String], default: [] },
+    risks: { type: [String], default: [] },
+    recommendations: { type: [String], default: [] },
+    highSignalQuestions: { type: [String], default: [] },
+    lowSignalQuestions: { type: [String], default: [] },
+    priorityCandidates: {
+      type: [{
+        responseId: { type: String, required: true },
+        reason: { type: String, default: "" },
+      }],
+      default: [],
+    },
   },
   { _id: false }
 );
@@ -108,11 +195,13 @@ const RecruitFormSchema = new Schema<IRecruitForm>(
     title: { type: String, required: true },
     description: { type: String, default: "" },
     slug: { type: String, required: true, unique: true, index: true },
+    jobDetails: { type: FormJobDetailsSchema, default: () => ({}) },
     questions: { type: [FormQuestionSchema], default: [] },
     status: { type: String, enum: ["active", "closed"], default: "active" },
     responseCount: { type: Number, default: 0 },
     agentMode: { type: FormAgentModeSchema, default: () => ({}) },
     pipelineRules: { type: [FormPipelineRuleSchema], default: [] },
+    aiHiringSummary: { type: FormHiringSummarySchema, default: undefined },
   },
   { timestamps: true }
 );

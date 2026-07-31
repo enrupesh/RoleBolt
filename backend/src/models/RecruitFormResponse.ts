@@ -36,7 +36,31 @@ export interface IAgentActionEntry {
   reason: string;
   emailSent: boolean;
   emailStatus: "sent" | "failed" | "skipped" | "disabled";
+  runKey?: string;
   timestamp: Date;
+}
+
+export interface IFormStageHistoryEntry {
+  fromStage: string;
+  toStage: string;
+  actor: "recruiter" | "agent" | "rule" | "system";
+  actorUid: string;
+  reason: string;
+  timestamp: Date;
+}
+
+export type FormAssessmentStatus = "not_sent" | "sent" | "in_progress" | "completed";
+export type FormAssessmentScoringStatus = "not_started" | "pending" | "completed" | "failed";
+
+export interface IFormAssessmentQuestion {
+  id: string;
+  text: string;
+}
+
+export interface IFormAssessmentAnswer {
+  questionId: string;
+  answer: string;
+  timeTakenSeconds: number;
 }
 
 export interface IRecruitFormResponse extends Document {
@@ -52,15 +76,41 @@ export interface IRecruitFormResponse extends Document {
   questionScores: IQuestionScore[];
   interviewQuestions: string[];
   scoringFailed: boolean;
-  stage: "new" | "shortlisted" | "interview" | "hired" | "rejected";
+  stage:
+    | "new"
+    | "scored"
+    | "review_zone"
+    | "shortlisted"
+    | "assessment"
+    | "interview"
+    | "offer"
+    | "hired"
+    | "rejected"
+    | "withdrawn";
   submittedName: string;
   submittedEmail: string;
   submittedPhone: string;
   emailLog: IEmailLogEntry[];
   agentLog: IAgentActionEntry[];
+  agentRunKeys: string[];
   notes: string;
   source: string;
   stageMovedAt: Date;
+  stageHistory: IFormStageHistoryEntry[];
+  assessmentStatus: FormAssessmentStatus;
+  assessmentToken?: string;
+  assessmentSentAt?: Date;
+  assessmentStartedAt?: Date;
+  assessmentCompletedAt?: Date;
+  assessmentQuestions: IFormAssessmentQuestion[];
+  assessmentAnswers: IFormAssessmentAnswer[];
+  assessmentCurrentQuestionIndex: number;
+  assessmentScore: number;
+  assessmentSummary: string;
+  assessmentStrengths: string[];
+  assessmentWeaknesses: string[];
+  assessmentScoringStatus: FormAssessmentScoringStatus;
+  assessmentRunKey: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -114,7 +164,37 @@ const AgentActionEntrySchema = new Schema<IAgentActionEntry>(
     reason:      { type: String, default: "" },
     emailSent:   { type: Boolean, default: false },
     emailStatus: { type: String, enum: ["sent", "failed", "skipped", "disabled"], default: "disabled" },
+    runKey:      { type: String, default: "" },
     timestamp:   { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
+const FormStageHistorySchema = new Schema<IFormStageHistoryEntry>(
+  {
+    fromStage: { type: String, required: true },
+    toStage: { type: String, required: true },
+    actor: { type: String, enum: ["recruiter", "agent", "rule", "system"], required: true },
+    actorUid: { type: String, default: "" },
+    reason: { type: String, default: "" },
+    timestamp: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
+const FormAssessmentQuestionSchema = new Schema<IFormAssessmentQuestion>(
+  {
+    id: { type: String, required: true },
+    text: { type: String, required: true },
+  },
+  { _id: false }
+);
+
+const FormAssessmentAnswerSchema = new Schema<IFormAssessmentAnswer>(
+  {
+    questionId: { type: String, required: true },
+    answer: { type: String, required: true },
+    timeTakenSeconds: { type: Number, default: 0 },
   },
   { _id: false }
 );
@@ -135,7 +215,10 @@ const RecruitFormResponseSchema = new Schema<IRecruitFormResponse>(
     scoringFailed: { type: Boolean, default: false },
     stage: {
       type: String,
-      enum: ["new", "shortlisted", "interview", "hired", "rejected"],
+      enum: [
+        "new", "scored", "review_zone", "shortlisted", "assessment",
+        "interview", "offer", "hired", "rejected", "withdrawn",
+      ],
       default: "new",
     },
     submittedName: { type: String, default: "" },
@@ -143,9 +226,33 @@ const RecruitFormResponseSchema = new Schema<IRecruitFormResponse>(
     submittedPhone: { type: String, default: "" },
     emailLog: { type: [EmailLogEntrySchema], default: [] },
     agentLog: { type: [AgentActionEntrySchema], default: [] },
+    agentRunKeys: { type: [String], default: [] },
     notes: { type: String, default: "" },
     source: { type: String, default: "Form" },
     stageMovedAt: { type: Date, default: Date.now },
+    stageHistory: { type: [FormStageHistorySchema], default: [] },
+    assessmentStatus: {
+      type: String,
+      enum: ["not_sent", "sent", "in_progress", "completed"],
+      default: "not_sent",
+    },
+    assessmentToken: { type: String, index: true, sparse: true },
+    assessmentSentAt: { type: Date },
+    assessmentStartedAt: { type: Date },
+    assessmentCompletedAt: { type: Date },
+    assessmentQuestions: { type: [FormAssessmentQuestionSchema], default: [] },
+    assessmentAnswers: { type: [FormAssessmentAnswerSchema], default: [] },
+    assessmentCurrentQuestionIndex: { type: Number, default: 0 },
+    assessmentScore: { type: Number, default: 0 },
+    assessmentSummary: { type: String, default: "" },
+    assessmentStrengths: { type: [String], default: [] },
+    assessmentWeaknesses: { type: [String], default: [] },
+    assessmentScoringStatus: {
+      type: String,
+      enum: ["not_started", "pending", "completed", "failed"],
+      default: "not_started",
+    },
+    assessmentRunKey: { type: String, default: "" },
   },
   { timestamps: true }
 );

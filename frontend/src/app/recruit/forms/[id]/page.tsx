@@ -7,14 +7,29 @@ import { RecruitGuard } from "@/components/RecruitGuard";
 import Link from "next/link";
 import { apiUrl, readApiJson } from "@/lib/api";
 
-type Stage = "new" | "shortlisted" | "interview" | "hired" | "rejected";
+type Stage =
+  | "new"
+  | "scored"
+  | "review_zone"
+  | "shortlisted"
+  | "assessment"
+  | "interview"
+  | "offer"
+  | "hired"
+  | "rejected"
+  | "withdrawn";
 
 const STAGES: { id: Stage; label: string; color: string; bg: string }[] = [
   { id: "new", label: "New", color: "text-slate-600", bg: "bg-slate-100 border-slate-200" },
+  { id: "scored", label: "Scored", color: "text-violet-700", bg: "bg-violet-50 border-violet-200" },
+  { id: "review_zone", label: "Review zone", color: "text-amber-700", bg: "bg-amber-50 border-amber-200" },
   { id: "shortlisted", label: "Shortlisted", color: "text-blue-600", bg: "bg-blue-50 border-blue-200" },
+  { id: "assessment", label: "Assessment", color: "text-indigo-700", bg: "bg-indigo-50 border-indigo-200" },
   { id: "interview", label: "Interview", color: "text-amber-700", bg: "bg-amber-50 border-amber-200" },
+  { id: "offer", label: "Offer", color: "text-cyan-700", bg: "bg-cyan-50 border-cyan-200" },
   { id: "hired", label: "Hired", color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200" },
   { id: "rejected", label: "Rejected", color: "text-rose-600", bg: "bg-rose-50 border-rose-200" },
+  { id: "withdrawn", label: "Withdrawn", color: "text-slate-500", bg: "bg-slate-100 border-slate-300" },
 ];
 
 type QuestionType =
@@ -67,6 +82,15 @@ type AgentLogEntry = {
   timestamp: string;
 };
 
+type StageHistoryEntry = {
+  fromStage: string;
+  toStage: string;
+  actor: "recruiter" | "agent" | "rule" | "system";
+  actorUid?: string;
+  reason?: string;
+  timestamp: string;
+};
+
 type AgentMode = {
   enabled: boolean;
   shortlistThreshold: number;
@@ -77,7 +101,16 @@ type AgentMode = {
 };
 
 type RuleCondition = "score_above" | "score_below" | "stage_age_days";
-type RuleAction = "move_to_shortlisted" | "move_to_interview" | "move_to_rejected";
+type RuleAction =
+  | "move_to_scored"
+  | "move_to_review_zone"
+  | "move_to_shortlisted"
+  | "move_to_assessment"
+  | "move_to_interview"
+  | "move_to_offer"
+  | "move_to_hired"
+  | "move_to_withdrawn"
+  | "move_to_rejected";
 
 type PipelineRule = {
   id: string;
@@ -110,6 +143,18 @@ type FormResponse = {
   agentLog?: AgentLogEntry[];
   notes?: string;
   source?: string;
+  stageMovedAt?: string;
+  stageHistory?: StageHistoryEntry[];
+  assessmentStatus?: "not_sent" | "sent" | "in_progress" | "completed";
+  assessmentToken?: string;
+  assessmentSentAt?: string;
+  assessmentCompletedAt?: string;
+  assessmentQuestions?: { id: string; text: string }[];
+  assessmentScore?: number;
+  assessmentSummary?: string;
+  assessmentStrengths?: string[];
+  assessmentWeaknesses?: string[];
+  assessmentScoringStatus?: "not_started" | "pending" | "completed" | "failed";
   createdAt: string;
 };
 
@@ -124,6 +169,78 @@ type Form = {
   agentMode?: AgentMode;
   pipelineRules?: PipelineRule[];
   createdAt: string;
+};
+
+type FormAnalysis = {
+  generatedAt: string;
+  overview: {
+    total: number;
+    scored: number;
+    pending: number;
+    failed: number;
+    averageScore: number;
+    medianScore: number;
+    shortlistRate: number;
+    interviewRate: number;
+    hireRate: number;
+  };
+  funnel: { stage: string; count: number }[];
+  scoreDistribution: { label: string; count: number }[];
+  timeline: { date: string; applications: number; averageScore: number | null }[];
+  sources: { source: string; applications: number; averageScore: number | null }[];
+  agentActions: {
+    shortlisted: number;
+    rejected: number;
+    review_zone: number;
+    emailsSent: number;
+    failed: number;
+  };
+  questionPerformance: {
+    questionId: string;
+    label: string;
+    answered: number;
+    strongSignals: number;
+    thinSignals: number;
+    averageScore: number | null;
+    signalRate: number;
+  }[];
+  stageAging: { stage: string; candidates: number; averageDays: number }[];
+};
+
+type FormHiringSummary = {
+  generatedAt: string;
+  summary: string;
+  strengths: string[];
+  risks: string[];
+  recommendations: string[];
+  highSignalQuestions: string[];
+  lowSignalQuestions: string[];
+  priorityCandidates: { responseId: string; reason: string }[];
+};
+
+type FormAssessmentAnalytics = {
+  formTitle: string;
+  totalResponses: number;
+  sent: number;
+  started: number;
+  completed: number;
+  pending: number;
+  scoringPending: number;
+  scoringFailed: number;
+  passThreshold: number;
+  passed: number;
+  passRate: number;
+  completionRate: number;
+  assessmentToInterviewRate: number;
+  averageCompletionMinutes: number | null;
+  questionPerformance: {
+    questionId: string;
+    text: string;
+    shown: number;
+    answered: number;
+    answerRate: number;
+    averageTimeSeconds: number | null;
+  }[];
 };
 
 const DEFAULT_AGENT_MODE: AgentMode = {
@@ -154,8 +271,14 @@ const RULE_CONDITION_LABEL: Record<RuleCondition, string> = {
 };
 
 const RULE_ACTION_LABEL: Record<RuleAction, string> = {
+  move_to_scored: "Move to Scored",
+  move_to_review_zone: "Move to Review zone",
   move_to_shortlisted: "Move to Shortlisted",
+  move_to_assessment: "Move to Assessment",
   move_to_interview: "Move to Interview",
+  move_to_offer: "Move to Offer",
+  move_to_hired: "Move to Hired",
+  move_to_withdrawn: "Move to Withdrawn",
   move_to_rejected: "Move to Rejected",
 };
 
@@ -1002,6 +1125,37 @@ function FormResponseInfoModal({ r, onClose }: { r: FormResponse; onClose: () =>
             </div>
           )}
 
+          {/* Pipeline audit trail */}
+          {(r.stageHistory || []).length > 0 && (
+            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Pipeline activity</p>
+                <span className="text-[10px] text-gray-600">{r.stageHistory?.length} event{r.stageHistory?.length === 1 ? "" : "s"}</span>
+              </div>
+              <div className="space-y-3">
+                {[...(r.stageHistory || [])].reverse().slice(0, 8).map((entry, index) => (
+                  <div key={`${entry.timestamp}-${index}`} className="flex gap-3">
+                    <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-violet-400" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+                        <p className="text-xs font-semibold text-gray-200">
+                          {entry.fromStage ? `${entry.fromStage} → ${entry.toStage}` : `Application → ${entry.toStage}`}
+                        </p>
+                        <time className="text-[10px] text-gray-600">
+                          {entry.timestamp ? new Date(entry.timestamp).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : ""}
+                        </time>
+                      </div>
+                      <p className="mt-0.5 text-[10px] text-gray-500">
+                        {entry.actor === "recruiter" ? "Recruiter" : entry.actor === "agent" ? "AI Agent" : entry.actor === "rule" ? "Pipeline rule" : "System"}
+                        {entry.reason ? ` · ${entry.reason}` : ""}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Assessment Analysis — per-question scores + expandable details */}
           {!r.scoringFailed && textAnswers.length > 0 && (
             <AssessmentAnalysisSection
@@ -1058,6 +1212,10 @@ function ResponseCard({ r, token, formId, formTitle, onUpdate, onDelete }: {
   const [rejectionDraft, setRejectionDraft] = useState("");
   const [loadingReject, setLoadingReject] = useState(false);
   const [deleteMode, setDeleteMode] = useState(false);
+  const [assessmentLoading, setAssessmentLoading] = useState(false);
+  const [assessmentRetryLoading, setAssessmentRetryLoading] = useState(false);
+  const [assessmentError, setAssessmentError] = useState("");
+  const [assessmentUrl, setAssessmentUrl] = useState("");
 
   async function updateStage(stage: Stage) {
     try {
@@ -1068,6 +1226,49 @@ function ResponseCard({ r, token, formId, formTitle, onUpdate, onDelete }: {
       });
       if (res.ok) onUpdate(r._id, { stage });
     } catch { /* silent */ }
+  }
+
+  async function sendAssessment() {
+    setAssessmentLoading(true);
+    setAssessmentError("");
+    try {
+      const res = await fetch(apiUrl(`/recruit/forms/${formId}/responses/${r._id}/assessment/send`), {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await readApiJson(res);
+      if (!res.ok) throw new Error(data.error || "Could not send assessment.");
+      setAssessmentUrl(data.assessmentUrl || "");
+      onUpdate(r._id, {
+        stage: "assessment",
+        assessmentStatus: data.status || "sent",
+        assessmentToken: data.assessmentUrl?.split("/").pop()?.split("?")[0],
+        assessmentQuestions: data.questions || r.assessmentQuestions,
+        assessmentSentAt: new Date().toISOString(),
+      });
+    } catch (e: any) {
+      setAssessmentError(e.message || "Could not send assessment.");
+    } finally {
+      setAssessmentLoading(false);
+    }
+  }
+
+  async function retryAssessmentScore() {
+    setAssessmentRetryLoading(true);
+    setAssessmentError("");
+    try {
+      const res = await fetch(apiUrl(`/recruit/forms/${formId}/responses/${r._id}/assessment/retry-score`), {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await readApiJson(res);
+      if (!res.ok) throw new Error(data.error || "Could not retry assessment scoring.");
+      onUpdate(r._id, { assessmentScoringStatus: "pending" });
+    } catch (e: any) {
+      setAssessmentError(e.message || "Could not retry assessment scoring.");
+    } finally {
+      setAssessmentRetryLoading(false);
+    }
   }
 
   async function generateRejectionEmail(forDelete = false) {
@@ -1234,6 +1435,24 @@ function ResponseCard({ r, token, formId, formTitle, onUpdate, onDelete }: {
             {retryError && <p className="mt-1 text-[11px] text-rose-500">{retryError}</p>}
           </div>
         )}
+        {r.assessmentSummary && r.assessmentScoringStatus === "completed" && (
+          <div className="mb-3 rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-600">Assessment score</p>
+              <p className="text-sm font-bold text-indigo-700">{r.assessmentScore ?? 0}%</p>
+            </div>
+            <p className="mt-1 text-xs leading-5 text-indigo-900 line-clamp-2">{r.assessmentSummary}</p>
+          </div>
+        )}
+        {assessmentError && <p className="mb-2 text-[11px] text-rose-500">{assessmentError}</p>}
+        {assessmentUrl && (
+          <div className="mb-3 flex items-center gap-2 rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2">
+            <a href={assessmentUrl} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate text-[11px] font-medium text-indigo-700 hover:underline">
+              Candidate assessment link
+            </a>
+            <button onClick={() => navigator.clipboard.writeText(assessmentUrl)} className="shrink-0 text-[10px] font-semibold text-indigo-600 hover:text-indigo-800">Copy</button>
+          </div>
+        )}
 
         {/* Actions row */}
         <div className="flex items-center gap-2 flex-wrap">
@@ -1267,6 +1486,38 @@ function ResponseCard({ r, token, formId, formTitle, onUpdate, onDelete }: {
             >
               <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,12 2,6"/></svg>
               Email
+            </button>
+          )}
+
+          {r.assessmentStatus === "completed" ? (
+            r.assessmentScoringStatus === "failed" ? (
+              <button
+                onClick={retryAssessmentScore}
+                disabled={assessmentRetryLoading}
+                className="flex items-center gap-1 rounded-xl border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-[11px] font-semibold text-amber-700 hover:bg-amber-100 transition disabled:opacity-50"
+              >
+                {assessmentRetryLoading ? <SpinnerIcon /> : <RetryIcon />}
+                {assessmentRetryLoading ? "Retrying…" : "Retry assessment score"}
+              </button>
+            ) : (
+              <span className={`rounded-xl border px-2.5 py-1.5 text-[11px] font-semibold ${
+                r.assessmentScoringStatus === "pending"
+                  ? "border-violet-200 bg-violet-50 text-violet-700"
+                  : "border-emerald-200 bg-emerald-50 text-emerald-700"
+              }`}>
+                {r.assessmentScoringStatus === "pending"
+                  ? "Assessment scoring…"
+                  : `Assessment completed${r.assessmentScoringStatus === "completed" ? ` · ${r.assessmentScore ?? 0}%` : ""}`}
+              </span>
+            )
+          ) : (
+            <button
+              onClick={sendAssessment}
+              disabled={assessmentLoading || r.assessmentStatus === "sent" || r.assessmentStatus === "in_progress"}
+              className="flex items-center gap-1 rounded-xl border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-[11px] font-semibold text-indigo-600 hover:bg-indigo-100 transition disabled:opacity-50"
+            >
+              {assessmentLoading ? <SpinnerIcon /> : <SparkIcon />}
+              {assessmentLoading ? "Preparing…" : r.assessmentStatus === "sent" || r.assessmentStatus === "in_progress" ? "Assessment pending" : "Send assessment"}
             </button>
           )}
 
@@ -1870,6 +2121,543 @@ function NotesSection({ formId, responseId, token, initialNotes, onSaved }: {
   );
 }
 
+function FormAnalysisPanel({ formId, token }: { formId: string; token: string }) {
+  const [analysis, setAnalysis] = useState<FormAnalysis | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState("");
+
+  const loadAnalysis = useCallback(async (isRefresh = false) => {
+    if (!token) return;
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(apiUrl(`/recruit/forms/${formId}/analysis`), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await readApiJson(res);
+      if (!res.ok || !data.analysis) {
+        throw new Error(data.error || "Could not load analysis.");
+      }
+      setAnalysis(data.analysis);
+    } catch (err: any) {
+      setError(err?.message || "Could not load analysis.");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [formId, token]);
+
+  useEffect(() => { loadAnalysis(); }, [loadAnalysis]);
+
+  if (loading) {
+    return (
+      <section className="rounded-2xl bg-white border border-slate-200 p-5 shadow-sm space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <div className="h-4 w-28 rounded-full rb-skeleton" />
+            <div className="h-3 w-52 rounded-full rb-skeleton" />
+          </div>
+          <div className="h-8 w-20 rounded-lg rb-skeleton" />
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-20 rounded-xl rb-skeleton" />
+          ))}
+        </div>
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section className="rounded-2xl border border-rose-200 bg-rose-50 p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-bold text-rose-700">Analysis unavailable</p>
+            <p className="mt-1 text-xs text-rose-600">{error}</p>
+          </div>
+          <button
+            onClick={() => loadAnalysis(true)}
+            disabled={refreshing}
+            className="rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-50"
+          >
+            {refreshing ? "Retrying…" : "Retry"}
+          </button>
+        </div>
+      </section>
+    );
+  }
+
+  if (!analysis) return null;
+
+  const { overview, funnel, scoreDistribution, timeline, sources, agentActions, questionPerformance, stageAging } = analysis;
+  const maxScoreBucket = Math.max(1, ...scoreDistribution.map(bucket => bucket.count));
+  const maxTimelineApplications = Math.max(1, ...timeline.map(point => point.applications));
+  const maxQuestionAnswers = Math.max(1, ...questionPerformance.map(question => question.answered));
+  const stageLabel: Record<string, string> = {
+    new: "New",
+    shortlisted: "Shortlisted",
+    interview: "Interview",
+    hired: "Hired",
+    rejected: "Rejected",
+  };
+  const scoreColorFor = (score: number) => score >= 75 ? "text-emerald-600" : score >= 50 ? "text-amber-600" : "text-rose-500";
+
+  return (
+    <section className="rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-violet-100 text-violet-700">
+              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M4 19V5M4 19h16"/><path d="m7 15 3-3 3 2 6-7"/></svg>
+            </span>
+            <h2 className="text-sm font-bold text-slate-900">Analyze</h2>
+          </div>
+          <p className="mt-1 text-xs text-slate-500">Real funnel, scoring, source, and question-signal performance.</p>
+        </div>
+        <button
+          onClick={() => loadAnalysis(true)}
+          disabled={refreshing}
+          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:border-violet-300 hover:text-violet-700 disabled:opacity-50"
+        >
+          {refreshing ? "Refreshing…" : "Refresh analysis"}
+        </button>
+      </div>
+
+      <div className="space-y-5 p-5">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {[
+            { label: "Applications", value: overview.total, accent: "text-slate-900" },
+            { label: "Scored", value: overview.scored, accent: "text-violet-700" },
+            { label: "Average score", value: overview.scored ? `${overview.averageScore}%` : "—", accent: scoreColorFor(overview.averageScore) },
+            { label: "Scoring failed", value: overview.failed, accent: overview.failed ? "text-rose-600" : "text-slate-500" },
+          ].map(item => (
+            <div key={item.label} className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+              <p className={`text-xl font-bold ${item.accent}`}>{item.value}</p>
+              <p className="mt-0.5 text-[11px] text-slate-500">{item.label}</p>
+            </div>
+          ))}
+        </div>
+
+        {overview.total === 0 ? (
+          <div className="rounded-xl border border-dashed border-slate-200 px-5 py-8 text-center">
+            <p className="text-sm font-semibold text-slate-700">Analysis will appear after responses arrive</p>
+            <p className="mt-1 text-xs text-slate-400">Share this form to start building a real hiring funnel.</p>
+          </div>
+        ) : (
+          <>
+            <div className="grid gap-5 lg:grid-cols-2">
+              <div className="rounded-xl border border-slate-100 p-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Pipeline funnel</h3>
+                  <span className="text-[10px] text-slate-400">Current stage</span>
+                </div>
+                <div className="mt-4 space-y-3">
+                  {funnel.map(item => {
+                    const width = overview.total ? Math.max(3, Math.round((item.count / overview.total) * 100)) : 3;
+                    return (
+                      <div key={item.stage} className="flex items-center gap-3">
+                        <span className="w-20 shrink-0 text-xs text-slate-600">{stageLabel[item.stage] || item.stage}</span>
+                        <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
+                          <div className="h-full rounded-full bg-violet-500 transition-all" style={{ width: `${width}%` }} />
+                        </div>
+                        <span className="w-7 text-right text-xs font-bold text-slate-700">{item.count}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="mt-4 grid grid-cols-3 gap-2 border-t border-slate-100 pt-3 text-center">
+                  <div><p className="text-sm font-bold text-blue-600">{overview.shortlistRate}%</p><p className="text-[10px] text-slate-400">shortlist rate</p></div>
+                  <div><p className="text-sm font-bold text-amber-600">{overview.interviewRate}%</p><p className="text-[10px] text-slate-400">interview rate</p></div>
+                  <div><p className="text-sm font-bold text-emerald-600">{overview.hireRate}%</p><p className="text-[10px] text-slate-400">hire rate</p></div>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-100 p-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Score distribution</h3>
+                  <span className="text-[10px] text-slate-400">Failed scores excluded</span>
+                </div>
+                <div className="mt-4 flex h-32 items-end justify-around gap-3">
+                  {scoreDistribution.map(bucket => (
+                    <div key={bucket.label} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
+                      <span className="text-[11px] font-bold text-slate-600">{bucket.count}</span>
+                      <div className="flex w-full max-w-10 items-end rounded-t-md bg-violet-100" style={{ height: `${Math.max(8, (bucket.count / maxScoreBucket) * 88)}px` }}>
+                        <div className="w-full rounded-t-md bg-violet-500" style={{ height: "100%" }} />
+                      </div>
+                      <span className="text-[10px] text-slate-400">{bucket.label}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 flex justify-between border-t border-slate-100 pt-3 text-xs">
+                  <span className="text-slate-500">Median score <b className="text-slate-800">{overview.medianScore || "—"}%</b></span>
+                  <span className="text-slate-500">Pending <b className="text-amber-600">{overview.pending}</b></span>
+                </div>
+              </div>
+            </div>
+
+            {timeline.length > 0 && (
+              <div className="rounded-xl border border-slate-100 p-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Applications over time</h3>
+                  <span className="text-[10px] text-slate-400">Last {timeline.length} active days</span>
+                </div>
+                <div className="mt-4 flex min-h-24 items-end gap-1.5 overflow-x-auto pb-5">
+                  {timeline.map(point => (
+                    <div key={point.date} className="group flex min-w-7 flex-1 flex-col items-center justify-end gap-1">
+                      <span className="invisible text-[9px] text-slate-500 group-hover:visible">{point.applications}</span>
+                      <div className="w-full rounded-t bg-violet-400 transition-colors group-hover:bg-violet-600" style={{ height: `${Math.max(8, (point.applications / maxTimelineApplications) * 68)}px` }} />
+                      <span className="text-[9px] text-slate-400">{point.date.slice(5)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="grid gap-5 lg:grid-cols-2">
+              <div className="rounded-xl border border-slate-100 p-4">
+                <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">AI Agent activity</h3>
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  {[
+                    ["Shortlisted", agentActions.shortlisted, "text-blue-600"],
+                    ["Review zone", agentActions.review_zone, "text-amber-600"],
+                    ["Rejected", agentActions.rejected, "text-rose-600"],
+                    ["Emails sent", agentActions.emailsSent, "text-violet-600"],
+                  ].map(([label, value, color]) => (
+                    <div key={String(label)} className="rounded-lg bg-slate-50 p-3">
+                      <p className={`text-lg font-bold ${color}`}>{value}</p>
+                      <p className="text-[10px] text-slate-500">{label}</p>
+                    </div>
+                  ))}
+                </div>
+                {agentActions.failed > 0 && <p className="mt-3 text-[11px] text-rose-600">{agentActions.failed} agent action{agentActions.failed === 1 ? "" : "s"} failed and need attention.</p>}
+              </div>
+
+              <div className="rounded-xl border border-slate-100 p-4">
+                <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Application sources</h3>
+                {sources.length === 0 ? (
+                  <p className="mt-4 text-xs text-slate-400">No source data yet.</p>
+                ) : (
+                  <div className="mt-3 space-y-3">
+                    {sources.slice(0, 5).map(source => (
+                      <div key={source.source}>
+                        <div className="mb-1 flex justify-between text-xs">
+                          <span className="font-medium text-slate-700">{source.source}</span>
+                          <span className="text-slate-500">{source.applications} · {source.averageScore == null ? "—" : `${source.averageScore}% avg`}</span>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-slate-100"><div className="h-full rounded-full bg-sky-400" style={{ width: `${Math.max(4, (source.applications / Math.max(1, sources[0].applications)) * 100)}%` }} /></div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-slate-100 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Question signal performance</h3>
+                  <p className="mt-1 text-[11px] text-slate-400">Which questions are separating strong answers from thin ones.</p>
+                </div>
+                <span className="hidden text-[10px] text-slate-400 sm:block">Strong signal rate</span>
+              </div>
+              {questionPerformance.length === 0 ? (
+                <p className="mt-4 text-xs text-slate-400">Question insights appear after candidates are scored.</p>
+              ) : (
+                <div className="mt-4 space-y-3">
+                  {questionPerformance.slice(0, 8).map(question => (
+                    <div key={question.questionId}>
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="min-w-0 truncate text-xs font-medium text-slate-700">{question.label}</p>
+                        <span className={`shrink-0 text-xs font-bold ${question.signalRate >= 60 ? "text-emerald-600" : question.thinSignals > question.strongSignals ? "text-amber-600" : "text-slate-600"}`}>
+                          {question.signalRate}%
+                        </span>
+                      </div>
+                      <div className="mt-1.5 flex items-center gap-2">
+                        <div className="h-1.5 flex-1 rounded-full bg-slate-100"><div className="h-full rounded-full bg-emerald-400" style={{ width: `${Math.max(2, (question.answered / maxQuestionAnswers) * 100)}%` }} /></div>
+                        <span className="w-28 text-right text-[10px] text-slate-400">{question.strongSignals} strong · {question.thinSignals} thin</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {stageAging.length > 0 && (
+              <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-4">
+                {stageAging.map(item => (
+                  <span key={item.stage} className="rounded-full bg-slate-50 px-3 py-1.5 text-[10px] text-slate-500">
+                    {stageLabel[item.stage] || item.stage}: <b className="text-slate-700">{item.averageDays}d avg</b>
+                  </span>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+        {analysis.generatedAt && (
+          <p className="text-right text-[10px] text-slate-400">
+            Updated {new Date(analysis.generatedAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function FormAssessmentAnalyticsPanel({ formId, token }: { formId: string; token: string }) {
+  const [analytics, setAnalytics] = useState<FormAssessmentAnalytics | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState("");
+
+  const load = useCallback(async (refresh = false) => {
+    if (!token) return;
+    refresh ? setRefreshing(true) : setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(apiUrl(`/recruit/forms/${formId}/assessment-analytics`), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await readApiJson(res);
+      if (!res.ok || !data.analytics) throw new Error(data.error || "Could not load assessment analytics.");
+      setAnalytics(data.analytics);
+    } catch (err: any) {
+      setError(err?.message || "Could not load assessment analytics.");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [formId, token]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) {
+    return <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="h-5 w-48 rounded rb-skeleton" /><div className="mt-4 h-20 rounded-xl rb-skeleton" /></section>;
+  }
+  if (error) {
+    return <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p className="text-xs text-rose-500">{error}</p></section>;
+  }
+  if (!analytics || analytics.sent === 0) {
+    return (
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-bold text-slate-900">Assessment analytics</h2>
+            <p className="mt-1 text-xs text-slate-500">Send an assessment to see completion, scoring, and question-level performance.</p>
+          </div>
+          <button onClick={() => load(true)} disabled={refreshing} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:border-indigo-300 disabled:opacity-50">
+            {refreshing ? "Refreshing…" : "Refresh"}
+          </button>
+        </div>
+      </section>
+    );
+  }
+
+  const statItems = [
+    { label: "Sent", value: analytics.sent, tone: "text-indigo-700" },
+    { label: "Started", value: analytics.started, tone: "text-violet-700" },
+    { label: "Completed", value: analytics.completed, tone: "text-emerald-700" },
+    { label: "Passed", value: `${analytics.passed} · ${analytics.passRate}%`, tone: "text-blue-700" },
+  ];
+
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
+        <div>
+          <h2 className="text-sm font-bold text-slate-900">Assessment analytics</h2>
+          <p className="mt-1 text-xs text-slate-500">Persisted candidate progress and assessment outcomes.</p>
+        </div>
+        <button onClick={() => load(true)} disabled={refreshing} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:border-indigo-300 disabled:opacity-50">
+          {refreshing ? "Refreshing…" : "Refresh"}
+        </button>
+      </div>
+      <div className="space-y-4 p-5">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {statItems.map(item => (
+            <div key={item.label} className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+              <p className={`text-lg font-bold ${item.tone}`}>{item.value}</p>
+              <p className="mt-0.5 text-[11px] text-slate-500">{item.label}</p>
+            </div>
+          ))}
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="rounded-xl border border-slate-100 p-3">
+            <p className="text-lg font-bold text-slate-800">{analytics.completionRate}%</p>
+            <p className="text-[11px] text-slate-500">Completion rate</p>
+          </div>
+          <div className="rounded-xl border border-slate-100 p-3">
+            <p className="text-lg font-bold text-slate-800">{analytics.assessmentToInterviewRate}%</p>
+            <p className="text-[11px] text-slate-500">Assessment → interview</p>
+          </div>
+          <div className="rounded-xl border border-slate-100 p-3">
+            <p className="text-lg font-bold text-slate-800">{analytics.averageCompletionMinutes ?? "—"}<span className="ml-1 text-xs font-medium">min</span></p>
+            <p className="text-[11px] text-slate-500">Average completion time</p>
+          </div>
+        </div>
+        {(analytics.pending > 0 || analytics.scoringPending > 0 || analytics.scoringFailed > 0) && (
+          <div className="flex flex-wrap gap-2 text-[11px]">
+            {analytics.pending > 0 && <span className="rounded-full bg-amber-50 px-3 py-1.5 text-amber-700">{analytics.pending} pending</span>}
+            {analytics.scoringPending > 0 && <span className="rounded-full bg-violet-50 px-3 py-1.5 text-violet-700">{analytics.scoringPending} scoring</span>}
+            {analytics.scoringFailed > 0 && <span className="rounded-full bg-rose-50 px-3 py-1.5 text-rose-700">{analytics.scoringFailed} scoring failed</span>}
+          </div>
+        )}
+        {analytics.questionPerformance.length > 0 && (
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Question drop-off</h3>
+              <span className="text-[10px] text-slate-400">Answer rate</span>
+            </div>
+            <div className="space-y-2">
+              {analytics.questionPerformance.map((question, index) => (
+                <div key={question.questionId} className="flex items-center gap-3">
+                  <span className="w-5 shrink-0 text-[10px] font-bold text-slate-400">Q{index + 1}</span>
+                  <p className="min-w-0 flex-1 truncate text-xs text-slate-600">{question.text}</p>
+                  <div className="h-2 w-24 overflow-hidden rounded-full bg-slate-100">
+                    <div className="h-full rounded-full bg-indigo-500" style={{ width: `${question.answerRate}%` }} />
+                  </div>
+                  <span className="w-9 text-right text-[11px] font-bold text-slate-700">{question.answerRate}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function FormHiringSummaryPanel({ formId, token }: { formId: string; token: string }) {
+  const [summary, setSummary] = useState<FormHiringSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState("");
+
+  const loadSummary = useCallback(async (refresh = false) => {
+    if (!token) return;
+    if (refresh) setRefreshing(true);
+    else setLoading(true);
+    setError("");
+    try {
+      const path = refresh
+        ? `/recruit/forms/${formId}/ai-summary/refresh`
+        : `/recruit/forms/${formId}/ai-summary`;
+      const res = await fetch(apiUrl(path), {
+        method: refresh ? "POST" : "GET",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await readApiJson(res);
+      if (data.summary) setSummary(data.summary);
+      if (!res.ok && !data.summary) throw new Error(data.error || "Could not load AI summary.");
+      if (!res.ok) setError(data.error || "AI refresh failed. Showing the last saved summary.");
+    } catch (err: any) {
+      setError(err?.message || "Could not load AI summary.");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [formId, token]);
+
+  useEffect(() => { loadSummary(); }, [loadSummary]);
+
+  if (loading) {
+    return (
+      <section className="rounded-2xl border border-violet-200 bg-violet-50/60 p-5 space-y-3">
+        <div className="h-4 w-40 rounded-full rb-skeleton" />
+        <div className="h-3 w-3/4 rounded-full rb-skeleton" />
+        <div className="h-3 w-1/2 rounded-full rb-skeleton" />
+      </section>
+    );
+  }
+
+  return (
+    <section className="rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 to-white shadow-sm overflow-hidden">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-violet-100 px-5 py-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-violet-600 text-white">
+              <SparkIcon />
+            </span>
+            <h2 className="text-sm font-bold text-slate-900">AI Hiring Summary</h2>
+          </div>
+          <p className="mt-1 text-xs text-slate-500">Evidence-based guidance from this form’s real responses.</p>
+        </div>
+        <button
+          onClick={() => loadSummary(true)}
+          disabled={refreshing}
+          className="rounded-xl bg-violet-600 px-3 py-2 text-xs font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
+        >
+          {refreshing ? "Refreshing…" : summary ? "Refresh summary" : "Generate summary"}
+        </button>
+      </div>
+
+      <div className="p-5">
+        {error && (
+          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+            {error}
+          </div>
+        )}
+        {!summary ? (
+          <div className="rounded-xl border border-dashed border-violet-200 bg-white/70 px-5 py-7 text-center">
+            <p className="text-sm font-semibold text-slate-700">No AI summary saved yet</p>
+            <p className="mt-1 text-xs text-slate-500">Generate one after responses have been scored.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <p className="text-sm leading-6 text-slate-700">{summary.summary}</p>
+            <div className="grid gap-3 md:grid-cols-3">
+              {[
+                { title: "What’s working", items: summary.strengths, color: "border-emerald-200 bg-emerald-50", text: "text-emerald-800", dot: "bg-emerald-500" },
+                { title: "Risks to watch", items: summary.risks, color: "border-amber-200 bg-amber-50", text: "text-amber-800", dot: "bg-amber-500" },
+                { title: "Recommended next steps", items: summary.recommendations, color: "border-sky-200 bg-sky-50", text: "text-sky-800", dot: "bg-sky-500" },
+              ].map(group => (
+                <div key={group.title} className={`rounded-xl border p-3 ${group.color}`}>
+                  <p className={`text-[11px] font-bold uppercase tracking-wide ${group.text}`}>{group.title}</p>
+                  {group.items.length === 0 ? (
+                    <p className="mt-2 text-xs text-slate-500">No clear signal yet.</p>
+                  ) : (
+                    <ul className="mt-2 space-y-2">
+                      {group.items.map((item, index) => (
+                        <li key={`${group.title}-${index}`} className="flex gap-2 text-xs leading-5 text-slate-700">
+                          <span className={`mt-2 h-1.5 w-1.5 shrink-0 rounded-full ${group.dot}`} />
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))}
+            </div>
+            {(summary.highSignalQuestions.length > 0 || summary.lowSignalQuestions.length > 0) && (
+              <div className="grid gap-3 md:grid-cols-2">
+                {[
+                  { title: "High-signal questions", items: summary.highSignalQuestions, color: "text-emerald-700" },
+                  { title: "Questions to review", items: summary.lowSignalQuestions, color: "text-amber-700" },
+                ].map(group => (
+                  <div key={group.title} className="rounded-xl border border-slate-200 bg-white/80 p-3">
+                    <p className={`text-[11px] font-bold uppercase tracking-wide ${group.color}`}>{group.title}</p>
+                    {group.items.length > 0 ? (
+                      <ul className="mt-2 space-y-1.5">
+                        {group.items.map((item, index) => <li key={index} className="text-xs leading-5 text-slate-600">{item}</li>)}
+                      </ul>
+                    ) : (
+                      <p className="mt-2 text-xs text-slate-400">Not enough evidence yet.</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="text-right text-[10px] text-slate-400">
+              Generated {new Date(summary.generatedAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+            </p>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function FormResponsesContent({ id }: { id: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -2050,6 +2838,10 @@ function FormResponsesContent({ id }: { id: string }) {
             </div>
           ))}
         </div>
+
+        <FormAnalysisPanel formId={id} token={token!} />
+        <FormAssessmentAnalyticsPanel formId={id} token={token!} />
+        <FormHiringSummaryPanel formId={id} token={token!} />
 
         <AgentModeCard
           formId={id}
