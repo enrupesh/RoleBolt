@@ -56,6 +56,39 @@ type EmailLogEntry = {
   error?: string;
 };
 
+type AgentAction = "shortlisted" | "rejected" | "review_zone";
+
+type AgentLogEntry = {
+  action: AgentAction;
+  score: number;
+  reason: string;
+  emailSent: boolean;
+  emailStatus: "sent" | "failed" | "skipped" | "disabled";
+  timestamp: string;
+};
+
+type AgentMode = {
+  enabled: boolean;
+  shortlistThreshold: number;
+  rejectThreshold: number;
+  autoEmailShortlist: boolean;
+  autoEmailReject: boolean;
+  emailReviewZoneCandidates: boolean;
+};
+
+type RuleCondition = "score_above" | "score_below" | "stage_age_days";
+type RuleAction = "move_to_shortlisted" | "move_to_interview" | "move_to_rejected";
+
+type PipelineRule = {
+  id: string;
+  condition: RuleCondition;
+  threshold: number;
+  fromStage?: string;
+  action: RuleAction;
+  enabled: boolean;
+  triggerCount: number;
+};
+
 type FormResponse = {
   _id: string;
   formId: string;
@@ -74,6 +107,9 @@ type FormResponse = {
   submittedPhone: string;
   resumeText?: string;
   emailLog: EmailLogEntry[];
+  agentLog?: AgentLogEntry[];
+  notes?: string;
+  source?: string;
   createdAt: string;
 };
 
@@ -85,7 +121,42 @@ type Form = {
   status: "active" | "closed";
   responseCount: number;
   questions: FormQuestion[];
+  agentMode?: AgentMode;
+  pipelineRules?: PipelineRule[];
   createdAt: string;
+};
+
+const DEFAULT_AGENT_MODE: AgentMode = {
+  enabled: false,
+  shortlistThreshold: 75,
+  rejectThreshold: 35,
+  autoEmailShortlist: true,
+  autoEmailReject: false,
+  emailReviewZoneCandidates: false,
+};
+
+const AGENT_ACTION_LABEL: Record<AgentAction, string> = {
+  shortlisted: "Auto-shortlisted",
+  rejected: "Auto-rejected",
+  review_zone: "Review zone",
+};
+
+const AGENT_ACTION_STYLE: Record<AgentAction, string> = {
+  shortlisted: "bg-blue-50 text-blue-600 border-blue-200",
+  rejected: "bg-rose-50 text-rose-600 border-rose-200",
+  review_zone: "bg-amber-50 text-amber-700 border-amber-200",
+};
+
+const RULE_CONDITION_LABEL: Record<RuleCondition, string> = {
+  score_above: "AI score is at or above",
+  score_below: "AI score is below",
+  stage_age_days: "Days sitting in the same stage reaches",
+};
+
+const RULE_ACTION_LABEL: Record<RuleAction, string> = {
+  move_to_shortlisted: "Move to Shortlisted",
+  move_to_interview: "Move to Interview",
+  move_to_rejected: "Move to Rejected",
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -1106,6 +1177,8 @@ function ResponseCard({ r, token, formId, formTitle, onUpdate, onDelete }: {
   const signalMap: Record<string, AnswerSignal> = {};
   for (const s of (r.answerSignals || [])) signalMap[s.questionId] = s;
 
+  const lastAgentAction = r.agentLog?.length ? r.agentLog[r.agentLog.length - 1] : null;
+
   return (
     <div className="rounded-3xl border border-slate-200 bg-white shadow-sm overflow-hidden">
       <div className="p-5">
@@ -1114,6 +1187,14 @@ function ResponseCard({ r, token, formId, formTitle, onUpdate, onDelete }: {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap mb-1">
               <h3 className="text-sm font-bold text-slate-900 truncate">{displayName}</h3>
+              {lastAgentAction && (
+                <span
+                  title={lastAgentAction.reason}
+                  className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${AGENT_ACTION_STYLE[lastAgentAction.action]}`}
+                >
+                  {AGENT_ACTION_LABEL[lastAgentAction.action]} by AI
+                </span>
+              )}
               {r.redFlags.length > 0 && (
                 <span className="flex items-center gap-0.5 text-rose-400 text-[10px] font-semibold">
                   <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
@@ -1305,6 +1386,14 @@ function ResponseCard({ r, token, formId, formTitle, onUpdate, onDelete }: {
             )
           )}
         </div>
+
+        <NotesSection
+          formId={formId}
+          responseId={r._id}
+          token={token}
+          initialNotes={r.notes || ""}
+          onSaved={notes => onUpdate(r._id, { notes })}
+        />
       </div>
 
       {/* Modals */}
@@ -1425,6 +1514,362 @@ function ResponseCard({ r, token, formId, formTitle, onUpdate, onDelete }: {
 
 // ─── Page ──────────────────────────────────────────────────────────────────────
 
+function Toggle({ checked, onChange, label, hint, disabled }: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+  hint?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <label className={`flex items-start gap-3 ${disabled ? "opacity-50" : "cursor-pointer"}`}>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+        disabled={disabled}
+        onClick={() => !disabled && onChange(!checked)}
+        className={`mt-0.5 h-5 w-9 shrink-0 rounded-full transition ${checked ? "bg-violet-600" : "bg-slate-300"} ${disabled ? "cursor-not-allowed" : "cursor-pointer"}`}
+      >
+        <span className={`block h-4 w-4 rounded-full bg-white shadow transition-transform ${checked ? "translate-x-4" : "translate-x-0.5"}`} />
+      </button>
+      <span className="min-w-0">
+        <span className="block text-xs font-semibold text-slate-700">{label}</span>
+        {hint && <span className="block text-[11px] text-slate-400 leading-4">{hint}</span>}
+      </span>
+    </label>
+  );
+}
+
+function AgentModeCard({ formId, token, agentMode, responses, onSaved }: {
+  formId: string;
+  token: string;
+  agentMode: AgentMode;
+  responses: FormResponse[];
+  onSaved: (mode: AgentMode) => void;
+}) {
+  const [draft, setDraft] = useState<AgentMode>(agentMode);
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => { setDraft(agentMode); }, [agentMode]);
+
+  const handled = responses.flatMap(r => r.agentLog ?? []);
+  const shortlisted = handled.filter(e => e.action === "shortlisted").length;
+  const rejected = handled.filter(e => e.action === "rejected").length;
+  const reviewZone = handled.filter(e => e.action === "review_zone").length;
+  const emailsSent = handled.filter(e => e.emailSent).length;
+
+  const invalid = draft.rejectThreshold >= draft.shortlistThreshold;
+
+  async function save(patch: Partial<AgentMode>) {
+    const next = { ...draft, ...patch };
+    setDraft(next);
+    if (next.rejectThreshold >= next.shortlistThreshold) {
+      setError("Reject threshold must be lower than the shortlist threshold.");
+      return;
+    }
+    setError("");
+    setSaving(true);
+    try {
+      const res = await fetch(apiUrl(`/recruit/forms/${formId}/agent-mode`), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(patch),
+      });
+      const data = await readApiJson(res);
+      if (!res.ok) { setError(data.error || "Could not save agent settings."); return; }
+      onSaved(data.agentMode);
+    } catch {
+      setError("Could not save agent settings.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div className="flex items-start justify-between gap-3 p-5">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-violet-600"><SparkIcon /></span>
+            <h2 className="text-sm font-bold text-slate-900">AI Agent Mode</h2>
+            <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${draft.enabled ? "border-emerald-200 bg-emerald-50 text-emerald-600" : "border-slate-200 bg-slate-50 text-slate-500"}`}>
+              {draft.enabled ? "Active" : "Manual"}
+            </span>
+          </div>
+          <p className="mt-1 text-[11px] leading-4 text-slate-500">
+            Triages every new response the moment it&rsquo;s scored — shortlist, reject, or leave in the review zone for you.
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Toggle checked={draft.enabled} onChange={v => save({ enabled: v })} label="" />
+          <button
+            onClick={() => setOpen(o => !o)}
+            className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 transition"
+          >
+            {open ? "Hide" : "Settings"}
+          </button>
+        </div>
+      </div>
+
+      {handled.length > 0 && (
+        <div className="grid grid-cols-2 gap-px border-t border-slate-100 bg-slate-100 sm:grid-cols-4">
+          {[
+            { label: "Auto-shortlisted", value: shortlisted, accent: "text-blue-600" },
+            { label: "Auto-rejected", value: rejected, accent: "text-rose-500" },
+            { label: "Review zone", value: reviewZone, accent: "text-amber-600" },
+            { label: "Emails sent", value: emailsSent, accent: "text-slate-700" },
+          ].map(s => (
+            <div key={s.label} className="bg-white px-4 py-3">
+              <p className={`text-lg font-bold leading-none ${s.accent}`}>{s.value}</p>
+              <p className="mt-1 text-[10px] text-slate-400">{s.label}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {open && (
+        <div className="space-y-4 border-t border-slate-100 bg-slate-50 p-5">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-700">Shortlist at or above</span>
+              <div className="mt-1.5 flex items-center gap-2">
+                <input
+                  type="range" min={0} max={100} value={draft.shortlistThreshold}
+                  onChange={e => setDraft({ ...draft, shortlistThreshold: Number(e.target.value) })}
+                  onMouseUp={e => save({ shortlistThreshold: Number((e.target as HTMLInputElement).value) })}
+                  onTouchEnd={e => save({ shortlistThreshold: Number((e.target as HTMLInputElement).value) })}
+                  className="w-full accent-violet-600"
+                />
+                <span className="w-10 text-right text-xs font-bold text-slate-800">{draft.shortlistThreshold}%</span>
+              </div>
+            </label>
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-700">Reject below</span>
+              <div className="mt-1.5 flex items-center gap-2">
+                <input
+                  type="range" min={0} max={100} value={draft.rejectThreshold}
+                  onChange={e => setDraft({ ...draft, rejectThreshold: Number(e.target.value) })}
+                  onMouseUp={e => save({ rejectThreshold: Number((e.target as HTMLInputElement).value) })}
+                  onTouchEnd={e => save({ rejectThreshold: Number((e.target as HTMLInputElement).value) })}
+                  className="w-full accent-rose-500"
+                />
+                <span className="w-10 text-right text-xs font-bold text-slate-800">{draft.rejectThreshold}%</span>
+              </div>
+            </label>
+          </div>
+
+          <p className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] leading-4 text-slate-500">
+            Responses scoring between <strong>{draft.rejectThreshold}%</strong> and <strong>{draft.shortlistThreshold}%</strong> stay in
+            the review zone for you to decide. Form answers are thinner evidence than a full resume, so keep auto-reject conservative.
+          </p>
+
+          <div className="space-y-3">
+            <Toggle
+              checked={draft.autoEmailShortlist}
+              onChange={v => save({ autoEmailShortlist: v })}
+              label="Email shortlisted applicants"
+              hint="Sends the standard 'you've been shortlisted' email."
+            />
+            <Toggle
+              checked={draft.autoEmailReject}
+              onChange={v => save({ autoEmailReject: v })}
+              label="Email auto-rejected applicants"
+              hint="Off by default — nothing is sent until you turn this on."
+            />
+            <Toggle
+              checked={draft.emailReviewZoneCandidates}
+              onChange={v => save({ emailReviewZoneCandidates: v })}
+              label="Email review-zone applicants"
+              hint="Acknowledges that their application is still under review."
+            />
+          </div>
+
+          {(error || invalid) && (
+            <p className="text-[11px] font-medium text-rose-500">{error || "Reject threshold must be lower than the shortlist threshold."}</p>
+          )}
+          {saving && <p className="text-[11px] text-slate-400">Saving…</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PipelineRulesCard({ formId, token, rules, onChange }: {
+  formId: string;
+  token: string;
+  rules: PipelineRule[];
+  onChange: (rules: PipelineRule[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [condition, setCondition] = useState<RuleCondition>("score_above");
+  const [threshold, setThreshold] = useState(80);
+  const [fromStage, setFromStage] = useState<"" | Stage>("");
+  const [action, setAction] = useState<RuleAction>("move_to_shortlisted");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const authHeaders = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+
+  async function addRule() {
+    setBusy(true); setError("");
+    try {
+      const res = await fetch(apiUrl(`/recruit/forms/${formId}/pipeline-rules`), {
+        method: "POST",
+        headers: authHeaders,
+        body: JSON.stringify({ condition, threshold, fromStage, action }),
+      });
+      const data = await readApiJson(res);
+      if (!res.ok) { setError(data.error || "Could not add rule."); return; }
+      onChange(data.rules);
+    } catch { setError("Could not add rule."); }
+    finally { setBusy(false); }
+  }
+
+  async function toggleRule(rule: PipelineRule) {
+    const res = await fetch(apiUrl(`/recruit/forms/${formId}/pipeline-rules/${rule.id}`), {
+      method: "PATCH", headers: authHeaders, body: JSON.stringify({ enabled: !rule.enabled }),
+    });
+    const data = await readApiJson(res);
+    if (res.ok) onChange(data.rules);
+  }
+
+  async function removeRule(rule: PipelineRule) {
+    const res = await fetch(apiUrl(`/recruit/forms/${formId}/pipeline-rules/${rule.id}`), {
+      method: "DELETE", headers: authHeaders,
+    });
+    const data = await readApiJson(res);
+    if (res.ok) onChange(data.rules);
+  }
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <button onClick={() => setOpen(o => !o)} className="flex w-full items-center justify-between gap-3 p-5 text-left">
+        <div className="min-w-0">
+          <h2 className="text-sm font-bold text-slate-900">Pipeline Rules</h2>
+          <p className="mt-1 text-[11px] leading-4 text-slate-500">
+            Keep the middle of the funnel moving — rules run when a response is scored and whenever its stage changes.
+          </p>
+        </div>
+        <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
+          {rules.filter(r => r.enabled).length} active
+        </span>
+      </button>
+
+      {open && (
+        <div className="border-t border-slate-100 bg-slate-50 p-5 space-y-4">
+          {rules.length > 0 && (
+            <ul className="space-y-2">
+              {rules.map(rule => (
+                <li key={rule.id} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold text-slate-700">
+                      When {RULE_CONDITION_LABEL[rule.condition]} {rule.threshold}
+                      {rule.condition === "stage_age_days" ? " days" : "%"}
+                      {rule.fromStage ? ` (in ${rule.fromStage})` : ""} → {RULE_ACTION_LABEL[rule.action]}
+                    </p>
+                    <p className="text-[10px] text-slate-400">Fired {rule.triggerCount} time{rule.triggerCount !== 1 ? "s" : ""}</p>
+                  </div>
+                  <button
+                    onClick={() => toggleRule(rule)}
+                    className={`rounded-lg border px-2 py-1 text-[10px] font-semibold transition ${rule.enabled ? "border-emerald-200 bg-emerald-50 text-emerald-600" : "border-slate-200 bg-slate-50 text-slate-500"}`}
+                  >
+                    {rule.enabled ? "On" : "Off"}
+                  </button>
+                  <button onClick={() => removeRule(rule)} className="text-[10px] font-semibold text-slate-400 hover:text-rose-500 transition">
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <div className="rounded-xl border border-slate-200 bg-white p-3 space-y-3">
+            <div className="grid gap-2 sm:grid-cols-2">
+              <select value={condition} onChange={e => setCondition(e.target.value as RuleCondition)} className="rounded-lg border border-slate-200 px-2.5 py-2 text-xs text-slate-700 outline-none">
+                {(Object.keys(RULE_CONDITION_LABEL) as RuleCondition[]).map(c => (
+                  <option key={c} value={c}>{RULE_CONDITION_LABEL[c]}</option>
+                ))}
+              </select>
+              <input
+                type="number" min={0} value={threshold}
+                onChange={e => setThreshold(Number(e.target.value))}
+                aria-label={condition === "stage_age_days" ? "Days" : "Score percentage"}
+                className="rounded-lg border border-slate-200 px-2.5 py-2 text-xs text-slate-700 outline-none"
+              />
+              <select value={fromStage} onChange={e => setFromStage(e.target.value as "" | Stage)} className="rounded-lg border border-slate-200 px-2.5 py-2 text-xs text-slate-700 outline-none">
+                <option value="">Any stage</option>
+                {STAGES.map(s => <option key={s.id} value={s.id}>Only in {s.label}</option>)}
+              </select>
+              <select value={action} onChange={e => setAction(e.target.value as RuleAction)} className="rounded-lg border border-slate-200 px-2.5 py-2 text-xs text-slate-700 outline-none">
+                {(Object.keys(RULE_ACTION_LABEL) as RuleAction[]).map(a => (
+                  <option key={a} value={a}>{RULE_ACTION_LABEL[a]}</option>
+                ))}
+              </select>
+            </div>
+            {error && <p className="text-[11px] font-medium text-rose-500">{error}</p>}
+            <button
+              onClick={addRule}
+              disabled={busy}
+              className="rounded-xl bg-violet-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-violet-700 transition disabled:opacity-50"
+            >
+              {busy ? "Adding…" : "Add rule"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NotesSection({ formId, responseId, token, initialNotes, onSaved }: {
+  formId: string;
+  responseId: string;
+  token: string;
+  initialNotes: string;
+  onSaved: (notes: string) => void;
+}) {
+  const [notes, setNotes] = useState(initialNotes);
+  const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+
+  async function save() {
+    if (notes === initialNotes) return;
+    setStatus("saving");
+    try {
+      const res = await fetch(apiUrl(`/recruit/forms/${formId}/responses/${responseId}`), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ notes }),
+      });
+      if (!res.ok) { setStatus("error"); return; }
+      onSaved(notes);
+      setStatus("saved");
+    } catch { setStatus("error"); }
+  }
+
+  return (
+    <div className="mt-4">
+      <div className="mb-1.5 flex items-center justify-between">
+        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Private notes</p>
+        <span className="text-[10px] text-slate-400">
+          {status === "saving" ? "Saving…" : status === "saved" ? "Saved" : status === "error" ? "Could not save" : ""}
+        </span>
+      </div>
+      <textarea
+        value={notes}
+        onChange={e => { setNotes(e.target.value); setStatus("idle"); }}
+        onBlur={save}
+        rows={3}
+        placeholder="Only you can see this — interview impressions, follow-ups, salary expectations…"
+        className="w-full resize-y rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-700 outline-none focus:border-violet-300"
+      />
+    </div>
+  );
+}
+
 function FormResponsesContent({ id }: { id: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1436,6 +1881,7 @@ function FormResponsesContent({ id }: { id: string }) {
   const [loading, setLoading] = useState(true);
   const [showShare, setShowShare] = useState(justSaved);
   const [stageFilter, setStageFilter] = useState<Stage | "all">("all");
+  const [exporting, setExporting] = useState(false);
 
   const { sessionToken } = useRecruitAuth();
   useEffect(() => {
@@ -1466,6 +1912,25 @@ function FormResponsesContent({ id }: { id: string }) {
 
   function onDelete(responseId: string) {
     setResponses(prev => prev.filter(r => r._id !== responseId));
+  }
+
+  async function exportResponses(format: "csv" | "json") {
+    if (!token) return;
+    setExporting(true);
+    try {
+      const res = await fetch(apiUrl(`/recruit/forms/${id}/export?format=${format}`), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${(form?.title || "form").replace(/[^a-z0-9]/gi, "_")}_responses.${format}`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch { /* silent */ }
+    finally { setExporting(false); }
   }
 
   const filtered = stageFilter === "all" ? responses : responses.filter(r => r.stage === stageFilter);
@@ -1557,6 +2022,14 @@ function FormResponsesContent({ id }: { id: string }) {
               Edit Form
             </Link>
             <button
+              onClick={() => exportResponses("csv")}
+              disabled={exporting || responses.length === 0}
+              title="Download all responses as CSV"
+              className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition disabled:opacity-50"
+            >
+              {exporting ? "Exporting…" : "Export CSV"}
+            </button>
+            <button
               onClick={() => setShowShare(true)}
               className="flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-2 text-xs font-semibold text-white hover:bg-violet-700 transition"
             >
@@ -1577,6 +2050,21 @@ function FormResponsesContent({ id }: { id: string }) {
             </div>
           ))}
         </div>
+
+        <AgentModeCard
+          formId={id}
+          token={token!}
+          agentMode={form.agentMode ?? DEFAULT_AGENT_MODE}
+          responses={responses}
+          onSaved={mode => setForm(f => (f ? { ...f, agentMode: mode } : f))}
+        />
+
+        <PipelineRulesCard
+          formId={id}
+          token={token!}
+          rules={form.pipelineRules ?? []}
+          onChange={rules => setForm(f => (f ? { ...f, pipelineRules: rules } : f))}
+        />
 
         {/* Scoring criteria card — only show when there are form questions */}
         {form.questions && form.questions.length > 0 && (
