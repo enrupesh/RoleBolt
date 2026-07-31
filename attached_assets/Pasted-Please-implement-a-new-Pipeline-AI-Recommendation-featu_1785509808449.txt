@@ -1,0 +1,134 @@
+Please implement a new **Pipeline AI Recommendation** feature to provide recruiters with AI hiring insights directly on the candidate pipeline.
+
+## Feature Name
+
+**Pipeline AI Recommendation**
+
+## Objective
+
+Display the AI hiring recommendation directly on each candidate card in the Pipeline Board, allowing recruiters to quickly identify high-potential candidates without opening individual candidate profiles.
+
+The recommendation should be a decision-support tool only. Final hiring decisions must always remain with the recruiter.
+
+---
+
+## Feature Requirements
+
+### AI Recommendation Badge
+
+When the AI Hiring Summary has been generated, display a recommendation badge on the candidate card.
+
+Supported recommendations:
+
+* 🤖 Hire
+* ⏳ Hold
+* ❌ Pass
+
+Example:
+
+**Rahul Sharma**
+
+Interview Stage
+
+🤖 **Hire**
+
+or
+
+**Priya Singh**
+
+Interview Stage
+
+⏳ **Hold**
+
+or
+
+**Amit Kumar**
+
+Interview Stage
+
+❌ **Pass**
+
+---
+
+## Hover / Quick Preview
+
+When the recruiter hovers over or clicks the AI recommendation badge, display a quick summary including:
+
+* AI Recommendation
+* Overall Hiring Fit
+* Top 3 Strengths
+* Top 3 Concerns
+* Overall Assessment Score
+* Resume Score
+* Interview Summary
+* "View Full AI Summary" button
+
+This allows recruiters to review key insights without leaving the pipeline.
+
+---
+
+## Real-Time Updates
+
+The recommendation badge should update automatically whenever:
+
+* Resume analysis changes
+* Assessment results are updated
+* Interview feedback is completed
+* AI Hiring Summary is regenerated
+* Recruiter requests a re-evaluation
+
+Recruiters should not need to refresh the page to see updated recommendations.
+
+---
+
+## Status Before AI Recommendation
+
+If the AI recommendation is not yet available, display an appropriate status instead of a recommendation.
+
+Examples:
+
+* ⏳ Awaiting Interview Feedback
+* ⏳ AI Processing
+* ⏳ Recommendation Pending
+
+The AI must never display a **Hire** recommendation until all required interview feedback has been submitted.
+
+---
+
+## Filters
+
+Allow recruiters to filter the pipeline by AI recommendation:
+
+* Hire
+* Hold
+* Pass
+* Recommendation Pending
+
+This enables recruiters to prioritize candidates more efficiently.
+
+---
+
+## Activity Feed
+
+Record all recommendation-related events, including:
+
+* AI Recommendation Generated
+* AI Recommendation Updated
+* Recruiter Viewed AI Summary
+* AI Re-evaluation Completed
+
+Include timestamps and the responsible user where applicable.
+
+---
+
+## Acceptance Criteria
+
+1. Display AI hiring recommendations directly on candidate cards in the Pipeline Board.
+2. Support Hire, Hold, Pass, and Pending statuses.
+3. Provide a quick AI summary without requiring recruiters to open candidate profiles.
+4. Update recommendations automatically whenever candidate evaluation data changes.
+5. Support pipeline filtering based on AI recommendations.
+6. Prevent AI from displaying a Hire recommendation until all required interview feedback has been submitted.
+7. Integrate seamlessly with the existing AI Hiring Summary, Team Collaboration, Assessment, and ATS workflow.
+
+This feature will help recruiters scan the entire hiring pipeline at a glance, prioritize candidates faster, and make more informed hiring decisions while keeping the final decision under human control.

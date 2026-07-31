@@ -111,6 +111,21 @@ type Candidate = {
     changeSummary: string;
   }>;
   offerLog?: OfferLogEntry[];
+  aiHiringSynthesis?: {
+    recommendation: "hire" | "hold" | "pass";
+    executiveSummary: string;
+    strengths: string[];
+    weaknesses: string[];
+    riskFactors: string[];
+    keyReasons: string[];
+    overallFit: string;
+    suggestedNextStep: string;
+    generatedAt?: string;
+    generatedBy?: string;
+    recruiterDecision?: "accepted" | "overridden" | "ignored";
+    recruiterDecisionNote?: string;
+    recruiterDecisionAt?: string;
+  };
 };
 
 type RubricCriteria = { name: string; weight: number; description: string };
@@ -1828,6 +1843,131 @@ function ApplicantDetailsModal({ c, jobId, token, onClose }: {
   );
 }
 
+/* ─── AI Recommendation Badge + Hover Popover ──────────────────────────────*/
+const AI_REC_CONFIG = {
+  hire: { emoji: "🤖", label: "Hire", cls: "border-emerald-500/40 bg-emerald-500/10 text-emerald-400" },
+  hold: { emoji: "⏳", label: "Hold", cls: "border-amber-500/40 bg-amber-500/10 text-amber-400" },
+  pass: { emoji: "❌", label: "Pass", cls: "border-rose-500/40 bg-rose-500/10 text-rose-400" },
+} as const;
+
+function AiRecommendationBadge({
+  synthesis,
+  jobId,
+  candidateId,
+}: {
+  synthesis?: Candidate["aiHiringSynthesis"];
+  jobId: string;
+  candidateId: string;
+}) {
+  const [hovered, setHovered] = useState(false);
+
+  if (!synthesis) {
+    return (
+      <div className="mb-3">
+        <span className="flex items-center gap-1.5 rounded-full border border-slate-500/20 bg-slate-500/[0.06] px-2.5 py-0.5 text-[10px] font-medium text-[var(--text-muted)] w-fit">
+          ⏳ AI Recommendation Pending
+        </span>
+      </div>
+    );
+  }
+
+  const cfg = AI_REC_CONFIG[synthesis.recommendation];
+  const pct = Math.round(
+    (synthesis.strengths.length / Math.max(synthesis.strengths.length + synthesis.weaknesses.length, 1)) * 100
+  );
+
+  return (
+    <div className="relative mb-3" onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
+      <button
+        type="button"
+        className={`flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[10px] font-bold cursor-pointer transition ${cfg.cls}`}
+        aria-haspopup="true"
+        aria-expanded={hovered}
+      >
+        {cfg.emoji} AI: {cfg.label}
+        {synthesis.recruiterDecision && (
+          <span className="ml-0.5 text-[9px] opacity-70">· {synthesis.recruiterDecision}</span>
+        )}
+      </button>
+
+      {hovered && (
+        <div className="absolute left-0 top-full mt-1.5 z-50 w-72 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-xl shadow-black/20 ring-1 ring-[var(--border)]">
+          {/* Recommendation header */}
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <p className="text-[9px] font-bold uppercase tracking-widest text-[var(--text-muted)]">AI Recommendation</p>
+              <p className={`text-base font-extrabold mt-0.5 ${
+                synthesis.recommendation === "hire" ? "text-emerald-400" :
+                synthesis.recommendation === "hold" ? "text-amber-400" : "text-rose-400"
+              }`}>
+                {cfg.emoji} {cfg.label}
+              </p>
+            </div>
+            <a
+              href={`/recruit/jobs/${jobId}?tab=ai-hiring`}
+              className="rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-2.5 py-1.5 text-[10px] font-semibold text-indigo-400 hover:bg-indigo-500/20 transition whitespace-nowrap"
+              onClick={e => e.stopPropagation()}
+            >
+              Full Summary →
+            </a>
+          </div>
+
+          {/* Executive summary */}
+          {synthesis.executiveSummary && (
+            <p className="text-[11px] leading-5 text-[var(--text-secondary)] mb-3 line-clamp-3">
+              {synthesis.executiveSummary}
+            </p>
+          )}
+
+          {/* Strengths */}
+          {synthesis.strengths.slice(0, 3).length > 0 && (
+            <div className="mb-2">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-emerald-500/80 mb-1">Top Strengths</p>
+              <ul className="space-y-0.5">
+                {synthesis.strengths.slice(0, 3).map((s, i) => (
+                  <li key={i} className="text-[10px] leading-4 text-[var(--text-secondary)] flex gap-1.5">
+                    <span className="text-emerald-500 shrink-0 mt-0.5">✓</span>{s}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Concerns */}
+          {synthesis.weaknesses.slice(0, 3).length > 0 && (
+            <div className="mb-2">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-rose-500/80 mb-1">Concerns</p>
+              <ul className="space-y-0.5">
+                {synthesis.weaknesses.slice(0, 3).map((w, i) => (
+                  <li key={i} className="text-[10px] leading-4 text-[var(--text-secondary)] flex gap-1.5">
+                    <span className="text-rose-500 shrink-0 mt-0.5">·</span>{w}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Overall fit */}
+          {synthesis.overallFit && (
+            <div className="mt-2 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-[var(--text-muted)] mb-1">Overall Fit</p>
+              <p className="text-[10px] leading-4 text-[var(--text-secondary)] line-clamp-2">{synthesis.overallFit}</p>
+            </div>
+          )}
+
+          {/* Footer: generated info */}
+          {synthesis.generatedAt && (
+            <p className="mt-2 text-[9px] text-[var(--text-muted)]">
+              Generated {new Date(synthesis.generatedAt).toLocaleDateString()}
+              {synthesis.generatedBy ? ` by ${synthesis.generatedBy}` : ""}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CandidateCard({ c, jobId, job, token, onUpdate, onDelete }: {
   c: Candidate; jobId: string; job: Job; token: string;
   onUpdate: (id: string, update: Partial<Candidate>) => void;
@@ -2169,6 +2309,9 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete }: {
             )}
           </div>
 
+          {/* ── AI Hiring Recommendation Badge ── */}
+          <AiRecommendationBadge synthesis={c.aiHiringSynthesis} jobId={jobId} candidateId={c._id} />
+
           {/* ── Live Offer Response Status badge (offer / hired stage only) ── */}
           {(c.stage === "offer" || c.stage === "hired") && c.offerCandidateStatus && (() => {
             const statusMap: Record<string, { icon: string; label: string; cls: string }> = {
@@ -2464,6 +2607,7 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
   const [checkingPerf, setCheckingPerf] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [stageFilter, setStageFilter] = useState<CandidateStage | "all">("all");
+  const [aiRecFilter, setAiRecFilter] = useState<"all" | "hire" | "hold" | "pass" | "pending">("all");
 
   const { sessionToken } = useRecruitAuth();
   useEffect(() => {
@@ -2494,6 +2638,31 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
   }, [token, id]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // ── AI synthesis polling ───────────────────────────────────────────────────
+  // Poll every 30 s when on the pipeline tab to keep recommendation badges current.
+  useEffect(() => {
+    if (!token || !id || activeTab !== "pipeline") return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(apiUrl(`/recruit/jobs/${id}/candidates`), {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const fresh: Candidate[] = data.candidates ?? [];
+        if (!fresh.length) return;
+        setCandidates(prev => prev.map(c => {
+          const f = fresh.find(x => x._id === c._id);
+          if (!f) return c;
+          // Only update aiHiringSynthesis to avoid overwriting local state
+          if (JSON.stringify(f.aiHiringSynthesis) === JSON.stringify(c.aiHiringSynthesis)) return c;
+          return { ...c, aiHiringSynthesis: f.aiHiringSynthesis };
+        }));
+      } catch { /* silent */ }
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [token, id, activeTab]);
 
   // ── Live offer status polling ──────────────────────────────────────────────
   // Poll every 20 s when any offer-stage candidate still has a non-terminal status
@@ -2859,7 +3028,7 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
               </div>
             ) : (
               <>
-                {/* Stage filter — single dropdown, no duplicated pills/sections */}
+                {/* Stage + AI Recommendation filters */}
                 <div className="mb-6 flex items-center gap-3 flex-wrap">
                   <span className="text-[11px] font-bold uppercase tracking-widest text-[var(--text-secondary)]">Stage</span>
                   <div className="relative">
@@ -2877,11 +3046,31 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
                     </select>
                     <svg className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
                   </div>
+
+                  <span className="text-[11px] font-bold uppercase tracking-widest text-[var(--text-secondary)]">AI Rec</span>
+                  <div className="relative">
+                    <select
+                      value={aiRecFilter}
+                      onChange={e => setAiRecFilter(e.target.value as typeof aiRecFilter)}
+                      className="appearance-none rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] pl-4 pr-9 py-2 text-[12px] font-semibold text-[var(--foreground)] shadow-[var(--shadow-xs)] outline-none cursor-pointer transition hover:border-[var(--accent)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-light)]"
+                    >
+                      <option value="all">All recommendations</option>
+                      <option value="hire">🤖 Hire</option>
+                      <option value="hold">⏳ Hold</option>
+                      <option value="pass">❌ Pass</option>
+                      <option value="pending">⏳ Pending</option>
+                    </select>
+                    <svg className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                  </div>
                 </div>
 
                 {(() => {
                   const stage = stageFilter !== "all" ? STAGES.find(s => s.id === stageFilter)! : null;
-                  const visibleCandidates = stage ? byStage[stageFilter as CandidateStage] : candidates;
+                  const stageFiltered = stage ? byStage[stageFilter as CandidateStage] : candidates;
+                  const visibleCandidates = aiRecFilter === "all" ? stageFiltered : stageFiltered.filter(c => {
+                    if (aiRecFilter === "pending") return !c.aiHiringSynthesis;
+                    return c.aiHiringSynthesis?.recommendation === aiRecFilter;
+                  });
                   return (
                     <div>
                       {stage && (
