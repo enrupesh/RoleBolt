@@ -57,6 +57,69 @@ export interface IAgentActionEntry {
   timestamp: Date;
 }
 
+export interface ICandidateComment {
+  id: string;
+  body: string;
+  richText?: string;
+  authorUid: string;
+  authorName: string;
+  authorRole?: string;
+  mentions: string[];
+  createdAt: Date;
+  updatedAt: Date;
+  editHistory: Array<{
+    editedAt: Date;
+    editorUid: string;
+    previousBody: string;
+    previousRichText?: string;
+  }>;
+}
+
+export interface IInternalNote {
+  id: string;
+  body: string;
+  richText?: string;
+  visibility: "internal";
+  authorUid: string;
+  authorName: string;
+  mentions: string[];
+  createdAt: Date;
+  updatedAt: Date;
+  editHistory: Array<{
+    editedAt: Date;
+    editorUid: string;
+    previousBody: string;
+    previousRichText?: string;
+  }>;
+}
+
+export interface ICandidateAssignment {
+  uid: string;
+  role?: string;
+  assignedByUid: string;
+  assignedAt: Date;
+}
+
+export interface ICandidateActivityTimelineEntry {
+  id: string;
+  actorUid: string;
+  actorName: string;
+  action: string;
+  details?: string;
+  timestamp: Date;
+  metadata?: Record<string, any>;
+}
+
+export interface ICandidateAuditLogEntry {
+  id: string;
+  actorUid: string;
+  actorName: string;
+  action: string;
+  category: "comment" | "internal_note" | "assignment" | "permission" | "stage_change" | "assessment" | "offer" | "feedback";
+  metadata?: Record<string, any>;
+  timestamp: Date;
+}
+
 export interface IRecruitCandidate extends Document {
   jobId: mongoose.Types.ObjectId;
   uid: string;
@@ -92,6 +155,11 @@ export interface IRecruitCandidate extends Document {
   inTalentPool?: boolean;
   talentPoolNote?: string;
   stageMovedAt?: Date;
+  comments: ICandidateComment[];
+  internalNotes: IInternalNote[];
+  assignments: ICandidateAssignment[];
+  activityTimeline: ICandidateActivityTimelineEntry[];
+  auditLog: ICandidateAuditLogEntry[];
   emailLog: IEmailLogEntry[];
   agentLog: IAgentActionEntry[];
   offerLetter?: string;
@@ -188,6 +256,100 @@ const AssessmentImpactSchema = new Schema<IAssessmentImpact>(
   { _id: false }
 );
 
+const CandidateCommentSchema = new Schema<ICandidateComment>(
+  {
+    id:         { type: String, required: true },
+    body:       { type: String, default: "" },
+    richText:   { type: String, default: "" },
+    authorUid:  { type: String, required: true },
+    authorName: { type: String, default: "" },
+    authorRole: { type: String, default: "" },
+    mentions:   { type: [String], default: [] },
+    createdAt:  { type: Date, default: Date.now },
+    updatedAt:  { type: Date, default: Date.now },
+    editHistory: {
+      type: [
+        new Schema(
+          {
+            editedAt:         { type: Date, default: Date.now },
+            editorUid:        { type: String, required: true },
+            previousBody:     { type: String, default: "" },
+            previousRichText: { type: String, default: "" },
+          },
+          { _id: false }
+        ),
+      ],
+      default: [],
+    },
+  },
+  { _id: false }
+);
+
+const InternalNoteSchema = new Schema<IInternalNote>(
+  {
+    id:         { type: String, required: true },
+    body:       { type: String, default: "" },
+    richText:   { type: String, default: "" },
+    visibility: { type: String, default: "internal" },
+    authorUid:  { type: String, required: true },
+    authorName: { type: String, default: "" },
+    mentions:   { type: [String], default: [] },
+    createdAt:  { type: Date, default: Date.now },
+    updatedAt:  { type: Date, default: Date.now },
+    editHistory: {
+      type: [
+        new Schema(
+          {
+            editedAt:         { type: Date, default: Date.now },
+            editorUid:        { type: String, required: true },
+            previousBody:     { type: String, default: "" },
+            previousRichText: { type: String, default: "" },
+          },
+          { _id: false }
+        ),
+      ],
+      default: [],
+    },
+  },
+  { _id: false }
+);
+
+const CandidateAssignmentSchema = new Schema<ICandidateAssignment>(
+  {
+    uid:          { type: String, required: true },
+    role:         { type: String, default: "" },
+    assignedByUid:{ type: String, required: true },
+    assignedAt:   { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
+const CandidateActivityTimelineEntrySchema = new Schema<ICandidateActivityTimelineEntry>(
+  {
+    id:        { type: String, required: true },
+    actorUid:  { type: String, required: true },
+    actorName: { type: String, default: "" },
+    action:    { type: String, required: true },
+    details:   { type: String, default: "" },
+    timestamp: { type: Date, default: Date.now },
+    metadata:  { type: Schema.Types.Mixed, default: {} },
+  },
+  { _id: false }
+);
+
+const CandidateAuditLogEntrySchema = new Schema<ICandidateAuditLogEntry>(
+  {
+    id:        { type: String, required: true },
+    actorUid:  { type: String, required: true },
+    actorName: { type: String, default: "" },
+    action:    { type: String, required: true },
+    category:  { type: String, required: true },
+    metadata:  { type: Schema.Types.Mixed, default: {} },
+    timestamp: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
 const RecruitCandidateSchema = new Schema<IRecruitCandidate>(
   {
     jobId: { type: Schema.Types.ObjectId, required: true, ref: "RecruitJob", index: true },
@@ -235,6 +397,11 @@ const RecruitCandidateSchema = new Schema<IRecruitCandidate>(
     inTalentPool: { type: Boolean, default: false },
     talentPoolNote: { type: String, default: "" },
     stageMovedAt: { type: Date },
+    comments: { type: [CandidateCommentSchema], default: [] },
+    internalNotes: { type: [InternalNoteSchema], default: [] },
+    assignments: { type: [CandidateAssignmentSchema], default: [] },
+    activityTimeline: { type: [CandidateActivityTimelineEntrySchema], default: [] },
+    auditLog: { type: [CandidateAuditLogEntrySchema], default: [] },
     emailLog: {
       type: [
         new Schema(

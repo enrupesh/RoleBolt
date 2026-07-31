@@ -48,6 +48,62 @@ export interface IAssessmentAlert {
   alertLog: IAssessmentAlertLogEntry[];
 }
 
+export type TeamRole =
+  | "admin"
+  | "recruiter"
+  | "senior_recruiter"
+  | "hiring_manager"
+  | "hr_manager"
+  | "interviewer";
+
+export interface ICollaborationNotification {
+  id: string;
+  uid: string;
+  type: "mention" | "assignment" | "team_invite" | "permission_change";
+  message: string;
+  jobId: string;
+  candidateId?: string;
+  createdByUid?: string;
+  createdAt: Date;
+  readAt?: Date;
+  emailSent?: boolean;
+}
+
+export interface IJobTeamMember {
+  uid: string;
+  role: TeamRole;
+  displayName: string;
+  email?: string;
+  permissions: string[];
+  active: boolean;
+  invitedByUid?: string;
+  invitedAt: Date;
+  joinedAt?: Date;
+  notificationPrefs: {
+    inApp: boolean;
+    email: boolean;
+  };
+}
+
+export interface IRolePermissionConfig {
+  role: TeamRole;
+  permissions: string[];
+  updatedByUid?: string;
+  updatedAt: Date;
+}
+
+export interface ICollaborationAuditEntry {
+  id: string;
+  actorUid: string;
+  actorName?: string;
+  action: string;
+  targetType: "job" | "candidate" | "comment" | "note" | "assignment" | "permission";
+  targetId?: string;
+  candidateId?: string;
+  metadata?: Record<string, any>;
+  timestamp: Date;
+}
+
 export interface IPipelineRule {
   id: string;
   condition: "score_above" | "score_below" | "assessment_passed" | "assessment_failed" | "stage_age_days";
@@ -97,6 +153,10 @@ export interface IRecruitJob extends Document {
   pipelineRules: IPipelineRule[];
   performanceAlerts: IPerformanceAlert[];
   assessmentAlert: IAssessmentAlert;
+  teamMembers: IJobTeamMember[];
+  rolePermissions: IRolePermissionConfig[];
+  collaborationNotifications: ICollaborationNotification[];
+  collaborationAuditLog: ICollaborationAuditEntry[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -167,6 +227,69 @@ const AssessmentAlertSchema = new Schema<IAssessmentAlert>(
   { _id: false }
 );
 
+const CollaborationNotificationSchema = new Schema<ICollaborationNotification>(
+  {
+    id:          { type: String, required: true },
+    uid:         { type: String, required: true, index: true },
+    type:        { type: String, required: true },
+    message:     { type: String, default: "" },
+    jobId:       { type: String, required: true },
+    candidateId: { type: String, default: "" },
+    createdByUid:{ type: String, default: "" },
+    createdAt:   { type: Date, default: Date.now },
+    readAt:      { type: Date },
+    emailSent:   { type: Boolean, default: false },
+  },
+  { _id: false }
+);
+
+const JobTeamMemberSchema = new Schema<IJobTeamMember>(
+  {
+    uid:          { type: String, required: true, index: true },
+    role:         { type: String, required: true },
+    displayName:  { type: String, default: "" },
+    email:        { type: String, default: "" },
+    permissions:  { type: [String], default: [] },
+    active:       { type: Boolean, default: true },
+    invitedByUid: { type: String, default: "" },
+    invitedAt:    { type: Date, default: Date.now },
+    joinedAt:     { type: Date },
+    notificationPrefs: {
+      type: {
+        inApp:  { type: Boolean, default: true },
+        email:  { type: Boolean, default: true },
+      },
+      default: () => ({ inApp: true, email: true }),
+    },
+  },
+  { _id: false }
+);
+
+const RolePermissionConfigSchema = new Schema<IRolePermissionConfig>(
+  {
+    role:         { type: String, required: true },
+    permissions:  { type: [String], default: [] },
+    updatedByUid: { type: String, default: "" },
+    updatedAt:    { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
+const CollaborationAuditEntrySchema = new Schema<ICollaborationAuditEntry>(
+  {
+    id:         { type: String, required: true },
+    actorUid:   { type: String, required: true },
+    actorName:  { type: String, default: "" },
+    action:     { type: String, required: true },
+    targetType: { type: String, required: true },
+    targetId:   { type: String, default: "" },
+    candidateId:{ type: String, default: "" },
+    metadata:   { type: Schema.Types.Mixed, default: {} },
+    timestamp:  { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
 const AgentModeSchema = new Schema<IAgentMode>(
   {
     enabled:                    { type: Boolean, default: false },
@@ -220,6 +343,10 @@ const RecruitJobSchema = new Schema<IRecruitJob>(
     pipelineRules: { type: [PipelineRuleSchema], default: [] },
     performanceAlerts: { type: [PerformanceAlertSchema], default: [] },
     assessmentAlert: { type: AssessmentAlertSchema, default: () => ({}) },
+    teamMembers: { type: [JobTeamMemberSchema], default: [] },
+    rolePermissions: { type: [RolePermissionConfigSchema], default: [] },
+    collaborationNotifications: { type: [CollaborationNotificationSchema], default: [] },
+    collaborationAuditLog: { type: [CollaborationAuditEntrySchema], default: [] },
   },
   { timestamps: true }
 );

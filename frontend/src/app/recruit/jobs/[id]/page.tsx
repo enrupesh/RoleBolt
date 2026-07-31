@@ -1591,7 +1591,52 @@ function ResumeSection({ resumeText }: { resumeText: string }) {
 type CandidateAppInfo = {
   name: string; email: string; phone?: string;
   location?: string; currentStatus?: string; educationLevel?: string;
-  currentClassYear?: string; availability?: string; coverLetter?: string; linkedinUrl?: string;
+  currentClassYear?: string; availability?: string; coverLetter?: string;   linkedinUrl?: string;
+  comments?: Array<{
+    id: string;
+    body: string;
+    richText?: string;
+    authorUid: string;
+    authorName: string;
+    authorRole?: string;
+    mentions?: string[];
+    createdAt: string;
+    updatedAt: string;
+    editHistory?: Array<{ editedAt: string }>;
+  }>;
+  internalNotes?: Array<{
+    id: string;
+    body: string;
+    richText?: string;
+    authorUid: string;
+    authorName: string;
+    mentions?: string[];
+    createdAt: string;
+    updatedAt: string;
+    editHistory?: Array<{ editedAt: string }>;
+  }>;
+  assignments?: Array<{
+    uid: string;
+    role?: string;
+    assignedByUid: string;
+    assignedAt: string;
+  }>;
+  activityTimeline?: Array<{
+    id: string;
+    actorUid: string;
+    actorName: string;
+    action: string;
+    details?: string;
+    timestamp: string;
+  }>;
+};
+
+type TeamMember = {
+  uid: string;
+  role: "admin" | "recruiter" | "senior_recruiter" | "hiring_manager" | "hr_manager" | "interviewer";
+  displayName: string;
+  email?: string;
+  active?: boolean;
   resumeText?: string;
 };
 
@@ -1826,8 +1871,8 @@ function ApplicantDetailsModal({ c, jobId, token, onClose }: {
   );
 }
 
-function CandidateCard({ c, jobId, job, token, onUpdate, onDelete }: {
-  c: Candidate; jobId: string; job: Job; token: string;
+function CandidateCard({ c, jobId, job, token, teamMembers, onUpdate, onDelete }: {
+  c: Candidate; jobId: string; job: Job; token: string; teamMembers: TeamMember[];
   onUpdate: (id: string, update: Partial<Candidate>) => void;
   onDelete: (id: string) => void;
 }) {
@@ -1849,6 +1894,11 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete }: {
   const [assessmentEmailSent, setAssessmentEmailSent] = useState(false);
   const [showEmailHistory, setShowEmailHistory] = useState(false);
   const [deleteMode, setDeleteMode] = useState(false);
+  const [newComment, setNewComment] = useState("");
+  const [newNote, setNewNote] = useState("");
+  const [savingComment, setSavingComment] = useState(false);
+  const [savingNote, setSavingNote] = useState(false);
+  const [assigningUid, setAssigningUid] = useState("");
 
   // Keep local email log in sync when parent refreshes the candidate (e.g. after re-fetch)
   // Using c._id as the key so we only reset when the candidate identity changes, not on every render
@@ -2041,6 +2091,64 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete }: {
       });
       if (res.ok) onDelete(c._id);
     } catch { /* silent */ }
+  }
+
+  async function addComment() {
+    if (!newComment.trim()) return;
+    setSavingComment(true);
+    try {
+      const res = await fetch(apiUrl(`/recruit/jobs/${jobId}/candidates/${c._id}/comments`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `****** },
+        body: JSON.stringify({ body: newComment, richText: newComment.replace(/\n/g, "<br/>") }),
+      });
+      const data = await readApiJson(res);
+      if (!res.ok) throw new Error(data.error || "Failed to add comment");
+      onUpdate(c._id, { comments: [...(c.comments ?? []), data.comment] });
+      setNewComment("");
+    } catch (err: any) {
+      alert(err.message || "Failed to add comment.");
+    } finally {
+      setSavingComment(false);
+    }
+  }
+
+  async function addInternalNote() {
+    if (!newNote.trim()) return;
+    setSavingNote(true);
+    try {
+      const res = await fetch(apiUrl(`/recruit/jobs/${jobId}/candidates/${c._id}/internal-notes`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `****** },
+        body: JSON.stringify({ body: newNote, richText: newNote.replace(/\n/g, "<br/>") }),
+      });
+      const data = await readApiJson(res);
+      if (!res.ok) throw new Error(data.error || "Failed to add internal note");
+      onUpdate(c._id, { internalNotes: [...(c.internalNotes ?? []), data.note] });
+      setNewNote("");
+    } catch (err: any) {
+      alert(err.message || "Failed to add internal note.");
+    } finally {
+      setSavingNote(false);
+    }
+  }
+
+  async function assignCandidate() {
+    if (!assigningUid) return;
+    try {
+      const member = teamMembers.find((item) => item.uid === assigningUid);
+      const res = await fetch(apiUrl(`/recruit/jobs/${jobId}/candidates/${c._id}/assignments`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `****** },
+        body: JSON.stringify({ uid: assigningUid, role: member?.role }),
+      });
+      const data = await readApiJson(res);
+      if (!res.ok) throw new Error(data.error || "Assignment failed");
+      onUpdate(c._id, { assignments: data.assignments ?? [] });
+      setAssigningUid("");
+    } catch (err: any) {
+      alert(err.message || "Failed to assign candidate.");
+    }
   }
 
   return (
@@ -2436,6 +2544,135 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete }: {
               <div className="rounded-2xl border border-indigo-500/15 bg-indigo-500/[0.05] p-4">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-600/80 mb-2 flex items-center gap-1"><SparkIcon /> Interview Brief</p>
                 <p className="text-xs text-[var(--text-secondary)] leading-6 whitespace-pre-wrap">{brief}</p>
+              </div>
+            )}
+
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] p-4 space-y-3">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Assignments</p>
+              <div className="flex flex-wrap items-center gap-2">
+                {(c.assignments ?? []).map((assignment, idx) => {
+                  const member = teamMembers.find((item) => item.uid === assignment.uid);
+                  return (
+                    <span key={`${assignment.uid}-${idx}`} className="rounded-full border border-sky-500/20 bg-sky-500/10 px-2.5 py-1 text-[10px] font-semibold text-sky-600">
+                      {(member?.displayName || assignment.uid)}{assignment.role ? ` · ${assignment.role.replace(/_/g, " ")}` : ""}
+                    </span>
+                  );
+                })}
+                {(c.assignments ?? []).length === 0 && (
+                  <span className="text-[11px] text-[var(--text-muted)]">No assignees yet</span>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <select
+                  value={assigningUid}
+                  onChange={(e) => setAssigningUid(e.target.value)}
+                  className="flex-1 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[11px] text-[var(--foreground)]"
+                >
+                  <option value="">Assign team member…</option>
+                  {teamMembers.filter((member) => member.active !== false).map((member) => (
+                    <option key={member.uid} value={member.uid}>
+                      {member.displayName || member.email || member.uid} · {member.role.replace(/_/g, " ")}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={assignCandidate}
+                  disabled={!assigningUid}
+                  className="rounded-xl border border-indigo-500/25 bg-indigo-500/10 px-3 py-2 text-[11px] font-semibold text-indigo-600 disabled:opacity-50"
+                >
+                  Assign
+                </button>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] p-4 space-y-3">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Candidate Comments</p>
+              <textarea
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                rows={3}
+                placeholder="Add a collaborative comment. Use @name to mention teammates."
+                className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[12px] text-[var(--foreground)] outline-none"
+              />
+              <div className="flex justify-end">
+                <button
+                  onClick={addComment}
+                  disabled={savingComment || !newComment.trim()}
+                  className="rounded-xl bg-indigo-500 px-3 py-2 text-[11px] font-semibold text-white disabled:opacity-50"
+                >
+                  {savingComment ? "Saving…" : "Add Comment"}
+                </button>
+              </div>
+              <div className="space-y-2">
+                {(c.comments ?? []).slice().reverse().map((comment) => (
+                  <div key={comment.id} className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[11px] font-semibold text-[var(--foreground)]">{comment.authorName}</p>
+                      <p className="text-[10px] text-[var(--text-muted)]">{new Date(comment.createdAt).toLocaleString("en-IN")}</p>
+                    </div>
+                    <p className="mt-1 text-[12px] whitespace-pre-wrap text-[var(--text-secondary)]">{comment.body}</p>
+                    {(comment.editHistory?.length ?? 0) > 0 && (
+                      <p className="mt-1 text-[10px] text-[var(--text-muted)]">Edited {comment.editHistory?.length} time(s)</p>
+                    )}
+                  </div>
+                ))}
+                {(c.comments ?? []).length === 0 && (
+                  <p className="text-[11px] text-[var(--text-muted)]">No comments yet.</p>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.05] p-4 space-y-3">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-amber-700/70">Internal Notes (Private)</p>
+              <textarea
+                value={newNote}
+                onChange={(e) => setNewNote(e.target.value)}
+                rows={3}
+                placeholder="Add private notes (never visible to candidates)."
+                className="w-full rounded-xl border border-amber-500/25 bg-[var(--surface)] px-3 py-2 text-[12px] text-[var(--foreground)] outline-none"
+              />
+              <div className="flex justify-end">
+                <button
+                  onClick={addInternalNote}
+                  disabled={savingNote || !newNote.trim()}
+                  className="rounded-xl bg-amber-500 px-3 py-2 text-[11px] font-semibold text-white disabled:opacity-50"
+                >
+                  {savingNote ? "Saving…" : "Add Internal Note"}
+                </button>
+              </div>
+              <div className="space-y-2">
+                {(c.internalNotes ?? []).slice().reverse().map((note) => (
+                  <div key={note.id} className="rounded-xl border border-amber-500/20 bg-[var(--surface)] px-3 py-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[11px] font-semibold text-[var(--foreground)]">{note.authorName}</p>
+                      <p className="text-[10px] text-[var(--text-muted)]">{new Date(note.createdAt).toLocaleString("en-IN")}</p>
+                    </div>
+                    <p className="mt-1 text-[12px] whitespace-pre-wrap text-[var(--text-secondary)]">{note.body}</p>
+                    {(note.editHistory?.length ?? 0) > 0 && (
+                      <p className="mt-1 text-[10px] text-[var(--text-muted)]">Edited {note.editHistory?.length} time(s)</p>
+                    )}
+                  </div>
+                ))}
+                {(c.internalNotes ?? []).length === 0 && (
+                  <p className="text-[11px] text-[var(--text-muted)]">No internal notes yet.</p>
+                )}
+              </div>
+            </div>
+
+            {(c.activityTimeline?.length ?? 0) > 0 && (
+              <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] p-4">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] mb-3">Activity Timeline</p>
+                <div className="space-y-2">
+                  {(c.activityTimeline ?? []).slice().sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, 8).map((entry) => (
+                    <div key={entry.id} className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-[11px] font-medium text-[var(--foreground)]">{entry.action}</p>
+                        <p className="text-[10px] text-[var(--text-muted)]">{new Date(entry.timestamp).toLocaleString("en-IN")}</p>
+                      </div>
+                      <p className="text-[10px] text-[var(--text-secondary)]">{entry.actorName}{entry.details ? ` · ${entry.details}` : ""}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 

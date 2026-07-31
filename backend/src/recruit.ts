@@ -78,6 +78,294 @@ function getUid(req: express.Request): string {
   return (req as any).user?.uid ?? "";
 }
 
+type TeamRole =
+  | "admin"
+  | "recruiter"
+  | "senior_recruiter"
+  | "hiring_manager"
+  | "hr_manager"
+  | "interviewer";
+
+type CollaborationPermission =
+  | "manage_team_members"
+  | "configure_job_settings"
+  | "view_analytics"
+  | "delete_jobs"
+  | "view_candidates"
+  | "move_pipeline_stages"
+  | "send_assessments"
+  | "schedule_interviews"
+  | "send_offers"
+  | "add_comments"
+  | "add_internal_notes"
+  | "leave_interview_feedback"
+  | "approve_hiring_decisions"
+  | "assign_candidates"
+  | "manage_role_permissions"
+  | "view_assigned_candidates_only";
+
+const DEFAULT_ROLE_PERMISSIONS: Record<TeamRole, CollaborationPermission[]> = {
+  admin: [
+    "manage_team_members",
+    "configure_job_settings",
+    "view_analytics",
+    "delete_jobs",
+    "view_candidates",
+    "move_pipeline_stages",
+    "send_assessments",
+    "schedule_interviews",
+    "send_offers",
+    "add_comments",
+    "add_internal_notes",
+    "leave_interview_feedback",
+    "approve_hiring_decisions",
+    "assign_candidates",
+    "manage_role_permissions",
+  ],
+  recruiter: [
+    "view_candidates",
+    "move_pipeline_stages",
+    "send_assessments",
+    "schedule_interviews",
+    "send_offers",
+    "add_comments",
+    "add_internal_notes",
+    "assign_candidates",
+  ],
+  senior_recruiter: [
+    "view_candidates",
+    "move_pipeline_stages",
+    "send_assessments",
+    "schedule_interviews",
+    "send_offers",
+    "add_comments",
+    "add_internal_notes",
+    "approve_hiring_decisions",
+    "assign_candidates",
+    "view_analytics",
+  ],
+  hiring_manager: [
+    "view_candidates",
+    "add_comments",
+    "add_internal_notes",
+    "leave_interview_feedback",
+    "approve_hiring_decisions",
+    "view_analytics",
+  ],
+  hr_manager: [
+    "view_candidates",
+    "move_pipeline_stages",
+    "schedule_interviews",
+    "send_offers",
+    "add_comments",
+    "add_internal_notes",
+    "assign_candidates",
+    "view_analytics",
+  ],
+  interviewer: [
+    "view_candidates",
+    "add_comments",
+    "add_internal_notes",
+    "leave_interview_feedback",
+    "view_assigned_candidates_only",
+  ],
+};
+
+const VALID_TEAM_ROLES = new Set<TeamRole>([
+  "admin",
+  "recruiter",
+  "senior_recruiter",
+  "hiring_manager",
+  "hr_manager",
+  "interviewer",
+]);
+
+const VALID_COLLAB_PERMISSIONS = new Set<CollaborationPermission>(
+  Object.values(DEFAULT_ROLE_PERMISSIONS).flat()
+);
+
+function defaultRolePermissionsConfig() {
+  return (Object.entries(DEFAULT_ROLE_PERMISSIONS) as Array<[TeamRole, CollaborationPermission[]]>).map(([role, permissions]) => ({
+    role,
+    permissions,
+    updatedAt: new Date(),
+  }));
+}
+
+async function getActorMeta(uid: string) {
+  const user = await User.findById(uid).lean().catch(() => null);
+  const fallback = await RecruitProfile.findOne({ uid }).lean().catch(() => null);
+  const name = ((user as any)?.name || (fallback as any)?.name || "").trim();
+  const email = ((user as any)?.email || (fallback as any)?.email || "").trim().toLowerCase();
+  return { uid, name: name || "Team Member", email };
+}
+
+function sanitizePermissionList(input: unknown, fallbackRole: TeamRole): CollaborationPermission[] {
+  if (!Array.isArray(input)) return [...DEFAULT_ROLE_PERMISSIONS[fallbackRole]];
+  const list = input
+    .map((entry) => String(entry || "").trim())
+    .filter((entry): entry is CollaborationPermission => VALID_COLLAB_PERMISSIONS.has(entry as CollaborationPermission));
+  return Array.from(new Set(list));
+}
+
+function getJobTeamMember(job: any, uid: string) {
+  return ((job?.teamMembers ?? []) as any[]).find((member) => member?.uid === uid && member?.active !== false);
+}
+
+function getEffectivePermissions(job: any, uid: string): Set<string> {
+  if (String(job?.uid || "") === uid) {
+    return new Set(Object.values(DEFAULT_ROLE_PERMISSIONS).flat());
+  }
+  const member = getJobTeamMember(job, uid);
+  if (!member) return new Set();
+  if (Array.isArray(member.permissions) && member.permissions.length) {
+    return new Set(member.permissions.map((entry: unknown) => String(entry || "").trim()).filter(Boolean));
+  }
+  const role = (member.role || "interviewer") as TeamRole;
+  const roleConfig = (job?.rolePermissions ?? []).find((cfg: any) => cfg?.role === role);
+  if (Array.isArray(roleConfig?.permissions) && roleConfig.permissions.length) {
+    return new Set(roleConfig.permissions);
+  }
+  return new Set(DEFAULT_ROLE_PERMISSIONS[role] ?? []);
+}
+
+function hasPermission(job: any, uid: string, permission: CollaborationPermission): boolean {
+  const permissions = getEffectivePermissions(job, uid);
+  return permissions.has(permission) || String(job?.uid || "") === uid;
+}
+
+async function findAuthorizedJob(jobId: string, uid: string) {
+  const job = await RecruitJob.findOne({
+    _id: jobId,
+    $or: [{ uid }, { "teamMembers.uid": uid }],
+  });
+  if (!job) return null;
+  const isOwner = String((job as any).uid) === uid;
+  const isActiveMember = Boolean(getJobTeamMember(job, uid));
+  if (!isOwner && !isActiveMember) return null;
+  return job;
+}
+
+function extractMentions(raw: string): string[] {
+  if (!raw) return [];
+  return Array.from(new Set((raw.match(/@([a-zA-Z0-9._-]{2,64})/g) ?? []).map((tag) => tag.slice(1).toLowerCase())));
+}
+
+function mapMentionsToUsers(job: any, mentions: string[]): any[] {
+  if (!mentions.length) return [];
+  const members = (job?.teamMembers ?? []) as any[];
+  return members.filter((member) => {
+    const name = String(member?.displayName || "").toLowerCase().replace(/\s+/g, "");
+    const emailHandle = String(member?.email || "").split("@")[0].toLowerCase();
+    return mentions.some((mention) =>
+      mention === emailHandle ||
+      mention === name ||
+      mention === String(member?.uid || "").toLowerCase()
+    );
+  });
+}
+
+async function sendMentionNotifications(args: {
+  job: any;
+  actorUid: string;
+  actorName: string;
+  candidateId?: string;
+  message: string;
+  mentionUsers: any[];
+}) {
+  const { job, actorUid, actorName, candidateId, message, mentionUsers } = args;
+  if (!mentionUsers.length) return;
+  const notifications = mentionUsers.map((user) => ({
+    id: generateToken(),
+    uid: String(user.uid),
+    type: "mention",
+    message,
+    jobId: String(job._id),
+    candidateId: candidateId || "",
+    createdByUid: actorUid,
+    createdAt: new Date(),
+    emailSent: false,
+  }));
+  await RecruitJob.updateOne({ _id: job._id }, { $push: { collaborationNotifications: { $each: notifications } } });
+  for (const user of mentionUsers) {
+    const shouldSendEmail = Boolean(user?.notificationPrefs?.email) && Boolean(user?.email);
+    if (!shouldSendEmail) continue;
+    const subject = `${actorName} mentioned you for ${job.title}`;
+    const plainText = `${actorName} mentioned you in a collaboration update.\n\n${message}`;
+    const result = await sendEmail({
+      to: String(user.email),
+      subject,
+      text: plainText,
+      html: `<p>${actorName} mentioned you in a collaboration update.</p><p>${message}</p>`,
+      from: NOTIFICATION_FROM,
+    }).catch(() => ({ ok: false, error: "send_failed" }));
+    if (result?.ok) {
+      await RecruitJob.updateOne(
+        { _id: job._id, "collaborationNotifications.id": notifications.find((n) => n.uid === String(user.uid))?.id },
+        { $set: { "collaborationNotifications.$.emailSent": true } }
+      );
+    }
+  }
+}
+
+async function logCandidateCollaborationEvent(args: {
+  jobId: string;
+  candidateId: string;
+  actorUid: string;
+  actorName: string;
+  action: string;
+  category: "comment" | "internal_note" | "assignment" | "permission" | "stage_change" | "assessment" | "offer" | "feedback";
+  details?: string;
+  metadata?: Record<string, unknown>;
+}) {
+  const { jobId, candidateId, actorUid, actorName, action, category, details, metadata } = args;
+  const now = new Date();
+  const eventId = generateToken();
+  await RecruitCandidate.updateOne(
+    { _id: candidateId, jobId },
+    {
+      $push: {
+        activityTimeline: {
+          id: eventId,
+          actorUid,
+          actorName,
+          action,
+          details: details || "",
+          timestamp: now,
+          metadata: metadata ?? {},
+        },
+        auditLog: {
+          id: eventId,
+          actorUid,
+          actorName,
+          action,
+          category,
+          metadata: metadata ?? {},
+          timestamp: now,
+        },
+      },
+    }
+  );
+  await RecruitJob.updateOne(
+    { _id: jobId },
+    {
+      $push: {
+        collaborationAuditLog: {
+          id: eventId,
+          actorUid,
+          actorName,
+          action,
+          targetType: "candidate",
+          targetId: String(candidateId),
+          candidateId: String(candidateId),
+          metadata: metadata ?? {},
+          timestamp: now,
+        },
+      },
+    }
+  );
+}
+
 // ── AI Pipeline Rules: evaluate rules against a candidate (call non-blocking) ─
 async function evaluatePipelineRules(jobId: string, candidateId: string) {
   try {
@@ -1235,6 +1523,7 @@ recruitRouter.post("/jobs", async (req, res) => {
     const safePerks = typeof perks === "string" ? perks.trim().slice(0, 1000) : "";
     const safeLanguageRequirement = typeof languageRequirement === "string" ? languageRequirement.trim().slice(0, 200) : "";
     const safeTimezoneOverlap = typeof timezoneOverlap === "string" ? timezoneOverlap.trim().slice(0, 200) : "";
+    const actor = await getActorMeta(uid);
 
     const { jd, rubric } = await generateJobDescription({
       title, department: department || "", seniority: seniority || "Mid-level",
@@ -1280,6 +1569,21 @@ recruitRouter.post("/jobs", async (req, res) => {
       languageRequirement: safeLanguageRequirement,
       timezoneOverlap: safeTimezoneOverlap,
       generatedJD: jd, rubric, status: "active", candidateCount: 0,
+      teamMembers: [
+        {
+          uid,
+          role: "admin",
+          displayName: actor.name || actor.email || "Job Admin",
+          email: actor.email,
+          permissions: [...DEFAULT_ROLE_PERMISSIONS.admin],
+          active: true,
+          invitedByUid: uid,
+          invitedAt: new Date(),
+          joinedAt: new Date(),
+          notificationPrefs: { inApp: true, email: true },
+        },
+      ],
+      rolePermissions: defaultRolePermissionsConfig(),
     });
 
     trackEvent("recruiter_job_posted", uid, { jobId: String(job._id), niche, title });
@@ -1294,7 +1598,9 @@ recruitRouter.get("/jobs", async (req, res) => {
   try {
     await connectMongo();
     const uid = getUid(req);
-    const jobs = await RecruitJob.find({ uid }).sort({ createdAt: -1 }).lean();
+    const jobs = await RecruitJob.find({
+      $or: [{ uid }, { "teamMembers.uid": uid }],
+    }).sort({ createdAt: -1 }).lean();
     return res.json({ jobs: jobs.map(serializeRecruitJob) });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
@@ -1305,7 +1611,7 @@ recruitRouter.get("/jobs/:jobId", async (req, res) => {
   try {
     await connectMongo();
     const uid = getUid(req);
-    const job = await RecruitJob.findOne({ _id: req.params.jobId, uid }).lean();
+    const job = await findAuthorizedJob(req.params.jobId, uid);
     if (!job) return res.status(404).json({ error: "Job not found." });
     return res.json({ job: serializeRecruitJob(job) });
   } catch (err: any) {
@@ -1317,6 +1623,11 @@ recruitRouter.patch("/jobs/:jobId", async (req, res) => {
   try {
     await connectMongo();
     const uid = getUid(req);
+    const jobForAccess = await findAuthorizedJob(req.params.jobId, uid);
+    if (!jobForAccess) return res.status(404).json({ error: "Job not found." });
+    if (!hasPermission(jobForAccess, uid, "configure_job_settings")) {
+      return res.status(403).json({ error: "Forbidden." });
+    }
     const allowed = [
       "status", "title", "niche", "companyName", "companyType", "jobType",
       "department", "location", "workMode", "salaryMin", "salaryMax",
@@ -1345,9 +1656,9 @@ recruitRouter.patch("/jobs/:jobId", async (req, res) => {
     if (update.timezoneOverlap !== undefined) {
       update.timezoneOverlap = typeof update.timezoneOverlap === "string" ? update.timezoneOverlap.trim().slice(0, 200) : "";
     }
-    const companyProfileForPatch = await RecruitCompanyProfile.findOne({ uid }).lean();
+    const companyProfileForPatch = await RecruitCompanyProfile.findOne({ uid: String((jobForAccess as any).uid || uid) }).lean();
     update.verifiedCompany = (companyProfileForPatch as any)?.verificationStatus === "verified";
-    const job = await RecruitJob.findOneAndUpdate({ _id: req.params.jobId, uid }, update, { returnDocument: "after" }).lean();
+    const job = await RecruitJob.findOneAndUpdate({ _id: req.params.jobId }, update, { returnDocument: "after" }).lean();
     if (!job) return res.status(404).json({ error: "Job not found." });
     return res.json({ job: serializeRecruitJob(job) });
   } catch (err: any) {
@@ -1730,8 +2041,11 @@ recruitRouter.delete("/jobs/:jobId", async (req, res) => {
   try {
     await connectMongo();
     const uid = getUid(req);
-    await RecruitJob.deleteOne({ _id: req.params.jobId, uid });
-    await RecruitCandidate.deleteMany({ jobId: req.params.jobId, uid });
+    const job = await findAuthorizedJob(req.params.jobId, uid);
+    if (!job) return res.status(404).json({ error: "Job not found." });
+    if (!hasPermission(job, uid, "delete_jobs")) return res.status(403).json({ error: "Forbidden." });
+    await RecruitJob.deleteOne({ _id: req.params.jobId });
+    await RecruitCandidate.deleteMany({ jobId: req.params.jobId });
     return res.json({ ok: true });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
@@ -2305,8 +2619,10 @@ recruitRouter.post("/jobs/:jobId/candidates", async (req, res) => {
   try {
     await connectMongo();
     const uid = getUid(req);
-    const job = await RecruitJob.findOne({ _id: req.params.jobId, uid });
+    const actor = await getActorMeta(uid);
+    const job = await findAuthorizedJob(req.params.jobId, uid);
     if (!job) return res.status(404).json({ error: "Job not found." });
+    if (!hasPermission(job, uid, "view_candidates")) return res.status(403).json({ error: "Forbidden." });
 
     const { resumeText } = req.body;
     if (!resumeText?.trim()) return res.status(400).json({ error: "Resume text is required." });
@@ -2331,7 +2647,7 @@ recruitRouter.post("/jobs/:jobId/candidates", async (req, res) => {
 
     if (scored.email) {
       const prev = await RecruitCandidate.findOne({
-        uid,
+        uid: String((job as any).uid || uid),
         email: scored.email,
         stage: { $in: ["rejected", "hired"] },
       })
@@ -2368,6 +2684,24 @@ recruitRouter.post("/jobs/:jobId/candidates", async (req, res) => {
       previousResumeScore: scored.totalScore,
       scoringFailed: scored.scoringFailed,
       source: source || "",
+      activityTimeline: [{
+        id: generateToken(),
+        actorUid: uid,
+        actorName: actor.name,
+        action: "Candidate added",
+        details: "Candidate profile created in pipeline",
+        timestamp: new Date(),
+        metadata: { stage: "applied" },
+      }],
+      auditLog: [{
+        id: generateToken(),
+        actorUid: uid,
+        actorName: actor.name,
+        action: "Candidate added",
+        category: "feedback",
+        timestamp: new Date(),
+        metadata: {},
+      }],
     });
 
     await RecruitJob.updateOne({ _id: job._id }, { $inc: { candidateCount: 1 } });
@@ -2525,7 +2859,21 @@ recruitRouter.get("/jobs/:jobId/candidates", async (req, res) => {
   try {
     await connectMongo();
     const uid = getUid(req);
-    const candidates = await RecruitCandidate.find({ jobId: req.params.jobId, uid })
+    const job = await findAuthorizedJob(req.params.jobId, uid);
+    if (!job) return res.status(404).json({ error: "Job not found." });
+    if (!hasPermission(job, uid, "view_candidates")) return res.status(403).json({ error: "Forbidden." });
+
+    const filter: Record<string, any> = { jobId: req.params.jobId };
+    const assignedTo = String(req.query.assignedTo ?? "").trim();
+    const assignedRole = String(req.query.assignedRole ?? "").trim();
+    if (assignedTo) filter["assignments.uid"] = assignedTo;
+    if (assignedRole) filter["assignments.role"] = assignedRole;
+
+    if (hasPermission(job, uid, "view_assigned_candidates_only")) {
+      filter["assignments.uid"] = uid;
+    }
+
+    const candidates = await RecruitCandidate.find(filter)
       .sort({ totalScore: -1 })
       .lean();
     return res.json({ candidates });
@@ -2538,22 +2886,40 @@ recruitRouter.patch("/jobs/:jobId/candidates/:candidateId", async (req, res) => 
   try {
     await connectMongo();
     const uid = getUid(req);
+    const actor = await getActorMeta(uid);
+    const job = await findAuthorizedJob(req.params.jobId, uid);
+    if (!job) return res.status(404).json({ error: "Job not found." });
     const allowed = ["stage", "notes", "source", "gender", "ageRange", "inTalentPool", "talentPoolNote"];
     const update: any = {};
     for (const key of allowed) {
       if (req.body[key] !== undefined) update[key] = req.body[key];
     }
+    if (update.stage && !hasPermission(job, uid, "move_pipeline_stages")) {
+      return res.status(403).json({ error: "Forbidden." });
+    }
+    if (update.notes !== undefined && !hasPermission(job, uid, "add_internal_notes")) {
+      return res.status(403).json({ error: "Forbidden." });
+    }
     if (update.stage) {
       update.stageMovedAt = new Date();
     }
     const candidate = await RecruitCandidate.findOneAndUpdate(
-      { _id: req.params.candidateId, jobId: req.params.jobId, uid },
+      { _id: req.params.candidateId, jobId: req.params.jobId },
       update,
       { returnDocument: "after" }
     ).lean();
     if (!candidate) return res.status(404).json({ error: "Candidate not found." });
     if (update.stage) {
       trackEvent("recruiter_stage_changed", uid, { jobId: req.params.jobId, stage: update.stage });
+      await logCandidateCollaborationEvent({
+        jobId: req.params.jobId,
+        candidateId: req.params.candidateId,
+        actorUid: uid,
+        actorName: actor.name,
+        action: `Candidate moved to ${update.stage}`,
+        category: "stage_change",
+        metadata: { stage: update.stage },
+      });
       // Evaluate pipeline rules after manual stage change (non-blocking)
       setImmediate(() => {
         evaluatePipelineRules(req.params.jobId, req.params.candidateId).catch(e =>
@@ -2593,8 +2959,671 @@ recruitRouter.patch("/jobs/:jobId/candidates/:candidateId", async (req, res) => 
         } catch (err) { console.error("[mailer] stage-change email failed:", err); }
       });
     }
+    if (update.notes !== undefined) {
+      await logCandidateCollaborationEvent({
+        jobId: req.params.jobId,
+        candidateId: req.params.candidateId,
+        actorUid: uid,
+        actorName: actor.name,
+        action: "Internal note updated",
+        category: "internal_note",
+      });
+    }
 
     return res.json({ candidate });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+recruitRouter.get("/jobs/:jobId/team", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const job = await findAuthorizedJob(req.params.jobId, uid);
+    if (!job) return res.status(404).json({ error: "Job not found." });
+    if (!hasPermission(job, uid, "view_candidates")) return res.status(403).json({ error: "Forbidden." });
+    return res.json({
+      teamMembers: (job as any).teamMembers ?? [],
+      rolePermissions: (job as any).rolePermissions ?? defaultRolePermissionsConfig(),
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+recruitRouter.post("/jobs/:jobId/team/invite", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const actor = await getActorMeta(uid);
+    const job = await findAuthorizedJob(req.params.jobId, uid);
+    if (!job) return res.status(404).json({ error: "Job not found." });
+    if (!hasPermission(job, uid, "manage_team_members")) return res.status(403).json({ error: "Forbidden." });
+
+    const inviteUid = String(req.body?.uid ?? "").trim();
+    const role = String(req.body?.role ?? "recruiter").trim() as TeamRole;
+    if (!inviteUid) return res.status(400).json({ error: "uid is required." });
+    if (!VALID_TEAM_ROLES.has(role)) return res.status(400).json({ error: "Invalid role." });
+
+    const invitedUser = await User.findById(inviteUid).lean();
+    if (!invitedUser) return res.status(404).json({ error: "User not found." });
+
+    const existingMember = getJobTeamMember(job, inviteUid);
+    const permissions = sanitizePermissionList(req.body?.permissions, role);
+    const displayName = String(req.body?.displayName || (invitedUser as any)?.name || "").trim();
+    const email = String(req.body?.email || (invitedUser as any)?.email || "").trim().toLowerCase();
+    if (existingMember) {
+      await RecruitJob.updateOne(
+        { _id: req.params.jobId, "teamMembers.uid": inviteUid },
+        {
+          $set: {
+            "teamMembers.$.active": true,
+            "teamMembers.$.role": role,
+            "teamMembers.$.permissions": permissions,
+            "teamMembers.$.displayName": displayName || existingMember.displayName,
+            "teamMembers.$.email": email || existingMember.email,
+            "teamMembers.$.joinedAt": new Date(),
+          },
+        }
+      );
+    } else {
+      await RecruitJob.updateOne(
+        { _id: req.params.jobId },
+        {
+          $push: {
+            teamMembers: {
+              uid: inviteUid,
+              role,
+              displayName: displayName || email || "Team Member",
+              email,
+              permissions,
+              active: true,
+              invitedByUid: uid,
+              invitedAt: new Date(),
+              joinedAt: new Date(),
+              notificationPrefs: {
+                inApp: req.body?.notificationPrefs?.inApp !== false,
+                email: req.body?.notificationPrefs?.email !== false,
+              },
+            },
+            collaborationNotifications: {
+              id: generateToken(),
+              uid: inviteUid,
+              type: "team_invite",
+              message: `${actor.name} added you to collaborate on ${String((job as any).title || "this job")}.`,
+              jobId: req.params.jobId,
+              createdByUid: uid,
+              createdAt: new Date(),
+              emailSent: false,
+            },
+            collaborationAuditLog: {
+              id: generateToken(),
+              actorUid: uid,
+              actorName: actor.name,
+              action: "Team member invited",
+              targetType: "job",
+              targetId: inviteUid,
+              metadata: { role },
+              timestamp: new Date(),
+            },
+          },
+        }
+      );
+    }
+
+    if (email && req.body?.notificationPrefs?.email !== false) {
+      await sendEmail({
+        to: email,
+        subject: `You've been invited to collaborate on ${String((job as any).title || "a job")}`,
+        text: `${actor.name} invited you as ${role.replace(/_/g, " ")} to collaborate on ${String((job as any).title || "a job")}.\n\nSign in to view candidates and activity.`,
+        html: `<p>${actor.name} invited you as <strong>${role.replace(/_/g, " ")}</strong> to collaborate on <strong>${String((job as any).title || "a job")}</strong>.</p><p>Sign in to view candidates and activity.</p>`,
+        from: NOTIFICATION_FROM,
+      }).catch(() => null);
+    }
+
+    const updatedJob = await RecruitJob.findById(req.params.jobId).lean();
+    return res.json({
+      teamMembers: (updatedJob as any)?.teamMembers ?? [],
+      rolePermissions: (updatedJob as any)?.rolePermissions ?? defaultRolePermissionsConfig(),
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+recruitRouter.patch("/jobs/:jobId/team/:memberUid", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const actor = await getActorMeta(uid);
+    const job = await findAuthorizedJob(req.params.jobId, uid);
+    if (!job) return res.status(404).json({ error: "Job not found." });
+    if (!hasPermission(job, uid, "manage_team_members")) return res.status(403).json({ error: "Forbidden." });
+
+    const memberUid = String(req.params.memberUid || "").trim();
+    const role = req.body?.role ? String(req.body.role).trim() as TeamRole : undefined;
+    if (role && !VALID_TEAM_ROLES.has(role)) return res.status(400).json({ error: "Invalid role." });
+
+    const $set: Record<string, unknown> = {};
+    if (role) $set["teamMembers.$.role"] = role;
+    if (req.body?.displayName !== undefined) $set["teamMembers.$.displayName"] = String(req.body.displayName || "").trim();
+    if (req.body?.email !== undefined) $set["teamMembers.$.email"] = String(req.body.email || "").trim().toLowerCase();
+    if (req.body?.active !== undefined) $set["teamMembers.$.active"] = Boolean(req.body.active);
+    if (req.body?.notificationPrefs?.inApp !== undefined) $set["teamMembers.$.notificationPrefs.inApp"] = Boolean(req.body.notificationPrefs.inApp);
+    if (req.body?.notificationPrefs?.email !== undefined) $set["teamMembers.$.notificationPrefs.email"] = Boolean(req.body.notificationPrefs.email);
+    if (req.body?.permissions !== undefined) {
+      const effectiveRole = role ?? ((job as any).teamMembers?.find((m: any) => m.uid === memberUid)?.role as TeamRole) ?? "interviewer";
+      $set["teamMembers.$.permissions"] = sanitizePermissionList(req.body.permissions, effectiveRole);
+    }
+    if (!Object.keys($set).length) return res.status(400).json({ error: "No updates provided." });
+
+    await RecruitJob.updateOne(
+      { _id: req.params.jobId, "teamMembers.uid": memberUid },
+      { $set, $push: { collaborationAuditLog: {
+        id: generateToken(),
+        actorUid: uid,
+        actorName: actor.name,
+        action: "Team member updated",
+        targetType: "permission",
+        targetId: memberUid,
+        metadata: { fields: Object.keys($set) },
+        timestamp: new Date(),
+      } } }
+    );
+
+    const updatedJob = await RecruitJob.findById(req.params.jobId).lean();
+    return res.json({
+      teamMembers: (updatedJob as any)?.teamMembers ?? [],
+      rolePermissions: (updatedJob as any)?.rolePermissions ?? defaultRolePermissionsConfig(),
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+recruitRouter.delete("/jobs/:jobId/team/:memberUid", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const actor = await getActorMeta(uid);
+    const job = await findAuthorizedJob(req.params.jobId, uid);
+    if (!job) return res.status(404).json({ error: "Job not found." });
+    if (!hasPermission(job, uid, "manage_team_members")) return res.status(403).json({ error: "Forbidden." });
+    if (String((job as any).uid) === req.params.memberUid) {
+      return res.status(400).json({ error: "Owner cannot be removed from team." });
+    }
+
+    await RecruitJob.updateOne(
+      { _id: req.params.jobId, "teamMembers.uid": req.params.memberUid },
+      {
+        $set: { "teamMembers.$.active": false },
+        $push: {
+          collaborationAuditLog: {
+            id: generateToken(),
+            actorUid: uid,
+            actorName: actor.name,
+            action: "Team member removed",
+            targetType: "job",
+            targetId: req.params.memberUid,
+            timestamp: new Date(),
+          },
+        },
+      }
+    );
+    return res.json({ ok: true });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+recruitRouter.patch("/jobs/:jobId/role-permissions/:role", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const actor = await getActorMeta(uid);
+    const job = await findAuthorizedJob(req.params.jobId, uid);
+    if (!job) return res.status(404).json({ error: "Job not found." });
+    if (!hasPermission(job, uid, "manage_role_permissions")) return res.status(403).json({ error: "Forbidden." });
+
+    const role = String(req.params.role || "").trim() as TeamRole;
+    if (!VALID_TEAM_ROLES.has(role)) return res.status(400).json({ error: "Invalid role." });
+    const permissions = sanitizePermissionList(req.body?.permissions, role);
+
+    const currentConfigs = Array.isArray((job as any).rolePermissions) && (job as any).rolePermissions.length
+      ? (job as any).rolePermissions
+      : defaultRolePermissionsConfig();
+    const nextConfigs = currentConfigs.map((cfg: any) =>
+      cfg.role === role
+        ? { ...cfg, permissions, updatedByUid: uid, updatedAt: new Date() }
+        : cfg
+    );
+    const hasRoleConfig = nextConfigs.some((cfg: any) => cfg.role === role);
+    if (!hasRoleConfig) {
+      nextConfigs.push({ role, permissions, updatedByUid: uid, updatedAt: new Date() });
+    }
+
+    await RecruitJob.updateOne(
+      { _id: req.params.jobId },
+      {
+        $set: { rolePermissions: nextConfigs },
+        $push: {
+          collaborationAuditLog: {
+            id: generateToken(),
+            actorUid: uid,
+            actorName: actor.name,
+            action: "Role permissions updated",
+            targetType: "permission",
+            targetId: role,
+            metadata: { permissions },
+            timestamp: new Date(),
+          },
+        },
+      }
+    );
+
+    const updated = await RecruitJob.findById(req.params.jobId).lean();
+    return res.json({ rolePermissions: (updated as any)?.rolePermissions ?? defaultRolePermissionsConfig() });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+recruitRouter.post("/jobs/:jobId/candidates/:candidateId/comments", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const actor = await getActorMeta(uid);
+    const job = await findAuthorizedJob(req.params.jobId, uid);
+    if (!job) return res.status(404).json({ error: "Job not found." });
+    if (!hasPermission(job, uid, "add_comments")) return res.status(403).json({ error: "Forbidden." });
+
+    const body = String(req.body?.body || "").trim();
+    const richText = String(req.body?.richText || "").trim();
+    if (!body && !richText) return res.status(400).json({ error: "Comment content is required." });
+    const mentions = extractMentions(`${body}\n${richText}`);
+    const role = String(getJobTeamMember(job, uid)?.role || "admin");
+    const comment = {
+      id: generateToken(),
+      body: body.slice(0, 5000),
+      richText: richText.slice(0, 12000),
+      authorUid: uid,
+      authorName: actor.name,
+      authorRole: role,
+      mentions,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      editHistory: [],
+    };
+
+    const candidate = await RecruitCandidate.findOneAndUpdate(
+      { _id: req.params.candidateId, jobId: req.params.jobId },
+      { $push: { comments: comment } },
+      { returnDocument: "after" }
+    ).lean();
+    if (!candidate) return res.status(404).json({ error: "Candidate not found." });
+
+    await logCandidateCollaborationEvent({
+      jobId: req.params.jobId,
+      candidateId: req.params.candidateId,
+      actorUid: uid,
+      actorName: actor.name,
+      action: "Comment added",
+      category: "comment",
+      metadata: { commentId: comment.id },
+    });
+
+    const mentionUsers = mapMentionsToUsers(job, mentions).filter((member) => String(member.uid) !== uid);
+    await sendMentionNotifications({
+      job,
+      actorUid: uid,
+      actorName: actor.name,
+      candidateId: req.params.candidateId,
+      message: `Comment on candidate ${(candidate as any).name || ""}: ${body.slice(0, 240)}`,
+      mentionUsers,
+    });
+
+    return res.json({ comment });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+recruitRouter.patch("/jobs/:jobId/candidates/:candidateId/comments/:commentId", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const actor = await getActorMeta(uid);
+    const job = await findAuthorizedJob(req.params.jobId, uid);
+    if (!job) return res.status(404).json({ error: "Job not found." });
+    if (!hasPermission(job, uid, "add_comments")) return res.status(403).json({ error: "Forbidden." });
+
+    const candidate = await RecruitCandidate.findOne({ _id: req.params.candidateId, jobId: req.params.jobId });
+    if (!candidate) return res.status(404).json({ error: "Candidate not found." });
+    const comments = (candidate as any).comments ?? [];
+    const idx = comments.findIndex((item: any) => item.id === req.params.commentId);
+    if (idx < 0) return res.status(404).json({ error: "Comment not found." });
+    const comment = comments[idx];
+    if (comment.authorUid !== uid && !hasPermission(job, uid, "manage_team_members")) {
+      return res.status(403).json({ error: "Forbidden." });
+    }
+    const nextBody = String(req.body?.body ?? comment.body).trim();
+    const nextRichText = String(req.body?.richText ?? comment.richText ?? "").trim();
+    comment.editHistory = [
+      ...(comment.editHistory ?? []),
+      {
+        editedAt: new Date(),
+        editorUid: uid,
+        previousBody: comment.body,
+        previousRichText: comment.richText || "",
+      },
+    ];
+    comment.body = nextBody.slice(0, 5000);
+    comment.richText = nextRichText.slice(0, 12000);
+    comment.mentions = extractMentions(`${nextBody}\n${nextRichText}`);
+    comment.updatedAt = new Date();
+    comments[idx] = comment;
+    (candidate as any).comments = comments;
+    await candidate.save();
+
+    await logCandidateCollaborationEvent({
+      jobId: req.params.jobId,
+      candidateId: req.params.candidateId,
+      actorUid: uid,
+      actorName: actor.name,
+      action: "Comment edited",
+      category: "comment",
+      metadata: { commentId: comment.id },
+    });
+    return res.json({ comment });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+recruitRouter.post("/jobs/:jobId/candidates/:candidateId/internal-notes", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const actor = await getActorMeta(uid);
+    const job = await findAuthorizedJob(req.params.jobId, uid);
+    if (!job) return res.status(404).json({ error: "Job not found." });
+    if (!hasPermission(job, uid, "add_internal_notes")) return res.status(403).json({ error: "Forbidden." });
+
+    const body = String(req.body?.body || "").trim();
+    const richText = String(req.body?.richText || "").trim();
+    if (!body && !richText) return res.status(400).json({ error: "Note content is required." });
+    const mentions = extractMentions(`${body}\n${richText}`);
+    const note = {
+      id: generateToken(),
+      body: body.slice(0, 6000),
+      richText: richText.slice(0, 12000),
+      visibility: "internal",
+      authorUid: uid,
+      authorName: actor.name,
+      mentions,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      editHistory: [],
+    };
+    const candidate = await RecruitCandidate.findOneAndUpdate(
+      { _id: req.params.candidateId, jobId: req.params.jobId },
+      { $push: { internalNotes: note } },
+      { returnDocument: "after" }
+    ).lean();
+    if (!candidate) return res.status(404).json({ error: "Candidate not found." });
+
+    await logCandidateCollaborationEvent({
+      jobId: req.params.jobId,
+      candidateId: req.params.candidateId,
+      actorUid: uid,
+      actorName: actor.name,
+      action: "Internal note added",
+      category: "internal_note",
+      metadata: { noteId: note.id },
+    });
+
+    const mentionUsers = mapMentionsToUsers(job, mentions).filter((member) => String(member.uid) !== uid);
+    await sendMentionNotifications({
+      job,
+      actorUid: uid,
+      actorName: actor.name,
+      candidateId: req.params.candidateId,
+      message: `Internal note on candidate ${(candidate as any).name || ""}: ${body.slice(0, 240)}`,
+      mentionUsers,
+    });
+
+    return res.json({ note });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+recruitRouter.patch("/jobs/:jobId/candidates/:candidateId/internal-notes/:noteId", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const actor = await getActorMeta(uid);
+    const job = await findAuthorizedJob(req.params.jobId, uid);
+    if (!job) return res.status(404).json({ error: "Job not found." });
+    if (!hasPermission(job, uid, "add_internal_notes")) return res.status(403).json({ error: "Forbidden." });
+
+    const candidate = await RecruitCandidate.findOne({ _id: req.params.candidateId, jobId: req.params.jobId });
+    if (!candidate) return res.status(404).json({ error: "Candidate not found." });
+    const notes = (candidate as any).internalNotes ?? [];
+    const idx = notes.findIndex((item: any) => item.id === req.params.noteId);
+    if (idx < 0) return res.status(404).json({ error: "Note not found." });
+    const note = notes[idx];
+    if (note.authorUid !== uid && !hasPermission(job, uid, "manage_team_members")) {
+      return res.status(403).json({ error: "Forbidden." });
+    }
+    const nextBody = String(req.body?.body ?? note.body).trim();
+    const nextRichText = String(req.body?.richText ?? note.richText ?? "").trim();
+    note.editHistory = [
+      ...(note.editHistory ?? []),
+      {
+        editedAt: new Date(),
+        editorUid: uid,
+        previousBody: note.body,
+        previousRichText: note.richText || "",
+      },
+    ];
+    note.body = nextBody.slice(0, 6000);
+    note.richText = nextRichText.slice(0, 12000);
+    note.mentions = extractMentions(`${nextBody}\n${nextRichText}`);
+    note.updatedAt = new Date();
+    notes[idx] = note;
+    (candidate as any).internalNotes = notes;
+    await candidate.save();
+
+    await logCandidateCollaborationEvent({
+      jobId: req.params.jobId,
+      candidateId: req.params.candidateId,
+      actorUid: uid,
+      actorName: actor.name,
+      action: "Internal note edited",
+      category: "internal_note",
+      metadata: { noteId: note.id },
+    });
+
+    return res.json({ note });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+recruitRouter.post("/jobs/:jobId/candidates/:candidateId/assignments", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const actor = await getActorMeta(uid);
+    const job = await findAuthorizedJob(req.params.jobId, uid);
+    if (!job) return res.status(404).json({ error: "Job not found." });
+    if (!hasPermission(job, uid, "assign_candidates")) return res.status(403).json({ error: "Forbidden." });
+
+    const assigneeUid = String(req.body?.uid || "").trim();
+    if (!assigneeUid) return res.status(400).json({ error: "uid is required." });
+    const teamMember = getJobTeamMember(job, assigneeUid);
+    if (!teamMember && assigneeUid !== String((job as any).uid || "")) {
+      return res.status(400).json({ error: "Assignee is not part of this team." });
+    }
+    const assignment = {
+      uid: assigneeUid,
+      role: String(req.body?.role || teamMember?.role || "").trim(),
+      assignedByUid: uid,
+      assignedAt: new Date(),
+    };
+    await RecruitCandidate.updateOne(
+      { _id: req.params.candidateId, jobId: req.params.jobId },
+      {
+        $pull: { assignments: { uid: assigneeUid } },
+      }
+    );
+    const candidate = await RecruitCandidate.findOneAndUpdate(
+      { _id: req.params.candidateId, jobId: req.params.jobId },
+      { $push: { assignments: assignment } },
+      { returnDocument: "after" }
+    ).lean();
+    if (!candidate) return res.status(404).json({ error: "Candidate not found." });
+
+    await logCandidateCollaborationEvent({
+      jobId: req.params.jobId,
+      candidateId: req.params.candidateId,
+      actorUid: uid,
+      actorName: actor.name,
+      action: "Candidate assigned",
+      category: "assignment",
+      metadata: { assigneeUid, role: assignment.role },
+    });
+
+    await RecruitJob.updateOne(
+      { _id: req.params.jobId },
+      {
+        $push: {
+          collaborationNotifications: {
+            id: generateToken(),
+            uid: assigneeUid,
+            type: "assignment",
+            message: `${actor.name} assigned you to candidate ${(candidate as any).name || ""}.`,
+            jobId: req.params.jobId,
+            candidateId: req.params.candidateId,
+            createdByUid: uid,
+            createdAt: new Date(),
+            emailSent: false,
+          },
+        },
+      }
+    );
+
+    const assigneeEmail = String((teamMember as any)?.email || "").trim();
+    if (assigneeEmail && (teamMember as any)?.notificationPrefs?.email !== false) {
+      await sendEmail({
+        to: assigneeEmail,
+        subject: `Candidate assigned: ${(candidate as any).name || "Candidate"}`,
+        text: `${actor.name} assigned you to candidate ${(candidate as any).name || ""} for ${String((job as any).title || "this role")}.`,
+        html: `<p>${actor.name} assigned you to candidate <strong>${(candidate as any).name || ""}</strong> for <strong>${String((job as any).title || "this role")}</strong>.</p>`,
+        from: NOTIFICATION_FROM,
+      }).catch(() => null);
+    }
+
+    return res.json({ assignments: (candidate as any).assignments ?? [] });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+recruitRouter.delete("/jobs/:jobId/candidates/:candidateId/assignments/:assigneeUid", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const actor = await getActorMeta(uid);
+    const job = await findAuthorizedJob(req.params.jobId, uid);
+    if (!job) return res.status(404).json({ error: "Job not found." });
+    if (!hasPermission(job, uid, "assign_candidates")) return res.status(403).json({ error: "Forbidden." });
+    const assigneeUid = String(req.params.assigneeUid || "").trim();
+
+    await RecruitCandidate.updateOne(
+      { _id: req.params.candidateId, jobId: req.params.jobId },
+      { $pull: { assignments: { uid: assigneeUid } } }
+    );
+    await logCandidateCollaborationEvent({
+      jobId: req.params.jobId,
+      candidateId: req.params.candidateId,
+      actorUid: uid,
+      actorName: actor.name,
+      action: "Candidate unassigned",
+      category: "assignment",
+      metadata: { assigneeUid },
+    });
+    return res.json({ ok: true });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+recruitRouter.get("/jobs/:jobId/candidates/:candidateId/activity", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const job = await findAuthorizedJob(req.params.jobId, uid);
+    if (!job) return res.status(404).json({ error: "Job not found." });
+    if (!hasPermission(job, uid, "view_candidates")) return res.status(403).json({ error: "Forbidden." });
+    const candidate = await RecruitCandidate.findOne(
+      { _id: req.params.candidateId, jobId: req.params.jobId },
+      { activityTimeline: 1, auditLog: 1 }
+    ).lean();
+    if (!candidate) return res.status(404).json({ error: "Candidate not found." });
+    return res.json({
+      activityTimeline: (candidate as any).activityTimeline ?? [],
+      auditLog: (candidate as any).auditLog ?? [],
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+recruitRouter.get("/jobs/:jobId/collaboration/audit-log", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const job = await findAuthorizedJob(req.params.jobId, uid);
+    if (!job) return res.status(404).json({ error: "Job not found." });
+    if (!hasPermission(job, uid, "view_candidates")) return res.status(403).json({ error: "Forbidden." });
+    const candidateId = String(req.query.candidateId ?? "").trim();
+    const baseEntries = ((job as any).collaborationAuditLog ?? []) as any[];
+    const filtered = candidateId ? baseEntries.filter((entry) => String(entry?.candidateId || "") === candidateId) : baseEntries;
+    return res.json({ entries: filtered.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()) });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+recruitRouter.get("/jobs/:jobId/notifications", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const job = await findAuthorizedJob(req.params.jobId, uid);
+    if (!job) return res.status(404).json({ error: "Job not found." });
+    const notifications = ((job as any).collaborationNotifications ?? [])
+      .filter((entry: any) => entry.uid === uid)
+      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return res.json({ notifications });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+recruitRouter.post("/jobs/:jobId/notifications/:notificationId/read", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const job = await findAuthorizedJob(req.params.jobId, uid);
+    if (!job) return res.status(404).json({ error: "Job not found." });
+    await RecruitJob.updateOne(
+      { _id: req.params.jobId, "collaborationNotifications.id": req.params.notificationId, "collaborationNotifications.uid": uid },
+      { $set: { "collaborationNotifications.$.readAt": new Date() } }
+    );
+    return res.json({ ok: true });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
