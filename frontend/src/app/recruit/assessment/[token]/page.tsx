@@ -3,6 +3,15 @@
 import { useState, useEffect, useCallback, use, useRef } from "react";
 import { apiUrl, readApiJson } from "@/lib/api";
 
+// Fire-and-forget: ping the backend with the candidate's current question index
+function pingProgress(token: string, questionIndex: number) {
+  fetch(apiUrl(`/recruit-public/assessment/${token}/progress`), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ questionIndex }),
+  }).catch(() => {/* silently ignore — progress tracking is best-effort */});
+}
+
 type Question = { id: string; text: string };
 
 type AssessmentData = {
@@ -44,6 +53,8 @@ export default function AssessmentPage({ params }: { params: Promise<{ token: st
         const json = await readApiJson(res);
         if (!res.ok) throw new Error(json.error || "Assessment not found.");
         setData(json);
+        // Ping backend that assessment has started (question 0)
+        pingProgress(token, 0);
       } catch (e: any) {
         setError(e.message || "Failed to load assessment.");
       } finally {
@@ -68,7 +79,9 @@ export default function AssessmentPage({ params }: { params: Promise<{ token: st
     if (!q) return;
     const elapsed = Math.round((Date.now() - questionStartRef.current) / 1000);
     setTimings(prev => ({ ...prev, [q.id]: elapsed }));
-    setCurrentQ(c => Math.min(c + 1, questions.length - 1));
+    const nextQ = Math.min(currentQ + 1, questions.length - 1);
+    setCurrentQ(nextQ);
+    pingProgress(token, nextQ);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 

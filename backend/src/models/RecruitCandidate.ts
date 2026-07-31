@@ -78,6 +78,8 @@ export interface IRecruitCandidate extends Document {
   assessmentSentAt?: Date;
   assessmentCompletedAt?: Date;
   assessmentReminderSentAt?: Date;
+  assessmentStartedAt?: Date;
+  currentQuestionIndex?: number;
   assessmentQuestions: IAssessmentQuestion[];
   assessmentAnswers: IAssessmentAnswer[];
   previousResumeScore: number;
@@ -216,6 +218,8 @@ const RecruitCandidateSchema = new Schema<IRecruitCandidate>(
     assessmentSentAt: { type: Date },
     assessmentCompletedAt: { type: Date },
     assessmentReminderSentAt: { type: Date },
+    assessmentStartedAt: { type: Date },
+    currentQuestionIndex: { type: Number, default: null },
     assessmentQuestions: { type: [AssessmentQuestionSchema], default: [] },
     assessmentAnswers: { type: [AssessmentAnswerSchema], default: [] },
     previousResumeScore: { type: Number, default: 0 },
