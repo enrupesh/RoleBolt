@@ -161,8 +161,8 @@ export default function CollaborationTab({ jobId, token, candidates, initialData
   const [busy, setBusy] = useState("");
   const [comment, setComment] = useState("");
   const [note, setNote] = useState("");
-  const [feedback, setFeedback] = useState("");
-  const [feedbackRating, setFeedbackRating] = useState("");
+  const [feedbackRatings, setFeedbackRatings] = useState<Record<string, string>>({});
+  const [feedbackComment, setFeedbackComment] = useState("");
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [editingCommentId, setEditingCommentId] = useState("");
   const [editingCommentBody, setEditingCommentBody] = useState("");
@@ -281,15 +281,24 @@ export default function CollaborationTab({ jobId, token, candidates, initialData
   }
 
   async function addInterviewFeedback() {
-    if (!selectedCandidate || !feedback.trim()) return;
+    const hasRatings = Object.values(feedbackRatings).some(v => v !== "");
+    if (!selectedCandidate || (!feedbackComment.trim() && !hasRatings)) return;
     setBusy("interview-feedback"); setError(""); setNotice("");
+    const ratingsPayload: Record<string, number> = {};
+    for (const [key, val] of Object.entries(feedbackRatings)) {
+      if (val !== "") ratingsPayload[key] = Number(val);
+    }
     try {
       await request(`/candidates/${selectedCandidate}/interview-feedback`, {
         method: "POST",
-        body: JSON.stringify({ body: feedback.trim(), rating: feedbackRating || undefined }),
+        body: JSON.stringify({
+          body: feedbackComment.trim(),
+          ratings: Object.keys(ratingsPayload).length ? ratingsPayload : undefined,
+        }),
       });
-      setFeedback(""); setFeedbackRating("");
-      setNotice("Interview feedback submitted.");
+      setFeedbackRatings({});
+      setFeedbackComment("");
+      setNotice("Structured interview feedback submitted.");
       await loadCandidateDetails(selectedCandidate); await load(); await onRefresh?.();
     } catch (e) { setError(e instanceof Error ? e.message : "Could not save interview feedback."); }
     finally { setBusy(""); }
@@ -416,9 +425,49 @@ export default function CollaborationTab({ jobId, token, candidates, initialData
             </div>
           )}
           <div className="mt-4 border-t border-slate-100 pt-4">
-            <div className="mb-2 flex items-center justify-between"><p className="text-[10px] font-bold uppercase tracking-widest text-indigo-600">Submit interview feedback</p><select value={feedbackRating} onChange={(e) => setFeedbackRating(e.target.value)} disabled={!selectedCandidate} className="rb-input w-24 py-1.5 text-xs"><option value="">Rating</option>{[1, 2, 3, 4, 5].map((value) => <option key={value} value={value}>{value}/5</option>)}</select></div>
-            <textarea value={feedback} onChange={(e) => setFeedback(e.target.value)} disabled={!selectedCandidate} rows={3} placeholder="Share interview observations and evaluation notes…" className="rb-input mb-2 h-auto resize-none border-indigo-200 bg-indigo-50/30 py-3" data-testid="textarea-interview-feedback" />
-            <button type="button" onClick={() => void addInterviewFeedback()} disabled={!selectedCandidate || !feedback.trim() || busy === "interview-feedback" || !data?.permissions?.includes("submit_feedback") && !data?.isOwner} className="rb-btn rb-btn-secondary rb-btn-sm border-indigo-200 text-indigo-700 hover:bg-indigo-50" data-testid="button-submit-interview-feedback">{busy === "interview-feedback" ? "Submitting…" : <><ClipboardList size={14} /> Submit feedback</>}</button>
+            <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-indigo-600">Submit structured interview feedback</p>
+            <div className="space-y-2 rounded-xl border border-indigo-100 bg-indigo-50/30 p-3">
+              {([
+                ["technicalSkills", "Technical Skills"],
+                ["communicationSkills", "Communication Skills"],
+                ["problemSolving", "Problem Solving"],
+                ["cultureFit", "Culture Fit"],
+                ["leadership", "Leadership (optional)"],
+                ["roleSpecificSkills", "Role-Specific Skills"],
+                ["overallRecommendation", "Overall Recommendation"],
+              ] as const).map(([key, label]) => (
+                <div key={key} className="flex items-center justify-between gap-3">
+                  <span className="min-w-0 text-xs text-slate-600 shrink-0">{label}</span>
+                  <select
+                    value={feedbackRatings[key] ?? ""}
+                    onChange={e => setFeedbackRatings(prev => ({ ...prev, [key]: e.target.value }))}
+                    disabled={!selectedCandidate}
+                    className="rb-input w-28 shrink-0 py-1 text-xs"
+                  >
+                    <option value="">—</option>
+                    {[1, 2, 3, 4, 5].map(v => <option key={v} value={v}>{v} / 5</option>)}
+                  </select>
+                </div>
+              ))}
+            </div>
+            <textarea
+              value={feedbackComment}
+              onChange={e => setFeedbackComment(e.target.value)}
+              disabled={!selectedCandidate}
+              rows={3}
+              placeholder="Additional interview observations and notes…"
+              className="rb-input mt-2 mb-2 h-auto resize-none border-indigo-200 bg-indigo-50/30 py-3"
+              data-testid="textarea-interview-feedback"
+            />
+            <button
+              type="button"
+              onClick={() => void addInterviewFeedback()}
+              disabled={!selectedCandidate || busy === "interview-feedback" || (feedbackComment.trim() === "" && !Object.values(feedbackRatings).some(v => v !== "")) || (!data?.permissions?.includes("submit_feedback") && !data?.isOwner)}
+              className="rb-btn rb-btn-secondary rb-btn-sm border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+              data-testid="button-submit-interview-feedback"
+            >
+              {busy === "interview-feedback" ? "Submitting…" : <><ClipboardList size={14} /> Submit feedback</>}
+            </button>
           </div>
         </div>
 
