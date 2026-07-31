@@ -3596,6 +3596,328 @@ recruitRouter.get("/jobs/:jobId/assessment-analytics/export", async (req, res) =
   }
 });
 
+// ─── Comprehensive Job Analysis ──────────────────────────────────────────────
+
+recruitRouter.get("/jobs/:jobId/job-analysis", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "Unauthorized" });
+
+    const job = await RecruitJob.findOne({ _id: req.params.jobId, uid }).lean() as any;
+    if (!job) return res.status(404).json({ error: "Job not found." });
+
+    const allCandidates = await RecruitCandidate.find({ jobId: req.params.jobId, uid }).lean() as any[];
+
+    const now = Date.now();
+    const jobCreated = new Date(job.createdAt).getTime();
+    const activeDays = Math.max(1, Math.round((now - jobCreated) / 86400000));
+
+    // ── Score helpers ─────────────────────────────────────────────────────────
+    function scorePct(c: any): number | null {
+      if (!c.maxScore || c.maxScore <= 0) return null;
+      return Math.round((c.totalScore / c.maxScore) * 100);
+    }
+
+    const allScores = allCandidates.map(scorePct).filter((s): s is number => s !== null);
+    const avgScore = allScores.length > 0 ? Math.round(allScores.reduce((a, b) => a + b, 0) / allScores.length) : null;
+    const topScore = allScores.length > 0 ? Math.max(...allScores) : null;
+
+    // ── Stage counts ──────────────────────────────────────────────────────────
+    const STAGES = ["applied", "screened", "assessed", "interview", "offer", "hired", "rejected"] as const;
+    const stageCounts: Record<string, number> = {};
+    for (const s of STAGES) stageCounts[s] = 0;
+    for (const c of allCandidates) {
+      if (stageCounts[c.stage] !== undefined) stageCounts[c.stage]++;
+    }
+
+    const hiredCount      = stageCounts["hired"];
+    const rejectedCount   = stageCounts["rejected"];
+    const activeStages    = ["applied", "screened", "assessed", "interview", "offer"] as const;
+    const totalActive     = activeStages.reduce((s, st) => s + stageCounts[st], 0);
+    const totalCandidates = allCandidates.length;
+
+    // ── Pipeline funnel ───────────────────────────────────────────────────────
+    const FUNNEL_STAGES = ["applied", "screened", "assessed", "interview", "offer", "hired"] as const;
+    const funnelStages = FUNNEL_STAGES.map((stage, i) => {
+      const count = stageCounts[stage] ?? 0;
+      // Cumulative count through this stage = everyone at this stage or further (except rejected)
+      const cumulative = FUNNEL_STAGES.slice(i).reduce((s, st) => s + (stageCounts[st] ?? 0), 0) + (stageCounts["rejected"] ?? 0);
+      const prevCumulative = i === 0
+        ? totalCandidates
+        : FUNNEL_STAGES.slice(i - 1).reduce((s, st) => s + (stageCounts[st] ?? 0), 0) + (stageCounts["rejected"] ?? 0);
+
+      // Conversion rate from previous stage
+      const conversionRate = (i === 0 || prevCumulative === 0)
+        ? null
+        : Math.round((cumulative / prevCumulative) * 100);
+
+      // Avg days in this stage (approx: for candidates currently here, days since stageMovedAt)
+      const inStage = allCandidates.filter((c: any) => c.stage === stage);
+      let avgDays: number | null = null;
+      if (inStage.length > 0) {
+        const days = inStage
+          .map((c: any) => c.stageMovedAt ? Math.round((now - new Date(c.stageMovedAt).getTime()) / 86400000) : null)
+          .filter((d: number | null): d is number => d !== null && d >= 0);
+        if (days.length > 0) avgDays = Math.round(days.reduce((a, b) => a + b, 0) / days.length);
+      }
+
+      return {
+        stage,
+        label: stage.charAt(0).toUpperCase() + stage.slice(1),
+        count,
+        pct: totalCandidates > 0 ? Math.round((count / totalCandidates) * 100) : 0,
+        conversionRate,
+        avgDaysInStage: avgDays,
+      };
+    });
+
+    // Bottleneck: active stage with highest absolute count (most candidates stuck)
+    const activeWithCount = funnelStages.filter(s => s.stage !== "hired" && s.count > 0);
+    const bottleneck = activeWithCount.length > 0
+      ? activeWithCount.reduce((a, b) => (a.count > b.count ? a : b)).stage
+      : null;
+
+    // ── Score distribution tiers ──────────────────────────────────────────────
+    const scoreBuckets = [
+      { range: "0–20",   min: 0,  max: 20,  count: 0 },
+      { range: "21–40",  min: 21, max: 40,  count: 0 },
+      { range: "41–60",  min: 41, max: 60,  count: 0 },
+      { range: "61–80",  min: 61, max: 80,  count: 0 },
+      { range: "81–100", min: 81, max: 100, count: 0 },
+    ];
+    for (const s of allScores) {
+      const b = scoreBuckets.find(bk => s >= bk.min && s <= bk.max);
+      if (b) b.count++;
+    }
+
+    const scoreDist = scoreBuckets.map(({ min: _m, max: _x, ...rest }) => ({
+      ...rest,
+      pct: allScores.length > 0 ? Math.round((rest.count / allScores.length) * 100) : 0,
+    }));
+
+    const excellent = allScores.filter(s => s >= 80).length;
+    const good      = allScores.filter(s => s >= 60 && s < 80).length;
+    const average   = allScores.filter(s => s >= 40 && s < 60).length;
+    const low       = allScores.filter(s => s < 40).length;
+    const scoringFailedCount = allCandidates.filter((c: any) => c.scoringFailed).length;
+
+    // ── Application timeline (daily) ─────────────────────────────────────────
+    const dayMap: Record<string, number> = {};
+    for (const c of allCandidates) {
+      const day = new Date(c.createdAt).toISOString().slice(0, 10);
+      dayMap[day] = (dayMap[day] || 0) + 1;
+    }
+    const sortedDays = Object.entries(dayMap).sort((a, b) => a[0].localeCompare(b[0]));
+    let cumulative = 0;
+    const timeline = sortedDays.map(([date, count]) => {
+      cumulative += count;
+      return { date, count, cumulative };
+    });
+
+    // Weekly avg applications
+    const totalDays = sortedDays.length;
+    const weeklyAvg = totalDays > 0 ? Math.round((totalCandidates / Math.max(1, activeDays)) * 7 * 10) / 10 : 0;
+    const peakEntry = sortedDays.length > 0 ? sortedDays.reduce((a, b) => a[1] >= b[1] ? a : b) : null;
+
+    // ── Source breakdown ──────────────────────────────────────────────────────
+    const srcMap: Record<string, { total: number; hired: number; rejected: number }> = {};
+    for (const c of allCandidates) {
+      const src = c.source?.trim() || "Direct / Unknown";
+      if (!srcMap[src]) srcMap[src] = { total: 0, hired: 0, rejected: 0 };
+      srcMap[src].total++;
+      if (c.stage === "hired")    srcMap[src].hired++;
+      if (c.stage === "rejected") srcMap[src].rejected++;
+    }
+    const sources = Object.entries(srcMap)
+      .map(([source, d]) => ({
+        source,
+        count: d.total,
+        pct: totalCandidates > 0 ? Math.round((d.total / totalCandidates) * 100) : 0,
+        hireCount: d.hired,
+        hireRate: d.total > 0 ? Math.round((d.hired / d.total) * 100) : null,
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8);
+
+    // ── Assessment summary ────────────────────────────────────────────────────
+    const allSent      = allCandidates.filter((c: any) => c.assessmentStatus !== "not_sent");
+    const allCompleted = allCandidates.filter((c: any) => c.assessmentStatus === "completed");
+    const assessCompletedScores = allCompleted
+      .map(scorePct)
+      .filter((s: number | null): s is number => s !== null);
+    const assessAvgScore = assessCompletedScores.length > 0
+      ? Math.round(assessCompletedScores.reduce((a: number, b: number) => a + b, 0) / assessCompletedScores.length)
+      : null;
+    const passCount  = allCompleted.filter((c: any) => c.hiringDecision === "strong_yes").length;
+    const assessPassRate = allCompleted.length > 0 ? Math.round((passCount / allCompleted.length) * 100) : null;
+
+    // ── Offer tracking ────────────────────────────────────────────────────────
+    const offerCandidates = allCandidates.filter((c: any) => c.stage === "offer" || c.stage === "hired");
+    const offerSent     = offerCandidates.filter((c: any) => c.offerStatus === "sent" || c.offerStatus === "approved" || c.offerCandidateStatus === "accepted" || c.offerCandidateStatus === "declined").length;
+    const offerAccepted = offerCandidates.filter((c: any) => c.offerCandidateStatus === "accepted" || c.stage === "hired").length;
+    const offerDeclined = offerCandidates.filter((c: any) => c.offerCandidateStatus === "declined").length;
+    const offerPending  = offerCandidates.filter((c: any) => c.offerCandidateStatus === "pending" || c.offerCandidateStatus === "viewed").length;
+    const acceptanceRate = offerSent > 0 ? Math.round((offerAccepted / offerSent) * 100) : null;
+
+    // ── Time-to-hire ──────────────────────────────────────────────────────────
+    const hiredCandidates = allCandidates.filter((c: any) => c.stage === "hired");
+    const tthDays = hiredCandidates
+      .map((c: any) => {
+        const applied = new Date(c.createdAt).getTime();
+        const hired   = new Date(c.updatedAt).getTime();
+        return Math.round((hired - applied) / 86400000);
+      })
+      .filter((d: number) => d >= 0 && d < 365);
+    const avgTimeToHireDays = tthDays.length > 0
+      ? Math.round(tthDays.reduce((a: number, b: number) => a + b, 0) / tthDays.length)
+      : null;
+
+    // ── AI Health Score + Insights ────────────────────────────────────────────
+    const aiPrompt = `You are a recruitment intelligence analyst. Analyze this job posting's hiring data and return structured insights.
+
+JOB: "${job.title}" at "${job.companyName || 'the company'}" (${job.department || job.niche || ''})
+STATUS: ${job.status} | Posted ${activeDays} day${activeDays !== 1 ? 's' : ''} ago | ${job.openings || 1} opening${(job.openings || 1) !== 1 ? 's' : ''}
+
+PIPELINE DATA:
+- Total candidates: ${totalCandidates}
+- Applied: ${stageCounts['applied']}, Screened: ${stageCounts['screened']}, Assessed: ${stageCounts['assessed']}, Interview: ${stageCounts['interview']}, Offer: ${stageCounts['offer']}, Hired: ${hiredCount}, Rejected: ${rejectedCount}
+- Bottleneck stage: ${bottleneck || 'none identified'}
+- Weekly application rate: ${weeklyAvg}/week
+
+CANDIDATE QUALITY:
+- Average resume score: ${avgScore !== null ? avgScore + '%' : 'N/A'}
+- Score distribution: Excellent (80+): ${excellent}, Good (60-79): ${good}, Average (40-59): ${average}, Low (<40): ${low}
+- Scoring failed: ${scoringFailedCount}
+
+ASSESSMENT:
+- Sent: ${allSent.length}, Completed: ${allCompleted.length}, Completion rate: ${allSent.length > 0 ? Math.round((allCompleted.length / allSent.length) * 100) : 0}%
+- Assessment avg score: ${assessAvgScore !== null ? assessAvgScore + '%' : 'N/A'}
+- Pass rate: ${assessPassRate !== null ? assessPassRate + '%' : 'N/A'}
+
+OFFERS:
+- Offer acceptance rate: ${acceptanceRate !== null ? acceptanceRate + '%' : 'N/A'}
+- Offers sent: ${offerSent}, Accepted: ${offerAccepted}, Declined: ${offerDeclined}
+
+TIME METRICS:
+- Avg time-to-hire: ${avgTimeToHireDays !== null ? avgTimeToHireDays + ' days' : 'no hires yet'}
+
+Return ONLY valid JSON (no markdown) with this exact shape:
+{
+  "healthScore": <number 0-100>,
+  "healthLabel": <"Excellent" | "Good" | "Needs Attention" | "At Risk">,
+  "insights": [
+    { "type": <"success" | "warning" | "danger" | "info">, "title": "<short title>", "detail": "<1-2 sentence explanation>", "action": "<optional actionable suggestion>" }
+  ]
+}
+
+Guidelines:
+- healthScore: weight pipeline activity (25%), candidate quality (25%), conversion efficiency (25%), time-to-hire (25%)
+- Provide 4-6 insights covering: pipeline health, quality of candidates, bottlenecks, time efficiency, recommendations
+- Be specific and actionable — reference actual numbers from the data
+- type "success" = doing well, "warning" = could improve, "danger" = needs immediate action, "info" = general observation`;
+
+    let aiResult: { healthScore: number; healthLabel: string; insights: any[] } = {
+      healthScore: 50,
+      healthLabel: "Needs Attention",
+      insights: [],
+    };
+
+    try {
+      const rawAI = await callGeminiChain({
+        prompt: aiPrompt,
+        temperature: 0.3,
+        maxOutputTokens: 3000,
+        jsonMode: true,
+      });
+      const parsed = JSON.parse(rawAI.trim());
+      if (parsed && typeof parsed.healthScore === "number" && Array.isArray(parsed.insights)) {
+        aiResult = {
+          healthScore: Math.min(100, Math.max(0, Math.round(parsed.healthScore))),
+          healthLabel: parsed.healthLabel || "Needs Attention",
+          insights: parsed.insights.slice(0, 6).map((ins: any) => ({
+            type:   ins.type   || "info",
+            title:  ins.title  || "",
+            detail: ins.detail || "",
+            action: ins.action || null,
+          })),
+        };
+      }
+    } catch (aiErr: any) {
+      console.warn("[job-analysis] AI health score skipped:", aiErr?.message);
+      // Fallback heuristic score
+      let hs = 50;
+      if (totalCandidates > 10) hs += 10;
+      if (hiredCount > 0) hs += 15;
+      if (avgScore !== null && avgScore >= 65) hs += 10;
+      if (allCompleted.length > 0 && assessPassRate !== null && assessPassRate >= 50) hs += 10;
+      aiResult.healthScore = Math.min(100, hs);
+      aiResult.healthLabel = hs >= 80 ? "Excellent" : hs >= 65 ? "Good" : hs >= 45 ? "Needs Attention" : "At Risk";
+    }
+
+    return res.json({
+      overview: {
+        totalCandidates,
+        activeDays,
+        jobStatus: job.status,
+        openings: job.openings || 1,
+        applicationDeadline: job.applicationDeadline ? new Date(job.applicationDeadline).toISOString() : null,
+        avgScore,
+        topScore,
+        hiredCount,
+        offerSentCount:     offerSent,
+        offerAcceptedCount: offerAccepted,
+        rejectedCount,
+        timeToHireDays: avgTimeToHireDays,
+        weeklyApplicationRate: weeklyAvg,
+        totalActive,
+      },
+      pipeline: {
+        stages: funnelStages,
+        bottleneck,
+        totalActive,
+        rejected: rejectedCount,
+      },
+      quality: {
+        scoreDistribution: scoreDist,
+        avgScore,
+        topScore,
+        scoringFailedCount,
+        candidatesByTier: { excellent, good, average, low },
+        totalScored: allScores.length,
+      },
+      timeline: {
+        daily: timeline,
+        weeklyAvg,
+        peakDay: peakEntry?.[0] ?? null,
+        peakCount: peakEntry?.[1] ?? 0,
+      },
+      sources,
+      assessment: {
+        sent:           allSent.length,
+        completed:      allCompleted.length,
+        completionRate: allSent.length > 0 ? Math.round((allCompleted.length / allSent.length) * 100) : 0,
+        avgScore:       assessAvgScore,
+        passRate:       assessPassRate,
+        passCount,
+        maybeCount:     allCompleted.filter((c: any) => c.hiringDecision === "maybe").length,
+        failCount:      allCompleted.filter((c: any) => c.hiringDecision === "no").length,
+      },
+      offers: {
+        sent:            offerSent,
+        accepted:        offerAccepted,
+        declined:        offerDeclined,
+        pending:         offerPending,
+        acceptanceRate,
+      },
+      ai: aiResult,
+    });
+  } catch (err: any) {
+    console.error("[recruit] GET /job-analysis", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── Live Assessment Progress ────────────────────────────────────────────────
 recruitRouter.get("/jobs/:jobId/live-assessment-progress", async (req, res) => {
   try {
