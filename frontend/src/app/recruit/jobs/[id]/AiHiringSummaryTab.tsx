@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { apiUrl, readApiJson } from "@/lib/api";
 import {
   AlertTriangle,
@@ -11,10 +11,13 @@ import {
   ChevronRight,
   Clock,
   Loader2,
+  MessageSquare,
   RefreshCw,
   ShieldAlert,
   ThumbsDown,
   ThumbsUp,
+  UserCheck,
+  UserX,
   XCircle,
 } from "lucide-react";
 
@@ -33,6 +36,15 @@ type AiSynthesis = {
   recruiterDecision?: "accepted" | "overridden" | "ignored";
   recruiterDecisionNote?: string;
   recruiterDecisionAt?: string;
+};
+
+type InterviewFeedbackEntry = {
+  _id?: string;
+  body?: string;
+  rating?: number;
+  ratings?: Record<string, number>;
+  author?: { name: string; email: string };
+  createdAt?: string;
 };
 
 type Candidate = {
@@ -134,6 +146,47 @@ function Section({ title, children, defaultOpen = true }: { title: string; child
   );
 }
 
+/* ─── Interview Feedback Status Banner ────────────────────────────────────────*/
+function InterviewFeedbackRequiredBanner({ feedback }: { feedback: InterviewFeedbackEntry[] }) {
+  const submitters = feedback.map(f => f.author?.name ?? "Unknown").filter(Boolean);
+
+  return (
+    <div className="rb-card border-amber-200 bg-amber-50 overflow-hidden">
+      <div className="px-5 py-4 flex items-start gap-3">
+        <div className="rounded-xl bg-amber-100 p-2 text-amber-600 shrink-0">
+          <MessageSquare size={18} />
+        </div>
+        <div className="flex-1">
+          <p className="font-bold text-amber-900 text-sm">Interview Feedback Required</p>
+          <p className="mt-1 text-sm text-amber-800 leading-5">
+            AI Recommendation is unavailable because the required interview feedback has not yet been submitted.
+            Once all interviewers submit their feedback, the AI Hiring Summary can be generated.
+          </p>
+
+          {submitters.length > 0 && (
+            <div className="mt-3 space-y-1.5">
+              <p className="text-xs font-bold uppercase tracking-widest text-amber-700">Feedback received from:</p>
+              {submitters.map((name, i) => (
+                <div key={i} className="flex items-center gap-2 text-sm text-amber-900">
+                  <UserCheck size={13} className="text-emerald-600 shrink-0" />
+                  {name} – <span className="text-emerald-700 font-medium">Submitted</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {submitters.length === 0 && (
+            <div className="mt-3 flex items-center gap-2 text-sm text-amber-900">
+              <UserX size={13} className="text-amber-600 shrink-0" />
+              No interviewers have submitted feedback yet.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─── main component ──────────────────────────────────────────────────────────*/
 export default function AiHiringSummaryTab({ jobId, token, candidates }: AiHiringSummaryTabProps) {
   const [selectedId, setSelectedId] = useState("");
@@ -145,6 +198,8 @@ export default function AiHiringSummaryTab({ jobId, token, candidates }: AiHirin
   const [notice, setNotice] = useState("");
   const [decisionNote, setDecisionNote] = useState("");
   const [showDecision, setShowDecision] = useState(false);
+  const [interviewFeedback, setInterviewFeedback] = useState<InterviewFeedbackEntry[] | null>(null);
+  const [loadingFeedback, setLoadingFeedback] = useState(false);
 
   const headers = useCallback(() => ({
     "Content-Type": "application/json",
@@ -159,6 +214,19 @@ export default function AiHiringSummaryTab({ jobId, token, candidates }: AiHirin
     return readApiJson(res);
   }, [jobId, headers]);
 
+  /* fetch collaboration data to get interview feedback status */
+  const fetchFeedbackStatus = useCallback(async (candidateId: string) => {
+    setLoadingFeedback(true);
+    try {
+      const data = await request(`/${candidateId}/collaboration`);
+      setInterviewFeedback(data.collaboration?.interviewFeedback ?? []);
+    } catch {
+      setInterviewFeedback(null);
+    } finally {
+      setLoadingFeedback(false);
+    }
+  }, [request]);
+
   /* select a candidate — try to load their existing synthesis from the candidate list */
   function selectCandidate(id: string) {
     setSelectedId(id);
@@ -166,10 +234,15 @@ export default function AiHiringSummaryTab({ jobId, token, candidates }: AiHirin
     setNotice("");
     setDecisionNote("");
     setShowDecision(false);
+    setInterviewFeedback(null);
     const c = candidates.find(c => getId(c) === id) ?? null;
     setCandidateData(c);
     setSynthesis(c?.aiHiringSynthesis ?? null);
+    if (id) void fetchFeedbackStatus(id);
   }
+
+  const hasFeedback = interviewFeedback !== null && interviewFeedback.length > 0;
+  const feedbackMissing = interviewFeedback !== null && interviewFeedback.length === 0;
 
   /* generate (or re-generate) AI synthesis */
   async function generate(force = false) {
@@ -185,7 +258,12 @@ export default function AiHiringSummaryTab({ jobId, token, candidates }: AiHirin
       setSynthesis(data.synthesis);
       setNotice("AI hiring summary generated successfully.");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not generate AI summary.");
+      const msg = e instanceof Error ? e.message : "Could not generate AI summary.";
+      // If the server blocked due to missing feedback, refresh feedback status for accurate display
+      if (msg.toLowerCase().includes("interview feedback")) {
+        void fetchFeedbackStatus(selectedId);
+      }
+      setError(msg);
     } finally {
       setGenerating(false);
     }
@@ -248,18 +326,24 @@ export default function AiHiringSummaryTab({ jobId, token, candidates }: AiHirin
             </select>
           </div>
           <div className="flex items-end gap-2">
-            {synthesis ? (
-              <button
-                type="button"
-                onClick={() => void generate(true)}
-                disabled={!selectedId || generating}
-                className="rb-btn rb-btn-ghost"
-                data-testid="button-regenerate-synthesis"
-              >
-                {generating ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                Regenerate
+            {loadingFeedback ? (
+              <button type="button" disabled className="rb-btn rb-btn-primary opacity-60">
+                <Loader2 size={14} className="animate-spin" /> Checking…
               </button>
-            ) : (
+            ) : synthesis ? (
+              hasFeedback && (
+                <button
+                  type="button"
+                  onClick={() => void generate(true)}
+                  disabled={!selectedId || generating}
+                  className="rb-btn rb-btn-ghost"
+                  data-testid="button-regenerate-synthesis"
+                >
+                  {generating ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                  Regenerate
+                </button>
+              )
+            ) : hasFeedback ? (
               <button
                 type="button"
                 onClick={() => void generate(false)}
@@ -269,7 +353,21 @@ export default function AiHiringSummaryTab({ jobId, token, candidates }: AiHirin
               >
                 {generating ? <><Loader2 size={14} className="animate-spin" /> Generating…</> : <><Brain size={14} /> Generate AI Summary</>}
               </button>
-            )}
+            ) : feedbackMissing ? (
+              <button
+                type="button"
+                disabled
+                className="rb-btn rb-btn-primary opacity-50 cursor-not-allowed"
+                title="Interview feedback must be submitted before generating an AI hiring recommendation"
+                data-testid="button-generate-synthesis-disabled"
+              >
+                <Brain size={14} /> AI Recommendation Pending
+              </button>
+            ) : selectedId ? (
+              <button type="button" disabled className="rb-btn rb-btn-primary opacity-60">
+                <Loader2 size={14} className="animate-spin" /> Checking…
+              </button>
+            ) : null}
           </div>
         </div>
         {notice && (
@@ -304,16 +402,23 @@ export default function AiHiringSummaryTab({ jobId, token, candidates }: AiHirin
             <p className="mt-1 text-lg font-extrabold capitalize text-slate-800">{selected.stage ?? "—"}</p>
           </div>
           <div className="rb-card p-4 text-center">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">AI Verdict</p>
-            {synthesis ? (
-              <span className={`mt-1 inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 text-sm font-bold ${rec?.badge}`}>
-                {rec?.emoji} {rec?.label}
-              </span>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Interview Feedback</p>
+            {loadingFeedback ? (
+              <Loader2 size={16} className="mt-1 mx-auto animate-spin text-slate-400" />
+            ) : interviewFeedback !== null ? (
+              <p className={`mt-1 text-lg font-extrabold ${hasFeedback ? "text-emerald-600" : "text-amber-600"}`}>
+                {hasFeedback ? `${interviewFeedback.length} submitted` : "Pending"}
+              </p>
             ) : (
-              <p className="mt-1 text-sm text-slate-400">Not yet</p>
+              <p className="mt-1 text-sm text-slate-400">—</p>
             )}
           </div>
         </div>
+      )}
+
+      {/* interview feedback required banner */}
+      {selectedId && feedbackMissing && !synthesis && !loadingFeedback && (
+        <InterviewFeedbackRequiredBanner feedback={interviewFeedback ?? []} />
       )}
 
       {/* AI recommendation card */}
@@ -470,16 +575,16 @@ export default function AiHiringSummaryTab({ jobId, token, candidates }: AiHirin
           <Brain className="mb-3 text-slate-300" size={32} />
           <p className="text-sm font-semibold text-slate-700">Select a candidate to view their AI hiring summary</p>
           <p className="mt-1 max-w-xs text-xs leading-5 text-slate-500">
-            The AI synthesises all available evaluation data into a Hire, Hold, or Pass recommendation. You always make the final call.
+            The AI synthesises all available evaluation data into a Hire, Hold, or Pass recommendation. Interview feedback is required before a recommendation can be generated.
           </p>
         </div>
       )}
-      {selectedId && !synthesis && !generating && (
+      {selectedId && !synthesis && !generating && hasFeedback && (
         <div className="rb-card flex min-h-52 flex-col items-center justify-center text-center p-8">
           <Brain className="mb-3 text-slate-300" size={28} />
           <p className="text-sm font-semibold text-slate-700">No AI summary yet</p>
           <p className="mt-1 max-w-xs text-xs leading-5 text-slate-500">
-            Click <strong>Generate AI Summary</strong> above to run the synthesis. Make sure interview feedback has been submitted for the best results.
+            Click <strong>Generate AI Summary</strong> above to run the synthesis.
           </p>
         </div>
       )}
