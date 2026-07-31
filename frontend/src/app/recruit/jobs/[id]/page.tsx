@@ -11,6 +11,7 @@ import { formatJobDescription } from "@/lib/jobDescription";
 import AssessmentAnalyticsTab from "./AssessmentAnalyticsTab";
 import LiveAssessmentProgressTab from "./LiveAssessmentProgressTab";
 import BulkImportModal from "./BulkImportModal";
+import CollaborationTab from "./CollaborationTab";
 
 function getFrontendUrl(): string {
   if (typeof window !== "undefined" && window.location?.origin) return window.location.origin;
@@ -2168,7 +2169,7 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete }: {
           </div>
 
           {/* ── Live Offer Response Status badge (offer / hired stage only) ── */}
-          {(c.stage === "offer" || c.stage === "hired") && c.offerCandidateStatus && c.offerCandidateStatus !== "" && (() => {
+          {(c.stage === "offer" || c.stage === "hired") && c.offerCandidateStatus && (() => {
             const statusMap: Record<string, { icon: string; label: string; cls: string }> = {
               pending:  { icon: "⏳", label: "Pending",  cls: "border-amber-500/30  bg-amber-500/10  text-amber-400"  },
               viewed:   { icon: "👀", label: "Viewed",   cls: "border-sky-500/30    bg-sky-500/10    text-sky-400"    },
@@ -2454,7 +2455,7 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<"pipeline" | "jd" | "rubric" | "post" | "rules" | "performance" | "agent-log" | "assessment-analytics" | "live">("pipeline");
+  const [activeTab, setActiveTab] = useState<"pipeline" | "jd" | "rubric" | "post" | "rules" | "performance" | "agent-log" | "assessment-analytics" | "live" | "collaboration">("pipeline");
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [pipelineRules, setPipelineRules] = useState<PipelineRule[]>([]);
   const [perfAlerts, setPerfAlerts] = useState<PerformanceAlert[]>([]);
@@ -2777,7 +2778,7 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
         </div>
 
         <div className="mb-6 flex gap-1 border-b border-[var(--border)] overflow-x-auto">
-          {(["pipeline", "jd", "rubric", "post", "rules", "performance", "agent-log", "assessment-analytics", "live"] as const).map(tab => (
+          {(["pipeline", "jd", "rubric", "post", "rules", "performance", "agent-log", "assessment-analytics", "live", "collaboration"] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -2826,6 +2827,11 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
                   <span className="flex items-center gap-1.5">
                     <span className="inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
                     Live Progress
+                  </span>
+                ) : tab === "collaboration" ? (
+                  <span className="flex items-center gap-1.5">
+                    <UserIcon2 />
+                    Collaboration
                   </span>
                 ) : "Pipeline"}
             </button>
@@ -2982,6 +2988,15 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
           <LiveAssessmentProgressTab
             jobId={id}
             token={token!}
+          />
+        )}
+
+        {activeTab === "collaboration" && token && (
+          <CollaborationTab
+            jobId={id}
+            token={token}
+            candidates={candidates}
+            onRefresh={fetchData}
           />
         )}
       </main>

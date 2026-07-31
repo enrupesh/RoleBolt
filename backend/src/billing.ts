@@ -9,7 +9,7 @@ export const billingRouter = express.Router();
 function getStripe(): Stripe {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) throw new Error("STRIPE_SECRET_KEY is not configured.");
-  return new Stripe(key, { apiVersion: "2026-06-24.dahlia" });
+  return new Stripe(key, { apiVersion: "2026-06-24.dahlia" as any });
 }
 
 function getUid(req: express.Request): string {
@@ -151,7 +151,7 @@ async function handleStripeEvent(event: Stripe.Event) {
       if (!userId || !plan) return;
 
       const sub = session.subscription
-        ? await new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2026-06-24.dahlia" }).subscriptions.retrieve(session.subscription as string)
+        ? await new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2026-06-24.dahlia" as any }).subscriptions.retrieve(session.subscription as string)
         : null;
 
       await Subscription.findOneAndUpdate(
