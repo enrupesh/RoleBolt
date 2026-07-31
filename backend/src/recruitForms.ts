@@ -9,6 +9,11 @@ import { sendEmail } from "./mailer";
 
 const CANDIDATE_FROM = `Rolebolt <${process.env.CANDIDATE_FROM_EMAIL ?? "notification@rolebolt.tech"}>`;
 import * as emailTemplates from "./emailTemplates";
+import {
+  verifyRecaptcha,
+  RECAPTCHA_REJECTION_MESSAGE,
+  checkRateLimit,
+} from "./publicSubmissionGuard";
 
 export const formRouter = express.Router();       // protected — /recruit/forms
 export const formPublicRouter = express.Router(); // public    — /recruit-public/forms
@@ -28,6 +33,10 @@ function safeJson(raw: string): any {
   } catch {
     return null;
   }
+}
+
+function clampPct(value: unknown): number {
+  return Math.min(100, Math.max(0, Number(value) || 0));
 }
 
 function generateSlug(length = 10): string {
@@ -287,6 +296,192 @@ Return only the plain text email body.`;
   }
 }
 
+// ─── AI Agent Mode ────────────────────────────────────────────────────────────
+
+export type FormAgentAction = "shortlisted" | "rejected" | "review_zone";
+
+interface FormAgentDecision {
+  action: FormAgentAction;
+  stage: "new" | "shortlisted" | "rejected";
+  reason: string;
+}
+
+/**
+ * Decides what the agent should do with a freshly scored response.
+ * Returns null when the agent is off or the score can't be trusted.
+ */
+export function decideFormAgentAction(
+  agentMode: any,
+  aiScore: number,
+  scoringFailed: boolean,
+): FormAgentDecision | null {
+  if (agentMode?.enabled !== true || scoringFailed) return null;
+
+  const shortlistThreshold = agentMode.shortlistThreshold ?? 75;
+  const rejectThreshold    = agentMode.rejectThreshold    ?? 35;
+
+  if (aiScore >= shortlistThreshold) {
+    return {
+      action: "shortlisted",
+      stage: "shortlisted",
+      reason: `Score ${aiScore}% ≥ shortlist threshold ${shortlistThreshold}%`,
+    };
+  }
+  if (aiScore < rejectThreshold) {
+    return {
+      action: "rejected",
+      stage: "rejected",
+      reason: `Score ${aiScore}% < reject threshold ${rejectThreshold}%`,
+    };
+  }
+  return {
+    action: "review_zone",
+    stage: "new",
+    reason: `Score ${aiScore}% is in review zone (${rejectThreshold}%–${shortlistThreshold}%)`,
+  };
+}
+
+/**
+ * Applies the agent decision: moves the response's stage, sends the configured
+ * email, and appends an agentLog entry. Safe to call fire-and-forget.
+ */
+async function runFormAgent(args: {
+  responseId: any;
+  formTitle: string;
+  agentMode: any;
+  aiScore: number;
+  scoringFailed: boolean;
+  candidateName: string;
+  candidateEmail: string;
+}): Promise<void> {
+  const decision = decideFormAgentAction(args.agentMode, args.aiScore, args.scoringFailed);
+  if (!decision) return;
+
+  const name = args.candidateName || "Applicant";
+  const email = args.candidateEmail?.trim() || "";
+
+  if (decision.stage !== "new") {
+    await RecruitFormResponse.updateOne(
+      { _id: args.responseId },
+      { $set: { stage: decision.stage, stageMovedAt: new Date() } }
+    );
+  }
+
+  let emailSent = false;
+  let emailStatus: "sent" | "failed" | "skipped" | "disabled" = "disabled";
+
+  const wantsEmail =
+    (decision.action === "shortlisted" && args.agentMode.autoEmailShortlist !== false) ||
+    (decision.action === "rejected"    && args.agentMode.autoEmailReject === true) ||
+    (decision.action === "review_zone" && args.agentMode.emailReviewZoneCandidates === true);
+
+  if (wantsEmail && !email) emailStatus = "skipped"; // nothing to send to
+
+  if (wantsEmail && email) {
+    let tpl: emailTemplates.EmailPayload;
+    if (decision.action === "shortlisted") {
+      tpl = emailTemplates.screened(name, args.formTitle, "");
+    } else if (decision.action === "rejected") {
+      const body = `Hi ${name.split(" ")[0]},\n\nThank you for taking the time to complete our "${args.formTitle}" application. After reviewing your responses, we've decided to move forward with other applicants at this time.\n\nWe appreciate your interest and wish you the best in your search.\n\nWarm regards,\nThe Hiring Team`;
+      tpl = emailTemplates.rejectionEmailHtml(name, args.formTitle, "", body);
+    } else {
+      tpl = emailTemplates.reviewZoneEmail(name, args.formTitle, "");
+    }
+
+    try {
+      const result = await sendEmail({
+        to: email, subject: tpl.subject, html: tpl.html, text: tpl.text, from: CANDIDATE_FROM,
+      });
+      emailSent = result.ok;
+      emailStatus = result.ok ? "sent" : "failed";
+      await RecruitFormResponse.updateOne({ _id: args.responseId }, {
+        $push: {
+          emailLog: {
+            type: `agent_${decision.action}`, to: email, subject: tpl.subject, body: tpl.text,
+            sentAt: new Date(), status: emailStatus, error: result.error,
+          },
+        },
+      });
+    } catch (e) {
+      console.error("[forms][agent] email dispatch failed:", e);
+      emailStatus = "failed";
+    }
+  }
+
+  await RecruitFormResponse.updateOne({ _id: args.responseId }, {
+    $push: {
+      agentLog: {
+        action: decision.action,
+        score: args.aiScore,
+        reason: decision.reason,
+        emailSent,
+        emailStatus,
+        timestamp: new Date(),
+      },
+    },
+  });
+
+  console.log(`[forms][agent] ${decision.action}: ${name} — ${decision.reason} (email ${emailStatus})`);
+}
+
+// ─── Pipeline Rules ───────────────────────────────────────────────────────────
+
+const FORM_RULE_STAGE_MAP: Record<string, string> = {
+  move_to_shortlisted: "shortlisted",
+  move_to_interview:   "interview",
+  move_to_rejected:    "rejected",
+};
+
+/**
+ * Evaluates a form's pipeline rules against one response. Call non-blocking —
+ * a rule failure must never affect the recruiter's request.
+ */
+async function evaluateFormPipelineRules(formId: string, responseId: string): Promise<void> {
+  try {
+    const [form, response] = await Promise.all([
+      RecruitForm.findById(formId).lean(),
+      RecruitFormResponse.findById(responseId).lean(),
+    ]);
+    if (!form || !response) return;
+
+    const rules: any[] = ((form as any).pipelineRules ?? []).filter((r: any) => r.enabled);
+    if (!rules.length) return;
+
+    const score = (response as any).aiScore ?? 0;
+    const movedAt = (response as any).stageMovedAt ?? (response as any).createdAt;
+    const daysInStage = movedAt ? (Date.now() - new Date(movedAt).getTime()) / 86400000 : 0;
+
+    // Track the stage locally so a second rule sees the result of the first.
+    let currentStage: string = (response as any).stage;
+
+    for (const rule of rules) {
+      if (rule.fromStage && currentStage !== rule.fromStage) continue;
+
+      let conditionMet = false;
+      if (rule.condition === "score_above"    && score >= rule.threshold)       conditionMet = true;
+      if (rule.condition === "score_below"    && score <  rule.threshold)       conditionMet = true;
+      if (rule.condition === "stage_age_days" && daysInStage >= rule.threshold) conditionMet = true;
+      if (!conditionMet) continue;
+
+      const nextStage = FORM_RULE_STAGE_MAP[rule.action];
+      if (!nextStage || nextStage === currentStage) continue;
+
+      await RecruitFormResponse.updateOne(
+        { _id: responseId },
+        { $set: { stage: nextStage, stageMovedAt: new Date() } }
+      );
+      await RecruitForm.updateOne(
+        { _id: formId, "pipelineRules.id": rule.id },
+        { $inc: { "pipelineRules.$.triggerCount": 1 } }
+      );
+      currentStage = nextStage;
+      console.log(`[forms][pipeline-rule] "${rule.id}" fired: ${rule.condition} → ${rule.action} for response ${responseId}`);
+    }
+  } catch (e) {
+    console.error("[forms][pipeline-rule] evaluation failed:", e);
+  }
+}
+
 // ─── Protected routes (/recruit/forms) ────────────────────────────────────────
 
 // POST /recruit/forms — create a form
@@ -470,7 +665,7 @@ formRouter.patch("/:formId/responses/:responseId", async (req, res) => {
     const uid = getUid(req);
     if (!uid) return res.status(401).json({ error: "Unauthorized" });
 
-    const { stage } = req.body;
+    const { stage, notes } = req.body;
 
     // Fetch current stage before update so we can detect actual transition
     const existing = await RecruitFormResponse.findOne(
@@ -479,9 +674,14 @@ formRouter.patch("/:formId/responses/:responseId", async (req, res) => {
     ).lean();
     if (!existing) return res.status(404).json({ error: "Response not found." });
 
+    const update: Record<string, any> = {};
+    if (stage !== undefined) update.stage = stage;
+    if (notes !== undefined) update.notes = String(notes).slice(0, 5000);
+    if (stage && stage !== (existing as any).stage) update.stageMovedAt = new Date();
+
     const response = await RecruitFormResponse.findOneAndUpdate(
       { _id: req.params.responseId, formId: req.params.formId, uid },
-      { $set: { stage } },
+      { $set: update },
       { returnDocument: "after" }
     );
     if (!response) return res.status(404).json({ error: "Response not found." });
@@ -513,6 +713,16 @@ formRouter.patch("/:formId/responses/:responseId", async (req, res) => {
             },
           });
         } catch (err) { console.error("[forms] auto stage-change email failed:", err); }
+      });
+    }
+
+    if (stageChanged) {
+      const _formId = req.params.formId;
+      const _responseId = req.params.responseId;
+      setImmediate(() => {
+        evaluateFormPipelineRules(_formId, _responseId).catch(e =>
+          console.error("[forms] post-stage-change rule evaluation failed:", e)
+        );
       });
     }
 
@@ -766,9 +976,353 @@ formRouter.post("/:formId/responses/:responseId/retry-score", async (req, res) =
       { returnDocument: "after" }
     ).lean();
 
+    // A retried score is the first trustworthy score for this response, so let the
+    // agent act on it — but only while the recruiter hasn't already triaged it.
+    if (!scored.scoringFailed && (response as any).stage === "new") {
+      const _formId = req.params.formId;
+      const _responseId = String(response._id);
+      setImmediate(async () => {
+        try {
+          await runFormAgent({
+            responseId: response._id,
+            formTitle: form.title,
+            agentMode: (form as any).agentMode ?? {},
+            aiScore: scored.aiScore,
+            scoringFailed: scored.scoringFailed,
+            candidateName: (response as any).submittedName,
+            candidateEmail: (response as any).submittedEmail,
+          });
+          await evaluateFormPipelineRules(_formId, _responseId);
+        } catch (e) {
+          console.error("[forms] post-retry agent run failed:", e);
+        }
+      });
+    }
+
     return res.json({ response: updated });
   } catch (err: any) {
     console.error("[forms] POST retry-score:", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── AI Agent Mode routes ─────────────────────────────────────────────────────
+
+// PATCH /recruit/forms/:formId/agent-mode — configure the agent
+formRouter.patch("/:formId/agent-mode", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "Unauthorized" });
+
+    const {
+      enabled, shortlistThreshold, rejectThreshold,
+      autoEmailShortlist, autoEmailReject, emailReviewZoneCandidates,
+    } = req.body;
+
+    const update: Record<string, any> = {};
+    if (enabled !== undefined)                   update["agentMode.enabled"]                   = Boolean(enabled);
+    if (shortlistThreshold !== undefined)        update["agentMode.shortlistThreshold"]        = clampPct(shortlistThreshold);
+    if (rejectThreshold !== undefined)           update["agentMode.rejectThreshold"]           = clampPct(rejectThreshold);
+    if (autoEmailShortlist !== undefined)        update["agentMode.autoEmailShortlist"]        = Boolean(autoEmailShortlist);
+    if (autoEmailReject !== undefined)           update["agentMode.autoEmailReject"]           = Boolean(autoEmailReject);
+    if (emailReviewZoneCandidates !== undefined) update["agentMode.emailReviewZoneCandidates"] = Boolean(emailReviewZoneCandidates);
+
+    const existing = await RecruitForm.findOne({ _id: req.params.formId, uid })
+      .select("agentMode")
+      .lean();
+    if (!existing) return res.status(404).json({ error: "Form not found." });
+
+    const current = (existing as any).agentMode ?? {};
+    const nextShortlist = update["agentMode.shortlistThreshold"] ?? current.shortlistThreshold ?? 75;
+    const nextReject    = update["agentMode.rejectThreshold"]    ?? current.rejectThreshold    ?? 35;
+    if (nextReject >= nextShortlist) {
+      return res.status(400).json({
+        error: "Reject threshold must be lower than the shortlist threshold.",
+        agentMode: current,
+      });
+    }
+
+    const form = await RecruitForm.findOneAndUpdate(
+      { _id: req.params.formId, uid },
+      { $set: update },
+      { returnDocument: "after" }
+    ).lean();
+    if (!form) return res.status(404).json({ error: "Form not found." });
+
+    return res.json({ ok: true, agentMode: (form as any).agentMode ?? {} });
+  } catch (err: any) {
+    console.error("[forms] PATCH agent-mode:", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /recruit/forms/:formId/agent-log — what the agent did, newest first
+formRouter.get("/:formId/agent-log", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "Unauthorized" });
+
+    const form = await RecruitForm.findOne({ _id: req.params.formId, uid }).lean();
+    if (!form) return res.status(404).json({ error: "Form not found." });
+
+    const responses = await RecruitFormResponse.find({ formId: req.params.formId, uid })
+      .select("submittedName submittedEmail stage agentLog")
+      .lean();
+
+    const entries = responses.flatMap((r: any) =>
+      (r.agentLog ?? []).map((entry: any) => ({
+        responseId: r._id,
+        name: r.submittedName || "Applicant",
+        email: r.submittedEmail || "",
+        currentStage: r.stage,
+        ...entry,
+      }))
+    ).sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+    return res.json({ entries });
+  } catch (err: any) {
+    console.error("[forms] GET agent-log:", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /recruit/forms/:formId/agent-stats — headline numbers for the agent card
+formRouter.get("/:formId/agent-stats", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "Unauthorized" });
+
+    const form = await RecruitForm.findOne({ _id: req.params.formId, uid }).lean();
+    if (!form) return res.status(404).json({ error: "Form not found." });
+
+    const responses = await RecruitFormResponse.find({ formId: req.params.formId, uid })
+      .select("agentLog aiScore scoringFailed")
+      .lean();
+
+    let shortlisted = 0, rejected = 0, reviewZone = 0, emailsSent = 0;
+    for (const r of responses as any[]) {
+      for (const entry of r.agentLog ?? []) {
+        if (entry.action === "shortlisted") shortlisted++;
+        else if (entry.action === "rejected") rejected++;
+        else if (entry.action === "review_zone") reviewZone++;
+        if (entry.emailSent) emailsSent++;
+      }
+    }
+
+    const scored = (responses as any[]).filter(r => !r.scoringFailed);
+    const avgScore = scored.length
+      ? Math.round(scored.reduce((s, r) => s + (r.aiScore ?? 0), 0) / scored.length)
+      : 0;
+
+    const agentMode = (form as any).agentMode ?? {};
+    const totalHandled = shortlisted + rejected + reviewZone;
+
+    return res.json({
+      agentMode,
+      totalResponses: responses.length,
+      totalHandled,
+      shortlisted,
+      rejected,
+      reviewZone,
+      emailsSent,
+      avgScore,
+      // Manual triage the recruiter did not have to do
+      manualReviewsSaved: shortlisted + rejected,
+    });
+  } catch (err: any) {
+    console.error("[forms] GET agent-stats:", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Pipeline rules routes ────────────────────────────────────────────────────
+
+const FORM_RULE_CONDITIONS = ["score_above", "score_below", "stage_age_days"];
+const FORM_RULE_ACTIONS = ["move_to_shortlisted", "move_to_interview", "move_to_rejected"];
+
+formRouter.get("/:formId/pipeline-rules", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "Unauthorized" });
+
+    const form = await RecruitForm.findOne({ _id: req.params.formId, uid }).select("pipelineRules").lean();
+    if (!form) return res.status(404).json({ error: "Form not found." });
+
+    return res.json({ rules: (form as any).pipelineRules ?? [] });
+  } catch (err: any) {
+    console.error("[forms] GET pipeline-rules:", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+formRouter.post("/:formId/pipeline-rules", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "Unauthorized" });
+
+    const { condition, threshold, fromStage, action } = req.body;
+    if (!FORM_RULE_CONDITIONS.includes(condition)) {
+      return res.status(400).json({ error: "Invalid rule condition." });
+    }
+    if (!FORM_RULE_ACTIONS.includes(action)) {
+      return res.status(400).json({ error: "Invalid rule action." });
+    }
+    if (threshold === undefined || Number.isNaN(Number(threshold))) {
+      return res.status(400).json({ error: "A numeric threshold is required." });
+    }
+
+    const rule = {
+      id: crypto.randomUUID(),
+      condition,
+      threshold: Math.max(0, Number(threshold)),
+      fromStage: typeof fromStage === "string" ? fromStage : "",
+      action,
+      enabled: true,
+      triggerCount: 0,
+    };
+
+    const form = await RecruitForm.findOneAndUpdate(
+      { _id: req.params.formId, uid },
+      { $push: { pipelineRules: rule } },
+      { returnDocument: "after" }
+    ).lean();
+    if (!form) return res.status(404).json({ error: "Form not found." });
+
+    return res.status(201).json({ rule, rules: (form as any).pipelineRules });
+  } catch (err: any) {
+    console.error("[forms] POST pipeline-rules:", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+formRouter.patch("/:formId/pipeline-rules/:ruleId", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "Unauthorized" });
+
+    const { enabled, threshold, fromStage } = req.body;
+    const update: Record<string, any> = {};
+    if (enabled !== undefined)   update["pipelineRules.$.enabled"]   = Boolean(enabled);
+    if (threshold !== undefined) update["pipelineRules.$.threshold"] = Math.max(0, Number(threshold) || 0);
+    if (fromStage !== undefined) update["pipelineRules.$.fromStage"] = String(fromStage);
+
+    const form = await RecruitForm.findOneAndUpdate(
+      { _id: req.params.formId, uid, "pipelineRules.id": req.params.ruleId },
+      { $set: update },
+      { returnDocument: "after" }
+    ).lean();
+    if (!form) return res.status(404).json({ error: "Rule not found." });
+
+    return res.json({ rules: (form as any).pipelineRules });
+  } catch (err: any) {
+    console.error("[forms] PATCH pipeline-rule:", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+formRouter.delete("/:formId/pipeline-rules/:ruleId", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "Unauthorized" });
+
+    const form = await RecruitForm.findOneAndUpdate(
+      { _id: req.params.formId, uid },
+      { $pull: { pipelineRules: { id: req.params.ruleId } } },
+      { returnDocument: "after" }
+    ).lean();
+    if (!form) return res.status(404).json({ error: "Form not found." });
+
+    return res.json({ rules: (form as any).pipelineRules });
+  } catch (err: any) {
+    console.error("[forms] DELETE pipeline-rule:", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Export ───────────────────────────────────────────────────────────────────
+
+// GET /recruit/forms/:formId/export?format=csv|json
+formRouter.get("/:formId/export", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "Unauthorized" });
+
+    const form = await RecruitForm.findOne({ _id: req.params.formId, uid }).lean();
+    if (!form) return res.status(404).json({ error: "Form not found." });
+
+    const responses = await RecruitFormResponse.find({ formId: req.params.formId, uid })
+      .sort({ aiScore: -1 })
+      .lean();
+
+    const filenameBase = (form as any).title.replace(/[^a-z0-9]/gi, "_");
+    const questions = (form as any).questions ?? [];
+
+    const rowFor = (r: any) => ({
+      name: r.submittedName || "",
+      email: r.submittedEmail || "",
+      phone: r.submittedPhone || "",
+      stage: r.stage,
+      score: r.scoringFailed ? "" : r.aiScore,
+      source: r.source || "",
+      agentAction: r.agentLog?.length ? r.agentLog[r.agentLog.length - 1].action : "",
+      redFlags: (r.redFlags ?? []).join("; "),
+      strengths: (r.strengths ?? []).join("; "),
+      aiSummary: r.aiSummary || "",
+      notes: r.notes || "",
+      submittedAt: new Date(r.createdAt).toISOString(),
+      answers: questions.map((q: any) => {
+        const a = (r.answers ?? []).find((x: any) => x.questionId === q.id);
+        return a?.value === "__file_uploaded__" ? "(file uploaded)" : (a?.value ?? "");
+      }),
+    });
+
+    if (req.query.format === "json") {
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("Content-Disposition", `attachment; filename="${filenameBase}_responses.json"`);
+      return res.json(
+        (responses as any[]).map(r => {
+          const row = rowFor(r);
+          const { answers, ...rest } = row;
+          return {
+            ...rest,
+            answers: questions.map((q: any, i: number) => ({ question: q.label, answer: answers[i] })),
+          };
+        })
+      );
+    }
+
+    const escape = (val: string | number | undefined) => {
+      const s = String(val ?? "");
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+
+    const headers = [
+      "Name", "Email", "Phone", "Stage", "AI Score", "Source", "Agent Action",
+      "Red Flags", "Strengths", "AI Summary", "Notes", "Submitted At",
+      ...questions.map((q: any) => q.label),
+    ];
+    const rows = (responses as any[]).map(r => {
+      const row = rowFor(r);
+      return [
+        row.name, row.email, row.phone, row.stage, row.score, row.source, row.agentAction,
+        row.redFlags, row.strengths, row.aiSummary, row.notes, row.submittedAt,
+        ...row.answers,
+      ].map(escape).join(",");
+    });
+
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", `attachment; filename="${filenameBase}_responses.csv"`);
+    return res.send([headers.map(escape).join(","), ...rows].join("\n"));
+  } catch (err: any) {
+    console.error("[forms] GET export:", err);
     return res.status(500).json({ error: err.message });
   }
 });
@@ -799,6 +1353,18 @@ formPublicRouter.post(
   async (req, res) => {
     try {
       await connectMongo();
+
+      // ── Bot + abuse protection (public unauthenticated write with an AI cost) ──
+      const captcha = await verifyRecaptcha(req.body.recaptchaToken ?? "");
+      if (!captcha.ok) return res.status(403).json({ error: RECAPTCHA_REJECTION_MESSAGE });
+
+      const limit = checkRateLimit(`form-submit:${req.params.slug}`, req);
+      if (!limit.allowed) {
+        res.setHeader("Retry-After", String(limit.retryAfterSeconds));
+        return res.status(429).json({
+          error: "Too many submissions from this network. Please try again later.",
+        });
+      }
 
       const form = await RecruitForm.findOne({ slug: req.params.slug, status: "active" }).lean();
       if (!form) return res.status(404).json({ error: "Form not found or no longer accepting responses." });
@@ -867,6 +1433,10 @@ formPublicRouter.post(
         submittedName,
         submittedEmail,
         submittedPhone,
+        source: typeof req.body.source === "string" && req.body.source.trim()
+          ? req.body.source.trim().slice(0, 80)
+          : "Form",
+        stageMovedAt: new Date(),
       });
 
       // ── 2. Increment counter (fire-and-forget; OK to drift by ±1 rarely) ─
@@ -900,6 +1470,18 @@ formPublicRouter.post(
               scoringFailed: scored.scoringFailed,
             },
           });
+
+          // AI Agent Mode acts on the fresh score, then pipeline rules run on the result.
+          await runFormAgent({
+            responseId: response._id,
+            formTitle: form.title,
+            agentMode: (form as any).agentMode ?? {},
+            aiScore: scored.aiScore,
+            scoringFailed: scored.scoringFailed,
+            candidateName: submittedName,
+            candidateEmail: submittedEmail,
+          });
+          await evaluateFormPipelineRules(String(form._id), String(response._id));
         } catch (e) {
           console.error("[forms] background scoring failed (non-fatal):", e);
         }

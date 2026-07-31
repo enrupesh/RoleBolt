@@ -33,6 +33,21 @@ export interface GlobalCandidateSummary {
   availability?: string;
 }
 
+/** A Form Job applicant, projected into the shape the global prompt needs. */
+export interface FormResponseSummary {
+  _id: any;
+  name: string;
+  email?: string;
+  formId: any;
+  formTitle: string;
+  aiScore: number;
+  scoringFailed?: boolean;
+  stage: string;
+  strengths?: string[];
+  redFlags?: string[];
+  submittedAt?: Date;
+}
+
 export interface CopilotPromptContext {
   level: CopilotContextLevel;
   mode?: CopilotPromptMode;
@@ -48,6 +63,8 @@ export interface CopilotPromptContext {
   allJobs?: Array<IRecruitJob & { _id: any }>;
   allCandidates?: GlobalCandidateSummary[];
   pipelines?: JobPipelineStat[];
+  /** Form Job applicants across the org (global context only). */
+  formResponses?: FormResponseSummary[];
   /** When set, this is a synthetic instruction (e.g. "generate today's insights card") rather than a real recruiter question. */
   syntheticInstruction?: string;
 }
@@ -419,6 +436,25 @@ function globalCandidateLine(c: GlobalCandidateSummary, rank: number): string {
 }
 
 const GLOBAL_CANDIDATE_CAP = 150;
+const GLOBAL_FORM_RESPONSE_CAP = 100;
+
+function formResponseLine(r: FormResponseSummary, rank: number): string {
+  const strengths = (r.strengths || []).slice(0, 3).join(", ") || "—";
+  const redFlags = (r.redFlags || []).slice(0, 2).join(", ") || "None";
+  const score = r.scoringFailed ? "not scored" : `${r.aiScore}%`;
+  return `[F${rank}] ${r.name || "Applicant"} — responseId: ${String(r._id)} | Email: ${r.email || "(not available)"} | Form: ${r.formTitle} | Score: ${score} | Stage: ${r.stage} | Strengths: ${strengths} | Red flags: ${redFlags}`;
+}
+
+function formResponsesBlock(responses: FormResponseSummary[]): string {
+  if (!responses.length) return "(no form applicants yet)";
+  const ranked = [...responses].sort((a, b) => (b.aiScore || 0) - (a.aiScore || 0));
+  const shown = ranked.slice(0, GLOBAL_FORM_RESPONSE_CAP);
+  const note =
+    ranked.length > GLOBAL_FORM_RESPONSE_CAP
+      ? `\n(Showing top ${GLOBAL_FORM_RESPONSE_CAP} of ${ranked.length} form applicants by score.)`
+      : "";
+  return shown.map((r, i) => formResponseLine(r, i + 1)).join("\n") + note;
+}
 
 function buildGlobalContextPrompt(ctx: CopilotPromptContext): string {
   const mode = ctx.mode ?? "json";
@@ -461,6 +497,9 @@ ${jobListBlock(jobs) || "(no jobs yet)"}
 ## Candidates Across the Organization (sorted by fit score, highest first)
 ${candidateLines || "(no candidates yet)"}${truncatedNote}
 
+## Form Job Applicants (people who applied through an application form rather than a Standard Job)
+${formResponsesBlock(ctx.formResponses || [])}
+
 ---
 
 ${mode === "stream" ? streamResponseFormat() : jsonResponseFormat()}
@@ -472,6 +511,8 @@ ${sharedBehaviourRules()}
 - When citing a candidate, use type "candidate_profile" and ALWAYS include their candidateId from the list above.
 - When citing a job, use type "job_description" and mention the job title in the label.
 - If the recruiter's question is really about one specific job or candidate, still answer using the data above — do not ask them to "select a job first"; you already have everything.
+- Form Job applicants are scored 0–100 directly from their written answers (no rubric), so their scores are not strictly comparable to Standard Job candidates — compare within a job type, and say so if the recruiter asks you to rank across both.
+- Form applicants have a shorter pipeline (new → shortlisted → interview → hired/rejected) and no assessments or offer letters. Never suggest an action for them that only exists on Standard Jobs.
 - Never guess a number. If organization stats don't cover something (e.g. a specific skill not tracked), say the data isn't available rather than inventing it.
 `;
 }

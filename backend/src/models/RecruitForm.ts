@@ -20,6 +20,31 @@ export interface IFormQuestion {
   placeholder: string;
 }
 
+export interface IFormAgentMode {
+  enabled: boolean;                    // false = Manual Mode, true = AI Agent Mode
+  shortlistThreshold: number;          // aiScore >= this → auto-shortlist
+  rejectThreshold: number;             // aiScore < this → auto-reject
+  autoEmailShortlist: boolean;
+  autoEmailReject: boolean;
+  emailReviewZoneCandidates: boolean;  // "still under review" email for the middle band
+}
+
+export type FormRuleCondition = "score_above" | "score_below" | "stage_age_days";
+export type FormRuleAction =
+  | "move_to_shortlisted"
+  | "move_to_interview"
+  | "move_to_rejected";
+
+export interface IFormPipelineRule {
+  id: string;
+  condition: FormRuleCondition;
+  threshold: number;    // aiScore for score conditions, days for stage_age_days
+  fromStage?: string;   // optional: only apply while the response sits in this stage
+  action: FormRuleAction;
+  enabled: boolean;
+  triggerCount: number;
+}
+
 export interface IRecruitForm extends Document {
   uid: string;
   title: string;
@@ -28,6 +53,8 @@ export interface IRecruitForm extends Document {
   questions: IFormQuestion[];
   status: "active" | "closed";
   responseCount: number;
+  agentMode: IFormAgentMode;
+  pipelineRules: IFormPipelineRule[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -48,6 +75,33 @@ const FormQuestionSchema = new Schema<IFormQuestion>(
   { _id: false }
 );
 
+// Form answers are weaker evidence than a resume scored against a rubric, so auto-reject
+// is off by default and the review zone is wider than on Standard Jobs.
+const FormAgentModeSchema = new Schema<IFormAgentMode>(
+  {
+    enabled:                   { type: Boolean, default: false },
+    shortlistThreshold:        { type: Number,  default: 75 },
+    rejectThreshold:           { type: Number,  default: 35 },
+    autoEmailShortlist:        { type: Boolean, default: true },
+    autoEmailReject:           { type: Boolean, default: false },
+    emailReviewZoneCandidates: { type: Boolean, default: false },
+  },
+  { _id: false }
+);
+
+const FormPipelineRuleSchema = new Schema<IFormPipelineRule>(
+  {
+    id:           { type: String, required: true },
+    condition:    { type: String, enum: ["score_above", "score_below", "stage_age_days"], required: true },
+    threshold:    { type: Number, required: true },
+    fromStage:    { type: String, default: "" },
+    action:       { type: String, enum: ["move_to_shortlisted", "move_to_interview", "move_to_rejected"], required: true },
+    enabled:      { type: Boolean, default: true },
+    triggerCount: { type: Number, default: 0 },
+  },
+  { _id: false }
+);
+
 const RecruitFormSchema = new Schema<IRecruitForm>(
   {
     uid: { type: String, required: true, index: true },
@@ -57,6 +111,8 @@ const RecruitFormSchema = new Schema<IRecruitForm>(
     questions: { type: [FormQuestionSchema], default: [] },
     status: { type: String, enum: ["active", "closed"], default: "active" },
     responseCount: { type: Number, default: 0 },
+    agentMode: { type: FormAgentModeSchema, default: () => ({}) },
+    pipelineRules: { type: [FormPipelineRuleSchema], default: [] },
   },
   { timestamps: true }
 );
