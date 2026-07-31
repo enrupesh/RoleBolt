@@ -14,6 +14,9 @@ import { RecruitCollaborationActivity, CollaborationActivityType } from "./model
 import { RecruitNotification } from "./models/RecruitNotification";
 import { User } from "./models/User";
 import { sendEmail } from "./mailer";
+import { callMeshChatCompletions } from "./ai/meshClient";
+
+const GEMINI_MESH_KEY = process.env.GEMINI_MESH_KEY ?? "";
 
 export const collaborationRouter = express.Router();
 
@@ -273,16 +276,33 @@ collaborationRouter.post("/jobs/:jobId/candidates/:candidateId/interview-feedbac
       return res.status(403).json({ error: "You do not have permission to submit interview feedback." });
     }
     const body = String(req.body.body ?? "").trim();
-    if (!body || body.length > 10000) {
-      return res.status(400).json({ error: "Feedback must contain between 1 and 10,000 characters." });
-    }
+    if (body.length > 10000) return res.status(400).json({ error: "Additional comments must be under 10,000 characters." });
+
+    // Overall rating (1-5, optional)
     const rating = req.body.rating === undefined || req.body.rating === "" ? undefined : Number(req.body.rating);
     if (rating !== undefined && (!Number.isInteger(rating) || rating < 1 || rating > 5)) {
       return res.status(400).json({ error: "Rating must be a whole number from 1 to 5." });
     }
+
+    // Per-category structured ratings (all optional, each 1-5)
+    const RATING_KEYS = ["technicalSkills", "communicationSkills", "problemSolving", "cultureFit", "leadership", "roleSpecificSkills", "overallRecommendation"] as const;
+    const rawRatings = req.body.ratings ?? {};
+    const ratings: Record<string, number> = {};
+    for (const key of RATING_KEYS) {
+      const val = rawRatings[key];
+      if (val !== undefined && val !== "" && val !== null) {
+        const n = Number(val);
+        if (!Number.isInteger(n) || n < 1 || n > 5) return res.status(400).json({ error: `Rating for ${key} must be 1–5.` });
+        ratings[key] = n;
+      }
+    }
+    const hasRatings = Object.keys(ratings).length > 0;
+    if (!body && !hasRatings) return res.status(400).json({ error: "At least one rating or a comment is required." });
+
     const entry = {
       body,
       ...(rating === undefined ? {} : { rating }),
+      ...(hasRatings ? { ratings } : {}),
       author: await actorForUid(uidOf(req)),
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -293,17 +313,221 @@ collaborationRouter.post("/jobs/:jobId/candidates/:candidateId/interview-feedbac
       { $setOnInsert: { ownerUid: context.access.job.uid }, $push: { interviewFeedback: entry } },
       { upsert: true },
     );
+    // Compute average of structured ratings for activity metadata
+    const ratingValues = Object.values(ratings);
+    const avgRating = hasRatings ? +(ratingValues.reduce((a, b) => a + b, 0) / ratingValues.length).toFixed(1) : (rating ?? null);
     await addActivity(
-      jobId,
-      uidOf(req),
-      "interview_feedback",
-      `Submitted interview feedback for ${context.candidate.name}`,
-      { rating: rating ?? null },
+      jobId, uidOf(req), "interview_feedback",
+      `Submitted structured interview feedback for ${context.candidate.name}`,
+      { rating: avgRating, categories: Object.keys(ratings) },
       candidateId,
     );
     const collaboration = await RecruitCandidateCollaboration.findOne({ jobId, candidateId }).lean();
     return res.status(201).json({ collaboration });
   } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+/* ─── AI Hiring Synthesis ──────────────────────────────────────────────────── */
+async function generateAiHiringSynthesis(args: {
+  candidateName: string;
+  jobTitle: string;
+  rubric: { name: string; weight: number; description: string }[];
+  resumeScore: number;
+  maxScore: number;
+  aiSummary: string;
+  resumeStrengths: string[];
+  resumeRedFlags: string[];
+  assessmentStatus: string;
+  assessmentImpact: { strengths?: string[]; weaknesses?: string[]; reasoning?: string } | null;
+  interviewFeedback: Array<{ body: string; rating?: number; ratings?: Record<string, number>; author?: { name: string } }>;
+  stage: string;
+}) {
+  const rubricText = args.rubric.map(r => `- ${r.name} (${r.weight} pts): ${r.description}`).join("\n") || "No rubric defined.";
+
+  const feedbackText = args.interviewFeedback.length
+    ? args.interviewFeedback.map((fb, i) => {
+        const ratingLines = fb.ratings
+          ? Object.entries(fb.ratings).map(([k, v]) => `  ${k}: ${v}/5`).join("\n")
+          : "";
+        return `--- Feedback #${i + 1} from ${fb.author?.name ?? "Interviewer"} ---
+Overall: ${fb.rating ? `${fb.rating}/5` : "not rated"}
+${ratingLines}
+Notes: ${fb.body || "(no notes)"}`;
+      }).join("\n\n")
+    : "No interview feedback submitted yet.";
+
+  const assessmentText = args.assessmentStatus === "completed" && args.assessmentImpact
+    ? `Status: Completed
+Strengths: ${args.assessmentImpact.strengths?.join(", ") || "none"}
+Weaknesses: ${args.assessmentImpact.weaknesses?.join(", ") || "none"}
+Reasoning: ${args.assessmentImpact.reasoning || ""}`
+    : `Status: ${args.assessmentStatus}`;
+
+  const prompt = `You are a senior talent partner at a top-tier company. Synthesise all available evaluation data for this candidate and produce a structured hiring recommendation.
+
+CANDIDATE: ${args.candidateName}
+JOB: ${args.jobTitle}
+CURRENT STAGE: ${args.stage}
+
+RESUME SCORE: ${args.resumeScore} / ${args.maxScore} (${Math.round((args.resumeScore / (args.maxScore || 100)) * 100)}%)
+RESUME SUMMARY: ${args.aiSummary || "Not available."}
+RESUME STRENGTHS: ${args.resumeStrengths.join(", ") || "none"}
+RESUME RED FLAGS: ${args.resumeRedFlags.join(", ") || "none"}
+
+SCORING RUBRIC:
+${rubricText}
+
+ASSESSMENT:
+${assessmentText}
+
+INTERVIEW FEEDBACK:
+${feedbackText}
+
+---
+
+Based on ALL of the above, produce a comprehensive hiring recommendation. Your output must be valid JSON only — no markdown, no commentary outside the JSON object.
+
+{
+  "recommendation": "hire" | "hold" | "pass",
+  "executiveSummary": "2-3 sentence summary of the candidate's overall fit",
+  "strengths": ["strength 1", "strength 2", "strength 3"],
+  "weaknesses": ["weakness 1", "weakness 2"],
+  "riskFactors": ["risk 1"],
+  "keyReasons": ["reason 1 for the recommendation", "reason 2"],
+  "overallFit": "One paragraph on how well they fit the role and team",
+  "suggestedNextStep": "One concrete action the recruiter should take next"
+}
+
+GUIDELINES:
+- recommendation: "hire" if clearly qualified and positive signals across resume/assessment/interview; "hold" if mixed signals or one more step needed; "pass" if performance clearly below bar.
+- Be specific, reference actual data from the inputs. Do not hallucinate.
+- strengths, weaknesses, riskFactors: 1-5 items each (bullet-style, concise).
+- keyReasons: 2-4 specific reasons grounded in the data.
+- suggestedNextStep: actionable (e.g. "Schedule final panel interview", "Send offer letter", "Archive candidate").
+- If interview feedback is missing, recommend "hold" unless resume+assessment are exceptional.`;
+
+  let raw = "";
+  try {
+    raw = await callMeshChatCompletions({
+      apiKey: GEMINI_MESH_KEY,
+      model: "google/gemini-2.0-flash-001",
+      fallbackModels: ["openai/gpt-4o-mini", "anthropic/claude-3-haiku"],
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: 1200,
+      temperature: 0.3,
+      responseFormat: "json_object",
+      retries: 2,
+    });
+    const parsed = JSON.parse(raw.trim().replace(/^```json\s*/i, "").replace(/```$/, ""));
+    const rec = (["hire", "hold", "pass"] as const).includes(parsed.recommendation) ? parsed.recommendation : "hold";
+    return {
+      recommendation: rec as "hire" | "hold" | "pass",
+      executiveSummary: String(parsed.executiveSummary ?? "").trim(),
+      strengths: Array.isArray(parsed.strengths) ? parsed.strengths.map(String) : [],
+      weaknesses: Array.isArray(parsed.weaknesses) ? parsed.weaknesses.map(String) : [],
+      riskFactors: Array.isArray(parsed.riskFactors) ? parsed.riskFactors.map(String) : [],
+      keyReasons: Array.isArray(parsed.keyReasons) ? parsed.keyReasons.map(String) : [],
+      overallFit: String(parsed.overallFit ?? "").trim(),
+      suggestedNextStep: String(parsed.suggestedNextStep ?? "").trim(),
+    };
+  } catch (err) {
+    console.error("[collaboration] generateAiHiringSynthesis failed:", err, "raw:", raw?.slice(0, 300));
+    return null;
+  }
+}
+
+collaborationRouter.post("/jobs/:jobId/candidates/:candidateId/ai-synthesis", async (req, res) => {
+  try {
+    await connectMongo();
+    const jobId = String(req.params.jobId);
+    const candidateId = String(req.params.candidateId);
+    const uid = uidOf(req);
+    const context = await candidateContext(jobId, candidateId, uid);
+    if (!context) return res.status(404).json({ error: "Candidate not found or access denied." });
+    if (!context.access.owner && !hasPermission(context.access, "review_candidates")) {
+      return res.status(403).json({ error: "You do not have permission to generate AI summaries." });
+    }
+    const force = req.body.force === true;
+    const candidate = context.candidate as any;
+
+    // Return cached synthesis unless forced
+    if (!force && candidate.aiHiringSynthesis?.generatedAt) {
+      return res.json({ synthesis: candidate.aiHiringSynthesis });
+    }
+
+    const job = await RecruitJob.findById(jobId).lean() as any;
+    const collaboration = await RecruitCandidateCollaboration.findOne({ jobId, candidateId }).lean() as any;
+    const actorInfo = await actorForUid(uid);
+
+    const synthesis = await generateAiHiringSynthesis({
+      candidateName: candidate.name,
+      jobTitle: job?.title ?? "",
+      rubric: job?.rubric ?? [],
+      resumeScore: candidate.totalScore ?? 0,
+      maxScore: candidate.maxScore ?? 100,
+      aiSummary: candidate.aiSummary ?? "",
+      resumeStrengths: candidate.strengths ?? [],
+      resumeRedFlags: candidate.redFlags ?? [],
+      assessmentStatus: candidate.assessmentStatus ?? "not_sent",
+      assessmentImpact: candidate.assessmentImpact ?? null,
+      interviewFeedback: collaboration?.interviewFeedback ?? [],
+      stage: candidate.stage ?? "applied",
+    });
+
+    if (!synthesis) return res.status(502).json({ error: "AI synthesis failed. Please try again." });
+
+    const fullSynthesis = { ...synthesis, generatedAt: new Date(), generatedBy: actorInfo.name };
+    await RecruitCandidate.updateOne({ _id: candidateId }, { $set: { aiHiringSynthesis: fullSynthesis } });
+    await addActivity(
+      jobId, uid, "ai_hiring_summary_generated",
+      `AI hiring summary generated for ${candidate.name} — recommendation: ${synthesis.recommendation.toUpperCase()}`,
+      { recommendation: synthesis.recommendation },
+      candidateId,
+    );
+
+    return res.json({ synthesis: fullSynthesis });
+  } catch (err: any) {
+    console.error("[collaboration] POST /ai-synthesis", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+collaborationRouter.patch("/jobs/:jobId/candidates/:candidateId/recruiter-decision", async (req, res) => {
+  try {
+    await connectMongo();
+    const jobId = String(req.params.jobId);
+    const candidateId = String(req.params.candidateId);
+    const uid = uidOf(req);
+    const context = await candidateContext(jobId, candidateId, uid);
+    if (!context) return res.status(404).json({ error: "Candidate not found or access denied." });
+    if (!context.access.owner && !hasPermission(context.access, "approve_hiring")) {
+      return res.status(403).json({ error: "You do not have permission to record hiring decisions." });
+    }
+    const decision = String(req.body.decision ?? "");
+    if (!["accepted", "overridden", "ignored"].includes(decision)) {
+      return res.status(400).json({ error: "Decision must be 'accepted', 'overridden', or 'ignored'." });
+    }
+    const candidate = await RecruitCandidate.findById(candidateId) as any;
+    if (!candidate?.aiHiringSynthesis) return res.status(400).json({ error: "Generate an AI summary first before recording a decision." });
+    const actorInfo = await actorForUid(uid);
+    const note = String(req.body.note ?? "").trim();
+    candidate.aiHiringSynthesis.recruiterDecision = decision;
+    candidate.aiHiringSynthesis.recruiterDecisionNote = note;
+    candidate.aiHiringSynthesis.recruiterDecisionAt = new Date();
+    candidate.aiHiringSynthesis.recruiterDecisionBy = actorInfo.name;
+    candidate.markModified("aiHiringSynthesis");
+    await candidate.save();
+    await addActivity(
+      jobId, uid, "recruiter_final_decision",
+      `${actorInfo.name} recorded hiring decision for ${context.candidate.name}: ${decision}`,
+      { decision, note },
+      candidateId,
+    );
+    return res.json({ synthesis: candidate.aiHiringSynthesis });
+  } catch (err: any) {
+    console.error("[collaboration] PATCH /recruiter-decision", err);
     return res.status(500).json({ error: err.message });
   }
 });

@@ -12,7 +12,9 @@ export type CollaborationActivityType =
   | "internal_note_edited"
   | "candidate_stage_changed"
   | "offer_approved"
-  | "interview_feedback";
+  | "interview_feedback"
+  | "ai_hiring_summary_generated"
+  | "recruiter_final_decision";
 
 export interface IRecruitCollaborationActivity extends Document {
   jobId: mongoose.Types.ObjectId;

@@ -29,10 +29,21 @@ export interface IInternalNote {
   editHistory: ICommentHistory[];
 }
 
+export interface IFeedbackRatings {
+  technicalSkills?: number;
+  communicationSkills?: number;
+  problemSolving?: number;
+  cultureFit?: number;
+  leadership?: number;
+  roleSpecificSkills?: number;
+  overallRecommendation?: number;
+}
+
 export interface IInterviewFeedback {
   _id?: mongoose.Types.ObjectId;
   body: string;
-  rating?: number;
+  rating?: number; // overall 1-5
+  ratings?: IFeedbackRatings; // per-category structured ratings
   author: ICollaborationAuthor;
   createdAt: Date;
   updatedAt: Date;
@@ -81,9 +92,23 @@ const NoteSchema = new Schema<IInternalNote>({
   updatedAt: { type: Date, default: Date.now },
   editHistory: { type: [HistorySchema], default: [] },
 });
+const FeedbackRatingsSchema = new Schema<IFeedbackRatings>(
+  {
+    technicalSkills:      { type: Number, min: 1, max: 5 },
+    communicationSkills:  { type: Number, min: 1, max: 5 },
+    problemSolving:       { type: Number, min: 1, max: 5 },
+    cultureFit:           { type: Number, min: 1, max: 5 },
+    leadership:           { type: Number, min: 1, max: 5 },
+    roleSpecificSkills:   { type: Number, min: 1, max: 5 },
+    overallRecommendation:{ type: Number, min: 1, max: 5 },
+  },
+  { _id: false }
+);
+
 const InterviewFeedbackSchema = new Schema<IInterviewFeedback>({
-  body: { type: String, required: true, maxlength: 10000 },
+  body: { type: String, default: "", maxlength: 10000 },
   rating: { type: Number, min: 1, max: 5 },
+  ratings: { type: FeedbackRatingsSchema },
   author: { type: AuthorSchema, required: true },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
