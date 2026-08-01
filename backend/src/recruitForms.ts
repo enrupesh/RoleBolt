@@ -5,6 +5,8 @@ import mongoose from "mongoose";
 import { connectMongo } from "./db";
 import { RecruitForm } from "./models/RecruitForm";
 import { RecruitFormResponse } from "./models/RecruitFormResponse";
+import { User } from "./models/User";
+import { RecruitProfile } from "./models/RecruitProfile";
 import { callMeshChatCompletions } from "./ai/meshClient";
 import { sendEmail } from "./mailer";
 
@@ -30,6 +32,26 @@ const FORM_FRONTEND_URL = (
 
 function getUid(req: express.Request): string {
   return (req as any).user?.uid ?? "";
+}
+
+async function getCreatorOfficialEmail(ownerUid: string): Promise<string> {
+  if (!ownerUid) return "";
+  try {
+    const user = await User.findById(ownerUid).select("email").lean();
+    if (user?.email?.trim()) return user.email.trim();
+  } catch { /* ignore */ }
+  const profile = await RecruitProfile.findOne({ uid: ownerUid }).select("email").lean();
+  return profile?.email?.trim() ?? "";
+}
+
+function formCompanyName(form: any): string {
+  return String(form?.jobDetails?.companyName ?? "").trim();
+}
+
+async function formEmailContext(form: any): Promise<{ companyName: string; officialContactEmail: string }> {
+  const companyName = formCompanyName(form);
+  const officialContactEmail = await getCreatorOfficialEmail(String(form?.uid ?? ""));
+  return { companyName, officialContactEmail };
 }
 
 type FormStageActor = "recruiter" | "agent" | "rule" | "system";
@@ -569,6 +591,8 @@ async function markFormResponseScored(responseId: any): Promise<void> {
 async function runFormAgent(args: {
   responseId: any;
   formTitle: string;
+  ownerUid: string;
+  companyName: string;
   agentMode: any;
   aiScore: number;
   scoringFailed: boolean;
@@ -614,14 +638,17 @@ async function runFormAgent(args: {
   if (wantsEmail && !email) emailStatus = "skipped"; // nothing to send to
 
   if (wantsEmail && email) {
+    const officialContactEmail = await getCreatorOfficialEmail(args.ownerUid);
+    const ctx = { officialContactEmail };
+    const co = args.companyName;
     let tpl: emailTemplates.EmailPayload;
     if (decision.action === "shortlisted") {
-      tpl = emailTemplates.screened(name, args.formTitle, "");
+      tpl = emailTemplates.screened(name, args.formTitle, co, ctx);
     } else if (decision.action === "rejected") {
       const body = `Hi ${name.split(" ")[0]},\n\nThank you for taking the time to complete our "${args.formTitle}" application. After reviewing your responses, we've decided to move forward with other applicants at this time.\n\nWe appreciate your interest and wish you the best in your search.\n\nWarm regards,\nThe Hiring Team`;
-      tpl = emailTemplates.rejectionEmailHtml(name, args.formTitle, "", body);
+      tpl = emailTemplates.rejectionEmailHtml(name, args.formTitle, co, body, ctx);
     } else {
-      tpl = emailTemplates.reviewZoneEmail(name, args.formTitle, "");
+      tpl = emailTemplates.reviewZoneEmail(name, args.formTitle, co, ctx);
     }
 
     try {
@@ -1441,8 +1468,7 @@ formRouter.patch("/:formId/responses/:responseId", async (req, res) => {
     );
     if (!response) return res.status(404).json({ error: "Response not found." });
 
-    // Auto-send stage-change emails only on actual transition (prevent duplicates on re-save)
-    const AUTO_EMAIL_STAGES = ["shortlisted", "interview", "hired"];
+    // Stage changes are recorded; recruiters choose when to email via the UI.
     const stageChanged = stage && stage !== (existing as any).stage;
     if (stageChanged) {
       await recordFormStageChange({
@@ -1452,32 +1478,6 @@ formRouter.patch("/:formId/responses/:responseId", async (req, res) => {
         actor: "recruiter",
         actorUid: uid,
         reason: typeof req.body.reason === "string" ? req.body.reason.slice(0, 300) : "Manual stage change",
-      });
-    }
-    if (stageChanged && AUTO_EMAIL_STAGES.includes(stage) && response.submittedEmail) {
-      const resId      = response._id;
-      const candName   = response.submittedName || "Applicant";
-      const candEmail  = response.submittedEmail;
-      const formId     = req.params.formId;
-      setImmediate(async () => {
-        try {
-          const form = await RecruitForm.findById(formId).lean();
-          const formTitle = (form as any)?.title || "";
-          let payload: emailTemplates.EmailPayload | null = null;
-          if (stage === "shortlisted") payload = emailTemplates.screened(candName, formTitle, "");
-          if (stage === "interview")   payload = emailTemplates.interview(candName, formTitle, "");
-          if (stage === "hired")       payload = emailTemplates.hired(candName, formTitle, "");
-          if (!payload) return;
-          const result = await sendEmail({ to: candEmail, subject: payload.subject, html: payload.html, text: payload.text, from: CANDIDATE_FROM });
-          await RecruitFormResponse.findByIdAndUpdate(resId, {
-            $push: {
-              emailLog: {
-                type: stage, to: candEmail, subject: payload.subject, body: payload.text,
-                sentAt: new Date(), status: result.ok ? "sent" : "failed", error: result.error,
-              },
-            },
-          });
-        } catch (err) { console.error("[forms] auto stage-change email failed:", err); }
       });
     }
 
@@ -1679,18 +1679,25 @@ formRouter.post("/:formId/responses/:responseId/send-email", async (req, res) =>
 
     const candName = response.submittedName || "Applicant";
     const formTitle = (form as any).title || "";
+    const emailCtx = await formEmailContext(form);
+    const ctx = { officialContactEmail: emailCtx.officialContactEmail };
 
     // Build branded HTML based on email type
     let html: string;
+    let text = body;
     if (type === "rejected") {
-      html = emailTemplates.rejectionEmailHtml(candName, formTitle, "", body).html;
+      const tpl = emailTemplates.rejectionEmailHtml(candName, formTitle, emailCtx.companyName, body, ctx);
+      html = tpl.html;
+      text = tpl.text;
     } else if (type === "offer") {
-      html = emailTemplates.offerEmail(candName, formTitle, "", body).html;
+      const tpl = emailTemplates.offerEmail(candName, formTitle, emailCtx.companyName, body, ctx);
+      html = tpl.html;
+      text = tpl.text;
     } else {
-      html = emailTemplates.genericEmail(candName, subject.trim(), body);
+      html = emailTemplates.genericEmail(candName, subject.trim(), body, ctx);
     }
 
-    const result = await sendEmail({ to: candEmail, subject: subject.trim(), html, text: body, from: CANDIDATE_FROM });
+    const result = await sendEmail({ to: candEmail, subject: subject.trim(), html, text, from: CANDIDATE_FROM });
 
     const logEntry = {
       type: type || "custom",
@@ -1876,6 +1883,8 @@ formRouter.post("/:formId/responses/:responseId/retry-score", async (req, res) =
           await runFormAgent({
             responseId: response._id,
             formTitle: form.title,
+            ownerUid: String(form.uid),
+            companyName: formCompanyName(form),
             agentMode: (form as any).agentMode ?? {},
             aiScore: scored.aiScore,
             scoringFailed: scored.scoringFailed,
@@ -2404,6 +2413,66 @@ formPublicRouter.get("/:slug", async (req, res) => {
   }
 });
 
+const PUBLIC_STAGE_LABELS: Record<string, string> = {
+  new: "Received",
+  scored: "Under review",
+  review_zone: "Under review",
+  shortlisted: "Shortlisted",
+  assessment: "Assessment",
+  interview: "Interview",
+  offer: "Offer",
+  hired: "Hired",
+  rejected: "Not selected",
+  withdrawn: "Withdrawn",
+};
+
+// GET /recruit-public/forms/:slug/status?email= — applicant self-service status check
+formPublicRouter.get("/:slug/status", async (req, res) => {
+  try {
+    await connectMongo();
+    const email = String(req.query.email ?? "").trim().toLowerCase();
+    if (!email || !email.includes("@")) {
+      return res.status(400).json({ error: "A valid email address is required." });
+    }
+
+    const limit = checkRateLimit(`form-status:${req.params.slug}:${email}`, req);
+    if (!limit.allowed) {
+      res.setHeader("Retry-After", String(limit.retryAfterSeconds));
+      return res.status(429).json({ error: "Too many lookups. Please try again later." });
+    }
+
+    const form = await RecruitForm.findOne({ slug: req.params.slug, status: "active" })
+      .select("title jobDetails.companyName slug")
+      .lean();
+    if (!form) return res.status(404).json({ error: "Form not found." });
+
+    const response = await RecruitFormResponse.findOne({
+      formId: form._id,
+      submittedEmail: { $regex: new RegExp(`^${email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
+    })
+      .select("stage stageMovedAt createdAt submittedName")
+      .lean();
+
+    if (!response) {
+      return res.json({ found: false, formTitle: form.title });
+    }
+
+    const stage = String((response as any).stage || "new");
+    return res.json({
+      found: true,
+      formTitle: form.title,
+      companyName: formCompanyName(form),
+      applicantName: (response as any).submittedName || "",
+      stage,
+      stageLabel: PUBLIC_STAGE_LABELS[stage] || stage.replace(/_/g, " "),
+      updatedAt: (response as any).stageMovedAt || (response as any).createdAt,
+    });
+  } catch (err: any) {
+    console.error("[forms] GET public status:", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /recruit-public/forms/:slug/submit — submit a response
 formPublicRouter.post(
   "/:slug/submit",
@@ -2462,6 +2531,18 @@ formPublicRouter.post(
         resumeText = await extractResumeText(req.file);
       }
 
+      // Duplicate application check (same email on this form)
+      const normalizedEmail = submittedEmail.trim().toLowerCase();
+      if (normalizedEmail) {
+        const existingApp = await RecruitFormResponse.findOne({
+          formId: form._id,
+          submittedEmail: { $regex: new RegExp(`^${normalizedEmail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
+        }).select("_id").lean();
+        if (existingApp) {
+          return res.status(409).json({ error: "You have already applied with this email address." });
+        }
+      }
+
       // Validate required fields
       for (const q of form.questions) {
         if (!q.required) continue;
@@ -2513,6 +2594,37 @@ formPublicRouter.post(
       // ── 3. Return 201 immediately — candidate is done ─────────────────────
       res.status(201).json({ ok: true, responseId: response._id });
 
+      // Confirmation email to applicant
+      if (submittedEmail?.trim()) {
+        const confirmName = submittedName || "Applicant";
+        const confirmEmail = submittedEmail.trim();
+        const formTitle = form.title;
+        const formUid = String(form.uid);
+        setImmediate(async () => {
+          try {
+            const ctx = await formEmailContext(form);
+            const statusUrl = `${FORM_FRONTEND_URL}/f/${form.slug}/status`;
+            const payload = emailTemplates.formApplicationReceived(
+              confirmName, formTitle, ctx.companyName,
+              { officialContactEmail: ctx.officialContactEmail, statusUrl },
+            );
+            const result = await sendEmail({
+              to: confirmEmail, subject: payload.subject, html: payload.html, text: payload.text, from: CANDIDATE_FROM,
+            });
+            await RecruitFormResponse.findByIdAndUpdate(response._id, {
+              $push: {
+                emailLog: {
+                  type: "application_received", to: confirmEmail, subject: payload.subject, body: payload.text,
+                  sentAt: new Date(), status: result.ok ? "sent" : "failed", error: result.error,
+                },
+              },
+            });
+          } catch (e) {
+            console.error("[forms] application confirmation email failed:", e);
+          }
+        });
+      }
+
       // ── 4. Score in background and patch result ───────────────────────────
       const textAnswers: ScoredAnswer[] = rawAnswers
         .filter(a => a.value?.trim() && a.value !== "__file_uploaded__")
@@ -2545,6 +2657,8 @@ formPublicRouter.post(
           await runFormAgent({
             responseId: response._id,
             formTitle: form.title,
+            ownerUid: String(form.uid),
+            companyName: formCompanyName(form),
             agentMode: (form as any).agentMode ?? {},
             aiScore: scored.aiScore,
             scoringFailed: scored.scoringFailed,

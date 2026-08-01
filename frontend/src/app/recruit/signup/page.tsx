@@ -9,6 +9,16 @@ import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { firebaseAuth, googleProvider } from "@/lib/firebaseClient";
 import { signInWithPopup, RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from "firebase/auth";
 
+function safeNextPath(raw: string | null): string {
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/recruit/dashboard";
+  return raw;
+}
+
+function readNextFromUrl(): string {
+  if (typeof window === "undefined") return "/recruit/dashboard";
+  return safeNextPath(new URLSearchParams(window.location.search).get("next"));
+}
+
 type Step = "form" | "check-email";
 type PhoneStep = "idle" | "entering" | "otp";
 
@@ -42,12 +52,13 @@ function PhoneIcon() {
 export default function RecruitSignUpPage() {
   const router = useRouter();
   const { authUser, recruitProfile, loading: authLoading, signInWithToken } = useRecruitAuth();
+  const [nextPath] = useState(readNextFromUrl);
 
   useEffect(() => {
     if (!authLoading && authUser && recruitProfile) {
-      router.replace("/recruit/dashboard");
+      router.replace(nextPath);
     }
-  }, [authLoading, authUser, recruitProfile, router]);
+  }, [authLoading, authUser, recruitProfile, router, nextPath]);
 
   const [step, setStep] = useState<Step>("form");
   const [name, setName]         = useState("");

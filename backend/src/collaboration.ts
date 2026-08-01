@@ -15,10 +15,20 @@ import { RecruitNotification } from "./models/RecruitNotification";
 import { User } from "./models/User";
 import { sendEmail } from "./mailer";
 import { callMeshChatCompletions } from "./ai/meshClient";
+import * as emailTemplates from "./emailTemplates";
 
 const GEMINI_MESH_KEY = process.env.GEMINI_MESH_KEY ?? "";
 
+const FRONTEND_URL = (() => {
+  const raw = process.env.FRONTEND_URL ?? "";
+  if (raw && !raw.includes("localhost") && !raw.includes("127.0.0.1")) return raw.replace(/\/$/, "");
+  return "https://www.rolebolt.tech";
+})();
+
+const TEAM_INVITE_EXPIRY_DAYS = 14;
+
 export const collaborationRouter = express.Router();
+export const collaborationPublicRouter = express.Router();
 
 const ROLE_PERMISSIONS: Record<CollaborationRole, CollaborationPermission[]> = {
   recruiter: ["view_candidates", "review_candidates", "move_pipeline", "send_assessments", "schedule_interviews", "send_offers", "add_comments", "add_notes"],
@@ -28,6 +38,125 @@ const ROLE_PERMISSIONS: Record<CollaborationRole, CollaborationPermission[]> = {
   interviewer: ["view_assigned_candidates", "submit_feedback", "add_comments", "add_notes"],
   admin: [...COLLABORATION_PERMISSIONS],
 };
+
+const ROLE_LABELS: Record<CollaborationRole, string> = {
+  recruiter: "Recruiter",
+  senior_recruiter: "Senior Recruiter",
+  hiring_manager: "Hiring Manager",
+  hr_manager: "HR Manager",
+  interviewer: "Interviewer",
+  admin: "Admin",
+};
+
+const ROLE_CAPABILITY_BULLETS: Record<CollaborationRole, string[]> = {
+  recruiter: [
+    "Review and score candidates",
+    "Move candidates through the hiring pipeline",
+    "Send assessments and offer letters",
+  ],
+  senior_recruiter: [
+    "Full pipeline management",
+    "Manage team members and assignments",
+    "Configure job settings and analytics",
+  ],
+  hiring_manager: [
+    "Review shortlisted candidates",
+    "Submit interview feedback",
+    "Approve final hiring decisions",
+  ],
+  hr_manager: [
+    "Review candidates and hiring analytics",
+    "Add internal notes and comments",
+    "Approve hiring decisions",
+  ],
+  interviewer: [
+    "View assigned candidates only",
+    "Submit structured interview feedback",
+    "Add comments on candidates you interview",
+  ],
+  admin: [
+    "Full access to this hiring workspace",
+    "Manage team, job settings, and all candidates",
+  ],
+};
+
+function roleLabel(role: CollaborationRole): string {
+  return ROLE_LABELS[role] ?? role.replace(/_/g, " ");
+}
+
+function inviteExpiryDate(from = new Date()): Date {
+  const d = new Date(from);
+  d.setDate(d.getDate() + TEAM_INVITE_EXPIRY_DAYS);
+  return d;
+}
+
+function maskEmail(email: string): string {
+  const [local, domain] = email.split("@");
+  if (!domain) return email;
+  const visible = local.length <= 2 ? local[0] ?? "*" : `${local.slice(0, 2)}***`;
+  return `${visible}@${domain}`;
+}
+
+function isInviteExpired(member: { inviteExpiresAt?: Date | null }): boolean {
+  if (!member.inviteExpiresAt) return false;
+  return new Date(member.inviteExpiresAt).getTime() < Date.now();
+}
+
+async function sendTeamInviteEmail(args: {
+  member: any;
+  job: any;
+  inviterName: string;
+  role: CollaborationRole;
+}) {
+  const { member, job, inviterName, role } = args;
+  if (!member?.email || !member.notifyByEmail) return;
+
+  const companyName = (job as any).companyName ?? "";
+  const jobTitle = (job as any).title ?? "Hiring workspace";
+  const inviteToken = member.inviteToken as string | undefined;
+
+  if (member.status === "pending" && inviteToken) {
+    const acceptUrl = `${FRONTEND_URL}/recruit/team-invite/${inviteToken}`;
+    const expiresAt = member.inviteExpiresAt ? new Date(member.inviteExpiresAt) : inviteExpiryDate();
+    const payload = emailTemplates.teamInviteEmail({
+      inviteeName: member.name,
+      inviterName,
+      companyName,
+      jobTitle,
+      roleLabel: roleLabel(role),
+      permissionBullets: ROLE_CAPABILITY_BULLETS[role] ?? [],
+      acceptUrl,
+      expiresAt,
+    });
+    const result = await sendEmail({
+      to: member.email,
+      subject: payload.subject,
+      html: payload.html,
+      text: payload.text,
+    });
+    if (!result.ok) console.error("[collaboration] team invite email failed:", result.error);
+    return;
+  }
+
+  if (member.status === "active") {
+    const jobUrl = `${FRONTEND_URL}/recruit/jobs/${job._id}`;
+    const payload = emailTemplates.teamMemberAddedEmail({
+      memberName: member.name,
+      inviterName,
+      companyName,
+      jobTitle,
+      roleLabel: roleLabel(role),
+      jobUrl,
+    });
+    const result = await sendEmail({
+      to: member.email,
+      subject: payload.subject,
+      html: payload.html,
+      text: payload.text,
+    });
+    if (!result.ok) console.error("[collaboration] team added email failed:", result.error);
+  }
+}
 
 function uidOf(req: express.Request): string {
   return (req as any).user?.uid ?? "";
@@ -150,13 +279,38 @@ collaborationRouter.post("/jobs/:jobId/team", async (req, res) => {
     const existing = await RecruitTeamMember.findOne({ jobId: req.params.jobId, email });
     if (existing && existing.status !== "revoked") return res.status(409).json({ error: "That person is already on this job team." });
     const invitedUser = await User.findOne({ email }).select("_id name email").lean() as any;
+    const inviteToken = invitedUser ? undefined : crypto.randomBytes(24).toString("hex");
+    const inviteExpiresAt = invitedUser ? undefined : inviteExpiryDate();
+    const memberPayload = {
+      name,
+      role,
+      permissions: normalizedPermissions(role, req.body.permissions),
+      status: invitedUser ? "active" as const : "pending" as const,
+      memberUid: invitedUser?._id?.toString(),
+      inviteToken,
+      inviteExpiresAt,
+      notifyByEmail: req.body.notifyByEmail !== false,
+      joinedAt: invitedUser ? new Date() : undefined,
+    };
     const member = existing
-      ? await RecruitTeamMember.findByIdAndUpdate(existing._id, { name, role, permissions: normalizedPermissions(role, req.body.permissions), status: invitedUser ? "active" : "pending", memberUid: invitedUser?._id?.toString(), inviteToken: invitedUser ? undefined : crypto.randomBytes(24).toString("hex"), notifyByEmail: req.body.notifyByEmail !== false, joinedAt: invitedUser ? new Date() : undefined }, { returnDocument: "after" }).lean()
-      : await RecruitTeamMember.create({ jobId: req.params.jobId, ownerUid: access.job.uid, memberUid: invitedUser?._id?.toString(), email, name, role, permissions: normalizedPermissions(role, req.body.permissions), status: invitedUser ? "active" : "pending", inviteToken: invitedUser ? undefined : crypto.randomBytes(24).toString("hex"), notifyByEmail: req.body.notifyByEmail !== false, joinedAt: invitedUser ? new Date() : undefined });
-    await addActivity(req.params.jobId, uid, "team_member_added", `Added ${name} as ${role.replace("_", " ")}`, { email, role });
-    if (invitedUser?._id) await notify(invitedUser._id.toString(), { type: "team_invite", title: "You joined a hiring team", body: `You were added to ${access.job.title}.`, jobId: req.params.jobId });
-    if (member?.notifyByEmail && !invitedUser) {
-      setImmediate(() => sendEmail({ to: email, subject: `You're invited to collaborate on ${access.job.title}`, html: `<p>You have been invited to collaborate on <strong>${access.job.title}</strong> as ${role.replace("_", " ")}.</p>` }).catch(() => {}));
+      ? await RecruitTeamMember.findByIdAndUpdate(existing._id, memberPayload, { returnDocument: "after" }).lean()
+      : await RecruitTeamMember.create({ jobId: req.params.jobId, ownerUid: access.job.uid, email, ...memberPayload }).then(m => m.toObject());
+    const inviter = await actorForUid(uid);
+    await addActivity(req.params.jobId, uid, "team_member_added", `Added ${name} as ${roleLabel(role)}`, { email, role });
+    if (invitedUser?._id) {
+      await notify(invitedUser._id.toString(), {
+        type: "team_invite",
+        title: "You joined a hiring team",
+        body: `You were added to ${access.job.title}.`,
+        jobId: req.params.jobId,
+      });
+    }
+    if (member?.notifyByEmail) {
+      setImmediate(() => {
+        sendTeamInviteEmail({ member, job: access.job, inviterName: inviter.name, role }).catch(err =>
+          console.error("[collaboration] invite email failed:", err),
+        );
+      });
     }
     return res.status(201).json({ member });
   } catch (err: any) {
@@ -203,9 +357,99 @@ collaborationRouter.delete("/jobs/:jobId/team/:memberId", async (req, res) => {
 collaborationRouter.post("/jobs/:jobId/team/:memberId/accept", async (req, res) => {
   try {
     await connectMongo();
-    const member = await RecruitTeamMember.findOneAndUpdate({ _id: req.params.memberId, jobId: req.params.jobId, email: (profileOf(req).email).toLowerCase(), status: "pending" }, { status: "active", memberUid: uidOf(req), joinedAt: new Date(), inviteToken: undefined }, { returnDocument: "after" }).lean();
+    const member = await RecruitTeamMember.findOneAndUpdate({ _id: req.params.memberId, jobId: req.params.jobId, email: (profileOf(req).email).toLowerCase(), status: "pending" }, { status: "active", memberUid: uidOf(req), joinedAt: new Date(), inviteToken: undefined, inviteExpiresAt: undefined }, { returnDocument: "after" }).lean();
     if (!member) return res.status(404).json({ error: "Invitation not found for this account." });
     return res.json({ member });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+/** Accept a pending team invite via secure email link token. */
+collaborationRouter.post("/team-invite/:token/accept", async (req, res) => {
+  try {
+    await connectMongo();
+    const profile = profileOf(req);
+    if (!profile.email) return res.status(401).json({ error: "You must be signed in to accept this invitation." });
+
+    const member = await RecruitTeamMember.findOne({
+      inviteToken: req.params.token,
+      status: "pending",
+    });
+    if (!member) return res.status(404).json({ error: "This invitation was not found or has already been accepted." });
+    if (isInviteExpired(member)) {
+      return res.status(410).json({ error: "This invitation has expired. Please ask the job owner to send a new invite." });
+    }
+    if (member.email.toLowerCase() !== profile.email.toLowerCase()) {
+      return res.status(403).json({
+        error: `This invitation was sent to ${maskEmail(member.email)}. Please sign in with that email address to accept.`,
+        expectedEmailMasked: maskEmail(member.email),
+      });
+    }
+
+    member.status = "active";
+    member.memberUid = uidOf(req);
+    member.joinedAt = new Date();
+    member.inviteToken = undefined;
+    member.inviteExpiresAt = undefined;
+    await member.save();
+
+    const job = await RecruitJob.findById(member.jobId).lean();
+    await addActivity(
+      String(member.jobId),
+      uidOf(req),
+      "team_member_added",
+      `${member.name} accepted the team invitation`,
+      { email: member.email, role: member.role },
+    );
+    await notify(uidOf(req), {
+      type: "team_invite",
+      title: "Welcome to the hiring team",
+      body: `You joined ${(job as any)?.title ?? "a hiring workspace"}.`,
+      jobId: String(member.jobId),
+    });
+
+    return res.json({
+      ok: true,
+      jobId: String(member.jobId),
+      jobTitle: (job as any)?.title ?? "",
+      member,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+collaborationPublicRouter.get("/team-invite/:token", async (req, res) => {
+  try {
+    await connectMongo();
+    const member = await RecruitTeamMember.findOne({
+      inviteToken: req.params.token,
+      status: "pending",
+    }).lean();
+    if (!member) return res.status(404).json({ error: "This invitation was not found or has already been accepted." });
+
+    const expired = isInviteExpired(member);
+    const job = await RecruitJob.findById(member.jobId).lean();
+    if (!job) return res.status(404).json({ error: "The associated job no longer exists." });
+
+    const inviter = await User.findById((job as any).uid).select("name email").lean() as any;
+    const inviterName = inviter?.name || inviter?.email?.split("@")[0] || "A team member";
+    const role = member.role as CollaborationRole;
+
+    return res.json({
+      inviteeName: member.name,
+      inviteeEmailMasked: maskEmail(member.email),
+      jobTitle: (job as any).title ?? "",
+      companyName: (job as any).companyName ?? "",
+      role,
+      roleLabel: roleLabel(role),
+      permissionBullets: ROLE_CAPABILITY_BULLETS[role] ?? [],
+      inviterName,
+      expiresAt: member.inviteExpiresAt,
+      expired,
+      jobId: String(member.jobId),
+    });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }

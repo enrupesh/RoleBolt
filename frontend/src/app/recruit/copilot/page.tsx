@@ -39,6 +39,15 @@ import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { RecruitGuard } from "@/components/RecruitGuard";
 import { apiUrl } from "@/lib/api";
 import { useTheme } from "@/components/ThemeProvider";
+import WorkspacePicker from "./WorkspacePicker";
+import {
+  type CopilotWorkspace,
+  type CopilotContextLevel,
+  buildApiContext,
+  inferWorkspace,
+  defaultContextMode,
+  workspaceLabel,
+} from "@/lib/copilotWorkspace";
 
 // ─── Theme ──────────────────────────────────────────────────────────────────
 // Soft light "premium AI product" theme — see UI/UX polish brief.
@@ -54,7 +63,33 @@ const T = {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type ContextMode = "job" | "candidate" | "global" | "form";
+type ContextMode = CopilotContextLevel;
+
+interface FormApplicantStat {
+  _id: string;
+  submittedName: string;
+  submittedEmail?: string;
+  aiScore: number;
+  scoringFailed?: boolean;
+  stage?: string;
+  aiSummary?: string;
+  strengths?: string[];
+  redFlags?: string[];
+  assessmentStatus?: string;
+  assessmentScore?: number;
+}
+
+interface FormGlobalStats {
+  activeForms: number;
+  totalApplicants: number;
+  avgAiScorePct: number | null;
+  shortlisted: number;
+  interviewStage: number;
+  hired: number;
+  assessmentCompleted: number;
+  topForm?: { formId: string; title: string; responseCount: number; avgScorePct: number | null } | null;
+  highestRatedApplicant?: { id: string; name: string; formTitle: string; scorePct: number } | null;
+}
 
 interface Job {
   _id: string;
@@ -107,6 +142,10 @@ interface ConversationSummary {
   selectedJobTitle?: string;
   selectedCandidateId?: string;
   selectedCandidateName?: string;
+  selectedFormId?: string;
+  selectedFormTitle?: string;
+  selectedResponseId?: string;
+  selectedResponseName?: string;
   lastActiveAt: string;
   totalMessages: number;
 }
@@ -571,6 +610,24 @@ const GLOBAL_PROMPTS = [
   { Icon: Users, text: "Where are candidates dropping off?" },
 ];
 
+const FORM_GLOBAL_PROMPTS = [
+  { Icon: Target, text: "What should I prioritize across my forms today?" },
+  { Icon: Award, text: "Who are my top applicants overall?" },
+  { Icon: TrendingUp, text: "Which form has the strongest pipeline?" },
+  { Icon: AlertTriangle, text: "Which applicants are stuck in review?" },
+  { Icon: ClipboardCheck, text: "Assessment completion across all forms" },
+  { Icon: Users, text: "Compare my active forms" },
+];
+
+const FORM_APPLICANT_PROMPTS = [
+  { Icon: ClipboardCheck, text: "Summarize this applicant" },
+  { Icon: Target, text: "Should I shortlist them?" },
+  { Icon: Search, text: "What are their strengths and weaknesses?" },
+  { Icon: FileText, text: "How did they answer the key questions?" },
+  { Icon: CheckCircle2, text: "What stage should they move to next?" },
+  { Icon: Mail, text: "Draft a shortlist email" },
+];
+
 const FORM_PROMPTS = [
   { Icon: Award, text: "Who are the top applicants for this form?" },
   { Icon: Target, text: "Which applicants should I shortlist?" },
@@ -580,20 +637,36 @@ const FORM_PROMPTS = [
   { Icon: Users, text: "Which stage has the most dropoff?" },
 ];
 
-function WelcomeScreen({ recruiterName, jobSelected, contextMode, candidateName, formTitle, onPrompt, loadingInsights }: {
+function WelcomeScreen({ recruiterName, jobSelected, contextMode, candidateName, formTitle, applicantName, workspace, onPrompt, loadingInsights }: {
   recruiterName?: string;
   jobSelected: boolean;
   contextMode: ContextMode;
   candidateName?: string;
   formTitle?: string;
+  applicantName?: string;
+  workspace: CopilotWorkspace;
   onPrompt: (t: string) => void;
   loadingInsights?: boolean;
 }) {
   const firstName = recruiterName?.split(" ")[0] ?? "there";
-  const prompts = contextMode === "candidate" ? CANDIDATE_PROMPTS : contextMode === "global" ? GLOBAL_PROMPTS : contextMode === "form" ? FORM_PROMPTS : JOB_PROMPTS;
-  const canChat = contextMode === "candidate" ? !!candidateName : contextMode === "global" ? true : contextMode === "form" ? !!formTitle : jobSelected;
+  const prompts =
+    contextMode === "candidate" ? CANDIDATE_PROMPTS
+    : contextMode === "form_applicant" ? FORM_APPLICANT_PROMPTS
+    : contextMode === "form_global" ? FORM_GLOBAL_PROMPTS
+    : contextMode === "global" ? GLOBAL_PROMPTS
+    : contextMode === "form" ? FORM_PROMPTS
+    : JOB_PROMPTS;
+  const canChat =
+    contextMode === "candidate" ? !!candidateName
+    : contextMode === "form_applicant" ? !!applicantName
+    : contextMode === "form_global" || contextMode === "global" ? true
+    : contextMode === "form" ? !!formTitle
+    : jobSelected;
 
-  if (contextMode === "global" && loadingInsights) {
+  const loadingGlobalInsights =
+    (contextMode === "global" || contextMode === "form_global") && loadingInsights;
+
+  if (loadingGlobalInsights) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center px-6 pb-24">
         <div
@@ -630,7 +703,22 @@ function WelcomeScreen({ recruiterName, jobSelected, contextMode, candidateName,
       ) : contextMode === "global" ? (
         <>
           <p className="text-[0.9rem] max-w-sm leading-relaxed mb-2" style={{ color: T.textSecondary }}>
-            I'm looking across your entire hiring organization — every job, every candidate, every pipeline. Ask me anything, no filtering needed.
+            I'm looking across your entire Standard Job organization — every job, every candidate.
+          </p>
+          <p className="text-xs mb-8" style={{ color: "var(--rb-muted)" }}>Select a prompt or type your own question below</p>
+        </>
+      ) : contextMode === "form_global" ? (
+        <>
+          <p className="text-[0.9rem] max-w-sm leading-relaxed mb-2" style={{ color: T.textSecondary }}>
+            Form Job workspace — all forms and applicants. Standard Job data is not included here.
+          </p>
+          <p className="text-xs mb-8" style={{ color: "var(--rb-muted)" }}>Select a prompt or type your own question below</p>
+        </>
+      ) : contextMode === "form_applicant" && applicantName ? (
+        <>
+          <p className="text-[0.9rem] max-w-sm leading-relaxed mb-2" style={{ color: T.textSecondary }}>
+            Focused on applicant <span className="font-semibold" style={{ color: T.text }}>{applicantName}</span>
+            {formTitle ? <> on <span className="font-semibold" style={{ color: T.text }}>{formTitle}</span></> : null}.
           </p>
           <p className="text-xs mb-8" style={{ color: "var(--rb-muted)" }}>Select a prompt or type your own question below</p>
         </>
@@ -1067,10 +1155,186 @@ function FormContextPanel({ form }: { form: Form | null }) {
   );
 }
 
+function FormGlobalContextPanel({ stats, loading }: { stats: FormGlobalStats | null; loading: boolean }) {
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-center px-4">
+        <div className="w-10 h-10 rounded-2xl border flex items-center justify-center mb-3 animate-pulse" style={{ background: T.card, borderColor: T.border }}>
+          <FileText size={16} strokeWidth={2} style={{ color: "var(--rb-faint)" }} />
+        </div>
+        <p className="text-[12px]" style={{ color: "var(--rb-muted)" }}>Loading form organization data…</p>
+      </div>
+    );
+  }
+
+  if (!stats) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-center px-4">
+        <div className="w-10 h-10 rounded-2xl border flex items-center justify-center mb-3" style={{ background: T.card, borderColor: T.border }}>
+          <FileText size={16} strokeWidth={2} style={{ color: "var(--rb-faint)" }} />
+        </div>
+        <p className="text-[12px]" style={{ color: "var(--rb-muted)" }}>No form data yet</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-4 py-5 space-y-5 overflow-y-auto h-full scrollbar-none">
+      <div>
+        <PanelSectionLabel>Form Job Context</PanelSectionLabel>
+        <div className="p-3.5 rounded-2xl border" style={{ background: T.card, borderColor: T.border }}>
+          <div className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "var(--rb-info)" }} />
+            <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: T.textSecondary }}>All Forms</p>
+          </div>
+          <p className="text-[0.9rem] font-semibold leading-snug mt-1" style={{ color: T.text }}>Every form, every applicant</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2.5">
+        <MetricCard label="Active Forms" value={stats.activeForms} icon={FileText} />
+        <MetricCard label="Total Applicants" value={stats.totalApplicants} icon={Users} />
+        <MetricCard label="Shortlisted" value={stats.shortlisted} icon={CheckCircle2} />
+        <MetricCard label="In Interview" value={stats.interviewStage} icon={Users} />
+        <MetricCard label="Hired" value={stats.hired} icon={Award} />
+        <MetricCard label="Avg AI Score" value={stats.avgAiScorePct !== null ? `${stats.avgAiScorePct}%` : "—"} color={stats.avgAiScorePct ? confColor(stats.avgAiScorePct) : undefined} icon={Target} />
+      </div>
+
+      {stats.topForm && (
+        <div className="p-3.5 rounded-2xl border" style={{ background: T.card, borderColor: T.border }}>
+          <PanelSectionLabel>Top Form Pipeline</PanelSectionLabel>
+          <p className="text-[0.85rem] font-semibold" style={{ color: T.text }}>{stats.topForm.title}</p>
+          {stats.topForm.avgScorePct !== null && (
+            <p className="text-[11px] mt-0.5" style={{ color: confColor(stats.topForm.avgScorePct) }}>
+              {stats.topForm.avgScorePct}% avg score · {stats.topForm.responseCount} applicants
+            </p>
+          )}
+        </div>
+      )}
+
+      {stats.highestRatedApplicant && (
+        <div className="p-3.5 rounded-2xl border" style={{ background: T.card, borderColor: T.border }}>
+          <PanelSectionLabel>Highest Rated Applicant</PanelSectionLabel>
+          <p className="text-[0.85rem] font-semibold" style={{ color: T.text }}>{stats.highestRatedApplicant.name}</p>
+          <p className="text-[11px] mt-0.5" style={{ color: T.textSecondary }}>
+            {stats.highestRatedApplicant.formTitle} · <span style={{ color: confColor(stats.highestRatedApplicant.scorePct) }}>{stats.highestRatedApplicant.scorePct}%</span>
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FormApplicantContextPanel({ applicant, form, onSwitchToForm }: {
+  applicant: FormApplicantStat | null;
+  form: Form | null;
+  onSwitchToForm: () => void;
+}) {
+  if (!applicant) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-center px-4">
+        <div className="w-10 h-10 rounded-2xl border flex items-center justify-center mb-3" style={{ background: T.card, borderColor: T.border }}>
+          <User size={16} strokeWidth={2} style={{ color: "var(--rb-faint)" }} />
+        </div>
+        <p className="text-[12px]" style={{ color: "var(--rb-muted)" }}>No applicant selected</p>
+      </div>
+    );
+  }
+
+  const pct = applicant.scoringFailed ? null : Math.round(applicant.aiScore);
+
+  return (
+    <div className="px-4 py-5 space-y-4 overflow-y-auto h-full scrollbar-none">
+      <div>
+        <PanelSectionLabel>Applicant Focus</PanelSectionLabel>
+        <div className="p-3.5 rounded-2xl border" style={{ background: T.card, borderColor: T.border }}>
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: T.accent }} />
+                <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: T.textSecondary }}>Applicant</p>
+              </div>
+              <p className="text-[0.9rem] font-semibold leading-snug" style={{ color: T.text }}>{applicant.submittedName}</p>
+              {applicant.stage && (
+                <p className="text-[11px] mt-0.5 capitalize" style={{ color: T.textSecondary }}>{applicant.stage.replace(/_/g, " ")}</p>
+              )}
+            </div>
+            {pct !== null && (
+              <div className="text-right shrink-0">
+                <p className="text-[10px] font-semibold uppercase tracking-widest mb-1" style={{ color: T.textSecondary }}>AI Score</p>
+                <p className="text-xl font-bold tabular-nums" style={{ color: confColor(pct) }}>{pct}%</p>
+              </div>
+            )}
+          </div>
+          {pct !== null && (
+            <div className="mt-2.5">
+              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: T.border }}>
+                <div className="h-full rounded-full" style={{ width: `${pct}%`, background: confColor(pct) }} />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {applicant.aiSummary && (
+        <div>
+          <PanelSectionLabel>AI Summary</PanelSectionLabel>
+          <p className="text-[12px] leading-relaxed p-3 rounded-xl border" style={{ background: "var(--rb-subtle)", borderColor: T.border, color: T.textSecondary }}>{applicant.aiSummary}</p>
+        </div>
+      )}
+
+      {applicant.strengths && applicant.strengths.length > 0 && (
+        <div>
+          <PanelSectionLabel>Strengths</PanelSectionLabel>
+          <div className="flex flex-wrap gap-1.5">
+            {applicant.strengths.map((s, i) => (
+              <span key={i} className="text-[11px] px-2.5 py-1 rounded-full border" style={{ background: "var(--rb-success-soft-bg)", color: "var(--rb-success-soft-text)", borderColor: "var(--rb-success-soft-border)" }}>{s}</span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {applicant.redFlags && applicant.redFlags.length > 0 && (
+        <div>
+          <PanelSectionLabel>Red Flags</PanelSectionLabel>
+          <div className="flex flex-wrap gap-1.5">
+            {applicant.redFlags.map((s, i) => (
+              <span key={i} className="text-[11px] px-2.5 py-1 rounded-full border" style={{ background: "var(--rb-danger-soft-bg)", color: "var(--rb-danger-soft-text)", borderColor: "var(--rb-danger-soft-border)" }}>{s}</span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {form && (
+        <div className="pt-1 space-y-2">
+          <button
+            onClick={onSwitchToForm}
+            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border text-[12px] font-medium transition-all hover:shadow-sm"
+            style={{ borderColor: T.border, color: T.textSecondary, background: T.card }}
+          >
+            <FileText size={13} strokeWidth={2} />
+            Switch to Form View
+          </button>
+          <Link
+            href={`/recruit/forms/${form._id}`}
+            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border text-[12px] font-medium transition-all hover:shadow-sm"
+            style={{ borderColor: T.border, color: T.textSecondary, background: T.card }}
+          >
+            <ExternalLink size={13} strokeWidth={2} />
+            Open form
+          </Link>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 function CopilotPageContent() {
   const { sessionToken, recruitProfile } = useRecruitAuth();
+
+  const [workspace, setWorkspace] = useState<CopilotWorkspace | null>(null);
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -1083,9 +1347,13 @@ function CopilotPageContent() {
   const [forms, setForms] = useState<Form[]>([]);
   const [selectedForm, setSelectedForm] = useState<Form | null>(null);
   const [formDropdownOpen, setFormDropdownOpen] = useState(false);
+  const [applicantDropdownOpen, setApplicantDropdownOpen] = useState(false);
+  const [formApplicants, setFormApplicants] = useState<FormApplicantStat[]>([]);
+  const [selectedResponseId, setSelectedResponseId] = useState<string | null>(null);
+  const [selectedApplicant, setSelectedApplicant] = useState<FormApplicantStat | null>(null);
+  const [formGlobalStats, setFormGlobalStats] = useState<FormGlobalStats | null>(null);
+  const [formGlobalStatsLoading, setFormGlobalStatsLoading] = useState(false);
 
-  // Context mode: "global" (no job/candidate selected — Organization Intelligence),
-  // "job" = talking about one job, "candidate" = focused on one candidate.
   const [contextMode, setContextMode] = useState<ContextMode>("global");
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
   const [selectedCandidate, setSelectedCandidate] = useState<CandidateStat | null>(null);
@@ -1098,6 +1366,8 @@ function CopilotPageContent() {
   // Pending URL params (applied after data loads)
   const [pendingJobId, setPendingJobId] = useState<string | null>(null);
   const [pendingCandidateId, setPendingCandidateId] = useState<string | null>(null);
+  const [pendingFormId, setPendingFormId] = useState<string | null>(null);
+  const [pendingResponseId, setPendingResponseId] = useState<string | null>(null);
 
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
@@ -1137,16 +1407,27 @@ function CopilotPageContent() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
+    const ws = params.get("workspace") as CopilotWorkspace | null;
+    if (ws === "form" || ws === "standard") {
+      setWorkspace(ws);
+      setContextMode(defaultContextMode(ws));
+    }
     const urlJobId = params.get("jobId");
     const urlCandidateId = params.get("candidateId");
+    const urlFormId = params.get("formId");
+    const urlResponseId = params.get("responseId");
     if (urlJobId) {
       setPendingJobId(urlJobId);
-      setContextMode("job");
+      setWorkspace("standard");
+      setContextMode(urlCandidateId ? "candidate" : "job");
     }
-    if (urlCandidateId) {
-      setPendingCandidateId(urlCandidateId);
-      setContextMode("candidate");
+    if (urlCandidateId) setPendingCandidateId(urlCandidateId);
+    if (urlFormId) {
+      setPendingFormId(urlFormId);
+      setWorkspace("form");
+      setContextMode(urlResponseId ? "form_applicant" : "form");
     }
+    if (urlResponseId) setPendingResponseId(urlResponseId);
   }, []);
 
   // ── Load jobs ──────────────────────────────────────────────────────────────
@@ -1194,6 +1475,13 @@ function CopilotPageContent() {
   }, [pendingJobId, jobs]);
 
   // ── Load organization-wide stats (Global Context Panel) ────────────────────
+  useEffect(() => {
+    if (!pendingFormId || forms.length === 0) return;
+    const form = forms.find(f => f._id === pendingFormId);
+    if (form) setSelectedForm(form);
+    setPendingFormId(null);
+  }, [pendingFormId, forms]);
+
   const loadGlobalStats = useCallback(async () => {
     const token = await getToken();
     if (!token) return;
@@ -1210,11 +1498,28 @@ function CopilotPageContent() {
     }
   }, [getToken]);
 
-  useEffect(() => {
-    if (contextMode === "global") loadGlobalStats();
-  }, [contextMode, loadGlobalStats]);
+  const loadFormGlobalStats = useCallback(async () => {
+    const token = await getToken();
+    if (!token) return;
+    setFormGlobalStatsLoading(true);
+    try {
+      const res = await fetch(apiUrl("/recruit/copilot/form-global-stats"), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setFormGlobalStats(data.stats ?? null);
+    } catch {} finally {
+      setFormGlobalStatsLoading(false);
+    }
+  }, [getToken]);
 
-  // ── Auto-generate the "Good morning" insights card when Global Context ─────
+  useEffect(() => {
+    if (contextMode === "global" && workspace === "standard") loadGlobalStats();
+    if (contextMode === "form_global" && workspace === "form") loadFormGlobalStats();
+  }, [contextMode, workspace, loadGlobalStats, loadFormGlobalStats]);
+
+  // ── Auto-generate insights card when global context opens ─────────────────
   // opens with no active conversation — the AI doesn't wait for a question.
   const loadInsights = useCallback(async () => {
     const token = await getToken();
@@ -1245,28 +1550,111 @@ function CopilotPageContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [getToken]);
 
+  const loadFormInsights = useCallback(async () => {
+    const token = await getToken();
+    if (!token) return;
+    setInsightsLoading(true);
+    try {
+      const res = await fetch(apiUrl("/recruit/copilot/form-insights"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setActiveConvId(data.conversationId);
+      setMessages([{
+        id: `form-insights-${Date.now()}`,
+        role: "assistant",
+        content: data.reply,
+        recommendation: data.recommendation,
+        confidence: data.confidence,
+        reasoning: data.reasoning,
+        sources: data.sources ?? [],
+        quickActions: data.quickActions ?? [],
+      }]);
+      loadConversations();
+    } catch {} finally {
+      setInsightsLoading(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [getToken]);
+
   useEffect(() => {
-    if (contextMode === "global" && messages.length === 0 && !activeConvId && !insightsRequestedRef.current) {
+    if (messages.length > 0 || activeConvId || insightsRequestedRef.current || !workspace) return;
+    if (workspace === "standard" && contextMode === "global") {
       insightsRequestedRef.current = true;
       loadInsights();
     }
-  }, [contextMode, messages.length, activeConvId, loadInsights]);
+    if (workspace === "form" && contextMode === "form_global") {
+      insightsRequestedRef.current = true;
+      loadFormInsights();
+    }
+  }, [workspace, contextMode, messages.length, activeConvId, loadInsights, loadFormInsights]);
 
   // ── Load conversations ─────────────────────────────────────────────────────
   const loadConversations = useCallback(async () => {
     const token = await getToken();
-    if (!token) return;
+    if (!token || !workspace) return;
     try {
-      const res = await fetch(apiUrl("/recruit/copilot/conversations"), {
+      const res = await fetch(apiUrl(`/recruit/copilot/conversations?workspace=${workspace}`), {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) return;
       const data = await res.json();
       setConversations(data.conversations ?? []);
     } catch {}
-  }, [getToken]);
+  }, [getToken, workspace]);
 
-  useEffect(() => { loadConversations(); }, [loadConversations]);
+  useEffect(() => { if (workspace) loadConversations(); }, [loadConversations, workspace]);
+
+  // ── Load form applicants when a form is selected ───────────────────────────
+  useEffect(() => {
+    if (workspace !== "form" || !selectedForm) {
+      setFormApplicants([]);
+      return;
+    }
+    async function load() {
+      const token = await getToken();
+      if (!token) return;
+      try {
+        const res = await fetch(apiUrl(`/recruit/forms/${selectedForm!._id}/responses`), {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const list: FormApplicantStat[] = (data.responses ?? []).map((r: any) => ({
+          _id: r._id,
+          submittedName: r.submittedName || "Applicant",
+          submittedEmail: r.submittedEmail,
+          aiScore: r.aiScore ?? 0,
+          scoringFailed: r.scoringFailed,
+          stage: r.stage,
+          aiSummary: r.aiSummary,
+          strengths: r.strengths,
+          redFlags: r.redFlags,
+          assessmentStatus: r.assessmentStatus,
+          assessmentScore: r.assessmentScore,
+        }));
+        setFormApplicants(list);
+        if (pendingResponseId) {
+          const a = list.find(x => x._id === pendingResponseId);
+          if (a) {
+            setSelectedApplicant(a);
+            setSelectedResponseId(a._id);
+            setContextMode("form_applicant");
+          }
+          setPendingResponseId(null);
+        }
+      } catch {}
+    }
+    load();
+  }, [workspace, selectedForm, getToken, pendingResponseId]);
+
+  useEffect(() => {
+    if (!selectedResponseId || formApplicants.length === 0) return;
+    const a = formApplicants.find(x => x._id === selectedResponseId);
+    if (a) setSelectedApplicant(a);
+  }, [selectedResponseId, formApplicants]);
 
   // ── Load candidates for context panel + apply pending candidateId ──────────
   useEffect(() => {
@@ -1328,34 +1716,36 @@ function CopilotPageContent() {
         }))
       );
 
-      // Restore job
-      if (data.selectedJobId || data.context?.jobId) {
+      // Restore workspace + context
+      const ws = inferWorkspace(data.context ?? {});
+      setWorkspace(ws);
+      const level = (data.context?.level || defaultContextMode(ws)) as ContextMode;
+      setContextMode(level);
+
+      if (ws === "form") {
+        setSelectedJob(null);
+        setSelectedCandidateId(null);
+        setSelectedCandidate(null);
+        const formId = data.selectedFormId || data.context?.formId;
+        if (formId) setSelectedForm(forms.find(f => f._id === formId) ?? null);
+        if (data.selectedResponseId || data.context?.responseId) {
+          setSelectedResponseId(data.selectedResponseId || data.context?.responseId);
+        }
+      } else if (data.selectedJobId || data.context?.jobId) {
         const jobId = data.selectedJobId || data.context?.jobId;
         const matchJob = jobs.find(j => j._id === jobId);
         if (matchJob) setSelectedJob(matchJob);
-      }
-
-      // Restore form context
-      if (data.context?.level === "form") {
-        setContextMode("form");
-        setSelectedForm(forms.find(form => form._id === data.context?.formId) ?? null);
+        setSelectedForm(null);
+        setSelectedResponseId(null);
+        setSelectedApplicant(null);
+        if (data.selectedCandidateId && level === "candidate") {
+          setSelectedCandidateId(data.selectedCandidateId);
+        }
+      } else if (level === "global") {
         setSelectedJob(null);
         setSelectedCandidateId(null);
         setSelectedCandidate(null);
-      // Restore candidate context
-      } else if (data.selectedCandidateId && data.context?.level === "candidate") {
-        setContextMode("candidate");
-        setSelectedCandidateId(data.selectedCandidateId);
-        // The candidate will be found once candidates load for the job
-      } else if (data.context?.level === "global") {
-        setContextMode("global");
-        setSelectedJob(null);
-        setSelectedCandidateId(null);
-        setSelectedCandidate(null);
-      } else {
-        setContextMode("job");
-        setSelectedCandidateId(null);
-        setSelectedCandidate(null);
+        setSelectedForm(null);
       }
     } catch {}
   }, [getToken, jobs, forms]);
@@ -1367,6 +1757,27 @@ function CopilotPageContent() {
   // currently selected, we switch jobs first via the same pendingCandidateId
   // flow already used for URL deep links.
   const handleSourceNavigate = useCallback((src: CopilotSource) => {
+    if (workspace === "form") {
+      if (src.candidateId) {
+        const formId = src.jobId;
+        if (formId && formId !== selectedForm?._id) {
+          const form = forms.find(f => f._id === formId);
+          if (form) setSelectedForm(form);
+        }
+        setContextMode("form_applicant");
+        setSelectedResponseId(src.candidateId);
+        setPendingResponseId(src.candidateId);
+      } else if ((src.type === "form_description" || src.type === "job_description") && src.jobId) {
+        const form = forms.find(f => f._id === src.jobId);
+        if (form) {
+          setSelectedForm(form);
+          setContextMode("form");
+          setSelectedResponseId(null);
+          setSelectedApplicant(null);
+        }
+      }
+      return;
+    }
     if (src.candidateId) {
       const targetJobId = src.jobId;
       // Resolve the job context this candidate lives under. If the source
@@ -1392,7 +1803,20 @@ function CopilotPageContent() {
         setSelectedCandidate(null);
       }
     }
-  }, [jobs, selectedJob]);
+  }, [workspace, forms, selectedForm, jobs, selectedJob]);
+
+  function selectWorkspace(ws: CopilotWorkspace) {
+    setWorkspace(ws);
+    setContextMode(defaultContextMode(ws));
+    newChat(true);
+    insightsRequestedRef.current = false;
+    setSelectedJob(null);
+    setSelectedForm(null);
+    setSelectedCandidateId(null);
+    setSelectedCandidate(null);
+    setSelectedResponseId(null);
+    setSelectedApplicant(null);
+  }
 
   // ── Auto-scroll ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -1417,12 +1841,14 @@ function CopilotPageContent() {
     setInput("");
     setSidebarOpen(false);
     insightsRequestedRef.current = false;
-    if (resetToGlobal) {
-      setContextMode("global");
+    if (resetToGlobal && workspace) {
+      setContextMode(defaultContextMode(workspace));
       setSelectedJob(null);
       setSelectedCandidateId(null);
       setSelectedCandidate(null);
       setSelectedForm(null);
+      setSelectedResponseId(null);
+      setSelectedApplicant(null);
     }
     if (textareaRef.current) textareaRef.current.style.height = "auto";
     requestAnimationFrame(() => textareaRef.current?.focus());
@@ -1449,12 +1875,14 @@ function CopilotPageContent() {
   // ── Send message (streaming) ───────────────────────────────────────────────
   const sendMessage = useCallback(async (text: string) => {
     const trimmed = text.trim();
-    if (!trimmed || isStreaming) return;
-    if (contextMode === "form" && !selectedForm) return;
-    if (contextMode !== "global" && contextMode !== "form" && !selectedJob) return;
-
-    // In candidate mode, we need a selected candidate
-    const isCandidateMode = contextMode === "candidate" && !!selectedCandidateId;
+    if (!trimmed || isStreaming || !workspace) return;
+    if (workspace === "form") {
+      if (contextMode === "form" && !selectedForm) return;
+      if (contextMode === "form_applicant" && (!selectedForm || !selectedResponseId)) return;
+    } else {
+      if (contextMode !== "global" && !selectedJob) return;
+      if (contextMode === "candidate" && !selectedCandidateId) return;
+    }
 
     const token = await getToken();
     if (!token) return;
@@ -1469,20 +1897,19 @@ function CopilotPageContent() {
     setInput("");
     if (textareaRef.current) textareaRef.current.style.height = "auto";
     setIsStreaming(true);
-    // Keep the cursor active in the input while the AI responds — the field
-    // is never disabled during streaming, so focus should never be lost.
     requestAnimationFrame(() => textareaRef.current?.focus());
 
     const controller = new AbortController();
     abortRef.current = controller;
 
-    const chatContext = isCandidateMode
-      ? { level: "candidate" as const, jobId: selectedJob!._id, candidateId: selectedCandidateId! }
-      : contextMode === "global"
-      ? { level: "global" as const }
-      : contextMode === "form"
-      ? { level: "form" as const, formId: selectedForm!._id }
-      : { level: "job" as const, jobId: selectedJob!._id };
+    const chatContext = buildApiContext({
+      workspace,
+      mode: contextMode,
+      jobId: selectedJob?._id,
+      candidateId: selectedCandidateId,
+      formId: selectedForm?._id,
+      responseId: selectedResponseId,
+    });
 
     try {
       const res = await fetch(apiUrl("/recruit/copilot/chat/stream"), {
@@ -1562,7 +1989,7 @@ function CopilotPageContent() {
       // keep chatting without touching the mouse.
       requestAnimationFrame(() => textareaRef.current?.focus());
     }
-  }, [isStreaming, selectedJob, selectedCandidateId, selectedForm, contextMode, getToken, activeConvId, loadConversations]);
+  }, [isStreaming, workspace, selectedJob, selectedCandidateId, selectedForm, selectedResponseId, contextMode, getToken, activeConvId, loadConversations]);
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -1574,10 +2001,15 @@ function CopilotPageContent() {
 
   // ── Input placeholder text ─────────────────────────────────────────────────
   const inputPlaceholder = (() => {
-    if (contextMode === "global") return "Ask about your entire hiring organization…";
+    if (contextMode === "global") return "Ask about your entire Standard Job organization…";
+    if (contextMode === "form_global") return "Ask about all your forms and applicants…";
     if (contextMode === "form") {
       if (!selectedForm) return "Select a form first…";
       return `Ask about ${selectedForm.title}…`;
+    }
+    if (contextMode === "form_applicant") {
+      if (!selectedApplicant) return "Loading applicant…";
+      return `Ask about ${selectedApplicant.submittedName.split(" ")[0]}…`;
     }
     if (!selectedJob) return "Select a job first…";
     if (contextMode === "candidate") {
@@ -1587,14 +2019,11 @@ function CopilotPageContent() {
     return `Ask about ${selectedJob.title}…`;
   })();
 
-  // The textarea itself is never disabled by streaming — only by a genuinely
-  // missing context (no job / no resolved candidate yet). Disabling it while
-  // the AI responds was the root cause of "have to click the textbox again"
-  // (disabled inputs lose focus in the browser).
   const textDisabled =
-    (contextMode === "form" && !selectedForm) ||
-    (contextMode !== "global" && contextMode !== "form" && !selectedJob) ||
-    (contextMode === "candidate" && !selectedCandidate);
+    (workspace === "form" && contextMode === "form" && !selectedForm) ||
+    (workspace === "form" && contextMode === "form_applicant" && !selectedApplicant) ||
+    (workspace === "standard" && contextMode !== "global" && !selectedJob) ||
+    (workspace === "standard" && contextMode === "candidate" && !selectedCandidate);
   const sendDisabled = isStreaming || textDisabled;
 
   // ── Grouped conversations ──────────────────────────────────────────────────
@@ -1602,30 +2031,71 @@ function CopilotPageContent() {
   const groupOrder = ["Today", "Yesterday", "This week", "Older"];
 
   // ── Context panel ─────────────────────────────────────────────────────────
-  const contextPanel = contextMode === "candidate"
-    ? (
-      <CandidateContextPanel
-        candidate={selectedCandidate}
-        job={selectedJob}
-        onSwitchToJob={() => {
-          setContextMode("job");
-          setSelectedCandidateId(null);
-          setSelectedCandidate(null);
-          newChat(false);
-        }}
-      />
-    )
-    : contextMode === "global"
-    ? (
-      <GlobalContextPanel stats={globalStats} loading={globalStatsLoading} />
-    )
-    : contextMode === "form"
-    ? (
-      <FormContextPanel form={selectedForm} />
-    )
-    : (
-      <JobContextPanel job={selectedJob} candidates={candidates} />
+  const contextPanel =
+    workspace === "form"
+      ? contextMode === "form_applicant"
+        ? (
+          <FormApplicantContextPanel
+            applicant={selectedApplicant}
+            form={selectedForm}
+            onSwitchToForm={() => {
+              setContextMode("form");
+              setSelectedResponseId(null);
+              setSelectedApplicant(null);
+              newChat(false);
+            }}
+          />
+        )
+        : contextMode === "form_global"
+        ? (
+          <FormGlobalContextPanel stats={formGlobalStats} loading={formGlobalStatsLoading} />
+        )
+        : (
+          <FormContextPanel form={selectedForm} />
+        )
+      : contextMode === "candidate"
+      ? (
+        <CandidateContextPanel
+          candidate={selectedCandidate}
+          job={selectedJob}
+          onSwitchToJob={() => {
+            setContextMode("job");
+            setSelectedCandidateId(null);
+            setSelectedCandidate(null);
+            newChat(false);
+          }}
+        />
+      )
+      : contextMode === "global"
+      ? (
+        <GlobalContextPanel stats={globalStats} loading={globalStatsLoading} />
+      )
+      : (
+        <JobContextPanel job={selectedJob} candidates={candidates} />
+      );
+
+  function switchWorkspace() {
+    if (abortRef.current) abortRef.current.abort();
+    setWorkspace(null);
+    setActiveConvId(null);
+    setMessages([]);
+    setInput("");
+    insightsRequestedRef.current = false;
+    setSelectedJob(null);
+    setSelectedForm(null);
+    setSelectedCandidateId(null);
+    setSelectedCandidate(null);
+    setSelectedResponseId(null);
+    setSelectedApplicant(null);
+  }
+
+  if (!workspace) {
+    return (
+      <div className="flex h-screen overflow-hidden" style={{ background: T.bg, color: T.text }}>
+        <WorkspacePicker onSelect={selectWorkspace} />
+      </div>
     );
+  }
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -1676,10 +2146,26 @@ function CopilotPageContent() {
           </button>
         </div>
 
+        {/* Workspace badge */}
+        <div className="px-3 pb-2">
+          <button
+            type="button"
+            onClick={switchWorkspace}
+            className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-[11px] font-semibold border transition-all hover:shadow-sm"
+            style={{ borderColor: T.border, background: "var(--rb-accent-softer-bg)", color: T.accent }}
+            title="Switch between Standard Job and Form Job"
+          >
+            <span className="truncate">{workspaceLabel(workspace)} workspace</span>
+            <ArrowLeft size={12} strokeWidth={2.2} className="rotate-180 shrink-0" />
+          </button>
+        </div>
+
+        {workspace === "standard" && (
+          <>
         {/* Job selector */}
         <div className="px-3 pb-2 relative">
           <button
-            onClick={() => { setJobDropdownOpen(o => !o); setCandidateDropdownOpen(false); }}
+            onClick={() => { setJobDropdownOpen(o => !o); setCandidateDropdownOpen(false); setFormDropdownOpen(false); }}
             className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-[13px] border transition-all hover:shadow-sm"
             style={{ borderColor: T.border, background: "var(--rb-subtle)" }}
           >
@@ -1742,7 +2228,7 @@ function CopilotPageContent() {
         {selectedJob && (
           <div className="px-3 pb-2 relative">
             <button
-              onClick={() => { setCandidateDropdownOpen(o => !o); setJobDropdownOpen(false); }}
+              onClick={() => { setCandidateDropdownOpen(o => !o); setJobDropdownOpen(false); setFormDropdownOpen(false); }}
               className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-[13px] border transition-all hover:shadow-sm"
               style={{ borderColor: T.border, background: "var(--rb-subtle)" }}
             >
@@ -1829,18 +2315,22 @@ function CopilotPageContent() {
             )}
           </div>
         )}
+          </>
+        )}
 
+        {workspace === "form" && (
+          <>
         {/* Form selector */}
         <div className="px-3 pb-2 relative">
           <button
-            onClick={() => { setFormDropdownOpen(o => !o); setJobDropdownOpen(false); setCandidateDropdownOpen(false); }}
+            onClick={() => { setFormDropdownOpen(o => !o); setJobDropdownOpen(false); setCandidateDropdownOpen(false); setApplicantDropdownOpen(false); }}
             className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-[13px] border transition-all hover:shadow-sm"
-            style={{ borderColor: contextMode === "form" ? "var(--rb-accent-hover-border)" : T.border, background: contextMode === "form" ? "var(--rb-accent-soft-bg)" : "var(--rb-subtle)" }}
+            style={{ borderColor: T.border, background: "var(--rb-subtle)" }}
           >
             <div className="flex items-center gap-2 min-w-0">
-              <FileText size={14} strokeWidth={2.2} style={{ color: contextMode === "form" ? T.accent : T.textSecondary }} />
-              <span className="truncate" style={{ color: contextMode === "form" ? T.accent : T.text }}>
-                {contextMode === "form" && selectedForm ? selectedForm.title : "Application Forms"}
+              {contextMode === "form_global" ? <Globe size={14} strokeWidth={2.2} style={{ color: T.textSecondary }} /> : <FileText size={14} strokeWidth={2.2} style={{ color: T.textSecondary }} />}
+              <span className="truncate" style={{ color: T.text }}>
+                {contextMode === "form_global" ? "All forms" : selectedForm ? selectedForm.title : "Select a form"}
               </span>
             </div>
             <ChevronDown size={14} strokeWidth={2.2} style={{ color: T.textSecondary }} />
@@ -1851,6 +2341,21 @@ function CopilotPageContent() {
               className="absolute left-3 right-3 top-full mt-1 z-10 rounded-xl border overflow-hidden shadow-lg max-h-72 overflow-y-auto"
               style={{ background: T.card, borderColor: T.border }}
             >
+              <button
+                onClick={() => {
+                  setFormDropdownOpen(false);
+                  setContextMode("form_global");
+                  setSelectedForm(null);
+                  setSelectedResponseId(null);
+                  setSelectedApplicant(null);
+                  newChat(false);
+                }}
+                className="w-full text-left px-4 py-2.5 text-[13px] transition-colors flex items-center gap-2 border-b hover:bg-[var(--rb-subtle)]"
+                style={{ borderColor: T.border, color: contextMode === "form_global" ? T.accent : T.textSecondary, fontWeight: contextMode === "form_global" ? 600 : 400 }}
+              >
+                <Globe size={14} strokeWidth={2.2} />
+                All forms
+              </button>
               {forms.length === 0 ? (
                 <div className="px-4 py-3 text-[12px]" style={{ color: "var(--rb-muted)" }}>No forms found</div>
               ) : (
@@ -1861,13 +2366,12 @@ function CopilotPageContent() {
                       setSelectedForm(form);
                       setFormDropdownOpen(false);
                       setContextMode("form");
-                      setSelectedJob(null);
-                      setSelectedCandidateId(null);
-                      setSelectedCandidate(null);
+                      setSelectedResponseId(null);
+                      setSelectedApplicant(null);
                       newChat(false);
                     }}
                     className="w-full text-left px-4 py-2.5 text-[13px] transition-colors hover:bg-[var(--rb-subtle)] flex items-center justify-between"
-                    style={{ color: selectedForm?._id === form._id ? T.accent : T.textSecondary, fontWeight: selectedForm?._id === form._id ? 600 : 400 }}
+                    style={{ color: selectedForm?._id === form._id && contextMode !== "form_global" ? T.accent : T.textSecondary, fontWeight: selectedForm?._id === form._id && contextMode !== "form_global" ? 600 : 400 }}
                   >
                     <span className="truncate">{form.title}</span>
                     {form.responseCount !== undefined && (
@@ -1879,6 +2383,100 @@ function CopilotPageContent() {
             </div>
           )}
         </div>
+
+        {/* Applicant selector — active once a form is selected */}
+        {selectedForm && (
+          <div className="px-3 pb-2 relative">
+            <button
+              onClick={() => { setApplicantDropdownOpen(o => !o); setFormDropdownOpen(false); setJobDropdownOpen(false); setCandidateDropdownOpen(false); }}
+              className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-[13px] border transition-all hover:shadow-sm"
+              style={{ borderColor: T.border, background: "var(--rb-subtle)" }}
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                {contextMode === "form_applicant" ? <User size={14} strokeWidth={2.2} style={{ color: T.textSecondary }} /> : <Users size={14} strokeWidth={2.2} style={{ color: T.textSecondary }} />}
+                <span className="truncate" style={{ color: T.text }}>
+                  {contextMode === "form_applicant" && selectedApplicant ? selectedApplicant.submittedName : "All Applicants"}
+                </span>
+              </div>
+              <ChevronDown size={14} strokeWidth={2.2} style={{ color: T.textSecondary }} />
+            </button>
+
+            {applicantDropdownOpen && (
+              <div
+                className="absolute left-3 right-3 top-full mt-1 z-10 rounded-xl border overflow-hidden shadow-lg flex flex-col"
+                style={{ background: T.card, borderColor: T.border, maxHeight: "22rem" }}
+              >
+                <div className="p-2 border-b" style={{ borderColor: T.border }}>
+                  <div className="relative">
+                    <Search size={13} strokeWidth={2.2} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: "var(--rb-muted)" }} />
+                    <input
+                      autoFocus
+                      value={candidateSearch}
+                      onChange={e => setCandidateSearch(e.target.value)}
+                      placeholder="Search applicants…"
+                      className="w-full pl-8 pr-3 py-2 rounded-lg text-[12px] border outline-none"
+                      style={{ background: "var(--rb-subtle)", borderColor: T.border, color: T.text }}
+                    />
+                  </div>
+                </div>
+                <div className="overflow-y-auto">
+                  <button
+                    onClick={() => {
+                      setApplicantDropdownOpen(false);
+                      setCandidateSearch("");
+                      setContextMode("form");
+                      setSelectedResponseId(null);
+                      setSelectedApplicant(null);
+                      newChat(false);
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-[13px] transition-colors flex items-center gap-2 border-b hover:bg-[var(--rb-subtle)]"
+                    style={{ borderColor: T.border, color: contextMode === "form" ? T.accent : T.textSecondary, fontWeight: contextMode === "form" ? 600 : 400 }}
+                  >
+                    <Users size={14} strokeWidth={2.2} />
+                    All Applicants
+                    <span className="ml-auto text-[11px]" style={{ color: "var(--rb-muted)" }}>Form context</span>
+                  </button>
+                  {(() => {
+                    const filtered = formApplicants.filter(a =>
+                      a.submittedName.toLowerCase().includes(candidateSearch.trim().toLowerCase())
+                    );
+                    if (formApplicants.length === 0) {
+                      return <div className="px-4 py-3 text-[12px]" style={{ color: "var(--rb-muted)" }}>No applicants yet</div>;
+                    }
+                    if (filtered.length === 0) {
+                      return <div className="px-4 py-3 text-[12px]" style={{ color: "var(--rb-muted)" }}>No matches for "{candidateSearch}"</div>;
+                    }
+                    return filtered.map(a => {
+                      const pct = a.scoringFailed ? null : Math.round(a.aiScore);
+                      return (
+                        <button
+                          key={a._id}
+                          onClick={() => {
+                            setContextMode("form_applicant");
+                            setSelectedResponseId(a._id);
+                            setSelectedApplicant(a);
+                            setApplicantDropdownOpen(false);
+                            setCandidateSearch("");
+                            newChat(false);
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-[13px] transition-colors flex items-center justify-between gap-2 hover:bg-[var(--rb-subtle)]"
+                          style={{ color: selectedResponseId === a._id ? T.accent : T.textSecondary, fontWeight: selectedResponseId === a._id ? 600 : 400 }}
+                        >
+                          <span className="truncate">{a.submittedName}</span>
+                          {pct !== null && (
+                            <span className="text-[11px] font-bold shrink-0" style={{ color: confColor(pct) }}>{pct}%</span>
+                          )}
+                        </button>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+          </>
+        )}
 
         {/* Conversation history */}
         <div className="flex-1 overflow-y-auto scrollbar-none px-3 pb-4 space-y-4 mt-1">
@@ -1908,8 +2506,16 @@ function CopilotPageContent() {
                         <p className="text-[10.5px] truncate mt-0.5 flex items-center gap-1" style={{ color: "var(--rb-muted)" }}>
                           <User size={9} strokeWidth={2.2} /> {c.selectedCandidateName}
                         </p>
+                      ) : c.selectedResponseName ? (
+                        <p className="text-[10.5px] truncate mt-0.5 flex items-center gap-1" style={{ color: "var(--rb-muted)" }}>
+                          <User size={9} strokeWidth={2.2} /> {c.selectedResponseName}
+                        </p>
                       ) : c.selectedJobTitle ? (
                         <p className="text-[10.5px] truncate mt-0.5" style={{ color: "var(--rb-muted)" }}>{c.selectedJobTitle}</p>
+                      ) : c.selectedFormTitle ? (
+                        <p className="text-[10.5px] truncate mt-0.5 flex items-center gap-1" style={{ color: "var(--rb-muted)" }}>
+                          <FileText size={9} strokeWidth={2.2} /> {c.selectedFormTitle}
+                        </p>
                       ) : null}
                     </div>
                     <button
@@ -1956,54 +2562,109 @@ function CopilotPageContent() {
               <span className="text-[13px] font-semibold" style={{ color: T.text }}>Ask Rolebolt</span>
             </div>
 
-            {/* Context breadcrumb: Global → Job → Candidate, each earlier crumb clickable */}
+            {/* Context breadcrumb */}
             <div className="hidden sm:flex items-center gap-1">
               <span className="text-xs mr-0.5" style={{ color: "var(--rb-faint)" }}>·</span>
-              <button
-                onClick={() => {
-                  setContextMode("global");
-                  setSelectedJob(null);
-                  setSelectedCandidateId(null);
-                  setSelectedCandidate(null);
-                  newChat(false);
-                }}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-colors"
-                style={contextMode === "global"
-                  ? { background: "var(--rb-src-profile-bg)", borderColor: "var(--rb-src-profile-border)", color: "var(--rb-src-profile-text)" }
-                  : { background: "var(--rb-subtle)", borderColor: T.border, color: T.textSecondary }}
-              >
-                <Globe size={11} strokeWidth={2.2} />
-                <span className="text-[11px] font-medium">Organization</span>
-              </button>
 
-              {selectedJob && (
+              {workspace === "standard" ? (
                 <>
-                  <span className="text-xs" style={{ color: "var(--rb-border)" }}>/</span>
                   <button
                     onClick={() => {
-                      setContextMode("job");
+                      setContextMode("global");
+                      setSelectedJob(null);
                       setSelectedCandidateId(null);
                       setSelectedCandidate(null);
                       newChat(false);
                     }}
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-colors max-w-[10rem]"
-                    style={contextMode === "job"
-                      ? { background: "var(--rb-src-resume-bg)", borderColor: "var(--rb-src-resume-border)", color: "var(--rb-src-resume-text)" }
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-colors"
+                    style={contextMode === "global"
+                      ? { background: "var(--rb-src-profile-bg)", borderColor: "var(--rb-src-profile-border)", color: "var(--rb-src-profile-text)" }
                       : { background: "var(--rb-subtle)", borderColor: T.border, color: T.textSecondary }}
                   >
-                    <Briefcase size={11} strokeWidth={2.2} />
-                    <span className="text-[11px] font-medium truncate">{selectedJob.title}</span>
+                    <Globe size={11} strokeWidth={2.2} />
+                    <span className="text-[11px] font-medium">Organization</span>
                   </button>
-                </>
-              )}
 
-              {contextMode === "candidate" && selectedCandidate && (
+                  {selectedJob && (
+                    <>
+                      <span className="text-xs" style={{ color: "var(--rb-border)" }}>/</span>
+                      <button
+                        onClick={() => {
+                          setContextMode("job");
+                          setSelectedCandidateId(null);
+                          setSelectedCandidate(null);
+                          newChat(false);
+                        }}
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-colors max-w-[10rem]"
+                        style={contextMode === "job"
+                          ? { background: "var(--rb-src-resume-bg)", borderColor: "var(--rb-src-resume-border)", color: "var(--rb-src-resume-text)" }
+                          : { background: "var(--rb-subtle)", borderColor: T.border, color: T.textSecondary }}
+                      >
+                        <Briefcase size={11} strokeWidth={2.2} />
+                        <span className="text-[11px] font-medium truncate">{selectedJob.title}</span>
+                      </button>
+                    </>
+                  )}
+
+                  {contextMode === "candidate" && selectedCandidate && (
+                    <>
+                      <span className="text-xs" style={{ color: "var(--rb-border)" }}>/</span>
+                      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full max-w-[10rem]" style={{ background: "var(--rb-accent-soft-bg)", border: "1px solid var(--rb-accent-chip-border)" }}>
+                        <User size={11} strokeWidth={2.2} style={{ color: T.accent }} />
+                        <span className="text-[11px] font-medium truncate" style={{ color: T.accent }}>{selectedCandidate.name}</span>
+                      </div>
+                    </>
+                  )}
+                </>
+              ) : (
                 <>
-                  <span className="text-xs" style={{ color: "var(--rb-border)" }}>/</span>
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full max-w-[10rem]" style={{ background: "var(--rb-accent-soft-bg)", border: "1px solid var(--rb-accent-chip-border)" }}>
-                    <User size={11} strokeWidth={2.2} style={{ color: T.accent }} />
-                    <span className="text-[11px] font-medium truncate" style={{ color: T.accent }}>{selectedCandidate.name}</span>
-                  </div>
+                  <button
+                    onClick={() => {
+                      setContextMode("form_global");
+                      setSelectedForm(null);
+                      setSelectedResponseId(null);
+                      setSelectedApplicant(null);
+                      newChat(false);
+                    }}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-colors"
+                    style={contextMode === "form_global"
+                      ? { background: "var(--rb-src-profile-bg)", borderColor: "var(--rb-src-profile-border)", color: "var(--rb-src-profile-text)" }
+                      : { background: "var(--rb-subtle)", borderColor: T.border, color: T.textSecondary }}
+                  >
+                    <Globe size={11} strokeWidth={2.2} />
+                    <span className="text-[11px] font-medium">All Forms</span>
+                  </button>
+
+                  {selectedForm && (
+                    <>
+                      <span className="text-xs" style={{ color: "var(--rb-border)" }}>/</span>
+                      <button
+                        onClick={() => {
+                          setContextMode("form");
+                          setSelectedResponseId(null);
+                          setSelectedApplicant(null);
+                          newChat(false);
+                        }}
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-colors max-w-[10rem]"
+                        style={contextMode === "form"
+                          ? { background: "var(--rb-src-resume-bg)", borderColor: "var(--rb-src-resume-border)", color: "var(--rb-src-resume-text)" }
+                          : { background: "var(--rb-subtle)", borderColor: T.border, color: T.textSecondary }}
+                      >
+                        <FileText size={11} strokeWidth={2.2} />
+                        <span className="text-[11px] font-medium truncate">{selectedForm.title}</span>
+                      </button>
+                    </>
+                  )}
+
+                  {contextMode === "form_applicant" && selectedApplicant && (
+                    <>
+                      <span className="text-xs" style={{ color: "var(--rb-border)" }}>/</span>
+                      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full max-w-[10rem]" style={{ background: "var(--rb-accent-soft-bg)", border: "1px solid var(--rb-accent-chip-border)" }}>
+                        <User size={11} strokeWidth={2.2} style={{ color: T.accent }} />
+                        <span className="text-[11px] font-medium truncate" style={{ color: T.accent }}>{selectedApplicant.submittedName}</span>
+                      </div>
+                    </>
+                  )}
                 </>
               )}
             </div>
@@ -2023,7 +2684,10 @@ function CopilotPageContent() {
               className="lg:hidden p-1.5 rounded-lg transition"
               style={{ color: T.textSecondary }}
             >
-              {contextMode === "candidate" ? <User size={16} strokeWidth={2.2} /> : contextMode === "global" ? <Globe size={16} strokeWidth={2.2} /> : <Users size={16} strokeWidth={2.2} />}
+              {contextMode === "candidate" || contextMode === "form_applicant" ? <User size={16} strokeWidth={2.2} />
+                : contextMode === "global" || contextMode === "form_global" ? <Globe size={16} strokeWidth={2.2} />
+                : workspace === "form" ? <FileText size={16} strokeWidth={2.2} />
+                : <Users size={16} strokeWidth={2.2} />}
             </button>
           </div>
         </div>
@@ -2035,8 +2699,10 @@ function CopilotPageContent() {
               recruiterName={recruitProfile?.name}
               jobSelected={!!selectedJob}
               contextMode={contextMode}
+              workspace={workspace}
               candidateName={selectedCandidate?.name}
               formTitle={selectedForm?.title}
+              applicantName={selectedApplicant?.submittedName}
               onPrompt={sendMessage}
               loadingInsights={insightsLoading}
             />
@@ -2062,14 +2728,17 @@ function CopilotPageContent() {
           style={{ borderColor: T.border, background: T.bg }}
         >
           <div className="max-w-2xl mx-auto">
-            {!selectedJob && contextMode !== "global" && contextMode !== "form" && (
+            {workspace === "standard" && !selectedJob && contextMode !== "global" && (
               <p className="text-center text-[12px] mb-2" style={{ color: "var(--rb-warning)" }}>Select a job from the sidebar to start chatting</p>
             )}
-            {contextMode === "form" && !selectedForm && (
+            {workspace === "form" && contextMode === "form" && !selectedForm && (
               <p className="text-center text-[12px] mb-2" style={{ color: "var(--rb-warning)" }}>Select a form from the sidebar to start chatting</p>
             )}
-            {selectedJob && contextMode === "candidate" && !selectedCandidate && (
+            {workspace === "standard" && selectedJob && contextMode === "candidate" && !selectedCandidate && (
               <p className="text-center text-[12px] mb-2" style={{ color: T.accent }}>Loading candidate context…</p>
+            )}
+            {workspace === "form" && contextMode === "form_applicant" && !selectedApplicant && (
+              <p className="text-center text-[12px] mb-2" style={{ color: T.accent }}>Loading applicant context…</p>
             )}
             <div
               className="flex items-end gap-2.5 rounded-[26px] border px-5 py-3.5 transition-all duration-200 ease-out"
@@ -2153,7 +2822,10 @@ function CopilotPageContent() {
       >
         <div className="flex items-center justify-between px-4 py-4 border-b shrink-0" style={{ borderColor: T.border }}>
           <p className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: "var(--rb-muted)" }}>
-            {contextMode === "candidate" ? "Candidate Context" : "Hiring Context"}
+            {contextMode === "candidate" ? "Candidate Context"
+              : contextMode === "form_applicant" ? "Applicant Context"
+              : workspace === "form" ? "Form Context"
+              : "Hiring Context"}
           </p>
           <button onClick={() => setContextOpen(false)} className="lg:hidden transition" style={{ color: "var(--rb-muted)" }}>
             <X size={14} strokeWidth={2.2} />
