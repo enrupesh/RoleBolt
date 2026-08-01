@@ -10,6 +10,7 @@ import { siteGuideRouter } from "./siteGuideChat";
 import { connectMongo } from "./db";
 import { startDailyBriefingJob } from "./jobs/dailyBriefing";
 import { startOfferManagementJob } from "./jobs/offerManagement";
+import { startPipelineRulesCron } from "./jobs/pipelineRulesCron";
 import { seekerRouter } from "./seeker";
 import { billingRouter, handleStripeWebhook } from "./billing";
 import { collaborationRouter } from "./collaboration";
@@ -463,6 +464,7 @@ connectMongo()
 if (process.env.CRON_ENABLED === "true") {
   startDailyBriefingJob();
   startOfferManagementJob();
+  startPipelineRulesCron();
 }
 
 app.listen(PORT, () => {
