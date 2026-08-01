@@ -6,6 +6,15 @@ import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { RecruitGuard } from "@/components/RecruitGuard";
 import Link from "next/link";
 import { apiUrl, readApiJson } from "@/lib/api";
+import { FORM_STAGE_FILTERS, matchesFormStageFilter, type FormPageTab, type FormStageFilter } from "@/lib/formTypes";
+import { isFormStageEmailNotifyStage, type FormStageEmailNotifyStage } from "@/lib/formStageEmailTemplates";
+import FormStageEmailFlow, { type FormEmailLogEntry } from "./FormStageEmailFlow";
+import FormApplicantTimeline from "./FormApplicantTimeline";
+import FormNeedsAttention from "./FormNeedsAttention";
+import FormTabNav from "./FormTabNav";
+import FormTopPicks from "./FormTopPicks";
+import FormPostCreateChecklist, { markFormChecklistStep } from "@/components/FormPostCreateChecklist";
+import FormCopilotDrawer from "./FormCopilotDrawer";
 
 type Stage =
   | "new"
@@ -166,6 +175,7 @@ type Form = {
   status: "active" | "closed";
   responseCount: number;
   questions: FormQuestion[];
+  jobDetails?: { companyName?: string };
   agentMode?: AgentMode;
   pipelineRules?: PipelineRule[];
   createdAt: string;
@@ -666,7 +676,17 @@ function FormRejectionEmailModal({
 
 function ShareModal({ slug, title, onClose }: { slug: string; title: string; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
+  const [copiedEmbed, setCopiedEmbed] = useState(false);
+  const [showQr, setShowQr] = useState(false);
   const link = `${typeof window !== "undefined" ? window.location.origin : "https://www.rolebolt.tech"}/f/${slug}`;
+  const embedCode = `<iframe src="${link}" width="100%" height="720" frameborder="0" style="border:1px solid #e2e8f0;border-radius:12px;" title="${title.replace(/"/g, "&quot;")}"></iframe>`;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(link)}`;
+
+  function copyEmbed() {
+    navigator.clipboard.writeText(embedCode).catch(() => {});
+    setCopiedEmbed(true);
+    setTimeout(() => setCopiedEmbed(false), 2000);
+  }
 
   function copy() {
     navigator.clipboard.writeText(link).catch(() => {});
@@ -706,6 +726,27 @@ function ShareModal({ slug, title, onClose }: { slug: string; title: string; onC
                 {copied ? "✓ Copied!" : "Copy"}
               </button>
             </div>
+          </div>
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-2">Embed on your site</p>
+            <div className="flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+              <p className="flex-1 text-[10px] text-slate-500 font-mono leading-5 line-clamp-3">{embedCode}</p>
+              <button onClick={copyEmbed} className={`shrink-0 rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition ${copiedEmbed ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-700 hover:bg-slate-300"}`}>
+                {copiedEmbed ? "✓ Copied" : "Copy"}
+              </button>
+            </div>
+          </div>
+          <div>
+            <button type="button" onClick={() => setShowQr(v => !v)} className="text-[11px] font-bold uppercase tracking-widest text-slate-400 hover:text-slate-600">
+              QR code {showQr ? "▲" : "▼"}
+            </button>
+            {showQr && (
+              <div className="mt-2 flex flex-col items-center gap-2 rounded-xl border border-slate-200 bg-white p-4">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={qrUrl} alt="QR code for form link" width={180} height={180} className="rounded-lg" />
+                <p className="text-[10px] text-slate-400 text-center">Print or share for in-person events</p>
+              </div>
+            )}
           </div>
           <div>
             <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-2.5">Share on</p>
@@ -1190,8 +1231,8 @@ function FormResponseInfoModal({ r, onClose }: { r: FormResponse; onClose: () =>
 
 // ─── Response card ─────────────────────────────────────────────────────────────
 
-function ResponseCard({ r, token, formId, formTitle, onUpdate, onDelete }: {
-  r: FormResponse; token: string; formId: string; formTitle: string;
+function ResponseCard({ r, token, formId, formTitle, companyName, onUpdate, onDelete }: {
+  r: FormResponse; token: string; formId: string; formTitle: string; companyName: string;
   onUpdate: (id: string, patch: Partial<FormResponse>) => void;
   onDelete: (id: string) => void;
 }) {
@@ -1216,15 +1257,23 @@ function ResponseCard({ r, token, formId, formTitle, onUpdate, onDelete }: {
   const [assessmentRetryLoading, setAssessmentRetryLoading] = useState(false);
   const [assessmentError, setAssessmentError] = useState("");
   const [assessmentUrl, setAssessmentUrl] = useState("");
+  const [pendingStageEmail, setPendingStageEmail] = useState<FormStageEmailNotifyStage | null>(null);
 
   async function updateStage(stage: Stage) {
+    const prevStage = r.stage;
+    if (stage === prevStage) return;
     try {
       const res = await fetch(apiUrl(`/recruit/forms/${formId}/responses/${r._id}`), {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ stage }),
+        body: JSON.stringify({ stage, skipAutoEmail: true }),
       });
-      if (res.ok) onUpdate(r._id, { stage });
+      if (res.ok) {
+        onUpdate(r._id, { stage, stageMovedAt: new Date().toISOString() });
+        if (isFormStageEmailNotifyStage(stage)) {
+          setPendingStageEmail(stage);
+        }
+      }
     } catch { /* silent */ }
   }
 
@@ -1597,6 +1646,8 @@ function ResponseCard({ r, token, formId, formTitle, onUpdate, onDelete }: {
         )}
 
         {/* Email history */}
+        <FormApplicantTimeline response={r} />
+
         <div className="mt-3">
           <button
             onClick={() => setShowEmailHistory(v => !v)}
@@ -1672,6 +1723,20 @@ function ResponseCard({ r, token, formId, formTitle, onUpdate, onDelete }: {
           onSent={(entry) => setLocalEmailLog(prev => [...prev, entry])}
           deleteMode={deleteMode}
           onDeleted={deleteResponseRecord}
+        />
+      )}
+      {pendingStageEmail && (
+        <FormStageEmailFlow
+          stage={pendingStageEmail}
+          responseId={r._id}
+          candidateName={displayName}
+          candidateEmail={displayEmail}
+          formId={formId}
+          formTitle={formTitle}
+          companyName={companyName}
+          token={token}
+          onClose={() => setPendingStageEmail(null)}
+          onSent={(entry: FormEmailLogEntry) => setLocalEmailLog(prev => [...prev, entry])}
         />
       )}
 
@@ -1884,6 +1949,31 @@ function AgentModeCard({ formId, token, agentMode, responses, onSaved }: {
 
       {open && (
         <div className="space-y-4 border-t border-slate-100 bg-slate-50 p-5">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Quick presets</p>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { label: "Balanced", shortlist: 75, reject: 40, enabled: true },
+                { label: "Strict", shortlist: 85, reject: 50, enabled: true },
+                { label: "Generous", shortlist: 65, reject: 30, enabled: true },
+              ].map(preset => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  onClick={() => save({
+                    enabled: preset.enabled,
+                    shortlistThreshold: preset.shortlist,
+                    rejectThreshold: preset.reject,
+                    autoEmailShortlist: true,
+                    autoEmailReject: false,
+                  })}
+                  className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold text-slate-600 hover:border-violet-300 hover:text-violet-700 transition"
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block">
               <span className="text-xs font-semibold text-slate-700">Shortlist at or above</span>
@@ -1966,6 +2056,10 @@ function PipelineRulesCard({ formId, token, rules, onChange }: {
   const authHeaders = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
 
   async function addRule() {
+    if (rules.length >= 3) {
+      setError("Maximum 3 automation rules — remove one to add another.");
+      return;
+    }
     setBusy(true); setError("");
     try {
       const res = await fetch(apiUrl(`/recruit/forms/${formId}/pipeline-rules`), {
@@ -2002,7 +2096,7 @@ function PipelineRulesCard({ formId, token, rules, onChange }: {
         <div className="min-w-0">
           <h2 className="text-sm font-bold text-slate-900">Pipeline Rules</h2>
           <p className="mt-1 text-[11px] leading-4 text-slate-500">
-            Keep the middle of the funnel moving — rules run when a response is scored and whenever its stage changes.
+            Up to 3 rules to keep the middle of the funnel moving — they run when a response is scored and when its stage changes.
           </p>
         </div>
         <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
@@ -2668,8 +2762,11 @@ function FormResponsesContent({ id }: { id: string }) {
   const [responses, setResponses] = useState<FormResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [showShare, setShowShare] = useState(justSaved);
-  const [stageFilter, setStageFilter] = useState<Stage | "all">("all");
+  const [stageFilter, setStageFilter] = useState<FormStageFilter>("all");
+  const [activeTab, setActiveTab] = useState<FormPageTab>("responses");
+  const [highlightId, setHighlightId] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [showCopilot, setShowCopilot] = useState(false);
 
   const { sessionToken } = useRecruitAuth();
   useEffect(() => {
@@ -2721,7 +2818,22 @@ function FormResponsesContent({ id }: { id: string }) {
     finally { setExporting(false); }
   }
 
-  const filtered = stageFilter === "all" ? responses : responses.filter(r => r.stage === stageFilter);
+  const filtered = responses.filter(r => matchesFormStageFilter(r.stage, stageFilter));
+  const companyName = form?.jobDetails?.companyName?.trim() || "";
+
+  function scrollToResponse(responseId: string) {
+    setActiveTab("responses");
+    setHighlightId(responseId);
+    setTimeout(() => {
+      document.getElementById(`form-response-${responseId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      setTimeout(() => setHighlightId(null), 2500);
+    }, 100);
+  }
+
+  function handleShare() {
+    markFormChecklistStep(id, "shared");
+    setShowShare(true);
+  }
 
   const stats = [
     { label: "Total", value: responses.length, accent: "text-slate-800" },
@@ -2803,6 +2915,23 @@ function FormResponsesContent({ id }: { id: string }) {
             <span className="text-sm font-semibold text-slate-900 truncate">{form.title}</span>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowCopilot(true)}
+              className="flex items-center gap-1.5 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-bold text-violet-700 hover:bg-violet-100 transition"
+              title="Ask Copilot about this form"
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z" />
+              </svg>
+              Copilot
+            </button>
+            <Link
+              href={`/recruit/copilot?workspace=form&formId=${id}`}
+              className="hidden sm:flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition"
+            >
+              Full Copilot
+            </Link>
             <Link
               href={`/recruit/forms/new?edit=${id}`}
               className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition"
@@ -2818,7 +2947,7 @@ function FormResponsesContent({ id }: { id: string }) {
               {exporting ? "Exporting…" : "Export CSV"}
             </button>
             <button
-              onClick={() => setShowShare(true)}
+              onClick={handleShare}
               className="flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-2 text-xs font-semibold text-white hover:bg-violet-700 transition"
             >
               <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98"/></svg>
@@ -2829,6 +2958,17 @@ function FormResponsesContent({ id }: { id: string }) {
       </header>
 
       <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 space-y-5">
+        <FormTabNav active={activeTab} onChange={setActiveTab} responseCount={responses.length} />
+
+        <FormPostCreateChecklist
+          formId={id}
+          formTitle={form.title}
+          responseCount={responses.length}
+          agentEnabled={form.agentMode?.enabled === true}
+          onShare={handleShare}
+          onOpenAutopilot={() => setActiveTab("autopilot")}
+        />
+
         {/* Stats */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {stats.map(s => (
@@ -2839,72 +2979,109 @@ function FormResponsesContent({ id }: { id: string }) {
           ))}
         </div>
 
-        <FormAnalysisPanel formId={id} token={token!} />
-        <FormAssessmentAnalyticsPanel formId={id} token={token!} />
-        <FormHiringSummaryPanel formId={id} token={token!} />
-
-        <AgentModeCard
-          formId={id}
-          token={token!}
-          agentMode={form.agentMode ?? DEFAULT_AGENT_MODE}
-          responses={responses}
-          onSaved={mode => setForm(f => (f ? { ...f, agentMode: mode } : f))}
-        />
-
-        <PipelineRulesCard
-          formId={id}
-          token={token!}
-          rules={form.pipelineRules ?? []}
-          onChange={rules => setForm(f => (f ? { ...f, pipelineRules: rules } : f))}
-        />
-
-        {/* Scoring criteria card — only show when there are form questions */}
-        {form.questions && form.questions.length > 0 && (
-          <ScoringCriteriaCard questions={form.questions} formTitle={form.title} />
+        {activeTab === "insights" && (
+          <>
+            <FormAnalysisPanel formId={id} token={token!} />
+            <FormAssessmentAnalyticsPanel formId={id} token={token!} />
+            <FormHiringSummaryPanel formId={id} token={token!} />
+          </>
         )}
 
-        {/* Filter tabs */}
-        <div className="flex flex-wrap gap-2 items-center">
-          {(["all", ...STAGES.map(s => s.id)] as (Stage | "all")[]).map(f => (
-            <button
-              key={f}
-              onClick={() => setStageFilter(f)}
-              className={`rounded-full px-3.5 py-1.5 text-xs font-semibold capitalize transition ${
-                stageFilter === f
-                  ? "bg-violet-600 text-white shadow"
-                  : "bg-white text-slate-600 border border-slate-200 hover:border-slate-300"
-              }`}
-            >
-              {f === "all" ? "All Responses" : STAGES.find(s => s.id === f)?.label ?? f}
-            </button>
-          ))}
-          <span className="ml-auto text-xs text-slate-400">{filtered.length} response{filtered.length !== 1 ? "s" : ""}</span>
-        </div>
-
-        {/* Response cards */}
-        {filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="text-4xl mb-4">📭</div>
-            <p className="text-sm font-semibold text-slate-700">
-              {responses.length === 0 ? "No responses yet" : `No ${stageFilter} responses`}
-            </p>
-            <p className="mt-1.5 text-xs text-slate-400 max-w-xs">
-              {responses.length === 0 ? "Share your form link to start receiving applications." : "Try a different filter."}
-            </p>
-            {responses.length === 0 && (
-              <button onClick={() => setShowShare(true)} className="mt-5 flex items-center gap-1.5 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 transition">
-                Share Form Link
-              </button>
+        {activeTab === "autopilot" && (
+          <>
+            <AgentModeCard
+              formId={id}
+              token={token!}
+              agentMode={form.agentMode ?? DEFAULT_AGENT_MODE}
+              responses={responses}
+              onSaved={mode => setForm(f => (f ? { ...f, agentMode: mode } : f))}
+            />
+            <PipelineRulesCard
+              formId={id}
+              token={token!}
+              rules={form.pipelineRules ?? []}
+              onChange={rules => setForm(f => (f ? { ...f, pipelineRules: rules } : f))}
+            />
+            {form.questions && form.questions.length > 0 && (
+              <ScoringCriteriaCard questions={form.questions} formTitle={form.title} />
             )}
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {filtered.map(r => (
-              <ResponseCard key={r._id} r={r} token={token!} formId={id} formTitle={form.title} onUpdate={onUpdate} onDelete={onDelete} />
-            ))}
-          </div>
+          </>
+        )}
+
+        {activeTab === "responses" && (
+          <>
+            <FormNeedsAttention responses={responses} onSelectResponse={scrollToResponse} />
+            <FormTopPicks responses={responses} onSelect={scrollToResponse} />
+
+            <div className="flex flex-wrap gap-2 items-center">
+              {FORM_STAGE_FILTERS.map(f => (
+                <button
+                  key={f.id}
+                  onClick={() => setStageFilter(f.id)}
+                  className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
+                    stageFilter === f.id
+                      ? "bg-violet-600 text-white shadow"
+                      : "bg-white text-slate-600 border border-slate-200 hover:border-slate-300"
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+              <span className="ml-auto text-xs text-slate-400">{filtered.length} response{filtered.length !== 1 ? "s" : ""}</span>
+            </div>
+
+            {filtered.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center">
+                <div className="text-4xl mb-4">📭</div>
+                <p className="text-sm font-semibold text-slate-700">
+                  {responses.length === 0 ? "No responses yet" : `No ${stageFilter} responses`}
+                </p>
+                <p className="mt-1.5 text-xs text-slate-400 max-w-xs">
+                  {responses.length === 0 ? "Share your form link to start receiving applications." : "Try a different filter."}
+                </p>
+                {responses.length === 0 && (
+                  <button onClick={handleShare} className="mt-5 flex items-center gap-1.5 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 transition">
+                    Share Form Link
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {filtered.map(r => (
+                  <div
+                    key={r._id}
+                    id={`form-response-${r._id}`}
+                    className={highlightId === r._id ? "ring-2 ring-violet-400 ring-offset-2 rounded-3xl transition" : ""}
+                  >
+                    <ResponseCard
+                      r={r}
+                      token={token!}
+                      formId={id}
+                      formTitle={form.title}
+                      companyName={companyName}
+                      onUpdate={(responseId, patch) => {
+                        markFormChecklistStep(id, "reviewedApplicant");
+                        onUpdate(responseId, patch);
+                      }}
+                      onDelete={onDelete}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </main>
+
+      {token && form && (
+        <FormCopilotDrawer
+          formId={id}
+          formTitle={form.title}
+          token={token}
+          open={showCopilot}
+          onClose={() => setShowCopilot(false)}
+        />
+      )}
     </div>
   );
 }

@@ -471,12 +471,23 @@ function RecruitDashboardContent() {
                   <span className="rb-golden-tag absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full px-2 py-[3px] text-[8.5px] font-extrabold uppercase tracking-wide text-amber-900">
                     ✨ Made for Standard Jobs
                   </span>
-                  <Link href="/recruit/copilot"
+                  <Link href="/recruit/copilot?workspace=standard"
                     className="flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition">
                     <SparklesIcon /> Hiring Copilot
                   </Link>
                 </div>
               </>
+            )}
+            {activeTab === "forms" && (
+              <div className="relative ml-1">
+                <span className="rb-golden-tag absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full px-2 py-[3px] text-[8.5px] font-extrabold uppercase tracking-wide text-amber-900">
+                  ✨ Made for Form Jobs
+                </span>
+                <Link href="/recruit/copilot?workspace=form"
+                  className="flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition">
+                  <SparklesIcon /> Hiring Copilot
+                </Link>
+              </div>
             )}
             <Link href="/recruit/recruiter-profile"
               className="flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition">

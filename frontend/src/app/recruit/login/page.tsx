@@ -9,6 +9,16 @@ import { apiUrl } from "@/lib/api";
 import { firebaseAuth, googleProvider } from "@/lib/firebaseClient";
 import { signInWithPopup, RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from "firebase/auth";
 
+function safeNextPath(raw: string | null): string {
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/recruit/dashboard";
+  return raw;
+}
+
+function readNextFromUrl(): string {
+  if (typeof window === "undefined") return "/recruit/dashboard";
+  return safeNextPath(new URLSearchParams(window.location.search).get("next"));
+}
+
 function GoogleIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
@@ -41,12 +51,13 @@ type PhoneStep = "idle" | "entering" | "otp";
 export default function RecruitLoginPage() {
   const router = useRouter();
   const { signIn, signInWithToken, authUser, recruitProfile, loading } = useRecruitAuth();
+  const [nextPath] = useState(readNextFromUrl);
 
   useEffect(() => {
     if (!loading && authUser && recruitProfile) {
-      router.replace("/recruit/dashboard");
+      router.replace(nextPath);
     }
-  }, [loading, authUser, recruitProfile, router]);
+  }, [loading, authUser, recruitProfile, router, nextPath]);
 
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");

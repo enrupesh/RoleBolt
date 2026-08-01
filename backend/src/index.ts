@@ -13,7 +13,7 @@ import { startOfferManagementJob } from "./jobs/offerManagement";
 import { startPipelineRulesCron } from "./jobs/pipelineRulesCron";
 import { seekerRouter } from "./seeker";
 import { billingRouter, handleStripeWebhook } from "./billing";
-import { collaborationRouter } from "./collaboration";
+import { collaborationRouter, collaborationPublicRouter } from "./collaboration";
 
 dotenv.config();
 
@@ -61,6 +61,7 @@ app.use("/auth", authRouter);
 
 // ── Public routes ─────────────────────────────────────────────────────────────
 app.use("/recruit-public", recruitPublicRouter);
+app.use("/recruit-public", collaborationPublicRouter);
 app.use("/recruit-public/forms", formPublicRouter);
 app.use("/recruit-public/site-guide", siteGuideRouter);
 

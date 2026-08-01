@@ -26,6 +26,9 @@ import { RecruitForm } from "./models/RecruitForm";
 import { RecruitFormResponse } from "./models/RecruitFormResponse";
 import { computeGlobalHiringStats, globalStatsToPromptText } from "./ai/globalHiringStats";
 import type { JobPipelineStat } from "./ai/globalHiringStats";
+import { computeGlobalFormStats, globalFormStatsToPromptText } from "./ai/globalFormStats";
+import type { FormPipelineStat } from "./ai/globalFormStats";
+import type { CopilotWorkspace } from "./models/RecruitCopilotConversation";
 
 export const copilotRouter = express.Router();
 
@@ -33,6 +36,27 @@ export const copilotRouter = express.Router();
 
 function getUid(req: express.Request): string {
   return (req as any).user?.uid ?? "";
+}
+
+type ApiContext = {
+  workspace?: CopilotWorkspace;
+  level: string;
+  jobId?: string;
+  candidateId?: string;
+  formId?: string;
+  responseId?: string;
+};
+
+function inferWorkspace(ctx: ApiContext): CopilotWorkspace {
+  if (ctx.workspace === "form" || ctx.workspace === "standard") return ctx.workspace;
+  if (ctx.level === "form" || ctx.level.startsWith("form_")) return "form";
+  return "standard";
+}
+
+function normalizeContext(ctx: ApiContext): ApiContext {
+  const workspace = inferWorkspace(ctx);
+  // Legacy: level "form" without workspace → form workspace, level stays "form"
+  return { ...ctx, workspace };
 }
 
 // ─── Structured response types ────────────────────────────────────────────────
@@ -148,6 +172,54 @@ function parseStreamMeta(metaRaw: string): Omit<ParsedAiResponse, "reply"> {
  * data before the response reaches the client. Sources without a
  * matching/known value are left untouched (simply omitted, never invented).
  */
+async function attachFormResponseDetails(
+  uid: string,
+  sources: ICopilotSource[]
+): Promise<ICopilotSource[]> {
+  const ids = Array.from(
+    new Set(
+      sources
+        .filter(s => s.type === "form_response" || (s.type === "candidate_profile" && !s.jobId))
+        .map(s => s.candidateId)
+        .filter((id): id is string => !!id)
+    )
+  );
+  if (ids.length === 0) return sources;
+
+  const rows = await RecruitFormResponse.find({ _id: { $in: ids }, uid })
+    .select("submittedEmail submittedName aiScore scoringFailed formId")
+    .lean();
+  const byId = new Map(
+    rows.map((r: any) => [
+      String(r._id),
+      {
+        email: r.submittedEmail as string | undefined,
+        name: r.submittedName as string | undefined,
+        score: r.scoringFailed ? undefined : (r.aiScore as number | undefined),
+        formId: String(r.formId),
+      },
+    ])
+  );
+
+  return sources.map(s => {
+    if (!s.candidateId) return s;
+    const d = byId.get(s.candidateId);
+    if (!d) return s;
+    return {
+      ...s,
+      ...(d.email ? { candidateEmail: d.email } : {}),
+      ...(d.name ? { candidateName: d.name } : {}),
+      ...(d.score !== undefined ? { candidateFitScorePct: d.score } : {}),
+      ...(d.formId ? { jobId: d.formId } : {}),
+    };
+  });
+}
+
+async function attachSourceDetails(uid: string, sources: ICopilotSource[], workspace: CopilotWorkspace): Promise<ICopilotSource[]> {
+  if (workspace === "form") return attachFormResponseDetails(uid, sources);
+  return attachCandidateEmails(uid, sources);
+}
+
 async function attachCandidateEmails(
   uid: string,
   sources: ICopilotSource[]
@@ -231,7 +303,14 @@ interface ContextData {
   // Form context
   form?: any | null;
   formDetailedResponses?: any[];
+  formResponse?: any | null;
+  formGlobalStatsText?: string;
+  formPipelines?: FormPipelineStat[];
 }
+
+/** Single-applicant fields for form_applicant level */
+const FORM_RESPONSE_FULL_SELECT =
+  "submittedName submittedEmail formId aiScore aiSummary scoringFailed stage strengths redFlags stageHistory createdAt assessmentStatus assessmentScore assessmentScoringStatus assessmentSummary answers agentLog emailLog notes";
 
 /** Fields needed for org-wide reasoning — deliberately excludes heavy fields
  * (resumeText, assessmentQuestions/Answers, interviewBrief) to keep the
@@ -247,10 +326,10 @@ const GLOBAL_FORM_RESPONSE_SELECT =
 const FORM_RESPONSE_DETAIL_SELECT =
   "submittedName submittedEmail formId aiScore aiSummary scoringFailed stage strengths redFlags stageHistory createdAt assessmentStatus assessmentScore assessmentScoringStatus answers";
 
-async function loadContextData(
-  uid: string,
-  context: { level: string; jobId?: string; candidateId?: string; formId?: string }
-): Promise<ContextData> {
+async function loadContextData(uid: string, rawContext: ApiContext): Promise<ContextData> {
+  const context = normalizeContext(rawContext);
+  const workspace = context.workspace!;
+
   const [profile, companyProfile] = await Promise.all([
     RecruitProfile.findOne({ uid }).lean(),
     RecruitCompanyProfile.findOne({ uid }).lean(),
@@ -259,6 +338,72 @@ async function loadContextData(
   const recruiterName = (profile as any)?.name as string | undefined;
   const companyName = (companyProfile as any)?.name as string | undefined;
 
+  // ── Form Job workspace ────────────────────────────────────────────────────
+  if (workspace === "form") {
+    if (context.level === "form_applicant" && context.responseId) {
+      const formResponse = await RecruitFormResponse.findOne({ _id: context.responseId, uid })
+        .select(FORM_RESPONSE_FULL_SELECT)
+        .lean();
+      const form = formResponse
+        ? await RecruitForm.findOne({ _id: (formResponse as any).formId, uid }).lean()
+        : null;
+      return {
+        job: null, candidates: [], candidate: null, recruiterName, companyName,
+        form, formResponse,
+      };
+    }
+
+    if (context.level === "form" && context.formId) {
+      const [form, formDetailedResponses] = await Promise.all([
+        RecruitForm.findOne({ _id: context.formId, uid }).lean(),
+        RecruitFormResponse.find({ formId: context.formId, uid })
+          .select(FORM_RESPONSE_DETAIL_SELECT)
+          .sort({ aiScore: -1 })
+          .lean(),
+      ]);
+      return {
+        job: null, candidates: [], candidate: null, recruiterName, companyName,
+        form, formDetailedResponses: formDetailedResponses ?? [],
+      };
+    }
+
+    // form_global — all forms, no Standard Job data
+    const [allForms, rawFormResponses] = await Promise.all([
+      RecruitForm.find({ uid }).sort({ createdAt: -1 }).lean(),
+      RecruitFormResponse.find({ uid }).select(GLOBAL_FORM_RESPONSE_SELECT).lean(),
+    ]);
+
+    const formTitleById = new Map(allForms.map((f: any) => [String(f._id), f.title as string]));
+    const formResponses: FormResponseSummary[] = rawFormResponses.map((r: any) => ({
+      _id: r._id,
+      name: r.submittedName,
+      email: r.submittedEmail,
+      formId: r.formId,
+      formTitle: formTitleById.get(String(r.formId)) || "Unknown form",
+      aiScore: r.aiScore ?? 0,
+      scoringFailed: r.scoringFailed,
+      stage: r.stage,
+      strengths: r.strengths,
+      redFlags: r.redFlags,
+      submittedAt: r.createdAt,
+      assessmentStatus: r.assessmentStatus,
+      assessmentScore: r.assessmentScore,
+      assessmentScoringStatus: r.assessmentScoringStatus,
+    }));
+
+    const { stats, pipelines } = computeGlobalFormStats(allForms as any[], rawFormResponses as any[]);
+    const formGlobalStatsText = globalFormStatsToPromptText(stats, pipelines);
+
+    return {
+      job: null, candidates: [], candidate: null, recruiterName, companyName,
+      allJobs: allForms as any[],
+      formResponses,
+      formGlobalStatsText,
+      formPipelines: pipelines,
+    };
+  }
+
+  // ── Standard Job workspace ────────────────────────────────────────────────
   if (context.level === "candidate" && context.candidateId) {
     const [candidate, job] = await Promise.all([
       RecruitCandidate.findOne({ _id: context.candidateId, uid }).lean(),
@@ -279,43 +424,11 @@ async function loadContextData(
     return { job, candidates: candidates ?? [], candidate: null, recruiterName, companyName };
   }
 
-  // ── Form context — single form with all its responses ─────────────────────
-  if (context.level === "form" && context.formId) {
-    const [form, formDetailedResponses] = await Promise.all([
-      RecruitForm.findOne({ _id: context.formId, uid }).lean(),
-      RecruitFormResponse.find({ formId: context.formId, uid })
-        .select(FORM_RESPONSE_DETAIL_SELECT)
-        .sort({ aiScore: -1 })
-        .lean(),
-    ]);
-    return { job: null, candidates: [], candidate: null, recruiterName, companyName, form, formDetailedResponses: formDetailedResponses ?? [] };
-  }
-
-  // ── Global — Organization Intelligence ────────────────────────────────────
-  const [allJobs, rawCandidates, allForms, rawFormResponses] = await Promise.all([
+  // Standard global — NO form data
+  const [allJobs, rawCandidates] = await Promise.all([
     RecruitJob.find({ uid }).sort({ createdAt: -1 }).lean(),
     RecruitCandidate.find({ uid }).select(GLOBAL_CANDIDATE_SELECT).lean(),
-    RecruitForm.find({ uid }).select("title").lean(),
-    RecruitFormResponse.find({ uid }).select(GLOBAL_FORM_RESPONSE_SELECT).lean(),
   ]);
-
-  const formTitleById = new Map(allForms.map((f: any) => [String(f._id), f.title as string]));
-  const formResponses: FormResponseSummary[] = rawFormResponses.map((r: any) => ({
-    _id: r._id,
-    name: r.submittedName,
-    email: r.submittedEmail,
-    formId: r.formId,
-    formTitle: formTitleById.get(String(r.formId)) || "Unknown form",
-    aiScore: r.aiScore ?? 0,
-    scoringFailed: r.scoringFailed,
-    stage: r.stage,
-    strengths: r.strengths,
-    redFlags: r.redFlags,
-    submittedAt: r.createdAt,
-    assessmentStatus: r.assessmentStatus,
-    assessmentScore: r.assessmentScore,
-    assessmentScoringStatus: r.assessmentScoringStatus,
-  }));
 
   const jobTitleById = new Map(allJobs.map((j: any) => [String(j._id), j.title as string]));
   const allCandidates: GlobalCandidateSummary[] = rawCandidates.map((c: any) => ({
@@ -347,7 +460,6 @@ async function loadContextData(
     allCandidates,
     globalStatsText,
     pipelines,
-    formResponses,
   };
 }
 
@@ -423,6 +535,26 @@ const STARTER_ACTIONS: Record<string, string[]> = {
     "How is our assessment completion rate?",
     "Which stage has the most dropoff?",
   ],
+  form_global: [
+    "What should I prioritize across my forms today?",
+    "Which form has the strongest applicants?",
+    "Show applicants stuck in review",
+    "Compare my active forms",
+    "Who are my top 5 applicants overall?",
+    "Which forms need more sharing?",
+    "Assessment completion across all forms",
+    "Where are applicants dropping off?",
+  ],
+  form_applicant: [
+    "Summarize this applicant",
+    "Should I shortlist them?",
+    "What are their strengths and weaknesses?",
+    "How did they answer the key questions?",
+    "Compare to other applicants on this form",
+    "What stage should they move to next?",
+    "Draft a shortlist email",
+    "Any red flags I should know about?",
+  ],
 };
 
 // ─── Shared: build AI message history ────────────────────────────────────────
@@ -448,7 +580,9 @@ async function persistExchange(
   parsed: ParsedAiResponse,
   isNew: boolean,
   job: any | null,
-  candidate: any | null = null
+  candidate: any | null = null,
+  form: any | null = null,
+  formResponse: any | null = null,
 ): Promise<void> {
   const now = new Date();
 
@@ -485,6 +619,16 @@ async function persistExchange(
     conversation.selectedCandidateName = candidate.name;
   }
 
+  if (form) {
+    conversation.selectedFormId = String(form._id);
+    conversation.selectedFormTitle = form.title;
+  }
+
+  if (formResponse) {
+    conversation.selectedResponseId = String(formResponse._id);
+    conversation.selectedResponseName = formResponse.submittedName || "Applicant";
+  }
+
   await conversation.save();
 
   // Auto-title: fire and forget after first exchange
@@ -501,6 +645,42 @@ async function persistExchange(
   }
 }
 
+function buildPromptFromContext(context: ApiContext, data: ContextData, mode: "json" | "stream", syntheticInstruction?: string) {
+  const ctx = normalizeContext(context);
+  return buildCopilotPrompt({
+    level: ctx.level as any,
+    mode,
+    recruiterName: data.recruiterName,
+    companyName: data.companyName,
+    job: data.job ?? undefined,
+    candidates: data.candidates ?? undefined,
+    candidate: data.candidate ?? undefined,
+    form: data.form ?? undefined,
+    formDetailedResponses: data.formDetailedResponses ?? undefined,
+    formResponse: data.formResponse ?? undefined,
+    allJobs: data.allJobs,
+    allCandidates: data.allCandidates,
+    globalStats: data.globalStatsText,
+    formGlobalStats: data.formGlobalStatsText,
+    pipelines: data.pipelines,
+    formPipelines: data.formPipelines,
+    formResponses: data.formResponses,
+    syntheticInstruction,
+  });
+}
+
+function validateContext(context: ApiContext, data: ContextData): string | null {
+  const ctx = normalizeContext(context);
+  if (ctx.workspace === "standard") {
+    if (ctx.level === "job" && ctx.jobId && !data.job) return "Job not found";
+    if (ctx.level === "candidate" && ctx.candidateId && !data.candidate) return "Candidate not found";
+  } else {
+    if (ctx.level === "form" && ctx.formId && !data.form) return "Form not found";
+    if (ctx.level === "form_applicant" && ctx.responseId && !data.formResponse) return "Applicant not found";
+  }
+  return null;
+}
+
 // ─── POST /recruit/copilot/chat ───────────────────────────────────────────────
 
 copilotRouter.post("/chat", async (req, res) => {
@@ -509,22 +689,22 @@ copilotRouter.post("/chat", async (req, res) => {
 
   const {
     message,
-    context,
+    context: rawContext,
     conversationId,
   }: {
     message: string;
-    context: { level: "global" | "job" | "candidate" | "form"; jobId?: string; candidateId?: string; formId?: string };
+    context: ApiContext;
     conversationId?: string;
   } = req.body;
 
   if (!message?.trim()) return res.status(400).json({ error: "message is required" });
-  if (!context?.level) return res.status(400).json({ error: "context.level is required" });
+  if (!rawContext?.level) return res.status(400).json({ error: "context.level is required" });
+  const context = normalizeContext(rawContext);
 
   const apiKey = process.env.GEMINI_MESH_KEY;
   if (!apiKey) return res.status(500).json({ error: "AI service not configured (GEMINI_MESH_KEY missing)" });
 
   try {
-    // ── 1. Load or create conversation ──────────────────────────────────────
     let conversation = conversationId
       ? await RecruitCopilotConversation.findOne({ _id: conversationId, uid })
       : null;
@@ -534,50 +714,26 @@ copilotRouter.post("/chat", async (req, res) => {
       conversation = await RecruitCopilotConversation.create({
         uid,
         context: {
-          level: context.level,
+          workspace: context.workspace,
+          level: context.level as any,
           jobId: context.jobId,
           candidateId: context.candidateId,
           formId: context.formId,
+          responseId: context.responseId,
         },
         title: "New conversation",
         messages: [],
       });
     }
 
-    // ── 2. Load context data ─────────────────────────────────────────────────
-    const { job, candidates, candidate, recruiterName, companyName, allJobs, allCandidates, globalStatsText, pipelines, formResponses, form, formDetailedResponses } =
-      await loadContextData(uid, context);
-    if (context.level === "job" && context.jobId && !job) {
-      return res.status(404).json({ error: "Job not found" });
-    }
-    if (context.level === "candidate" && context.candidateId && !candidate) {
-      return res.status(404).json({ error: "Candidate not found" });
-    }
-    if (context.level === "form" && context.formId && !form) {
-      return res.status(404).json({ error: "Form not found" });
-    }
+    const data = await loadContextData(uid, context);
+    const err = validateContext(context, data);
+    if (err) return res.status(404).json({ error: err });
 
-    // ── 3. Build prompt + message history ────────────────────────────────────
-    const systemPrompt = buildCopilotPrompt({
-      level: context.level as "global" | "job" | "candidate" | "form",
-      mode: "json",
-      recruiterName,
-      companyName,
-      job: job ?? undefined,
-      candidates: candidates ?? undefined,
-      candidate: candidate ?? undefined,
-      form: form ?? undefined,
-      formDetailedResponses: formDetailedResponses ?? undefined,
-      allJobs,
-      allCandidates,
-      globalStats: globalStatsText,
-      pipelines,
-      formResponses,
-    });
+    const systemPrompt = buildPromptFromContext(context, data, "json");
 
     const aiMessages = buildMessageHistory(systemPrompt, conversation, message.trim());
 
-    // ── 4. Call AI ────────────────────────────────────────────────────────────
     const rawAi = await callMeshChatCompletions({
       apiKey,
       model: "openai/gpt-4o-mini",
@@ -591,10 +747,12 @@ copilotRouter.post("/chat", async (req, res) => {
     });
 
     const parsed = parseAiResponse(rawAi);
-    parsed.sources = await attachCandidateEmails(uid, parsed.sources);
+    parsed.sources = await attachSourceDetails(uid, parsed.sources, context.workspace!);
 
-    // ── 5. Persist + respond ──────────────────────────────────────────────────
-    await persistExchange(conversation, message.trim(), parsed, isNew, job, candidate);
+    await persistExchange(
+      conversation, message.trim(), parsed, isNew,
+      data.job, data.candidate, data.form, data.formResponse,
+    );
 
     return res.status(200).json({
       conversationId: String(conversation._id),
@@ -632,16 +790,17 @@ copilotRouter.post("/chat/stream", async (req, res) => {
 
   const {
     message,
-    context,
+    context: rawContext,
     conversationId,
   }: {
     message: string;
-    context: { level: "global" | "job" | "candidate" | "form"; jobId?: string; candidateId?: string; formId?: string };
+    context: ApiContext;
     conversationId?: string;
   } = req.body;
 
   if (!message?.trim()) return res.status(400).json({ error: "message is required" });
-  if (!context?.level) return res.status(400).json({ error: "context.level is required" });
+  if (!rawContext?.level) return res.status(400).json({ error: "context.level is required" });
+  const context = normalizeContext(rawContext);
 
   const apiKey = process.env.GEMINI_MESH_KEY;
   if (!apiKey) return res.status(500).json({ error: "AI service not configured" });
@@ -650,7 +809,7 @@ copilotRouter.post("/chat/stream", async (req, res) => {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
-  res.setHeader("X-Accel-Buffering", "no"); // disable nginx buffering
+  res.setHeader("X-Accel-Buffering", "no");
   res.flushHeaders();
 
   function sendEvent(data: Record<string, unknown>) {
@@ -658,7 +817,6 @@ copilotRouter.post("/chat/stream", async (req, res) => {
   }
 
   try {
-    // ── 1. Load or create conversation ──────────────────────────────────────
     let conversation = conversationId
       ? await RecruitCopilotConversation.findOne({ _id: conversationId, uid })
       : null;
@@ -668,49 +826,26 @@ copilotRouter.post("/chat/stream", async (req, res) => {
       conversation = await RecruitCopilotConversation.create({
         uid,
         context: {
-          level: context.level,
+          workspace: context.workspace,
+          level: context.level as any,
           jobId: context.jobId,
           candidateId: context.candidateId,
           formId: context.formId,
+          responseId: context.responseId,
         },
         title: "New conversation",
         messages: [],
       });
     }
 
-    // ── 2. Load context data ─────────────────────────────────────────────────
-    const { job, candidates, candidate, recruiterName, companyName, allJobs, allCandidates, globalStatsText, pipelines, formResponses, form, formDetailedResponses } =
-      await loadContextData(uid, context);
-    if (context.level === "job" && context.jobId && !job) {
-      sendEvent({ type: "error", error: "Job not found" });
-      return res.end();
-    }
-    if (context.level === "candidate" && context.candidateId && !candidate) {
-      sendEvent({ type: "error", error: "Candidate not found" });
-      return res.end();
-    }
-    if (context.level === "form" && context.formId && !form) {
-      sendEvent({ type: "error", error: "Form not found" });
+    const data = await loadContextData(uid, context);
+    const err = validateContext(context, data);
+    if (err) {
+      sendEvent({ type: "error", error: err });
       return res.end();
     }
 
-    // ── 3. Build prompt + history ────────────────────────────────────────────
-    const systemPrompt = buildCopilotPrompt({
-      level: context.level as "global" | "job" | "candidate" | "form",
-      mode: "stream",
-      recruiterName,
-      companyName,
-      job: job ?? undefined,
-      candidates: candidates ?? undefined,
-      candidate: candidate ?? undefined,
-      form: form ?? undefined,
-      formDetailedResponses: formDetailedResponses ?? undefined,
-      allJobs,
-      allCandidates,
-      globalStats: globalStatsText,
-      pipelines,
-      formResponses,
-    });
+    const systemPrompt = buildPromptFromContext(context, data, "stream");
 
     const aiMessages = buildMessageHistory(systemPrompt, conversation, message.trim());
 
@@ -768,10 +903,12 @@ copilotRouter.post("/chat/stream", async (req, res) => {
 
     const meta = parseStreamMeta(metaRaw);
     const parsed: ParsedAiResponse = { reply: replyText, ...meta };
-    parsed.sources = await attachCandidateEmails(uid, parsed.sources);
+    parsed.sources = await attachSourceDetails(uid, parsed.sources, context.workspace!);
 
-    // ── 6. Persist ────────────────────────────────────────────────────────────
-    await persistExchange(conversation, message.trim(), parsed, isNew, job, candidate);
+    await persistExchange(
+      conversation, message.trim(), parsed, isNew,
+      data.job, data.candidate, data.form, data.formResponse,
+    );
 
     // ── 7. Send done event ────────────────────────────────────────────────────
     sendEvent({
@@ -800,10 +937,25 @@ copilotRouter.get("/conversations", async (req, res) => {
   if (!uid) return res.status(401).json({ error: "Unauthorized" });
 
   try {
-    const conversations = await RecruitCopilotConversation.find({ uid })
+    const workspaceFilter = req.query.workspace as string | undefined;
+    const query: Record<string, unknown> = { uid };
+    if (workspaceFilter === "form") {
+      query.$or = [
+        { "context.workspace": "form" },
+        { "context.level": { $in: ["form", "form_global", "form_applicant"] } },
+      ];
+    } else if (workspaceFilter === "standard") {
+      query.$or = [
+        { "context.workspace": "standard" },
+        { "context.level": { $in: ["global", "job", "candidate"] } },
+        { "context.workspace": { $exists: false }, "context.level": { $nin: ["form", "form_global", "form_applicant"] } },
+      ];
+    }
+
+    const conversations = await RecruitCopilotConversation.find(query)
       .sort({ lastActiveAt: -1 })
       .limit(50)
-      .select("title context selectedJobId selectedJobTitle selectedCandidateId selectedCandidateName lastActiveAt totalMessages messages createdAt updatedAt")
+      .select("title context selectedJobId selectedJobTitle selectedCandidateId selectedCandidateName selectedFormId selectedFormTitle selectedResponseId selectedResponseName lastActiveAt totalMessages messages createdAt updatedAt")
       .lean();
 
     const result = conversations.map((c) => {
@@ -816,6 +968,10 @@ copilotRouter.get("/conversations", async (req, res) => {
         selectedJobTitle: c.selectedJobTitle,
         selectedCandidateId: (c as any).selectedCandidateId,
         selectedCandidateName: (c as any).selectedCandidateName,
+        selectedFormId: (c as any).selectedFormId,
+        selectedFormTitle: (c as any).selectedFormTitle,
+        selectedResponseId: (c as any).selectedResponseId,
+        selectedResponseName: (c as any).selectedResponseName,
         lastActiveAt: c.lastActiveAt,
         totalMessages: c.totalMessages ?? c.messages.length,
         lastMessage: lastMsg
@@ -957,12 +1113,12 @@ copilotRouter.post("/insights", async (req, res) => {
   if (!apiKey) return res.status(500).json({ error: "AI service not configured (GEMINI_MESH_KEY missing)" });
 
   try {
-    const { allJobs, allCandidates, globalStatsText, pipelines, formResponses, recruiterName, companyName } =
-      await loadContextData(uid, { level: "global" });
+    const { allJobs, allCandidates, globalStatsText, pipelines, recruiterName, companyName } =
+      await loadContextData(uid, { workspace: "standard", level: "global" });
 
     const conversation = await RecruitCopilotConversation.create({
       uid,
-      context: { level: "global" },
+      context: { workspace: "standard", level: "global" },
       title: "Organization Overview",
       messages: [],
     });
@@ -976,7 +1132,6 @@ copilotRouter.post("/insights", async (req, res) => {
       allCandidates,
       globalStats: globalStatsText,
       pipelines,
-      formResponses,
       syntheticInstruction:
         "The recruiter just opened their Organization Overview — they have not asked a question yet. " +
         "Proactively greet them by time of day and generate a short 'Here's today's hiring overview' card: " +
@@ -1030,5 +1185,102 @@ copilotRouter.post("/insights", async (req, res) => {
   } catch (err: any) {
     console.error("[copilot] insights error:", err?.message ?? err);
     return res.status(500).json({ error: "Failed to generate organization insights" });
+  }
+});
+
+// ─── GET /recruit/copilot/form-global-stats ───────────────────────────────────
+
+copilotRouter.get("/form-global-stats", async (req, res) => {
+  const uid = getUid(req);
+  if (!uid) return res.status(401).json({ error: "Unauthorized" });
+
+  try {
+    const [allForms, rawResponses] = await Promise.all([
+      RecruitForm.find({ uid }).lean(),
+      RecruitFormResponse.find({ uid }).select(GLOBAL_FORM_RESPONSE_SELECT).lean(),
+    ]);
+    const { stats, pipelines } = computeGlobalFormStats(allForms as any[], rawResponses as any[]);
+    return res.json({ stats, pipelines });
+  } catch (err: any) {
+    console.error("[copilot] form-global-stats error:", err?.message ?? err);
+    return res.status(500).json({ error: "Failed to load form organization stats" });
+  }
+});
+
+// ─── POST /recruit/copilot/form-insights ──────────────────────────────────────
+
+copilotRouter.post("/form-insights", async (req, res) => {
+  const uid = getUid(req);
+  if (!uid) return res.status(401).json({ error: "Unauthorized" });
+
+  const apiKey = process.env.GEMINI_MESH_KEY;
+  if (!apiKey) return res.status(500).json({ error: "AI service not configured" });
+
+  try {
+    const data = await loadContextData(uid, { workspace: "form", level: "form_global" });
+
+    const conversation = await RecruitCopilotConversation.create({
+      uid,
+      context: { workspace: "form", level: "form_global" },
+      title: "Forms Overview",
+      messages: [],
+    });
+
+    const systemPrompt = buildPromptFromContext(
+      { workspace: "form", level: "form_global" },
+      data,
+      "json",
+      "The recruiter just opened their Form Job workspace overview. " +
+        "Proactively greet them and summarize: active forms, top applicants, forms needing attention, " +
+        "assessment completion, and one concrete recommendation for who to shortlist or follow up today. Keep it brief.",
+    );
+
+    const aiMessages: ChatMessage[] = [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: "Generate today's Form Job overview." },
+    ];
+
+    const rawAi = await callMeshChatCompletions({
+      apiKey,
+      model: "openai/gpt-4o-mini",
+      fallbackModels: ["google/gemini-2.5-flash-lite"],
+      messages: aiMessages,
+      max_tokens: 1200,
+      temperature: 0.5,
+      retries: 2,
+      timeoutMs: 60_000,
+      nvidiaFallback: true,
+    });
+
+    const parsed = parseAiResponse(rawAi);
+    parsed.sources = await attachSourceDetails(uid, parsed.sources, "form");
+
+    conversation.messages.push({
+      role: "assistant",
+      content: parsed.reply,
+      recommendation: parsed.recommendation || undefined,
+      confidence: parsed.confidence || undefined,
+      reasoning: parsed.reasoning || undefined,
+      sources: parsed.sources,
+      quickActions: parsed.quickActions.length ? parsed.quickActions : STARTER_ACTIONS.form_global,
+      timestamp: new Date(),
+    } as any);
+    conversation.lastActiveAt = new Date();
+    conversation.totalMessages = conversation.messages.length;
+    await conversation.save();
+
+    return res.status(200).json({
+      conversationId: String(conversation._id),
+      reply: parsed.reply,
+      recommendation: parsed.recommendation,
+      confidence: parsed.confidence,
+      reasoning: parsed.reasoning,
+      sources: parsed.sources,
+      quickActions: parsed.quickActions.length ? parsed.quickActions : STARTER_ACTIONS.form_global,
+      title: conversation.title,
+    });
+  } catch (err: any) {
+    console.error("[copilot] form-insights error:", err?.message ?? err);
+    return res.status(500).json({ error: "Failed to generate form insights" });
   }
 });

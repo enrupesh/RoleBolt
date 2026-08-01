@@ -6,6 +6,8 @@ import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { RecruitGuard } from "@/components/RecruitGuard";
 import Link from "next/link";
 import { apiUrl, readApiJson } from "@/lib/api";
+import { FORM_ROLE_TEMPLATES } from "@/lib/formRoleTemplates";
+import { registerFormPostCreateChecklist } from "@/components/FormPostCreateChecklist";
 
 type QuestionType = "short" | "paragraph" | "number" | "email" | "phone" | "dropdown" | "multiple_choice" | "yes_no" | "file";
 
@@ -369,6 +371,9 @@ function FormBuilderContent() {
       if (!res.ok) throw new Error(data.error || "Failed to save form.");
       const slug = data.form?.slug || savedSlug;
       setSavedSlug(slug);
+      if (!editId && data.form?._id) {
+        registerFormPostCreateChecklist(data.form._id, title.trim());
+      }
       if (andShare) setShowShare(true);
       else router.push(`/recruit/forms/${data.form?._id}?saved=1`);
     } catch (e: any) {
@@ -449,6 +454,38 @@ function FormBuilderContent() {
           <div className="flex items-center gap-2.5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3.5 text-[13px] font-medium text-rose-700 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
             <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" className="shrink-0"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>
             {error}
+          </div>
+        )}
+
+        {!editId && (
+          <div className="rounded-2xl bg-white border border-black/[0.06] p-5 shadow-sm">
+            <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-3">Start from a template</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {FORM_ROLE_TEMPLATES.map(tpl => (
+                <button
+                  key={tpl.id}
+                  type="button"
+                  onClick={() => {
+                    setTitle(tpl.title);
+                    setDescription(tpl.description);
+                    setJobDetails(prev => ({ ...prev, jobType: tpl.jobType }));
+                    setQuestions(tpl.questions.map(q => ({
+                      id: genId(),
+                      label: q.label,
+                      type: q.type as QuestionType,
+                      required: q.required,
+                      options: q.options || [],
+                      placeholder: q.placeholder || "",
+                    })));
+                  }}
+                  className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 text-left hover:border-violet-300 hover:bg-violet-50/40 transition"
+                >
+                  <span className="text-xl">{tpl.emoji}</span>
+                  <p className="mt-2 text-sm font-bold text-slate-900">{tpl.title}</p>
+                  <p className="mt-1 text-[11px] text-slate-500 leading-4">{tpl.description}</p>
+                </button>
+              ))}
+            </div>
           </div>
         )}
 

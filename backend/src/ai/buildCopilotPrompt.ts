@@ -13,8 +13,16 @@
 import type { IRecruitJob } from "../models/RecruitJob";
 import type { IRecruitCandidate } from "../models/RecruitCandidate";
 import type { JobPipelineStat } from "./globalHiringStats";
+import type { FormPipelineStat } from "./globalFormStats";
+import type { FormPipelineStat } from "./globalFormStats";
 
-export type CopilotContextLevel = "global" | "job" | "candidate" | "form";
+export type CopilotContextLevel =
+  | "global"
+  | "job"
+  | "candidate"
+  | "form_global"
+  | "form"
+  | "form_applicant";
 export type CopilotPromptMode = "json" | "stream";
 
 export interface GlobalCandidateSummary {
@@ -66,13 +74,15 @@ export interface CopilotPromptContext {
   allJobs?: Array<IRecruitJob & { _id: any }>;
   allCandidates?: GlobalCandidateSummary[];
   pipelines?: JobPipelineStat[];
-  /** Form Job applicants across the org (global context only). */
+  /** Form Job workspace — org-wide form stats text */
+  formGlobalStats?: string;
+  formPipelines?: FormPipelineStat[];
   formResponses?: FormResponseSummary[];
-  /** When set, this is a synthetic instruction (e.g. "generate today's insights card") rather than a real recruiter question. */
   syntheticInstruction?: string;
-  // Form context (single form deep view)
+  // Form context (single form or single applicant)
   form?: any;
   formDetailedResponses?: any[];
+  formResponse?: any;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -506,9 +516,6 @@ ${jobListBlock(jobs) || "(no jobs yet)"}
 ## Candidates Across the Organization (sorted by fit score, highest first)
 ${candidateLines || "(no candidates yet)"}${truncatedNote}
 
-## Form Job Applicants (people who applied through an application form rather than a Standard Job)
-${formResponsesBlock(ctx.formResponses || [])}
-
 ---
 
 ${mode === "stream" ? streamResponseFormat() : jsonResponseFormat()}
@@ -520,8 +527,7 @@ ${sharedBehaviourRules()}
 - When citing a candidate, use type "candidate_profile" and ALWAYS include their candidateId from the list above.
 - When citing a job, use type "job_description" and mention the job title in the label.
 - If the recruiter's question is really about one specific job or candidate, still answer using the data above — do not ask them to "select a job first"; you already have everything.
-- Form Job applicants are scored 0–100 directly from their written answers (no rubric), so their scores are not strictly comparable to Standard Job candidates — compare within a job type, and say so if the recruiter asks you to rank across both.
-- Form applicants support assessments (a separate scored test sent after submission). When an applicant has assessmentStatus "completed", their assessmentScore is a second data point to factor in alongside the AI submission score.
+- This is the Standard Job workspace only — you do NOT have Form Job applicants here. If asked about application forms, tell the recruiter to switch to the Form Job workspace.
 - Never guess a number. If organization stats don't cover something (e.g. a specific skill not tracked), say the data isn't available rather than inventing it.
 `;
 }
@@ -622,6 +628,115 @@ ${sharedBehaviourRules()}
 - Focus recommendations on concrete next actions: shortlist X, reject Y, send assessment to Z, schedule interview with W.`;
 }
 
+// ─── Form Global Context (all forms — Form Job workspace only) ───────────────
+
+function buildFormGlobalContextPrompt(ctx: CopilotPromptContext): string {
+  const mode = ctx.mode ?? "json";
+  const company = ctx.companyName || "the company";
+  const recruiter = ctx.recruiterName || "the recruiter";
+  const forms = (ctx.allJobs || []) as Array<{ _id: any; title: string; status?: string; responseCount?: number }>;
+  const formResponses = ctx.formResponses || [];
+
+  const instructionLine = ctx.syntheticInstruction
+    ? `\n## Task\n${ctx.syntheticInstruction}\n`
+    : "";
+
+  const formList = forms.length
+    ? forms.map((f, i) => `[F${i + 1}] ${f.title} — formId: ${String(f._id)} | Status: ${f.status || "active"} | Applicants: ${f.responseCount ?? 0}`).join("\n")
+    : "(no forms yet)";
+
+  return `You are Rolebolt AI — an expert AI Hiring Copilot for ${company}, assisting ${recruiter}.
+
+## Your Role
+You are in the **Form Job workspace** — application forms for creators and small businesses. You have visibility across EVERY form and EVERY applicant. You do NOT have Standard Job (resume/rubric) data here. Reason only from Form Job data below.
+
+## Current Context
+Level: FORM GLOBAL (all application forms — no specific form or applicant selected)
+${instructionLine}
+## Organization Stats (Form Jobs)
+${ctx.formGlobalStats || ctx.globalStats || "(no data yet)"}
+
+## Active Forms
+${formList}
+
+## Applicants Across All Forms (sorted by AI score, highest first)
+${formResponsesBlock(formResponses)}
+
+---
+
+${mode === "stream" ? streamResponseFormat() : jsonResponseFormat()}
+
+${sharedBehaviourRules()}
+
+## Form Global Rules
+- AI scores (0–100) come from evaluating written form answers — not comparable to Standard Job rubric scores.
+- When citing an applicant, use type "form_response" with responseId in the candidateId field.
+- When citing a form, use type "form_description" with formId in jobId field.
+- Compare applicants within the same form when ranking; note when comparing across forms.
+- Assessment scores are a second data point when assessmentStatus is "completed".
+- Never reference Standard Job candidates — they are in a separate workspace.`;
+}
+
+// ─── Form Applicant Context (single applicant deep dive) ─────────────────────
+
+function buildFormApplicantContextPrompt(ctx: CopilotPromptContext): string {
+  const mode = ctx.mode ?? "json";
+  const company = ctx.companyName || "the company";
+  const recruiter = ctx.recruiterName || "the recruiter";
+  const form = ctx.form;
+  const r = ctx.formResponse;
+  if (!r) return buildFormGlobalContextPrompt(ctx);
+
+  const formTitle = form?.title || "Unknown Form";
+  const score = r.scoringFailed ? "not scored" : `${r.aiScore ?? 0}%`;
+  const answers = (r.answers || []) as Array<{ label: string; value: string }>;
+  const answerBlock = answers
+    .filter(a => a.value?.trim() && a.value !== "__file_uploaded__")
+    .map((a, i) => `  Q${i + 1} — ${a.label}: ${(a.value || "").slice(0, 500)}`)
+    .join("\n") || "  (no text answers)";
+
+  const stageHistory = (r.stageHistory || [])
+    .slice(-8)
+    .map((h: any) => `  • ${h.fromStage || "start"} → ${h.toStage} (${h.actor}${h.reason ? `: ${h.reason}` : ""})`)
+    .join("\n") || "  (none)";
+
+  return `You are Rolebolt AI — an expert AI Hiring Copilot for ${company}, assisting ${recruiter}.
+
+## Your Role
+You are focused on ONE Form Job applicant in the **Form Job workspace**. Analyze their answers, AI score, assessment, and pipeline stage. Do not reference Standard Job data.
+
+## Applicant Profile
+Name: ${r.submittedName || "Applicant"}
+Email: ${r.submittedEmail || "(not available)"}
+responseId: ${String(r._id)}
+Form: ${formTitle} (formId: ${String(form?._id || r.formId)})
+AI Score: ${score}
+Stage: ${r.stage || "new"}
+AI Summary: ${safeText(r.aiSummary, 800)}
+Strengths: ${(r.strengths || []).join(", ") || "—"}
+Red flags: ${(r.redFlags || []).join(", ") || "None"}
+Assessment: ${r.assessmentStatus || "not sent"}${r.assessmentScore ? ` (${r.assessmentScore}%)` : ""}
+${r.assessmentSummary ? `Assessment summary: ${safeText(r.assessmentSummary, 400)}` : ""}
+
+## Written Answers
+${answerBlock}
+
+## Stage History
+${stageHistory}
+
+---
+
+${mode === "stream" ? streamResponseFormat() : jsonResponseFormat()}
+
+${sharedBehaviourRules()}
+
+## Form Applicant Rules
+- Use type "form_response" with responseId ${String(r._id)} when citing this applicant.
+- Recommend concrete next steps: shortlist, reject, send assessment, schedule interview.
+- scoringFailed means retry scoring — not low quality.
+- Pipeline: new → scored → review_zone → shortlisted → assessment → interview → offer → hired / rejected / withdrawn.`;
+}
+
 // ─── Main Export ──────────────────────────────────────────────────────────────
 
 export function buildCopilotPrompt(ctx: CopilotPromptContext): string {
@@ -630,9 +745,15 @@ export function buildCopilotPrompt(ctx: CopilotPromptContext): string {
       return buildJobContextPrompt(ctx);
     case "global":
       return buildGlobalContextPrompt(ctx);
+    case "form_global":
+      return buildFormGlobalContextPrompt(ctx);
     case "form":
       if (ctx.form) return buildFormContextPrompt(ctx);
-      return buildGlobalContextPrompt(ctx);
+      return buildFormGlobalContextPrompt(ctx);
+    case "form_applicant":
+      if (ctx.formResponse) return buildFormApplicantContextPrompt(ctx);
+      if (ctx.form) return buildFormContextPrompt(ctx);
+      return buildFormGlobalContextPrompt(ctx);
     case "candidate":
       if (ctx.candidate) return buildCandidateContextPrompt(ctx);
       if (ctx.job) return buildJobContextPrompt(ctx);

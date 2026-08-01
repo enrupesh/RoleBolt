@@ -6,6 +6,7 @@ export type EmailPayload = { subject: string; html: string; text: string };
 /** Optional footer data for candidate-facing emails. */
 export type CandidateEmailContext = {
   officialContactEmail?: string;
+  statusUrl?: string;
 };
 
 function esc(s: string) {
@@ -661,5 +662,122 @@ export function assessmentCompletionAlertEmail(
   </table>
 </body></html>`;
   const text = `Hi ${recruiterName || 'Recruiter'},\n\nAssessment Completion Rate Alert for ${jobTitle}\n\nCurrent Rate: ${completionRate}% (threshold: ${threshold}%)\nSent: ${totalSent} | Completed: ${totalCompleted}\nGenerated: ${generatedAt}\n\nYou may want to review the assessment experience or send reminder emails to candidates.\n\nView dashboard: ${dashboardUrl}`;
+  return { subject, html, text };
+}
+
+// ── 15. Team invitation (pending teammate — must accept via link) ───────────────
+export function teamInviteEmail(args: {
+  inviteeName: string;
+  inviterName: string;
+  companyName: string;
+  jobTitle: string;
+  roleLabel: string;
+  permissionBullets: string[];
+  acceptUrl: string;
+  expiresAt: Date;
+}): EmailPayload {
+  const org = args.companyName?.trim() || args.jobTitle;
+  const subject = `You're invited to join ${org} on Rolebolt`;
+  const expiryStr = args.expiresAt.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+  const bullets = args.permissionBullets.length
+    ? args.permissionBullets.map(b => `<li style="margin:0 0 8px;font-size:14px;color:#475569;line-height:1.55;">${esc(b)}</li>`).join("")
+    : `<li style="margin:0;font-size:14px;color:#475569;">Collaborate on this hiring workspace</li>`;
+
+  const html = shell(args.inviteeName, subject, `
+    <p style="margin:0 0 16px;font-size:15px;color:#333;line-height:1.65;">
+      <strong>${esc(args.inviterName)}</strong> has invited you to join their hiring team on Rolebolt.
+    </p>
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:18px 20px;margin:0 0 20px;">
+      <p style="margin:0 0 4px;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.06em;">Invitation details</p>
+      <p style="margin:8px 0 0;font-size:15px;font-weight:700;color:#0f172a;">${esc(args.jobTitle)}</p>
+      ${args.companyName ? `<p style="margin:4px 0 0;font-size:13px;color:#64748b;">${esc(args.companyName)}</p>` : ""}
+      <p style="margin:12px 0 0;font-size:13px;color:#475569;"><strong>Your role:</strong> ${esc(args.roleLabel)}</p>
+    </div>
+    <p style="margin:0 0 12px;font-size:14px;color:#475569;line-height:1.65;">
+      Rolebolt helps teams review candidates, run assessments, and make hiring decisions together. As a team member, you'll be able to:
+    </p>
+    <ul style="margin:0 0 20px;padding-left:20px;">${bullets}</ul>
+    ${btn("Accept Invitation →", args.acceptUrl)}
+    <p style="margin:8px 0 6px;font-size:12px;color:#94a3b8;">Or copy this link into your browser:</p>
+    <p style="margin:0 0 20px;font-size:11px;color:#cbd5e1;word-break:break-all;">${esc(args.acceptUrl)}</p>
+    <p style="margin:0 0 16px;font-size:13px;color:#64748b;line-height:1.6;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;">
+      <strong style="color:#92400e;">This invitation expires on ${esc(expiryStr)}.</strong> After that, you'll need to ask ${esc(args.inviterName)} to send a new invite.
+    </p>
+    <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.55;">
+      If you weren't expecting this invitation, you can safely ignore this email.
+    </p>
+  `);
+
+  const text = [
+    `Hi ${args.inviteeName},`,
+    "",
+    `${args.inviterName} has invited you to join their hiring team on Rolebolt.`,
+    "",
+    `Job: ${args.jobTitle}`,
+    args.companyName ? `Organization: ${args.companyName}` : "",
+    `Role: ${args.roleLabel}`,
+    "",
+    "Accept your invitation:",
+    args.acceptUrl,
+    "",
+    `This invitation expires on ${expiryStr}.`,
+    "",
+    "If you weren't expecting this, you can ignore this email.",
+  ].filter(Boolean).join("\n");
+
+  return { subject, html, text };
+}
+
+// ── 16. Team added (existing Rolebolt user — immediate access) ─────────────────
+export function teamMemberAddedEmail(args: {
+  memberName: string;
+  inviterName: string;
+  companyName: string;
+  jobTitle: string;
+  roleLabel: string;
+  jobUrl: string;
+}): EmailPayload {
+  const org = args.companyName?.trim() || args.jobTitle;
+  const subject = `You've been added to ${org} on Rolebolt`;
+  const html = shell(args.memberName, subject, `
+    <p style="margin:0 0 16px;font-size:15px;color:#333;line-height:1.65;">
+      <strong>${esc(args.inviterName)}</strong> added you to the hiring team for <strong>${esc(args.jobTitle)}</strong>${args.companyName ? ` at <strong>${esc(args.companyName)}</strong>` : ""}.
+    </p>
+    <p style="margin:0 0 16px;font-size:14px;color:#475569;line-height:1.65;">
+      Your role: <strong>${esc(args.roleLabel)}</strong>. You can sign in to Rolebolt and start collaborating right away.
+    </p>
+    ${btn("Open hiring workspace →", args.jobUrl)}
+    <p style="margin:8px 0 0;font-size:11px;color:#cbd5e1;word-break:break-all;">${esc(args.jobUrl)}</p>
+  `);
+  const text = `Hi ${args.memberName},\n\n${args.inviterName} added you to ${args.jobTitle} as ${args.roleLabel}.\n\nOpen workspace: ${args.jobUrl}`;
+  return { subject, html, text };
+}
+
+// ── 17. Form application received (confirmation to applicant) ───────────────────
+export function formApplicationReceived(
+  applicantName: string,
+  formTitle: string,
+  companyName: string,
+  ctx?: CandidateEmailContext,
+): EmailPayload {
+  const org = companyName?.trim() || formTitle;
+  const subject = `We received your application — ${formTitle}`;
+  const html = shell(applicantName, subject, `
+    <p style="margin:0 0 16px;font-size:15px;color:#333;line-height:1.65;">
+      Thank you for applying${companyName ? ` to <strong>${esc(companyName)}</strong>` : ""}! We have successfully received your application for <strong>${esc(formTitle)}</strong>.
+    </p>
+    <p style="margin:0 0 16px;font-size:15px;color:#333;line-height:1.65;">
+      Our team will review your responses and get back to you if you are selected to move forward.
+    </p>
+    ${WHAT_HAPPENS_NEXT}
+    ${ctx?.statusUrl ? `<p style="margin:0 0 16px;font-size:15px;color:#333;line-height:1.65;">You can check your application status anytime: <a href="${esc(ctx.statusUrl)}" style="color:#0a66c2;">View status</a></p>` : ""}
+    <p style="margin:0;font-size:15px;color:#333;">Thank you for your interest!<br><strong>${companyName ? esc(companyName) : "The Hiring Team"}</strong></p>
+  `, ctx);
+  const text = `Hi ${applicantName},\n\nThank you for applying for ${formTitle}. We received your application and will review it soon.${ctx?.statusUrl ? `\n\nCheck status: ${ctx.statusUrl}` : ""}${officialContactPlain(ctx?.officialContactEmail)}\n\nThank you!`;
   return { subject, html, text };
 }
