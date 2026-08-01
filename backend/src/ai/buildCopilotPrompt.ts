@@ -537,7 +537,7 @@ function buildFormContextPrompt(ctx: CopilotPromptContext): string {
 
   const formTitle = form?.title || "Unknown Form";
   const formDesc = form?.description || "";
-  const questions = (form?.questions || []) as Array<{ question: string; type?: string }>;
+  const questions = (form?.questions || []) as Array<{ label: string; type?: string }>;
 
   const stageBreakdown = (() => {
     const counts: Record<string, number> = {};
@@ -555,7 +555,7 @@ function buildFormContextPrompt(ctx: CopilotPromptContext): string {
   const scoringFailed = responses.filter((r: any) => r.scoringFailed).length;
 
   const questionsBlock = questions.length
-    ? questions.map((q, i) => `  Q${i + 1}: ${q.question}`).join("\n")
+    ? questions.map((q, i) => `  Q${i + 1}: ${q.label}`).join("\n")
     : "  (no questions)";
 
   const responseLines = responses
@@ -570,10 +570,10 @@ function buildFormContextPrompt(ctx: CopilotPromptContext): string {
       const summaryLine = `[${i + 1}] ${r.submittedName || "Applicant"} — responseId: ${String(r._id)} | Email: ${r.submittedEmail || "(not available)"} | Score: ${score} | Stage: ${r.stage}${assessmentPart} | Strengths: ${strengths} | Red flags: ${redFlags}`;
 
       // Include a brief per-answer summary if answers exist
-      const answers = (r.answers || []) as Array<{ question: string; answer: string; aiScore?: number; signal?: string }>;
+      const answers = (r.answers || []) as Array<{ label: string; value: string }>;
       const answerLines = answers
         .slice(0, 5)
-        .map((a, qi) => `    Q${qi + 1} (${a.signal || "—"}): ${(a.answer || "").slice(0, 200)}`)
+        .map((a, qi) => `    Q${qi + 1} — ${a.label || "Question"}: ${(a.value || "").slice(0, 200)}`)
         .join("\n");
       return answerLines ? `${summaryLine}\n${answerLines}` : summaryLine;
     })

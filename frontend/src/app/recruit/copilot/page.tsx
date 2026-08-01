@@ -102,7 +102,7 @@ interface UIMessage {
 interface ConversationSummary {
   id: string;
   title: string;
-  context?: { level: string };
+  context?: { level: string; formId?: string };
   selectedJobId?: string;
   selectedJobTitle?: string;
   selectedCandidateId?: string;
@@ -1335,8 +1335,15 @@ function CopilotPageContent() {
         if (matchJob) setSelectedJob(matchJob);
       }
 
+      // Restore form context
+      if (data.context?.level === "form") {
+        setContextMode("form");
+        setSelectedForm(forms.find(form => form._id === data.context?.formId) ?? null);
+        setSelectedJob(null);
+        setSelectedCandidateId(null);
+        setSelectedCandidate(null);
       // Restore candidate context
-      if (data.selectedCandidateId && data.context?.level === "candidate") {
+      } else if (data.selectedCandidateId && data.context?.level === "candidate") {
         setContextMode("candidate");
         setSelectedCandidateId(data.selectedCandidateId);
         // The candidate will be found once candidates load for the job
@@ -1351,7 +1358,7 @@ function CopilotPageContent() {
         setSelectedCandidate(null);
       }
     } catch {}
-  }, [getToken, jobs]);
+  }, [getToken, jobs, forms]);
 
   // ── Deep-link navigation from an AI source citation ────────────────────────
   // Clicking a candidate/job source chip switches the whole Copilot UI into

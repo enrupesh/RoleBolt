@@ -533,7 +533,12 @@ copilotRouter.post("/chat", async (req, res) => {
     if (!conversation) {
       conversation = await RecruitCopilotConversation.create({
         uid,
-        context: { level: context.level, jobId: context.jobId, candidateId: context.candidateId },
+        context: {
+          level: context.level,
+          jobId: context.jobId,
+          candidateId: context.candidateId,
+          formId: context.formId,
+        },
         title: "New conversation",
         messages: [],
       });
@@ -662,7 +667,12 @@ copilotRouter.post("/chat/stream", async (req, res) => {
     if (!conversation) {
       conversation = await RecruitCopilotConversation.create({
         uid,
-        context: { level: context.level, jobId: context.jobId, candidateId: context.candidateId },
+        context: {
+          level: context.level,
+          jobId: context.jobId,
+          candidateId: context.candidateId,
+          formId: context.formId,
+        },
         title: "New conversation",
         messages: [],
       });
