@@ -46,9 +46,12 @@ export async function generateBriefingForUser(userId: string): Promise<void> {
   const formIds = forms.map((f: any) => f._id);
   const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
+  const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+
   const [
     newJobApps, pendingJobReview, inJobInterview,
     newFormApps, pendingFormReview, inFormInterview,
+    pendingFormAssessments, failedFormScoring,
   ] = await Promise.all([
     RecruitCandidate.countDocuments({ jobId: { $in: jobIds }, createdAt: { $gte: yesterday } }),
     RecruitCandidate.countDocuments({ jobId: { $in: jobIds }, stage: "applied" }),
@@ -56,6 +59,10 @@ export async function generateBriefingForUser(userId: string): Promise<void> {
     RecruitFormResponse.countDocuments({ formId: { $in: formIds }, createdAt: { $gte: yesterday } }),
     RecruitFormResponse.countDocuments({ formId: { $in: formIds }, stage: "new" }),
     RecruitFormResponse.countDocuments({ formId: { $in: formIds }, stage: "interview" }),
+    // Assessments sent but not yet completed
+    RecruitFormResponse.countDocuments({ formId: { $in: formIds }, assessmentStatus: { $in: ["sent", "started"] } }),
+    // Responses where AI scoring failed and needs retry
+    RecruitFormResponse.countDocuments({ formId: { $in: formIds }, scoringFailed: true }),
   ]);
 
   // Form applicants are applicants — the briefing counts both job types.
@@ -68,12 +75,41 @@ export async function generateBriefingForUser(userId: string): Promise<void> {
   for (const job of jobs) {
     const recentApps = await RecruitCandidate.countDocuments({
       jobId: job._id,
-      createdAt: { $gte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000) },
+      createdAt: { $gte: twoWeeksAgo },
     });
     if (recentApps < 3) staleJobs.push(job.title);
   }
 
+  // Stale forms: active but < 3 submissions in last 14 days
+  const staleForms: string[] = [];
+  for (const form of forms) {
+    const recentSubs = await RecruitFormResponse.countDocuments({
+      formId: form._id,
+      createdAt: { $gte: twoWeeksAgo },
+    });
+    if (recentSubs < 3) staleForms.push((form as any).title);
+  }
+
+  // Top Form candidates (highest scoring, not yet shortlisted or higher)
+  const topFormCandidates = await RecruitFormResponse.find({
+    formId: { $in: formIds },
+    scoringFailed: { $ne: true },
+    aiScore: { $gte: 70 },
+    stage: { $in: ["new", "scored", "review_zone"] },
+  })
+    .sort({ aiScore: -1 })
+    .limit(3)
+    .select("submittedName aiScore formId")
+    .lean() as any[];
+
   const name = user.name || user.email.split("@")[0];
+
+  // Build form-specific insights line
+  const formInsights: string[] = [];
+  if (pendingFormAssessments > 0) formInsights.push(`${pendingFormAssessments} form assessment${pendingFormAssessments !== 1 ? "s" : ""} pending completion`);
+  if (failedFormScoring > 0) formInsights.push(`${failedFormScoring} form submission${failedFormScoring !== 1 ? "s" : ""} need scoring retry`);
+  if (topFormCandidates.length > 0) formInsights.push(`${topFormCandidates.length} high-scoring form applicant${topFormCandidates.length !== 1 ? "s" : ""} (70%+) still in early stages`);
+  if (staleForms.length > 0) formInsights.push(`low recent traffic on form${staleForms.length !== 1 ? "s" : ""}: ${staleForms.join(", ")}`);
 
   const prompt = `You are an AI hiring assistant. Generate a brief, actionable morning briefing for a recruiter.
 
@@ -82,22 +118,23 @@ DATA:
 - Active jobs: ${jobs.length} (${jobs.map((j: any) => j.title).join(", ") || "none"})
 - Active application forms: ${forms.length} (${forms.map((f: any) => f.title).join(", ") || "none"})
 - New applications in last 24h: ${newApps}${forms.length > 0 ? ` (${newFormApps} via application forms)` : ""}
-- Candidates awaiting review: ${pendingReview}
+- Form applicants awaiting review: ${pendingFormReview}
 - Candidates in interview stage: ${inInterview}
 - Stale jobs (low applications in 14 days): ${staleJobs.length > 0 ? staleJobs.join(", ") : "none"}
+${formInsights.length > 0 ? `- Form job highlights: ${formInsights.join("; ")}` : ""}
 
 Write a 3-paragraph briefing:
-1. Quick summary of overnight activity
-2. Today's top priority action (be specific — name which job, which candidate stage, etc.)
-3. One actionable insight to improve hiring velocity
+1. Quick summary of overnight activity (mention form submissions separately if significant)
+2. Today's top priority action (be specific — name which job or form, which candidate stage, etc.)
+3. One actionable insight — if there are high-scoring form applicants waiting or pending assessments, highlight those
 
-Rules: Under 200 words total. Conversational tone, not robotic. No bullet points — flowing paragraphs only. Address recruiter by first name.`;
+Rules: Under 220 words total. Conversational tone, not robotic. No bullet points — flowing paragraphs only. Address recruiter by first name.`;
 
   let briefingText = "";
   try {
     briefingText = await callAI(prompt);
   } catch {
-    briefingText = `Good morning ${name}! Here's your hiring summary for today: you have ${newApps} new application${newApps !== 1 ? "s" : ""} in the last 24 hours and ${pendingReview} candidate${pendingReview !== 1 ? "s" : ""} awaiting your review across ${jobs.length} active job${jobs.length !== 1 ? "s" : ""}${forms.length > 0 ? ` and ${forms.length} active form${forms.length !== 1 ? "s" : ""}` : ""}. ${inInterview > 0 ? `${inInterview} candidate${inInterview !== 1 ? "s are" : " is"} currently in the interview stage — worth following up on today.` : ""} ${staleJobs.length > 0 ? `Consider refreshing these listings to attract more applicants: ${staleJobs.join(", ")}.` : "Your active jobs are receiving healthy interest."}`;
+    briefingText = `Good morning ${name}! Here's your hiring summary for today: you have ${newApps} new application${newApps !== 1 ? "s" : ""} in the last 24 hours and ${pendingReview} candidate${pendingReview !== 1 ? "s" : ""} awaiting your review across ${jobs.length} active job${jobs.length !== 1 ? "s" : ""}${forms.length > 0 ? ` and ${forms.length} active form${forms.length !== 1 ? "s" : ""}` : ""}. ${inInterview > 0 ? `${inInterview} candidate${inInterview !== 1 ? "s are" : " is"} currently in the interview stage — worth following up on today.` : ""} ${pendingFormAssessments > 0 ? `${pendingFormAssessments} form assessment${pendingFormAssessments !== 1 ? "s are" : " is"} still pending — follow up with those candidates.` : ""} ${staleJobs.length > 0 ? `Consider refreshing these listings: ${staleJobs.join(", ")}.` : "Your active jobs are receiving healthy interest."}`;
   }
 
   const html = emailTemplates.dailyBriefing(name, briefingText, {
