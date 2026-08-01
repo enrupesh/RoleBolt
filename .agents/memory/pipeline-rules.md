@@ -29,4 +29,5 @@ First matching rule fires, then stops.
 Use `getCollaborationAccess`: read requires `view_candidates`, write requires `configure_job`.
 
 ## Frontend
-Pipeline Rules tab in `/recruit/jobs/[id]/page.tsx`. Deep link candidates: `?tab=pipeline&candidate={id}`.
+Autopilot hub tab in `/recruit/jobs/[id]` (`HiringAutopilotHub.tsx`). Rules section is under Autopilot → Pipeline Rules.
+Legacy deep links: `?tab=rules` → Autopilot rules section. Candidate deep link: `?tab=pipeline&candidate={id}`.

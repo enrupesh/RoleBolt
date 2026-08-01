@@ -11,7 +11,7 @@ export async function runPipelineRulesAgeSweep() {
   const activeJobs = await RecruitJob.find({ status: "active" }).select("_id pipelineRules").lean();
   const jobsWithAgeRules = activeJobs.filter(job =>
     ((job as any).pipelineRules ?? []).some(
-      (rule: any) => rule.enabled && rule.condition === "stage_age_days",
+      (rule: any) => rule.enabled !== false && rule.condition === "stage_age_days",
     ),
   );
 
