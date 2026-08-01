@@ -2354,6 +2354,28 @@ recruitRouter.post("/jobs/:jobId/candidates", async (req, res) => {
       }
     }
 
+    // ── AI Agent Mode evaluation (same logic as self-apply) ─────────────────
+    const agentMode = (job as any).agentMode ?? {};
+    const agentEnabled = agentMode.enabled === true && !scored.scoringFailed;
+    const scorePct = scored.maxScore > 0 ? Math.round((scored.totalScore / scored.maxScore) * 100) : 0;
+    const shortlistThreshold = agentMode.shortlistThreshold ?? 75;
+    const rejectThreshold    = agentMode.rejectThreshold    ?? 40;
+
+    let initialStage: string = "applied";
+    let agentAction: "shortlisted" | "rejected" | "review_zone" | null = null;
+
+    if (agentEnabled) {
+      if (scorePct >= shortlistThreshold) {
+        initialStage = "screened";
+        agentAction  = "shortlisted";
+      } else if (scorePct < rejectThreshold) {
+        initialStage = "rejected";
+        agentAction  = "rejected";
+      } else {
+        agentAction = "review_zone";
+      }
+    }
+
     const candidate = await RecruitCandidate.create({
       jobId: job._id,
       uid,
@@ -2366,7 +2388,7 @@ recruitRouter.post("/jobs/:jobId/candidates", async (req, res) => {
       aiSummary: scored.aiSummary,
       redFlags: scored.redFlags,
       strengths: scored.strengths,
-      stage: "applied",
+      stage: initialStage,
       assessmentStatus: "not_sent",
       previousResumeScore: scored.totalScore,
       scoringFailed: scored.scoringFailed,
@@ -2374,6 +2396,139 @@ recruitRouter.post("/jobs/:jobId/candidates", async (req, res) => {
     });
 
     await RecruitJob.updateOne({ _id: job._id }, { $inc: { candidateCount: 1 } });
+
+    // ── AI Agent: send emails + write agentLog (non-blocking) ────────────────
+    if (agentEnabled && agentAction) {
+      const candidateEmail = scored.email || "";
+      const _agentReason = agentAction === "shortlisted"
+        ? `Score ${scorePct}% ≥ shortlist threshold ${shortlistThreshold}%`
+        : agentAction === "rejected"
+          ? `Score ${scorePct}% < reject threshold ${rejectThreshold}%`
+          : `Score ${scorePct}% is in review zone (${rejectThreshold}%–${shortlistThreshold}%)`;
+
+      setImmediate(async () => {
+        let emailSent = false;
+        let emailStatus: "sent" | "failed" | "skipped" | "disabled" = "disabled";
+
+        try {
+          if (agentAction === "shortlisted" && agentMode.autoEmailShortlist !== false && candidateEmail) {
+            const tpl = emailTemplates.screened(candidate.name, job.title, job.companyName || "");
+            const result = await sendEmail({ to: candidateEmail, subject: tpl.subject, html: tpl.html, text: tpl.text });
+            emailSent = result.ok;
+            emailStatus = result.ok ? "sent" : "failed";
+            await RecruitCandidate.updateOne({ _id: candidate._id }, {
+              $push: {
+                emailLog: {
+                  type: "agent_shortlisted", to: candidateEmail, subject: tpl.subject, body: tpl.text,
+                  sentAt: new Date(), status: emailStatus, error: result.error,
+                }
+              }
+            });
+            console.log(`[agent] recruiter-upload: auto-shortlisted & emailed: ${candidate.name} (${scorePct}% ≥ ${shortlistThreshold}%)`);
+          } else if (agentAction === "shortlisted") {
+            emailStatus = "disabled";
+          }
+
+          // ── Auto-send Assessment to shortlisted candidates ────────────────
+          if (agentAction === "shortlisted" && agentMode.autoSendAssessment === true) {
+            try {
+              const freshCandidate = await RecruitCandidate.findById(candidate._id).lean();
+              const alreadySent = (freshCandidate as any)?.assessmentStatus !== "not_sent";
+              if (!alreadySent) {
+                const questions = await generateAssessmentQuestions({
+                  jobTitle:            (job as any).title,
+                  rubric:              (job as any).rubric,
+                  jd:                  (job as any).generatedJD,
+                  niche:               (job as any).niche,
+                  nicheDetails:        (job as any).nicheDetails,
+                  languageRequirement: (job as any).languageRequirement,
+                });
+                const assessmentToken = generateToken();
+                await RecruitCandidate.findByIdAndUpdate(candidate._id, {
+                  assessmentToken,
+                  assessmentQuestions: questions,
+                  assessmentStatus: "sent",
+                  assessmentSentAt: new Date(),
+                  previousResumeScore: candidate.totalScore,
+                });
+                const assessmentUrl = `${FRONTEND_URL}/recruit/assessment/${assessmentToken}`;
+                if (candidateEmail) {
+                  const payload = emailTemplates.assessment(candidate.name, (job as any).title, (job as any).companyName ?? "", assessmentUrl);
+                  const assessResult = await sendEmail({ to: candidateEmail, subject: payload.subject, html: payload.html, text: payload.text, from: CANDIDATE_FROM });
+                  await RecruitCandidate.updateOne({ _id: candidate._id }, {
+                    $push: {
+                      emailLog: {
+                        type: "agent_assessment", to: candidateEmail, subject: payload.subject, body: payload.text,
+                        sentAt: new Date(), status: assessResult.ok ? "sent" : "failed", error: assessResult.error,
+                      }
+                    }
+                  });
+                  console.log(`[agent] recruiter-upload: auto-sent assessment to shortlisted: ${candidate.name}`);
+                }
+              }
+            } catch (e) {
+              console.error("[agent] recruiter-upload: auto-send assessment failed:", e);
+            }
+          }
+
+          if (agentAction === "rejected" && agentMode.autoEmailReject === true && candidateEmail) {
+            const rejBody = `Hi ${candidate.name.split(" ")[0]},\n\nThank you for applying for the ${job.title} role${job.companyName ? ` at ${job.companyName}` : ""}. After reviewing your application, we've decided to move forward with other candidates at this time.\n\nWe appreciate your interest and wish you the best in your search.\n\nWarm regards,\nThe Hiring Team`;
+            const tpl = emailTemplates.rejectionEmailHtml(candidate.name, job.title, job.companyName || "", rejBody);
+            const result = await sendEmail({ to: candidateEmail, subject: tpl.subject, html: tpl.html, text: tpl.text });
+            emailSent = result.ok;
+            emailStatus = result.ok ? "sent" : "failed";
+            await RecruitCandidate.updateOne({ _id: candidate._id }, {
+              $push: {
+                emailLog: {
+                  type: "agent_rejected", to: candidateEmail, subject: tpl.subject, body: tpl.text,
+                  sentAt: new Date(), status: emailStatus, error: result.error,
+                }
+              }
+            });
+            console.log(`[agent] recruiter-upload: auto-rejected & emailed: ${candidate.name} (${scorePct}% < ${rejectThreshold}%)`);
+          } else if (agentAction === "rejected") {
+            emailStatus = "disabled";
+          } else if (agentAction === "review_zone" && agentMode.emailReviewZoneCandidates === true && candidateEmail) {
+            const tpl = emailTemplates.reviewZoneEmail(candidate.name, job.title, job.companyName || "");
+            const result = await sendEmail({ to: candidateEmail, subject: tpl.subject, html: tpl.html, text: tpl.text });
+            emailSent = result.ok;
+            emailStatus = result.ok ? "sent" : "failed";
+            await RecruitCandidate.updateOne({ _id: candidate._id }, {
+              $push: {
+                emailLog: {
+                  type: "agent_review_zone", to: candidateEmail, subject: tpl.subject, body: tpl.text,
+                  sentAt: new Date(), status: emailStatus, error: result.error,
+                }
+              }
+            });
+            console.log(`[agent] recruiter-upload: review zone email sent: ${candidate.name} (${scorePct}%)`);
+          } else if (agentAction === "review_zone") {
+            emailStatus = "disabled";
+          }
+        } catch (e) {
+          console.error("[agent] recruiter-upload: email dispatch failed:", e);
+          emailStatus = "failed";
+        }
+
+        // ── Write agentLog entry ──────────────────────────────────────────────
+        try {
+          await RecruitCandidate.updateOne({ _id: candidate._id }, {
+            $push: {
+              agentLog: {
+                action: agentAction,
+                score: scorePct,
+                reason: _agentReason,
+                emailSent,
+                emailStatus,
+                timestamp: new Date(),
+              }
+            }
+          });
+        } catch (e) {
+          console.error("[agent] recruiter-upload: agentLog write failed:", e);
+        }
+      });
+    }
 
     trackEvent("recruiter_candidate_added", uid, { jobId: req.params.jobId, source: source || "" });
     return res.json({ candidate, previousApplication });
