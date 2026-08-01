@@ -222,12 +222,13 @@ function HealthGauge({ score, label }: { score: number; label: string }) {
 
 // ── Pipeline Funnel ───────────────────────────────────────────────────────────
 const STAGE_COLORS: Record<string, string> = {
-  applied:   "#6366f1",
-  screened:  "#8b5cf6",
-  assessed:  "#a78bfa",
-  interview: "#0ea5e9",
-  offer:     "#f59e0b",
-  hired:     "#10b981",
+  applied:      "#6366f1",
+  review_zone:  "#f59e0b",
+  screened:     "#8b5cf6",
+  assessed:     "#a78bfa",
+  interview:    "#0ea5e9",
+  offer:        "#f59e0b",
+  hired:        "#10b981",
 };
 
 function PipelineFunnel({ pipeline, total }: { pipeline: PipelineData; total: number }) {

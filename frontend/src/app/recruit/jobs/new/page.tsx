@@ -7,6 +7,7 @@ import { RecruitGuard } from "@/components/RecruitGuard";
 import Link from "next/link";
 import { computeJobQuality } from "@/lib/jobQuality";
 import { apiUrl, readApiJson } from "@/lib/api";
+import { registerPostCreateChecklist } from "@/components/PostCreateChecklist";
 
 function ChevronLeftIcon() {
   return (
@@ -645,6 +646,7 @@ function NewJobContent() {
       const data = await readApiJson(res);
       if (!res.ok) throw new Error(data.error || "Failed to create job.");
       setCreatedJob({ id: data.job._id, title: form.title });
+      registerPostCreateChecklist(data.job._id, form.title);
     } catch (e: any) {
       setError(e.message);
       setLoading(false);

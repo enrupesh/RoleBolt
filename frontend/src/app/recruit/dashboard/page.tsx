@@ -8,6 +8,7 @@ import { apiUrl, readApiJson } from "@/lib/api";
 import { RecruitGuard } from "@/components/RecruitGuard";
 import { SkStatCard, SkJobCard } from "@/components/Skeleton";
 import { RoleboltLogo } from "@/components/RoleboltLogo";
+import PostCreateChecklist from "@/components/PostCreateChecklist";
 
 type Job = {
   _id: string;
@@ -19,6 +20,7 @@ type Job = {
   status: "active" | "paused" | "closed";
   candidateCount: number;
   createdAt: string;
+  agentMode?: { enabled?: boolean };
 };
 
 type Form = {
@@ -585,6 +587,8 @@ function RecruitDashboardContent() {
         {/* ── Standard Jobs tab ─────────────────────────────────────────── */}
         {activeTab === "jobs" && (
           <>
+            <PostCreateChecklist jobs={jobs} />
+
             {/* Example roles */}
             <div className="mb-5 flex flex-wrap items-center gap-1.5">
               {["Large Companies", "Corporate Hiring", "Enterprise Recruitment", "Structured Teams", "etc."].map(ex => (

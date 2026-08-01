@@ -2,69 +2,17 @@
 
 import { useMemo, useState, useEffect } from "react";
 import { apiUrl, readApiJson } from "@/lib/api";
-import type { AgentMode, CandidateStage } from "./jobDetailTypes";
+import type { AgentMode } from "./jobDetailTypes";
+import {
+  simulateCandidateScore,
+  zoneFor,
+  currentPct,
+  type RubricCriteria,
+  type SimCandidate,
+  type Zone,
+} from "@/lib/whatIfSimulation";
 
-export type RubricCriteria = { name: string; weight: number; description: string };
-
-type SimCandidate = {
-  _id: string;
-  name: string;
-  stage: CandidateStage;
-  totalScore: number;
-  maxScore: number;
-  scoringFailed?: boolean;
-  scoreBreakdown: Array<{ criterion: string; score: number; maxScore: number }>;
-};
-
-type Zone = "shortlist" | "review" | "reject" | "unscored";
-
-function normalize(s: string) {
-  return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, " ");
-}
-
-function findBreakdown(
-  breakdown: SimCandidate["scoreBreakdown"],
-  criterionName: string,
-) {
-  const target = normalize(criterionName);
-  const exact = breakdown.find(b => normalize(b.criterion) === target);
-  if (exact) return exact;
-  return breakdown.find(b => {
-    const n = normalize(b.criterion);
-    return n.includes(target) || target.includes(n);
-  });
-}
-
-/** Re-weight existing criterion scores onto a new rubric (no AI call). */
-export function simulateCandidateScore(
-  c: SimCandidate,
-  newRubric: RubricCriteria[],
-): { pct: number; total: number; max: number } | null {
-  if (c.scoringFailed || !c.scoreBreakdown?.length || !(c.maxScore > 0)) return null;
-  let total = 0;
-  let max = 0;
-  for (const r of newRubric) {
-    const b = findBreakdown(c.scoreBreakdown, r.name);
-    max += r.weight;
-    if (b && b.maxScore > 0) {
-      total += (b.score / b.maxScore) * r.weight;
-    }
-  }
-  if (max <= 0) return null;
-  return { pct: Math.round((total / max) * 100), total, max };
-}
-
-function zoneFor(pct: number | null, shortlist: number, reject: number): Zone {
-  if (pct === null) return "unscored";
-  if (pct >= shortlist) return "shortlist";
-  if (pct < reject) return "reject";
-  return "review";
-}
-
-function currentPct(c: SimCandidate): number | null {
-  if (c.scoringFailed || !(c.maxScore > 0)) return null;
-  return Math.round((c.totalScore / c.maxScore) * 100);
-}
+export type { RubricCriteria };
 
 export default function WhatIfSimulator({
   jobId,
@@ -215,7 +163,7 @@ export default function WhatIfSimulator({
       }
 
       const early = candidates.filter(c =>
-        ["applied", "screened", "rejected"].includes(c.stage) && !c.scoringFailed && (c.scoreBreakdown?.length ?? 0) > 0,
+        ["applied", "review_zone", "screened", "rejected"].includes(c.stage) && !c.scoringFailed && (c.scoreBreakdown?.length ?? 0) > 0,
       );
       let ok = 0;
       let fail = 0;
@@ -233,7 +181,7 @@ export default function WhatIfSimulator({
       }
       onRescoreComplete();
       setMessage(
-        `Rubric applied. Re-scored ${ok} candidate${ok !== 1 ? "s" : ""} in Applied/Screened/Rejected${fail ? ` · ${fail} failed` : ""}.`,
+        `Rubric applied. Re-scored ${ok} candidate${ok !== 1 ? "s" : ""} in early stages${fail ? ` · ${fail} failed` : ""}.`,
       );
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to apply changes.");

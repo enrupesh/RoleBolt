@@ -33,6 +33,7 @@ type Analytics = {
 
 const STAGE_COLORS: Record<string, string> = {
   applied: "bg-slate-400",
+  review_zone: "bg-amber-500",
   screened: "bg-blue-500",
   assessed: "bg-violet-500",
   interview: "bg-amber-500",
@@ -43,6 +44,7 @@ const STAGE_COLORS: Record<string, string> = {
 
 const STAGE_TEXT: Record<string, string> = {
   applied: "text-slate-600",
+  review_zone: "text-amber-700",
   screened: "text-blue-600",
   assessed: "text-violet-600",
   interview: "text-amber-600",

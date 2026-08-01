@@ -11,6 +11,7 @@
 - [Hiring Autopilot hub](hiring-autopilot.md) — Autopilot tab unifies Agent + Rules + Job Health + Activity Log; Manual/Assisted/Autopilot modes; setup wizard; legacy ?tab=rules|performance|agent-log redirect.
 - [Needs attention + tab grouping](needs-attention-tabs.md) — JobTabNav 5 groups; NeedsAttentionQueue prioritizes scoring failures, assessments, offers, stale candidates, health alerts.
 - [Pipeline sort/bulk + What-If](what-if-pipeline-bulk.md) — pipeline sort & bulk stage/reject/assessment; WhatIfSimulator on rubric tab; PATCH job accepts rubric.
+- [Standard Job completion](standard-job-completion.md) — P0 tests core; Hiring Timeline; review_zone stage; job tour + post-create checklist; Talent Pool reuse; Copilot drawer.
 - [Daily Briefing feature](daily-briefing.md) — Feature 1.3; cron in backend/src/jobs/dailyBriefing.ts (8AM UTC, CRON_ENABLED=true env var); manual trigger POST /recruit/briefing/send-now; dailyBriefing() email template uses custom recruiter HTML (not candidate shell()); dashboard card in DailyBriefingCard component.
 - [Seeker system architecture](seeker-system.md) — Role in RecruitProfile (not User); RecruitGuard requiredRole="seeker|creator"; seeker routes at /recruit/seeker/*; guard redirects to right login per requiredRole.
 - [Stripe API version](stripe-api-version.md) — Always use "2026-06-24.dahlia" as apiVersion; `current_period_end` on Stripe.Subscription requires `(sub as any).current_period_end` cast; proxy.ts must export `proxy` function (not `middleware`).

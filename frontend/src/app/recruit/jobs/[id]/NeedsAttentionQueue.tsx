@@ -114,7 +114,7 @@ export function buildAttentionItems(args: {
       });
     }
 
-    if (c.assessmentStatus === "sent" && daysSince(c.assessmentSentAt) >= 5) {
+    if (c.assessmentStatus === "sent" || c.assessmentStatus === "invited") {
       items.push({
         id: `assess-stale-${c._id}`,
         priority: 25,
@@ -151,7 +151,20 @@ export function buildAttentionItems(args: {
     }
 
     const stageAge = daysSince(c.stageMovedAt || c.createdAt);
-    if (c.stage === "applied" && stageAge >= 5 && !c.scoringFailed) {
+    // Explicit Review Zone stage OR legacy mid-score still sitting in Applied
+    if (c.stage === "review_zone" && stageAge >= 3 && !c.scoringFailed) {
+      const pct = scorePct(c);
+      items.push({
+        id: `stale-rz-${c._id}`,
+        priority: 22,
+        severity: "medium",
+        title: `${c.name} — stuck in Review Zone`,
+        detail: `${Math.floor(stageAge)} days awaiting a human decision${pct ? ` · score ${pct}%` : ""}.`,
+        cta: "Review",
+        action: { type: "pipeline", candidateId: c._id, stage: "review_zone" },
+        candidateId: c._id,
+      });
+    } else if (c.stage === "applied" && stageAge >= 5 && !c.scoringFailed) {
       const pct = scorePct(c);
       const inReviewZone = pct >= reject && pct < shortlist;
       const latestAgent = [...(c.agentLog ?? [])].reverse().find(a => a.action);
@@ -163,7 +176,7 @@ export function buildAttentionItems(args: {
         title: `${c.name} — stuck in ${isReviewZone ? "review zone" : "Applied"}`,
         detail: `${Math.floor(stageAge)} days without a stage change${pct ? ` · score ${pct}%` : ""}.`,
         cta: "Review",
-        action: { type: "pipeline", candidateId: c._id, stage: "applied" },
+        action: { type: "pipeline", candidateId: c._id, stage: isReviewZone ? "review_zone" : "applied" },
         candidateId: c._id,
       });
     }
