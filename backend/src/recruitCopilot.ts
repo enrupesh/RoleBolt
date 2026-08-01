@@ -228,6 +228,9 @@ interface ContextData {
   globalStatsText?: string;
   pipelines?: JobPipelineStat[];
   formResponses?: FormResponseSummary[];
+  // Form context
+  form?: any | null;
+  formDetailedResponses?: any[];
 }
 
 /** Fields needed for org-wide reasoning — deliberately excludes heavy fields
@@ -238,11 +241,15 @@ const GLOBAL_CANDIDATE_SELECT =
 
 /** Same idea for Form Job applicants — excludes resumeText and per-answer detail. */
 const GLOBAL_FORM_RESPONSE_SELECT =
-  "submittedName submittedEmail formId aiScore scoringFailed stage strengths redFlags createdAt";
+  "submittedName submittedEmail formId aiScore scoringFailed stage strengths redFlags createdAt assessmentStatus assessmentScore assessmentScoringStatus";
+
+/** Full fields for a single-form context (deeper — includes question answers for AI reasoning). */
+const FORM_RESPONSE_DETAIL_SELECT =
+  "submittedName submittedEmail formId aiScore aiSummary scoringFailed stage strengths redFlags stageHistory createdAt assessmentStatus assessmentScore assessmentScoringStatus answers";
 
 async function loadContextData(
   uid: string,
-  context: { level: string; jobId?: string; candidateId?: string }
+  context: { level: string; jobId?: string; candidateId?: string; formId?: string }
 ): Promise<ContextData> {
   const [profile, companyProfile] = await Promise.all([
     RecruitProfile.findOne({ uid }).lean(),
@@ -272,6 +279,18 @@ async function loadContextData(
     return { job, candidates: candidates ?? [], candidate: null, recruiterName, companyName };
   }
 
+  // ── Form context — single form with all its responses ─────────────────────
+  if (context.level === "form" && context.formId) {
+    const [form, formDetailedResponses] = await Promise.all([
+      RecruitForm.findOne({ _id: context.formId, uid }).lean(),
+      RecruitFormResponse.find({ formId: context.formId, uid })
+        .select(FORM_RESPONSE_DETAIL_SELECT)
+        .sort({ aiScore: -1 })
+        .lean(),
+    ]);
+    return { job: null, candidates: [], candidate: null, recruiterName, companyName, form, formDetailedResponses: formDetailedResponses ?? [] };
+  }
+
   // ── Global — Organization Intelligence ────────────────────────────────────
   const [allJobs, rawCandidates, allForms, rawFormResponses] = await Promise.all([
     RecruitJob.find({ uid }).sort({ createdAt: -1 }).lean(),
@@ -293,6 +312,9 @@ async function loadContextData(
     strengths: r.strengths,
     redFlags: r.redFlags,
     submittedAt: r.createdAt,
+    assessmentStatus: r.assessmentStatus,
+    assessmentScore: r.assessmentScore,
+    assessmentScoringStatus: r.assessmentScoringStatus,
   }));
 
   const jobTitleById = new Map(allJobs.map((j: any) => [String(j._id), j.title as string]));
@@ -391,6 +413,16 @@ const STARTER_ACTIONS: Record<string, string[]> = {
     "Which candidates are stuck in a stage?",
     "Where should I focus my time this week?",
   ],
+  form: [
+    "Who are the top applicants for this form?",
+    "Which applicants should I shortlist?",
+    "Summarize the overall applicant quality",
+    "Which applicants have red flags?",
+    "Who answered the questions most thoroughly?",
+    "Which applicants are stuck in a stage?",
+    "How is our assessment completion rate?",
+    "Which stage has the most dropoff?",
+  ],
 };
 
 // ─── Shared: build AI message history ────────────────────────────────────────
@@ -481,7 +513,7 @@ copilotRouter.post("/chat", async (req, res) => {
     conversationId,
   }: {
     message: string;
-    context: { level: "global" | "job" | "candidate"; jobId?: string; candidateId?: string };
+    context: { level: "global" | "job" | "candidate" | "form"; jobId?: string; candidateId?: string; formId?: string };
     conversationId?: string;
   } = req.body;
 
@@ -508,7 +540,7 @@ copilotRouter.post("/chat", async (req, res) => {
     }
 
     // ── 2. Load context data ─────────────────────────────────────────────────
-    const { job, candidates, candidate, recruiterName, companyName, allJobs, allCandidates, globalStatsText, pipelines, formResponses } =
+    const { job, candidates, candidate, recruiterName, companyName, allJobs, allCandidates, globalStatsText, pipelines, formResponses, form, formDetailedResponses } =
       await loadContextData(uid, context);
     if (context.level === "job" && context.jobId && !job) {
       return res.status(404).json({ error: "Job not found" });
@@ -516,16 +548,21 @@ copilotRouter.post("/chat", async (req, res) => {
     if (context.level === "candidate" && context.candidateId && !candidate) {
       return res.status(404).json({ error: "Candidate not found" });
     }
+    if (context.level === "form" && context.formId && !form) {
+      return res.status(404).json({ error: "Form not found" });
+    }
 
     // ── 3. Build prompt + message history ────────────────────────────────────
     const systemPrompt = buildCopilotPrompt({
-      level: context.level,
+      level: context.level as "global" | "job" | "candidate" | "form",
       mode: "json",
       recruiterName,
       companyName,
       job: job ?? undefined,
       candidates: candidates ?? undefined,
       candidate: candidate ?? undefined,
+      form: form ?? undefined,
+      formDetailedResponses: formDetailedResponses ?? undefined,
       allJobs,
       allCandidates,
       globalStats: globalStatsText,
@@ -594,7 +631,7 @@ copilotRouter.post("/chat/stream", async (req, res) => {
     conversationId,
   }: {
     message: string;
-    context: { level: "global" | "job" | "candidate"; jobId?: string; candidateId?: string };
+    context: { level: "global" | "job" | "candidate" | "form"; jobId?: string; candidateId?: string; formId?: string };
     conversationId?: string;
   } = req.body;
 
@@ -632,7 +669,7 @@ copilotRouter.post("/chat/stream", async (req, res) => {
     }
 
     // ── 2. Load context data ─────────────────────────────────────────────────
-    const { job, candidates, candidate, recruiterName, companyName, allJobs, allCandidates, globalStatsText, pipelines, formResponses } =
+    const { job, candidates, candidate, recruiterName, companyName, allJobs, allCandidates, globalStatsText, pipelines, formResponses, form, formDetailedResponses } =
       await loadContextData(uid, context);
     if (context.level === "job" && context.jobId && !job) {
       sendEvent({ type: "error", error: "Job not found" });
@@ -642,16 +679,22 @@ copilotRouter.post("/chat/stream", async (req, res) => {
       sendEvent({ type: "error", error: "Candidate not found" });
       return res.end();
     }
+    if (context.level === "form" && context.formId && !form) {
+      sendEvent({ type: "error", error: "Form not found" });
+      return res.end();
+    }
 
     // ── 3. Build prompt + history ────────────────────────────────────────────
     const systemPrompt = buildCopilotPrompt({
-      level: context.level,
+      level: context.level as "global" | "job" | "candidate" | "form",
       mode: "stream",
       recruiterName,
       companyName,
       job: job ?? undefined,
       candidates: candidates ?? undefined,
       candidate: candidate ?? undefined,
+      form: form ?? undefined,
+      formDetailedResponses: formDetailedResponses ?? undefined,
       allJobs,
       allCandidates,
       globalStats: globalStatsText,
