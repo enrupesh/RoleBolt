@@ -4,7 +4,7 @@ description: How the Ask Rolebolt AI Hiring Copilot is built — model, prompt s
 ---
 
 ## Model: RecruitCopilotConversation
-- Generic context: { level: "global"|"job"|"candidate", jobId?, candidateId? }
+- Generic context: { level: "global"|"job"|"candidate"|"form", jobId?, candidateId?, formId? }
 - Conversation metadata: lastActiveAt, totalMessages, selectedJobId, selectedJobTitle
 - Per-message: recommendation, confidence (0-100), reasoning, sources[], quickActions[]
 - Source shape: { type, label, candidateId, resumeId, assessmentId, page, sectionId, detail }
@@ -31,4 +31,4 @@ description: How the Ask Rolebolt AI Hiring Copilot is built — model, prompt s
 - Streaming via fetch ReadableStream + buffer split on \n\n (POST not supported by EventSource)
 - react-markdown + remark-gfm installed; .copilot-markdown CSS class in globals.css
 - "Ask Rolebolt" nav link in RecruitHeader CREATOR_NAV section
-- Future context levels only need new cases in buildCopilotPrompt — no route changes
+- Form context requires the conversation schema enum and persisted formId to be updated together; Form answers use label/value fields
