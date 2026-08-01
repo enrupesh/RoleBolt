@@ -1,6 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, use, Suspense } from "react";
+import HiringAutopilotHub from "./HiringAutopilotHub";
+import type { HubSection } from "./HiringAutopilotHub";
+import JobTabNav, { type JobTabId } from "./JobTabNav";
+import NeedsAttentionQueue, { buildAttentionItems, type AttentionAction, type AttentionItem } from "./NeedsAttentionQueue";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { RecruitGuard } from "@/components/RecruitGuard";
@@ -13,6 +17,7 @@ import LiveAssessmentProgressTab from "./LiveAssessmentProgressTab";
 import BulkImportModal from "./BulkImportModal";
 import CollaborationTab from "./CollaborationTab";
 import AiHiringSummaryTab from "./AiHiringSummaryTab";
+import WhatIfSimulator from "./WhatIfSimulator";
 import JobAnalysisTab from "./JobAnalysisTab";
 
 function getFrontendUrl(): string {
@@ -75,9 +80,11 @@ type Candidate = {
   redFlags: string[];
   strengths: string[];
   stage: CandidateStage;
+  stageMovedAt?: string;
   notes: string;
   interviewBrief: string;
   createdAt: string;
+  agentLog?: Array<{ action: string; score?: number; reason?: string; timestamp?: string }>;
   assessmentStatus: AssessmentStatus;
   assessmentToken?: string;
   assessmentSentAt?: string;
@@ -1325,15 +1332,28 @@ function UserIcon2() {
 }
 
 // ── AI Agent Mode Toggle ──────────────────────────────────────────────────────
-function AgentModeToggle({ job, token, onUpdate }: {
+function AgentModeToggle({ job, token, onUpdate, onOpenHub }: {
   job: Job;
   token: string;
   onUpdate: (agentMode: AgentMode) => void;
+  onOpenHub?: () => void;
 }) {
   const am = job.agentMode ?? { enabled: false, shortlistThreshold: 75, rejectThreshold: 40, autoEmailShortlist: true, autoEmailReject: false, autoSendAssessment: false, emailReviewZoneCandidates: false };
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [localSettings, setLocalSettings] = useState<AgentMode>(am);
+
+  useEffect(() => {
+    setLocalSettings(job.agentMode ?? {
+      enabled: false,
+      shortlistThreshold: 75,
+      rejectThreshold: 40,
+      autoEmailShortlist: true,
+      autoEmailReject: false,
+      autoSendAssessment: false,
+      emailReviewZoneCandidates: false,
+    });
+  }, [job.agentMode, job._id]);
 
   // Sync if job prop changes
   const enabled = am.enabled;
@@ -1410,9 +1430,9 @@ function AgentModeToggle({ job, token, onUpdate }: {
         </div>
 
         <button
-          onClick={() => setOpen(o => !o)}
+          onClick={() => (onOpenHub ? onOpenHub() : setOpen(o => !o))}
           className="ml-1 text-[var(--text-muted)] hover:text-[var(--foreground)] transition"
-          title="Configure AI Agent settings"
+          title={onOpenHub ? "Open Hiring Autopilot" : "Configure AI Agent settings"}
         >
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a1 1 0 0 0-1.41 0l-.71.71A8 8 0 0 0 4.93 17.66l.71.71a1 1 0 0 0 1.41 0L8 17.41A8 8 0 0 0 19.07 4.93z"/>
@@ -1439,6 +1459,7 @@ function AgentModeToggle({ job, token, onUpdate }: {
               <p className="text-[11px] text-indigo-200/80">🎯 Auto-shortlist candidates scoring above threshold</p>
               <p className="text-[11px] text-indigo-200/80">❌ Auto-reject candidates scoring below threshold</p>
               <p className="text-[11px] text-indigo-200/80">📧 Send emails automatically (per settings below)</p>
+              <p className="text-[11px] text-indigo-200/80">📝 Auto-send assessments to shortlisted candidates (optional)</p>
             </div>
 
             {/* Shortlist Threshold */}
@@ -1532,9 +1553,25 @@ function AgentModeToggle({ job, token, onUpdate }: {
                   }`} />
                 </button>
               </label>
-            </div>
 
-            {/* Score zone preview */}
+              {/* Auto assessment */}
+              <label className="flex items-center justify-between cursor-pointer">
+                <div>
+                  <p className="text-[12px] text-[var(--text-secondary)]">Auto-send assessment to shortlisted</p>
+                  <p className="text-[10px] text-[var(--text-muted)]">Sends AI assessment immediately after shortlist</p>
+                </div>
+                <button
+                  onClick={() => setLocalSettings(s => ({ ...s, autoSendAssessment: !s.autoSendAssessment }))}
+                  className={`relative flex h-4.5 w-8 shrink-0 items-center rounded-full transition-colors ${
+                    localSettings.autoSendAssessment ? "bg-indigo-500" : "bg-gray-400/30"
+                  }`}
+                >
+                  <span className={`absolute h-3 w-3 rounded-full bg-white shadow transition-transform ${
+                    localSettings.autoSendAssessment ? "translate-x-4" : "translate-x-0.5"
+                  }`} />
+                </button>
+              </label>
+            </div>
             <div className="rounded-xl bg-[var(--surface-muted)] border border-[var(--border)] px-3 py-2.5">
               <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">Score Zones</p>
               <div className="flex items-center gap-1 text-[10px]">
@@ -1969,11 +2006,13 @@ function AiRecommendationBadge({
   );
 }
 
-function CandidateCard({ c, jobId, job, token, onUpdate, onDelete, highlighted }: {
+function CandidateCard({ c, jobId, job, token, onUpdate, onDelete, highlighted, selected, onToggleSelect }: {
   c: Candidate; jobId: string; job: Job; token: string;
   onUpdate: (id: string, update: Partial<Candidate>) => void;
   onDelete: (id: string) => void;
   highlighted?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (id: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [loadingBrief, setLoadingBrief] = useState(false);
@@ -2234,11 +2273,25 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete, highlighted }
       <div
         id={`candidate-${c._id}`}
         className={`rounded-3xl border bg-[var(--surface)] shadow-[var(--shadow-card)] transition hover:shadow-[var(--shadow-card-hover)] overflow-hidden ${
-          highlighted ? "border-indigo-500 ring-2 ring-indigo-500/30" : "border-[var(--border)]"
+          highlighted ? "border-indigo-500 ring-2 ring-indigo-500/30" : selected ? "border-indigo-400/60 ring-1 ring-indigo-400/20" : "border-[var(--border)]"
         }`}
       >
         <div className="p-5">
           <div className="flex items-start justify-between gap-3 mb-3">
+            {onToggleSelect && (
+              <button
+                type="button"
+                onClick={() => onToggleSelect(c._id)}
+                aria-label={selected ? "Deselect candidate" : "Select candidate"}
+                className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition ${
+                  selected
+                    ? "border-indigo-500 bg-indigo-500 text-white"
+                    : "border-[var(--border-strong)] bg-[var(--surface-muted)] text-transparent hover:border-indigo-400"
+                }`}
+              >
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              </button>
+            )}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <h3 className="text-sm font-semibold text-[var(--foreground)] truncate">{c.name}</h3>
@@ -2602,11 +2655,27 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const validTabs = ["pipeline", "jd", "rubric", "post", "rules", "performance", "agent-log", "assessment-analytics", "live", "collaboration", "ai-hiring", "job-analysis"] as const;
-  type JobTab = typeof validTabs[number];
+  const validTabs = ["pipeline", "autopilot", "jd", "rubric", "post", "assessment-analytics", "live", "collaboration", "ai-hiring", "job-analysis"] as const;
+  type JobTab = JobTabId;
   const tabFromUrl = searchParams.get("tab");
-  const initialTab: JobTab = validTabs.includes(tabFromUrl as JobTab) ? (tabFromUrl as JobTab) : "pipeline";
+  const sectionFromUrl = searchParams.get("section");
+  const legacyAutopilotSection: HubSection | undefined =
+    tabFromUrl === "rules" ? "rules"
+    : tabFromUrl === "performance" ? "health"
+    : tabFromUrl === "agent-log" ? "log"
+    : sectionFromUrl === "agent" || sectionFromUrl === "rules" || sectionFromUrl === "health" || sectionFromUrl === "log" || sectionFromUrl === "overview"
+      ? sectionFromUrl
+      : undefined;
+  const resolvedTab: JobTab =
+    tabFromUrl === "rules" || tabFromUrl === "performance" || tabFromUrl === "agent-log"
+      ? "autopilot"
+      : validTabs.includes(tabFromUrl as JobTab)
+        ? (tabFromUrl as JobTab)
+        : "pipeline";
+  const initialTab: JobTab = resolvedTab;
+  const initialAutopilotSection: HubSection = legacyAutopilotSection ?? "overview";
   const highlightCandidateId = searchParams.get("candidate");
+  const [focusCandidateId, setFocusCandidateId] = useState<string | null>(highlightCandidateId);
 
   const [token, setToken] = useState<string | null>(null);
   const [job, setJob] = useState<Job | null>(null);
@@ -2615,6 +2684,7 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [activeTab, setActiveTab] = useState<JobTab>(initialTab);
+  const [autopilotSection, setAutopilotSection] = useState<HubSection>(initialAutopilotSection);
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [pipelineRules, setPipelineRules] = useState<PipelineRule[]>([]);
   const [perfAlerts, setPerfAlerts] = useState<PerformanceAlert[]>([]);
@@ -2623,6 +2693,10 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
   const [linkCopied, setLinkCopied] = useState(false);
   const [stageFilter, setStageFilter] = useState<CandidateStage | "all">("all");
   const [aiRecFilter, setAiRecFilter] = useState<"all" | "hire" | "hold" | "pass" | "pending">("all");
+  const [pipelineSort, setPipelineSort] = useState<"score_desc" | "score_asc" | "newest" | "oldest" | "stage_age" | "name">("score_desc");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkMessage, setBulkMessage] = useState<string | null>(null);
 
   const { sessionToken } = useRecruitAuth();
   useEffect(() => {
@@ -2662,12 +2736,110 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   useEffect(() => {
-    if (!highlightCandidateId || loading) return;
-    const el = document.getElementById(`candidate-${highlightCandidateId}`);
+    if (!focusCandidateId || loading) return;
+    const el = document.getElementById(`candidate-${focusCandidateId}`);
     if (el) {
       el.scrollIntoView({ behavior: "smooth", block: "center" });
     }
-  }, [highlightCandidateId, loading, candidates.length]);
+  }, [focusCandidateId, loading, candidates.length, activeTab, stageFilter]);
+
+  function handleAttentionAction(action: AttentionAction, _item: AttentionItem) {
+    if (action.type === "pipeline") {
+      if (action.stage) setStageFilter(action.stage);
+      setAiRecFilter("all");
+      setActiveTab("pipeline");
+      if (action.candidateId) setFocusCandidateId(action.candidateId);
+      return;
+    }
+    if (action.type === "autopilot") {
+      setActiveTab("autopilot");
+      setAutopilotSection(action.section ?? "overview");
+      return;
+    }
+    if (action.type === "tab") {
+      setActiveTab(action.tab as JobTab);
+      if (action.section) setAutopilotSection(action.section as HubSection);
+    }
+  }
+
+  function toggleSelectCandidate(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function sortCandidatesList(list: Candidate[]): Candidate[] {
+    const scoreOf = (c: Candidate) =>
+      (!c.scoringFailed && c.maxScore > 0) ? c.totalScore / c.maxScore : -1;
+    const ageOf = (c: Candidate) =>
+      new Date(c.stageMovedAt || c.createdAt).getTime();
+    return [...list].sort((a, b) => {
+      switch (pipelineSort) {
+        case "score_asc": return scoreOf(a) - scoreOf(b);
+        case "newest": return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        case "oldest": return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        case "stage_age": return ageOf(a) - ageOf(b);
+        case "name": return a.name.localeCompare(b.name);
+        case "score_desc":
+        default: return scoreOf(b) - scoreOf(a);
+      }
+    });
+  }
+
+  async function runBulkStageMove(stage: CandidateStage) {
+    if (!token || selectedIds.size === 0) return;
+    setBulkBusy(true);
+    setBulkMessage(null);
+    let ok = 0;
+    let fail = 0;
+    for (const cid of selectedIds) {
+      try {
+        const res = await fetch(apiUrl(`/recruit/jobs/${id}/candidates/${cid}`), {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ stage }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.candidate) handleUpdate(cid, data.candidate);
+          else handleUpdate(cid, { stage });
+          ok++;
+        } else fail++;
+      } catch { fail++; }
+    }
+    setSelectedIds(new Set());
+    setBulkBusy(false);
+    setBulkMessage(`Moved ${ok} candidate${ok !== 1 ? "s" : ""} to ${stage}${fail ? ` · ${fail} failed` : ""}`);
+  }
+
+  async function runBulkSendAssessment() {
+    if (!token || selectedIds.size === 0) return;
+    setBulkBusy(true);
+    setBulkMessage(null);
+    let ok = 0;
+    let fail = 0;
+    let skipped = 0;
+    for (const cid of selectedIds) {
+      const c = candidates.find(x => x._id === cid);
+      if (!c || c.assessmentStatus !== "not_sent") { skipped++; continue; }
+      try {
+        const res = await fetch(apiUrl(`/recruit/jobs/${id}/candidates/${cid}/assessment/send`), {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          handleUpdate(cid, { assessmentStatus: "sent", assessmentSentAt: new Date().toISOString() });
+          ok++;
+        } else fail++;
+      } catch { fail++; }
+    }
+    setSelectedIds(new Set());
+    setBulkBusy(false);
+    setBulkMessage(`Sent ${ok} assessment${ok !== 1 ? "s" : ""}${skipped ? ` · ${skipped} skipped` : ""}${fail ? ` · ${fail} failed` : ""}`);
+  }
 
   // ── AI synthesis polling ───────────────────────────────────────────────────
   // Poll every 30 s when on the pipeline tab to keep recommendation badges current.
@@ -2839,6 +3011,11 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
     applied: [], screened: [], assessed: [], interview: [], offer: [], hired: [], rejected: [],
   };
   candidates.forEach(c => { if (byStage[c.stage]) byStage[c.stage].push(c); });
+  const attentionCount = buildAttentionItems({
+    candidates,
+    perfAlerts,
+    agentMode: job.agentMode,
+  }).length;
 
   const strongYesCount = candidates.filter(c => c.hiringDecision === "strong_yes").length;
   const maybeCount = candidates.filter(c => c.hiringDecision === "maybe").length;
@@ -2926,7 +3103,15 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
               </a>
             )}
             {token && (
-              <AgentModeToggle job={job} token={token} onUpdate={handleAgentModeUpdate} />
+              <AgentModeToggle
+                job={job}
+                token={token}
+                onUpdate={handleAgentModeUpdate}
+                onOpenHub={() => {
+                  setActiveTab("autopilot");
+                  setAutopilotSection("agent");
+                }}
+              />
             )}
             <button
               onClick={() => setShowBulkModal(true)}
@@ -2992,99 +3177,68 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
           </div>
         </div>
 
-        <div className="mb-6 flex gap-1 border-b border-[var(--border)] overflow-x-auto">
-          {(["pipeline", "jd", "rubric", "post", "rules", "performance", "agent-log", "assessment-analytics", "live", "collaboration", "ai-hiring", "job-analysis"] as const).map(tab => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`relative whitespace-nowrap px-4 py-2.5 text-sm transition border-b-2 -mb-px ${
-                activeTab === tab
-                  ? "border-indigo-500 text-[var(--foreground)] font-medium"
-                  : "border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-              }`}
-            >
-              {tab === "jd" ? "Job Description"
-                : tab === "rubric" ? "Scoring Rubric"
-                : tab === "post" ? "Post to Boards"
-                : tab === "rules" ? (
-                  <span className="flex items-center gap-1.5">
-                    Pipeline Rules
-                    {pipelineRules.filter(r => r.enabled).length > 0 && (
-                      <span className="rounded-full bg-indigo-500 px-1.5 py-0.5 text-[10px] font-bold text-white leading-none">
-                        {pipelineRules.filter(r => r.enabled).length}
-                      </span>
-                    )}
-                  </span>
-                ) : tab === "performance" ? (
-                  <span className="flex items-center gap-1.5">
-                    Performance
-                    {perfAlerts.length > 0 && (
-                      <span className="rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold text-white leading-none">
-                        {perfAlerts.length}
-                      </span>
-                    )}
-                  </span>
-                ) : tab === "agent-log" ? (
-                  <span className="flex items-center gap-1.5">
-                    Agent Log
-                    {agentLogCount > 0 && (
-                      <span className="rounded-full bg-indigo-500 px-1.5 py-0.5 text-[10px] font-bold text-white leading-none">
-                        {agentLogCount}
-                      </span>
-                    )}
-                  </span>
-                ) : tab === "assessment-analytics" ? (
-                  <span className="flex items-center gap-1.5">
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
-                    Assessment Analytics
-                  </span>
-                ) : tab === "live" ? (
-                  <span className="flex items-center gap-1.5">
-                    <span className="inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    Live Progress
-                  </span>
-                ) : tab === "collaboration" ? (
-                  <span className="flex items-center gap-1.5">
-                    <UserIcon2 />
-                    Collaboration
-                  </span>
-                ) : tab === "ai-hiring" ? (
-                  <span className="flex items-center gap-1.5">
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.46 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z"/></svg>
-                    AI Hiring
-                  </span>
-                ) : tab === "job-analysis" ? (
-                  <span className="flex items-center gap-1.5">
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
-                    Job Analysis
-                  </span>
-                ) : "Pipeline"}
-            </button>
-          ))}
-        </div>
+        <NeedsAttentionQueue
+          candidates={candidates}
+          perfAlerts={perfAlerts}
+          agentMode={job.agentMode}
+          onAction={handleAttentionAction}
+        />
+
+        <JobTabNav
+          activeTab={activeTab}
+          onSelectTab={(tab) => {
+            setActiveTab(tab);
+            if (tab === "autopilot") setAutopilotSection("overview");
+          }}
+          badges={{
+            pipeline: attentionCount > 0 ? (
+              <span className="rounded-full bg-[var(--foreground)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--surface)] leading-none">
+                {attentionCount}
+              </span>
+            ) : undefined,
+            autopilot: perfAlerts.length > 0 ? (
+              <span className="rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold text-white leading-none">
+                {perfAlerts.length}
+              </span>
+            ) : undefined,
+          }}
+        />
 
         {activeTab === "pipeline" && (
           <div>
             {candidates.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 text-center">
                 <p className="text-[var(--text-secondary)] text-sm mb-2">No candidates yet</p>
-                <p className="text-[var(--text-muted)] text-xs mb-6">Add your first candidate — paste a resume and the AI will score it against your rubric.</p>
-                <button
-                  onClick={() => setShowAddModal(true)}
-                  className="flex items-center gap-2 rounded-2xl bg-indigo-500 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-indigo-500/20 transition hover:bg-indigo-400"
-                >
-                  <PlusIcon /> Add First Candidate
-                </button>
+                <p className="text-[var(--text-muted)] text-xs mb-6 max-w-sm">
+                  Add your first candidate — paste a resume and the AI will score it against your rubric.
+                  {!job.agentMode?.enabled && " Set up Autopilot so new applicants are triaged automatically."}
+                </p>
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  <button
+                    onClick={() => setShowAddModal(true)}
+                    className="flex items-center gap-2 rounded-2xl bg-indigo-500 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-indigo-500/20 transition hover:bg-indigo-400"
+                  >
+                    <PlusIcon /> Add First Candidate
+                  </button>
+                  {!job.agentMode?.enabled && (
+                    <button
+                      onClick={() => { setActiveTab("autopilot"); setAutopilotSection("overview"); }}
+                      className="flex items-center gap-2 rounded-2xl border border-indigo-500/30 bg-indigo-500/5 px-5 py-2.5 text-sm font-semibold text-indigo-600 transition hover:bg-indigo-500/10"
+                    >
+                      Set up Autopilot
+                    </button>
+                  )}
+                </div>
               </div>
             ) : (
               <>
-                {/* Stage + AI Recommendation filters */}
-                <div className="mb-6 flex items-center gap-3 flex-wrap">
+                {/* Stage + AI Recommendation + Sort filters */}
+                <div className="mb-4 flex items-center gap-3 flex-wrap">
                   <span className="text-[11px] font-bold uppercase tracking-widest text-[var(--text-secondary)]">Stage</span>
                   <div className="relative">
                     <select
                       value={stageFilter}
-                      onChange={e => setStageFilter(e.target.value as CandidateStage | "all")}
+                      onChange={e => { setStageFilter(e.target.value as CandidateStage | "all"); setSelectedIds(new Set()); }}
                       className="appearance-none rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] pl-4 pr-9 py-2 text-[12px] font-semibold text-[var(--foreground)] shadow-[var(--shadow-xs)] outline-none cursor-pointer transition hover:border-[var(--accent)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-light)]"
                     >
                       <option value="all">All stages ({candidates.length})</option>
@@ -3101,28 +3255,131 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
                   <div className="relative">
                     <select
                       value={aiRecFilter}
-                      onChange={e => setAiRecFilter(e.target.value as typeof aiRecFilter)}
+                      onChange={e => { setAiRecFilter(e.target.value as typeof aiRecFilter); setSelectedIds(new Set()); }}
                       className="appearance-none rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] pl-4 pr-9 py-2 text-[12px] font-semibold text-[var(--foreground)] shadow-[var(--shadow-xs)] outline-none cursor-pointer transition hover:border-[var(--accent)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-light)]"
                     >
                       <option value="all">All recommendations</option>
-                      <option value="hire">🤖 Hire</option>
-                      <option value="hold">⏳ Hold</option>
-                      <option value="pass">❌ Pass</option>
-                      <option value="pending">⏳ Pending</option>
+                      <option value="hire">Hire</option>
+                      <option value="hold">Hold</option>
+                      <option value="pass">Pass</option>
+                      <option value="pending">Pending</option>
+                    </select>
+                    <svg className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                  </div>
+
+                  <span className="text-[11px] font-bold uppercase tracking-widest text-[var(--text-secondary)]">Sort</span>
+                  <div className="relative">
+                    <select
+                      value={pipelineSort}
+                      onChange={e => setPipelineSort(e.target.value as typeof pipelineSort)}
+                      className="appearance-none rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] pl-4 pr-9 py-2 text-[12px] font-semibold text-[var(--foreground)] shadow-[var(--shadow-xs)] outline-none cursor-pointer transition hover:border-[var(--accent)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-light)]"
+                    >
+                      <option value="score_desc">Score · high → low</option>
+                      <option value="score_asc">Score · low → high</option>
+                      <option value="newest">Newest applied</option>
+                      <option value="oldest">Oldest applied</option>
+                      <option value="stage_age">Longest in stage</option>
+                      <option value="name">Name A–Z</option>
                     </select>
                     <svg className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
                   </div>
                 </div>
 
+                {bulkMessage && (
+                  <div className="mb-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-700 flex items-center justify-between gap-2">
+                    <span>{bulkMessage}</span>
+                    <button type="button" onClick={() => setBulkMessage(null)} className="font-bold opacity-70 hover:opacity-100">Dismiss</button>
+                  </div>
+                )}
+
                 {(() => {
                   const stage = stageFilter !== "all" ? STAGES.find(s => s.id === stageFilter)! : null;
                   const stageFiltered = stage ? byStage[stageFilter as CandidateStage] : candidates;
-                  const visibleCandidates = aiRecFilter === "all" ? stageFiltered : stageFiltered.filter(c => {
+                  const filtered = aiRecFilter === "all" ? stageFiltered : stageFiltered.filter(c => {
                     if (aiRecFilter === "pending") return !c.aiHiringSynthesis;
                     return c.aiHiringSynthesis?.recommendation === aiRecFilter;
                   });
+                  const visibleCandidates = sortCandidatesList(filtered);
+                  const allVisibleSelected = visibleCandidates.length > 0 && visibleCandidates.every(c => selectedIds.has(c._id));
+
                   return (
                     <div>
+                      {visibleCandidates.length > 0 && (
+                        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (allVisibleSelected) {
+                                setSelectedIds(prev => {
+                                  const next = new Set(prev);
+                                  visibleCandidates.forEach(c => next.delete(c._id));
+                                  return next;
+                                });
+                              } else {
+                                setSelectedIds(prev => {
+                                  const next = new Set(prev);
+                                  visibleCandidates.forEach(c => next.add(c._id));
+                                  return next;
+                                });
+                              }
+                            }}
+                            className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1 text-[11px] font-bold text-[var(--text-secondary)] hover:text-[var(--foreground)] transition"
+                          >
+                            {allVisibleSelected ? "Deselect all" : "Select all visible"}
+                          </button>
+                          <span className="text-[11px] text-[var(--text-muted)]">
+                            {selectedIds.size > 0 ? `${selectedIds.size} selected` : "Select cards for bulk actions"}
+                          </span>
+
+                          {selectedIds.size > 0 && (
+                            <>
+                              <div className="relative">
+                                <select
+                                  disabled={bulkBusy}
+                                  defaultValue=""
+                                  onChange={e => {
+                                    const v = e.target.value as CandidateStage | "";
+                                    if (v) runBulkStageMove(v);
+                                    e.target.value = "";
+                                  }}
+                                  className="appearance-none rounded-lg border border-indigo-500/30 bg-indigo-500/10 pl-2.5 pr-7 py-1 text-[11px] font-bold text-indigo-700 outline-none disabled:opacity-50"
+                                >
+                                  <option value="" disabled>Move to…</option>
+                                  {STAGES.filter(s => s.id !== "hired").map(s => (
+                                    <option key={s.id} value={s.id}>{s.label}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <button
+                                type="button"
+                                disabled={bulkBusy}
+                                onClick={() => runBulkStageMove("rejected")}
+                                className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-2.5 py-1 text-[11px] font-bold text-rose-600 disabled:opacity-50"
+                              >
+                                Reject
+                              </button>
+                              <button
+                                type="button"
+                                disabled={bulkBusy}
+                                onClick={runBulkSendAssessment}
+                                className="rounded-lg border border-violet-500/30 bg-violet-500/10 px-2.5 py-1 text-[11px] font-bold text-violet-700 disabled:opacity-50"
+                              >
+                                Send assessment
+                              </button>
+                              <button
+                                type="button"
+                                disabled={bulkBusy}
+                                onClick={() => setSelectedIds(new Set())}
+                                className="rounded-lg px-2.5 py-1 text-[11px] font-semibold text-[var(--text-muted)] hover:text-[var(--foreground)]"
+                              >
+                                Clear
+                              </button>
+                              {bulkBusy && <span className="text-[11px] text-indigo-600 font-semibold">Working…</span>}
+                            </>
+                          )}
+                        </div>
+                      )}
+
                       {stage && (
                         <div className="flex items-center gap-3 mb-4">
                           <span className={`rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-wide ${stage.bg} ${stage.color}`}>
@@ -3146,7 +3403,9 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
                               token={token!}
                               onUpdate={handleUpdate}
                               onDelete={handleDelete}
-                              highlighted={highlightCandidateId === c._id}
+                              highlighted={focusCandidateId === c._id}
+                              selected={selectedIds.has(c._id)}
+                              onToggleSelect={toggleSelectCandidate}
                             />
                           ))}
                         </div>
@@ -3169,16 +3428,30 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
         )}
 
         {activeTab === "rubric" && (
-          <div className="space-y-4">
-            {job.rubric.map((r, i) => (
-              <div key={i} className="rounded-3xl border border-[var(--border)] bg-[var(--surface-muted)] p-5">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-semibold text-[var(--foreground)]">{r.name}</h3>
-                  <span className="rounded-full border border-indigo-500/20 bg-indigo-500/10 px-3 py-1 text-xs font-bold text-indigo-600">{r.weight} pts</span>
+          <div className="space-y-5">
+            {token && (
+              <WhatIfSimulator
+                jobId={id}
+                token={token}
+                rubric={job.rubric}
+                agentMode={job.agentMode}
+                candidates={candidates}
+                onRubricApplied={(rubric) => setJob(j => j ? { ...j, rubric } : j)}
+                onAgentModeUpdate={handleAgentModeUpdate}
+                onRescoreComplete={fetchData}
+              />
+            )}
+            <div className="space-y-4">
+              {job.rubric.map((r, i) => (
+                <div key={i} className="rounded-3xl border border-[var(--border)] bg-[var(--surface-muted)] p-5">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-semibold text-[var(--foreground)]">{r.name}</h3>
+                    <span className="rounded-full border border-indigo-500/20 bg-indigo-500/10 px-3 py-1 text-xs font-bold text-indigo-600">{r.weight} pts</span>
+                  </div>
+                  <p className="text-xs text-[var(--text-muted)] leading-5">{r.description}</p>
                 </div>
-                <p className="text-xs text-[var(--text-muted)] leading-5">{r.description}</p>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         )}
 
@@ -3186,47 +3459,63 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
           <PostToBoardsTab job={job} />
         )}
 
-        {activeTab === "rules" && (
-          <PipelineRulesTab
+        {activeTab === "autopilot" && token && (
+          <HiringAutopilotHub
             jobId={id}
-            token={token!}
-            rules={pipelineRules}
-            onChange={setPipelineRules}
-          />
-        )}
-
-        {activeTab === "performance" && (
-          <PerformanceTab
-            jobId={id}
-            token={token!}
-            alerts={perfAlerts}
-            checking={checkingPerf}
-            agentEnabled={job.agentMode?.enabled ?? false}
-            onGoToStage={(stage) => {
+            token={token}
+            agentMode={job.agentMode ?? { enabled: false, shortlistThreshold: 75, rejectThreshold: 40, autoEmailShortlist: true, autoEmailReject: false, autoSendAssessment: false, emailReviewZoneCandidates: false }}
+            onAgentModeUpdate={handleAgentModeUpdate}
+            pipelineRules={pipelineRules}
+            onRulesChange={setPipelineRules}
+            perfAlerts={perfAlerts}
+            agentLogCount={agentLogCount}
+            initialSection={autopilotSection}
+            onGoToPipeline={(stage) => {
               setStageFilter(stage);
               setActiveTab("pipeline");
             }}
-            onDismiss={(alertId) => setPerfAlerts(a => a.filter(x => x.id !== alertId))}
-            onApplied={(newJD) => setJob(j => j ? { ...j, generatedJD: newJD } : j)}
-            onRefresh={async () => {
-              setCheckingPerf(true);
-              try {
-                const res = await fetch(apiUrl(`/recruit/jobs/${id}/performance`), {
-                  headers: { Authorization: `Bearer ${token}` },
-                });
-                const data = await res.json();
-                setPerfAlerts(data.alerts ?? []);
-              } finally { setCheckingPerf(false); }
-            }}
-          />
-        )}
-
-        {activeTab === "agent-log" && (
-          <AgentLogTab
-            jobId={id}
-            token={token!}
-            agentEnabled={job.agentMode?.enabled ?? false}
-            onCountChange={setAgentLogCount}
+            rulesPanel={
+              <PipelineRulesTab
+                jobId={id}
+                token={token}
+                rules={pipelineRules}
+                onChange={setPipelineRules}
+              />
+            }
+            healthPanel={
+              <PerformanceTab
+                jobId={id}
+                token={token}
+                alerts={perfAlerts}
+                checking={checkingPerf}
+                agentEnabled={job.agentMode?.enabled ?? false}
+                hideAgentStats
+                onGoToStage={(stage) => {
+                  setStageFilter(stage);
+                  setActiveTab("pipeline");
+                }}
+                onDismiss={(alertId) => setPerfAlerts(a => a.filter(x => x.id !== alertId))}
+                onApplied={(newJD) => setJob(j => j ? { ...j, generatedJD: newJD } : j)}
+                onRefresh={async () => {
+                  setCheckingPerf(true);
+                  try {
+                    const res = await fetch(apiUrl(`/recruit/jobs/${id}/performance`), {
+                      headers: { Authorization: `Bearer ${token}` },
+                    });
+                    const data = await res.json();
+                    setPerfAlerts(data.alerts ?? []);
+                  } finally { setCheckingPerf(false); }
+                }}
+              />
+            }
+            logPanel={
+              <AgentLogTab
+                jobId={id}
+                token={token}
+                agentEnabled={job.agentMode?.enabled ?? false}
+                onCountChange={setAgentLogCount}
+              />
+            }
           />
         )}
 
@@ -3909,7 +4198,7 @@ const ALERT_META: Record<PerformanceAlert["type"], { label: string; color: strin
 };
 
 function PerformanceTab({
-  jobId, token, alerts, checking, onDismiss, onApplied, onRefresh, agentEnabled, onGoToStage,
+  jobId, token, alerts, checking, onDismiss, onApplied, onRefresh, agentEnabled, onGoToStage, hideAgentStats,
 }: {
   jobId: string;
   token: string;
@@ -3920,6 +4209,7 @@ function PerformanceTab({
   onRefresh: () => Promise<void>;
   agentEnabled: boolean;
   onGoToStage: (stage: CandidateStage | "all") => void;
+  hideAgentStats?: boolean;
 }) {
   const [applyingMap, setApplyingMap]   = useState<Record<string, boolean>>({});
   const [dismissingId, setDismissingId] = useState<string | null>(null);
@@ -3963,18 +4253,19 @@ function PerformanceTab({
 
   return (
     <div className="space-y-5 py-2">
-      {/* AI Agent Stats Card */}
-      <AgentStatsCard
-        jobId={jobId}
-        token={token}
-        agentEnabled={agentEnabled}
-        onGoToStage={onGoToStage}
-      />
+      {!hideAgentStats && (
+        <AgentStatsCard
+          jobId={jobId}
+          token={token}
+          agentEnabled={agentEnabled}
+          onGoToStage={onGoToStage}
+        />
+      )}
 
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-base font-bold text-[var(--foreground)]">AI Job Performance Monitor</h2>
+          <h2 className="text-base font-bold text-[var(--foreground)]">Job Health Monitor</h2>
           <p className="mt-0.5 text-xs text-[var(--text-muted)]">
             AI monitors this job and flags issues automatically. Click &ldquo;Check Now&rdquo; to run a fresh analysis.
           </p>
@@ -4227,7 +4518,7 @@ function PipelineRulesTab({
       <div className="mb-6 rounded-2xl border border-indigo-500/20 bg-indigo-500/5 p-4 flex gap-3">
         <svg className="mt-0.5 shrink-0 text-indigo-500" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
         <p className="text-xs text-indigo-700 leading-5">
-          Rules fire <strong>non-blocking</strong> after every candidate action: new application, assessment submission, and manual stage change. Conditions are evaluated in order — first match wins.
+          Rules run after the AI Agent on every individual application, and also after assessments and stage changes. First matching rule wins. Score-based rules are skipped when AI scoring failed. (Bulk import runs rules only — not the Agent.)
         </p>
       </div>
 

@@ -227,6 +227,10 @@ export default function BulkImportModal({
         {/* ── Step: Pick files ── */}
         {step === "pick" && (
           <div className="flex flex-col gap-4 p-6 overflow-y-auto">
+            <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2.5 text-xs text-amber-800 leading-5">
+              Bulk import scores resumes and applies <strong>Pipeline Rules</strong> only. The AI Agent does not run on bulk uploads — add candidates individually if you need automatic shortlist/reject triage.
+            </div>
+
             {/* Drop zone */}
             <div
               onDragOver={e => { e.preventDefault(); setDragOver(true); }}
