@@ -107,6 +107,37 @@ async function getJobWithCollaborationPermission(
 
 type AgentAction = "shortlisted" | "rejected" | "review_zone";
 
+const PIPELINE_CONDITIONS = new Set([
+  "score_above", "score_below", "assessment_passed", "assessment_failed", "stage_age_days",
+]);
+const PIPELINE_ACTIONS = new Set([
+  "move_to_screened", "move_to_assessed", "move_to_interview", "move_to_offer",
+  "move_to_rejected", "send_assessment", "send_reminder",
+]);
+const PIPELINE_CONDITIONS_NEED_THRESHOLD = new Set(["score_above", "score_below", "stage_age_days"]);
+
+function validatePipelineRuleInput(body: {
+  condition?: string;
+  threshold?: number;
+  action?: string;
+}): string | null {
+  if (!body.condition || !PIPELINE_CONDITIONS.has(body.condition)) {
+    return "Invalid or missing condition.";
+  }
+  if (!body.action || !PIPELINE_ACTIONS.has(body.action)) {
+    return "Invalid or missing action.";
+  }
+  if (PIPELINE_CONDITIONS_NEED_THRESHOLD.has(body.condition)) {
+    const t = Number(body.threshold);
+    if (!Number.isFinite(t)) return "threshold is required for this condition.";
+  }
+  return null;
+}
+
+function isPipelineRuleEnabled(rule: { enabled?: boolean }): boolean {
+  return rule.enabled !== false;
+}
+
 function normalizeAgentThresholds(agentMode: Record<string, unknown>) {
   let shortlistThreshold = Number(agentMode.shortlistThreshold ?? 75);
   let rejectThreshold = Number(agentMode.rejectThreshold ?? 40);
@@ -200,6 +231,16 @@ async function sendCandidateStageEmail(
   }
 }
 
+/** Atomically claim the right to send an assessment (prevents agent + rule double-send). */
+async function claimAssessmentSend(candidateId: string): Promise<boolean> {
+  const claimed = await RecruitCandidate.findOneAndUpdate(
+    { _id: candidateId, assessmentStatus: "not_sent" },
+    { $set: { assessmentStatus: "sent", assessmentSentAt: new Date() } },
+    { new: true },
+  ).lean();
+  return !!claimed;
+}
+
 async function sendAssessmentToCandidate(args: {
   job: any;
   candidateId: string;
@@ -207,21 +248,32 @@ async function sendAssessmentToCandidate(args: {
   candidateEmail: string;
   previousResumeScore: number;
   logTag: string;
-}) {
-  const questions = await generateAssessmentQuestions({
-    jobTitle: args.job.title,
-    rubric: args.job.rubric,
-    jd: args.job.generatedJD,
-    niche: args.job.niche,
-    nicheDetails: args.job.nicheDetails,
-    languageRequirement: args.job.languageRequirement,
-  });
+}): Promise<boolean> {
+  const claimed = await claimAssessmentSend(args.candidateId);
+  if (!claimed) return false;
+
+  let questions: Awaited<ReturnType<typeof generateAssessmentQuestions>>;
   const token = generateToken();
+  try {
+    questions = await generateAssessmentQuestions({
+      jobTitle: args.job.title,
+      rubric: args.job.rubric,
+      jd: args.job.generatedJD,
+      niche: args.job.niche,
+      nicheDetails: args.job.nicheDetails,
+      languageRequirement: args.job.languageRequirement,
+    });
+  } catch (err) {
+    await RecruitCandidate.findByIdAndUpdate(args.candidateId, {
+      $set: { assessmentStatus: "not_sent" },
+      $unset: { assessmentSentAt: "" },
+    });
+    throw err;
+  }
+
   await RecruitCandidate.findByIdAndUpdate(args.candidateId, {
     assessmentToken: token,
     assessmentQuestions: questions,
-    assessmentStatus: "sent",
-    assessmentSentAt: new Date(),
     previousResumeScore: args.previousResumeScore,
   });
   const assessmentUrl = `${FRONTEND_URL}/recruit/assessment/${token}`;
@@ -262,6 +314,7 @@ async function sendAssessmentToCandidate(args: {
       }
     });
   }
+  return true;
 }
 
 async function dispatchAgentActions(args: {
@@ -297,7 +350,9 @@ async function dispatchAgentActions(args: {
   try {
     if (agentAction === "shortlisted" && agentMode.autoEmailShortlist !== false && candidateEmail?.trim()) {
       const tpl = emailTemplates.screened(candidateName, job.title, job.companyName || "");
-      const result = await sendEmail({ to: candidateEmail, subject: tpl.subject, html: tpl.html, text: tpl.text });
+      const result = await sendEmail({
+        to: candidateEmail, subject: tpl.subject, html: tpl.html, text: tpl.text, from: CANDIDATE_FROM,
+      });
       emailSent = result.ok;
       emailStatus = result.ok ? "sent" : "failed";
       await RecruitCandidate.updateOne(
@@ -323,19 +378,15 @@ async function dispatchAgentActions(args: {
 
     if (agentAction === "shortlisted" && agentMode.autoSendAssessment === true) {
       try {
-        const freshCandidate = await RecruitCandidate.findById(candidateId).lean();
-        const alreadySent = (freshCandidate as any)?.assessmentStatus !== "not_sent";
-        if (!alreadySent) {
-          await sendAssessmentToCandidate({
-            job,
-            candidateId,
-            candidateName,
-            candidateEmail,
-            previousResumeScore: candidateTotalScore,
-            logTag: logPrefix,
-          });
-          console.log(`[${logPrefix}] Auto-sent assessment to shortlisted candidate: ${candidateName}`);
-        }
+        await sendAssessmentToCandidate({
+          job,
+          candidateId,
+          candidateName,
+          candidateEmail,
+          previousResumeScore: candidateTotalScore,
+          logTag: logPrefix,
+        });
+        console.log(`[${logPrefix}] Auto-sent assessment to shortlisted candidate: ${candidateName}`);
       } catch (e) {
         console.error(`[${logPrefix}] Auto-send assessment failed:`, e);
       }
@@ -344,7 +395,9 @@ async function dispatchAgentActions(args: {
     if (agentAction === "rejected" && agentMode.autoEmailReject === true && candidateEmail?.trim()) {
       const rejBody = `Hi ${candidateName.split(" ")[0]},\n\nThank you for applying for the ${job.title} role${job.companyName ? ` at ${job.companyName}` : ""}. After reviewing your application, we've decided to move forward with other candidates at this time.\n\nWe appreciate your interest and wish you the best in your search.\n\nWarm regards,\nThe Hiring Team`;
       const tpl = emailTemplates.rejectionEmailHtml(candidateName, job.title, job.companyName || "", rejBody);
-      const result = await sendEmail({ to: candidateEmail, subject: tpl.subject, html: tpl.html, text: tpl.text });
+      const result = await sendEmail({
+        to: candidateEmail, subject: tpl.subject, html: tpl.html, text: tpl.text, from: CANDIDATE_FROM,
+      });
       emailSent = result.ok;
       emailStatus = result.ok ? "sent" : "failed";
       await RecruitCandidate.updateOne(
@@ -368,7 +421,9 @@ async function dispatchAgentActions(args: {
       emailStatus = "disabled";
     } else if (agentAction === "review_zone" && agentMode.emailReviewZoneCandidates === true && candidateEmail?.trim()) {
       const tpl = emailTemplates.reviewZoneEmail(candidateName, job.title, job.companyName || "");
-      const result = await sendEmail({ to: candidateEmail, subject: tpl.subject, html: tpl.html, text: tpl.text });
+      const result = await sendEmail({
+        to: candidateEmail, subject: tpl.subject, html: tpl.html, text: tpl.text, from: CANDIDATE_FROM,
+      });
       emailSent = result.ok;
       emailStatus = result.ok ? "sent" : "failed";
       await RecruitCandidate.updateOne(
@@ -417,12 +472,6 @@ async function dispatchAgentActions(args: {
   }
 }
 
-function scheduleAgentActions(args: Parameters<typeof dispatchAgentActions>[0]) {
-  setImmediate(() => {
-    dispatchAgentActions(args).catch(e => console.error("[agent] dispatch failed:", e));
-  });
-}
-
 function schedulePipelineRules(jobId: string, candidateId: string) {
   setImmediate(() => {
     evaluatePipelineRules(jobId, candidateId).catch(e =>
@@ -431,16 +480,87 @@ function schedulePipelineRules(jobId: string, candidateId: string) {
   });
 }
 
+/** Run agent actions then pipeline rules sequentially (prevents races on intake). */
+async function runPostIntakeAutomation(
+  job: any,
+  candidateId: string,
+  agentAction: AgentAction | null,
+  agentArgs: Omit<Parameters<typeof dispatchAgentActions>[0], "agentAction"> | null,
+) {
+  if (agentAction && agentArgs) {
+    await dispatchAgentActions({ ...agentArgs, agentAction });
+  }
+  await evaluatePipelineRules(String(job._id), candidateId);
+}
+
 function schedulePostIntakeAutomation(
   job: any,
   candidate: any,
   agentAction: AgentAction | null,
   agentArgs: Omit<Parameters<typeof dispatchAgentActions>[0], "agentAction"> | null,
 ) {
-  if (agentAction && agentArgs) {
-    scheduleAgentActions({ ...agentArgs, agentAction });
-  }
-  schedulePipelineRules(String(job._id), String(candidate._id));
+  const candidateId = String(candidate._id);
+  setImmediate(() => {
+    runPostIntakeAutomation(job, candidateId, agentAction, agentArgs).catch(e =>
+      console.error("[automation] post-intake failed:", e),
+    );
+  });
+}
+
+/** Score a saved candidate, apply agent triage, then run automation. Used after async public apply. */
+async function finalizeScoredCandidate(args: {
+  job: any;
+  candidateId: string;
+  scored: Awaited<ReturnType<typeof scoreCandidate>>;
+  candidateEmail: string;
+  fallbackName?: string;
+  logPrefix?: string;
+}) {
+  const { job, candidateId, scored, candidateEmail, fallbackName, logPrefix = "agent" } = args;
+  const agentMode = (job as any).agentMode ?? {};
+  const scorePct = scored.maxScore > 0 ? Math.round((scored.totalScore / scored.maxScore) * 100) : 0;
+  const { initialStage, agentAction, shortlistThreshold, rejectThreshold } = computeAgentTriage(
+    agentMode,
+    scorePct,
+    scored.scoringFailed,
+  );
+  const displayName = scored.name === "Candidate" && fallbackName ? fallbackName : scored.name;
+
+  await RecruitCandidate.findByIdAndUpdate(candidateId, {
+    $set: {
+      name: displayName,
+      totalScore: scored.totalScore,
+      maxScore: scored.maxScore,
+      scoreBreakdown: scored.scoreBreakdown,
+      aiSummary: scored.aiSummary,
+      redFlags: scored.redFlags,
+      strengths: scored.strengths,
+      scoringFailed: scored.scoringFailed,
+      stage: initialStage,
+      stageMovedAt: new Date(),
+      ...(scored.scoringFailed ? {} : { previousResumeScore: scored.totalScore }),
+    },
+  });
+
+  await runPostIntakeAutomation(
+    job,
+    candidateId,
+    agentAction,
+    agentAction
+      ? {
+          job,
+          candidateId,
+          candidateName: displayName,
+          candidateEmail,
+          candidateTotalScore: scored.totalScore,
+          scorePct,
+          shortlistThreshold,
+          rejectThreshold,
+          agentMode,
+          logPrefix,
+        }
+      : null,
+  );
 }
 
 function candidateDayInStage(candidate: any): number {
@@ -492,7 +612,7 @@ export async function evaluatePipelineRules(jobId: string, candidateId: string) 
     const job = await RecruitJob.findById(jobId).lean();
     let candidate = await RecruitCandidate.findById(candidateId);
     if (!job || !candidate) return;
-    const rules: any[] = ((job as any).pipelineRules ?? []).filter((r: any) => r.enabled);
+    const rules: any[] = ((job as any).pipelineRules ?? []).filter((r: any) => isPipelineRuleEnabled(r));
     if (!rules.length) return;
 
     for (const rule of rules) {
@@ -506,6 +626,14 @@ export async function evaluatePipelineRules(jobId: string, candidateId: string) 
 
       if (rule.fromStage && candidate.stage !== rule.fromStage) continue;
       if (shouldSkipPipelineRule(rule, candidate, scorePct, dayInStage)) continue;
+
+      // Do not treat AI scoring failures as genuine low scores.
+      if (
+        (rule.condition === "score_above" || rule.condition === "score_below") &&
+        candidate.scoringFailed === true
+      ) {
+        continue;
+      }
 
       let conditionMet = false;
       if (rule.condition === "score_above" && scorePct >= rule.threshold) conditionMet = true;
@@ -548,17 +676,8 @@ export async function evaluatePipelineRules(jobId: string, candidateId: string) 
             );
           }
           fired = true;
-        }
-      } else if (rule.action === "send_assessment" && candidate.assessmentStatus === "not_sent") {
-        try {
-          await sendAssessmentToCandidate({
-            job,
-            candidateId,
-            candidateName: candidate.name,
-            candidateEmail: candidate.email,
-            previousResumeScore: candidate.totalScore,
-            logTag: "pipeline-rule",
-          });
+        } else {
+          // Already at target stage (e.g. AI Agent moved them) — still count the rule as satisfied.
           await RecruitCandidate.updateOne(
             { _id: candidateId },
             { $set: { [`pipelineRuleState.${rule.id}`]: marker } },
@@ -567,8 +686,31 @@ export async function evaluatePipelineRules(jobId: string, candidateId: string) 
             { _id: jobId, "pipelineRules.id": rule.id },
             { $inc: { "pipelineRules.$.triggerCount": 1 } },
           );
-          console.log(`[pipeline-rule] send_assessment fired for candidate ${candidateId}`);
+          console.log(`[pipeline-rule] "${rule.id}" satisfied (already at ${newStage}) for candidate ${candidateId}`);
           fired = true;
+        }
+      } else if (rule.action === "send_assessment") {
+        try {
+          const sent = await sendAssessmentToCandidate({
+            job,
+            candidateId,
+            candidateName: candidate.name,
+            candidateEmail: candidate.email,
+            previousResumeScore: candidate.totalScore,
+            logTag: "pipeline-rule",
+          });
+          if (sent) {
+            await RecruitCandidate.updateOne(
+              { _id: candidateId },
+              { $set: { [`pipelineRuleState.${rule.id}`]: marker } },
+            );
+            await RecruitJob.updateOne(
+              { _id: jobId, "pipelineRules.id": rule.id },
+              { $inc: { "pipelineRules.$.triggerCount": 1 } },
+            );
+            console.log(`[pipeline-rule] send_assessment fired for candidate ${candidateId}`);
+            fired = true;
+          }
         } catch (e) {
           console.error("[pipeline-rule] send_assessment failed:", e);
         }
@@ -1787,10 +1929,24 @@ recruitRouter.patch("/jobs/:jobId", async (req, res) => {
       "experienceMin", "experienceMax", "educationRequirement", "noticePeriod",
       "freshersAllowed", "publicVisibility",
       "openings", "applicationDeadline", "perks", "languageRequirement", "timezoneOverlap",
+      "generatedJD", "rubric",
     ];
     const update: any = {};
     for (const key of allowed) {
       if (req.body[key] !== undefined) update[key] = req.body[key];
+    }
+    if (update.rubric !== undefined) {
+      if (!Array.isArray(update.rubric) || update.rubric.length === 0) {
+        return res.status(400).json({ error: "rubric must be a non-empty array." });
+      }
+      update.rubric = update.rubric.map((r: any) => ({
+        name: String(r.name ?? "").trim().slice(0, 120),
+        weight: Math.max(1, Math.min(100, Number(r.weight) || 10)),
+        description: String(r.description ?? "").trim().slice(0, 500),
+      })).filter((r: any) => r.name.length > 0);
+      if (!update.rubric.length) {
+        return res.status(400).json({ error: "rubric must include at least one named criterion." });
+      }
     }
     if (update.openings !== undefined) {
       const n = Number(update.openings);
@@ -1955,12 +2111,6 @@ recruitPublicRouter.post("/jobs/:jobId/apply", async (req, res) => {
       return res.status(400).json({ error: "Resume or profile summary must be at least 40 characters." });
     }
 
-    const scored = await scoreCandidate({
-      resumeText,
-      jobTitle: job.title,
-      rubric: job.rubric,
-    });
-
     const normalizedEmail = email.trim().toLowerCase();
     const existing = await RecruitCandidate.findOne({
       jobId: job._id,
@@ -1970,32 +2120,27 @@ recruitPublicRouter.post("/jobs/:jobId/apply", async (req, res) => {
       return res.status(409).json({ error: "You have already applied to this job." });
     }
 
-    const agentMode = (job as any).agentMode ?? {};
-    const scorePct = scored.maxScore > 0 ? Math.round((scored.totalScore / scored.maxScore) * 100) : 0;
-    const { initialStage, agentAction, shortlistThreshold, rejectThreshold } = computeAgentTriage(
-      agentMode,
-      scorePct,
-      scored.scoringFailed,
-    );
+    const rubricMaxScore = (job.rubric ?? []).reduce((sum: number, r: any) => sum + (r.weight ?? 0), 0) || 100;
 
+    // Save immediately — score + automation run in background (non-blocking for candidate).
     const candidate = await RecruitCandidate.create({
       jobId: job._id,
       uid: job.uid,
-      name: scored.name === "Candidate" ? name : scored.name,
+      name: name.trim(),
       email,
       phone: phone || "",
       resumeText,
-      totalScore: scored.totalScore,
-      maxScore: scored.maxScore,
-      scoreBreakdown: scored.scoreBreakdown,
-      aiSummary: scored.aiSummary,
-      redFlags: scored.redFlags,
-      strengths: scored.strengths,
-      stage: initialStage,
+      totalScore: 0,
+      maxScore: rubricMaxScore,
+      scoreBreakdown: [],
+      aiSummary: "",
+      redFlags: [],
+      strengths: [],
+      stage: "applied",
       stageMovedAt: new Date(),
       assessmentStatus: "not_sent",
-      previousResumeScore: scored.totalScore,
-      scoringFailed: scored.scoringFailed,
+      previousResumeScore: 0,
+      scoringFailed: true,
       source: source || "Rolebolt Jobs",
       location: location || "",
       currentStatus: currentStatus || "",
@@ -2008,30 +2153,34 @@ recruitPublicRouter.post("/jobs/:jobId/apply", async (req, res) => {
 
     await RecruitJob.updateOne({ _id: job._id }, { $inc: { candidateCount: 1 } });
 
-    schedulePostIntakeAutomation(
-      job,
-      candidate,
-      agentAction,
-      agentAction
-        ? {
-            job,
-            candidateId: String(candidate._id),
-            candidateName: candidate.name,
-            candidateEmail: email,
-            candidateTotalScore: candidate.totalScore,
-            scorePct,
-            shortlistThreshold,
-            rejectThreshold,
-            agentMode,
-            logPrefix: "agent",
-          }
-        : null,
-    );
+    res.status(201).json({ ok: true, candidateId: candidate._id });
 
-    return res.json({ ok: true, candidateId: candidate._id });
+    const candidateId = String(candidate._id);
+    const jobLean = job;
+    setImmediate(async () => {
+      try {
+        const scored = await scoreCandidate({
+          resumeText,
+          jobTitle: jobLean.title,
+          rubric: jobLean.rubric,
+        });
+        await finalizeScoredCandidate({
+          job: jobLean,
+          candidateId,
+          scored,
+          candidateEmail: email,
+          fallbackName: name.trim(),
+          logPrefix: "agent",
+        });
+      } catch (e) {
+        console.error("[recruit-public] background scoring failed (non-fatal):", e);
+      }
+    });
   } catch (err: any) {
     console.error("[recruit-public] POST /jobs/:jobId/apply", err);
-    return res.status(500).json({ error: err.message || "Failed to submit application." });
+    if (!res.headersSent) {
+      return res.status(500).json({ error: err.message || "Failed to submit application." });
+    }
   }
 });
 
@@ -2146,16 +2295,21 @@ recruitRouter.get("/jobs/:jobId/agent-stats", async (req, res) => {
       const agentLog: any[] = (c as any).agentLog ?? [];
       const emailLog: any[] = (c as any).emailLog ?? [];
 
-      for (const entry of agentLog) {
+      // Count only the latest triage entry per candidate (avoids double-count on retry-score).
+      const entriesInPeriod = agentLog.filter(entry => {
         const ts = entry.timestamp ? new Date(entry.timestamp) : null;
-        if (since && ts && ts < since) continue;
-
-        if (entry.action === "shortlisted") shortlisted++;
-        else if (entry.action === "rejected") rejected++;
-        else if (entry.action === "review_zone") reviewZone++;
-
-        if (typeof entry.score === "number") {
-          scoreSum += entry.score;
+        if (since && ts && ts < since) return false;
+        return true;
+      });
+      if (entriesInPeriod.length > 0) {
+        const latest = entriesInPeriod.reduce((a, b) =>
+          new Date(a.timestamp).getTime() >= new Date(b.timestamp).getTime() ? a : b,
+        );
+        if (latest.action === "shortlisted") shortlisted++;
+        else if (latest.action === "rejected") rejected++;
+        else if (latest.action === "review_zone") reviewZone++;
+        if (typeof latest.score === "number") {
+          scoreSum += latest.score;
           scoreCount++;
         }
       }
@@ -2262,8 +2416,8 @@ recruitRouter.patch("/jobs/:jobId/agent-mode", async (req, res) => {
 
 // ── Job Performance Monitor ───────────────────────────────────────────────────
 
-async function checkJobPerformanceAlerts(jobId: string, uid: string): Promise<void> {
-  const job = await RecruitJob.findOne({ _id: jobId, uid }).lean() as any;
+async function checkJobPerformanceAlerts(jobId: string): Promise<void> {
+  const job = await RecruitJob.findById(jobId).lean() as any;
   if (!job || job.status !== "active") return;
 
   const daysSinceCreated = (Date.now() - new Date(job.createdAt).getTime()) / (1000 * 60 * 60 * 24);
@@ -2361,9 +2515,12 @@ recruitRouter.get("/jobs/:jobId/performance", async (req, res) => {
   try {
     await connectMongo();
     const uid = getUid(req);
-    // Trigger a fresh check before returning
-    await checkJobPerformanceAlerts(req.params.jobId, uid);
-    const job = await RecruitJob.findOne({ _id: req.params.jobId, uid }).lean() as any;
+    const access = await getCollaborationAccess(req.params.jobId, uid);
+    if (!access || !hasPermission(access, "view_candidates")) {
+      return res.status(404).json({ error: "Job not found." });
+    }
+    await checkJobPerformanceAlerts(req.params.jobId);
+    const job = await RecruitJob.findById(req.params.jobId).lean() as any;
     if (!job) return res.status(404).json({ error: "Job not found." });
     const alerts = (job.performanceAlerts ?? []).filter((a: any) => !a.dismissed);
     return res.json({ alerts });
@@ -2376,8 +2533,12 @@ recruitRouter.post("/jobs/:jobId/performance/dismiss/:alertId", async (req, res)
   try {
     await connectMongo();
     const uid = getUid(req);
+    const access = await getCollaborationAccess(req.params.jobId, uid);
+    if (!access || !hasPermission(access, "configure_job")) {
+      return res.status(403).json({ error: "You do not have permission to manage performance alerts." });
+    }
     const job = await RecruitJob.findOneAndUpdate(
-      { _id: req.params.jobId, uid, "performanceAlerts.id": req.params.alertId },
+      { _id: req.params.jobId, uid: access.job.uid, "performanceAlerts.id": req.params.alertId },
       { $set: { "performanceAlerts.$.dismissed": true } },
       { returnDocument: "after" }
     ).lean();
@@ -2392,9 +2553,12 @@ recruitRouter.post("/jobs/:jobId/performance/apply", async (req, res) => {
   try {
     await connectMongo();
     const uid = getUid(req);
+    const access = await getCollaborationAccess(req.params.jobId, uid);
+    if (!access || !hasPermission(access, "configure_job")) {
+      return res.status(403).json({ error: "You do not have permission to apply performance suggestions." });
+    }
     const { suggestion } = req.body as { suggestion: string };
-    const job = await RecruitJob.findOne({ _id: req.params.jobId, uid }).lean() as any;
-    if (!job) return res.status(404).json({ error: "Job not found." });
+    const job = access.job as any;
 
     // Use AI to apply the suggestion — rewrite JD with the hint
     const prompt = `You are a recruitment expert. A recruiter wants to improve this job listing.
@@ -2406,7 +2570,7 @@ Rewrite the job description incorporating this suggestion to attract more qualif
 Keep it professional, structured, and under 600 words. Return ONLY the new job description text.`;
 
     const newJD = await callGeminiChain({ prompt });
-    await RecruitJob.updateOne({ _id: req.params.jobId, uid }, { $set: { generatedJD: newJD } });
+    await RecruitJob.updateOne({ _id: req.params.jobId, uid: access.job.uid }, { $set: { generatedJD: newJD } });
     return res.json({ ok: true, newJD });
   } catch (err: any) {
     console.error("[perf-monitor] apply suggestion failed:", err);
@@ -2583,13 +2747,14 @@ recruitRouter.post("/jobs/:jobId/pipeline-rules", async (req, res) => {
       return res.status(403).json({ error: "You do not have permission to manage pipeline rules." });
     }
     const { condition, threshold, fromStage, action } = req.body;
-    if (!condition || threshold === undefined || !action) {
-      return res.status(400).json({ error: "condition, threshold, and action are required." });
+    const validationError = validatePipelineRuleInput({ condition, threshold, action });
+    if (validationError) {
+      return res.status(400).json({ error: validationError });
     }
     const rule = {
       id: crypto.randomUUID(),
       condition,
-      threshold: Number(threshold),
+      threshold: Number(threshold ?? 0),
       fromStage: fromStage || "",
       action,
       enabled: true,
@@ -2616,6 +2781,16 @@ recruitRouter.patch("/jobs/:jobId/pipeline-rules/:ruleId", async (req, res) => {
       return res.status(403).json({ error: "You do not have permission to manage pipeline rules." });
     }
     const { enabled, condition, threshold, fromStage, action } = req.body;
+    if (condition !== undefined || action !== undefined || threshold !== undefined) {
+      const existing = ((access.job as any).pipelineRules ?? []).find((r: any) => r.id === req.params.ruleId);
+      const toValidate = {
+        condition: condition ?? existing?.condition,
+        threshold: threshold ?? existing?.threshold,
+        action: action ?? existing?.action,
+      };
+      const err = validatePipelineRuleInput(toValidate);
+      if (err) return res.status(400).json({ error: err });
+    }
     const setFields: Record<string, unknown> = {};
     if (enabled !== undefined) setFields["pipelineRules.$.enabled"] = Boolean(enabled);
     if (condition !== undefined) setFields["pipelineRules.$.condition"] = condition;
@@ -3060,22 +3235,27 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/retry-score", async (re
     await candidate.save();
     await clearScorePipelineRuleState(req.params.jobId, String(candidate._id));
 
-    if (agentAction) {
-      scheduleAgentActions({
+    setImmediate(() => {
+      runPostIntakeAutomation(
         job,
-        candidateId: String(candidate._id),
-        candidateName: candidate.name,
-        candidateEmail: candidate.email || "",
-        candidateTotalScore: candidate.totalScore,
+        String(candidate._id),
         agentAction,
-        scorePct,
-        shortlistThreshold,
-        rejectThreshold,
-        agentMode,
-        logPrefix: "agent-retry",
-      });
-    }
-    schedulePipelineRules(req.params.jobId, req.params.candidateId);
+        agentAction
+          ? {
+              job,
+              candidateId: String(candidate._id),
+              candidateName: candidate.name,
+              candidateEmail: candidate.email || "",
+              candidateTotalScore: candidate.totalScore,
+              scorePct,
+              shortlistThreshold,
+              rejectThreshold,
+              agentMode,
+              logPrefix: "agent-retry",
+            }
+          : null,
+      ).catch(e => console.error("[agent-retry] automation failed:", e));
+    });
 
     return res.json({ candidate });
   } catch (err: any) {
@@ -3147,52 +3327,29 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/assessment/send", async
     if (candidate.assessmentStatus === "completed") {
       return res.status(400).json({ error: "Assessment already completed by candidate." });
     }
-
-    const questions = await generateAssessmentQuestions({
-      jobTitle: job.title,
-      rubric: job.rubric,
-      jd: job.generatedJD,
-      niche: job.niche,
-      nicheDetails: job.nicheDetails,
-      languageRequirement: job.languageRequirement,
-    });
-
-    const token = generateToken();
-    candidate.assessmentToken = token;
-    candidate.assessmentQuestions = questions;
-    candidate.assessmentStatus = "sent";
-    candidate.assessmentSentAt = new Date();
-    candidate.previousResumeScore = candidate.totalScore;
-    await candidate.save();
-
-    const assessmentUrl = `${FRONTEND_URL}/recruit/assessment/${token}`;
-
-    // Auto-send assessment email (fire-and-forget)
-    if (candidate.email) {
-      const candId    = candidate._id;
-      const candName  = candidate.name;
-      const candEmail = candidate.email;
-      const companyName = (job as any)?.companyName || "";
-      setImmediate(async () => {
-        try {
-          const payload = emailTemplates.assessment(candName, job.title, companyName, assessmentUrl);
-          const result  = await sendEmail({ to: candEmail, subject: payload.subject, html: payload.html, text: payload.text, from: CANDIDATE_FROM });
-          await RecruitCandidate.findByIdAndUpdate(candId, {
-            $push: {
-              emailLog: {
-                type: "assessment", to: candEmail, subject: payload.subject, body: payload.text,
-                sentAt: new Date(), status: result.ok ? "sent" : "failed", error: result.error,
-              },
-            },
-          });
-        } catch (err) { console.error("[mailer] assessment email failed:", err); }
-      });
+    if (candidate.assessmentStatus !== "not_sent") {
+      return res.status(400).json({ error: "Assessment has already been sent." });
     }
+
+    const sent = await sendAssessmentToCandidate({
+      job,
+      candidateId: String(candidate._id),
+      candidateName: candidate.name,
+      candidateEmail: candidate.email,
+      previousResumeScore: candidate.totalScore,
+      logTag: "manual",
+    });
+    if (!sent) {
+      return res.status(409).json({ error: "Assessment could not be sent — it may already be in progress." });
+    }
+
+    const updated = await RecruitCandidate.findById(candidate._id).lean();
+    const assessmentUrl = `${FRONTEND_URL}/recruit/assessment/${(updated as any)?.assessmentToken}`;
 
     return res.json({
       ok: true,
       assessmentUrl,
-      questions,
+      questions: (updated as any)?.assessmentQuestions ?? [],
       candidateName: candidate.name,
       candidateEmail: candidate.email,
       emailSent: Boolean(candidate.email),
