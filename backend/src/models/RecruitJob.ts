@@ -53,7 +53,7 @@ export interface IPipelineRule {
   condition: "score_above" | "score_below" | "assessment_passed" | "assessment_failed" | "stage_age_days";
   threshold: number;       // score% for score conditions, days for age condition
   fromStage?: string;      // optional: only apply when candidate is in this stage
-  action: "move_to_screened" | "move_to_interview" | "move_to_offer" | "move_to_rejected" | "send_assessment" | "send_reminder";
+  action: "move_to_screened" | "move_to_assessed" | "move_to_interview" | "move_to_offer" | "move_to_rejected" | "send_assessment" | "send_reminder";
   enabled: boolean;
   triggerCount: number;    // how many times this rule has fired (for stats)
 }

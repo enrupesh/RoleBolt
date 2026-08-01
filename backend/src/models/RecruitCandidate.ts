@@ -92,6 +92,8 @@ export interface IRecruitCandidate extends Document {
   inTalentPool?: boolean;
   talentPoolNote?: string;
   stageMovedAt?: Date;
+  /** Tracks which pipeline rules already fired for this candidate (ruleId → context marker). */
+  pipelineRuleState?: Record<string, string>;
   emailLog: IEmailLogEntry[];
   agentLog: IAgentActionEntry[];
   offerLetter?: string;
@@ -251,6 +253,7 @@ const RecruitCandidateSchema = new Schema<IRecruitCandidate>(
     inTalentPool: { type: Boolean, default: false },
     talentPoolNote: { type: String, default: "" },
     stageMovedAt: { type: Date },
+    pipelineRuleState: { type: Schema.Types.Mixed, default: {} },
     emailLog: {
       type: [
         new Schema(
