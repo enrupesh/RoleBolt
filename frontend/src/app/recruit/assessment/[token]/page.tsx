@@ -20,6 +20,7 @@ type Question = { id: string; text: string };
 
 type AssessmentData = {
   completed: boolean;
+  needsStart?: boolean;
   candidateName: string;
   jobTitle?: string;
   jobDepartment?: string;
@@ -60,6 +61,9 @@ export default function AssessmentPage({ params }: { params: Promise<{ token: st
   const questionStartRef = useRef<number>(Date.now());
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState("");
+
   useEffect(() => {
     async function load() {
       try {
@@ -77,8 +81,9 @@ export default function AssessmentPage({ params }: { params: Promise<{ token: st
               jobLocation: json.jobDetails?.location,
             }
           : json);
-        // Ping backend that assessment has started (question 0)
-        pingProgress(token, 0, formMode);
+        if (!json.needsStart && !json.completed) {
+          pingProgress(token, 0, formMode);
+        }
       } catch (e: any) {
         setError(e.message || "Failed to load assessment.");
       } finally {
@@ -87,6 +92,23 @@ export default function AssessmentPage({ params }: { params: Promise<{ token: st
     }
     load();
   }, [token, formMode]);
+
+  async function handleStartAssessment() {
+    if (formMode) return;
+    setStarting(true);
+    setStartError("");
+    try {
+      const res = await fetch(apiUrl(`/recruit-public/assessment/${token}/start`), { method: "POST" });
+      const json = await readApiJson(res);
+      if (!res.ok) throw new Error(json.error || "Could not start assessment.");
+      setData(json);
+      pingProgress(token, 0, formMode);
+    } catch (e: any) {
+      setStartError(e.message || "Could not start assessment.");
+    } finally {
+      setStarting(false);
+    }
+  }
 
   useEffect(() => {
     questionStartRef.current = Date.now();
@@ -242,10 +264,32 @@ export default function AssessmentPage({ params }: { params: Promise<{ token: st
   const questions = data.questions ?? [];
   const totalQ = questions.length;
 
-  if (totalQ === 0) {
+  if (data.needsStart || totalQ === 0) {
     return (
       <div className="min-h-screen bg-[#050508] flex items-center justify-center p-6">
-        <p className="text-gray-500 text-sm">No questions found. Please contact your recruiter.</p>
+        <div className="max-w-md w-full text-center">
+          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl border border-indigo-500/30 bg-indigo-500/10 text-indigo-300">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
+            </svg>
+          </div>
+          <h1 className="text-2xl font-bold text-white mb-2">You&apos;ve been screened</h1>
+          <p className="text-gray-400 text-sm leading-7 mb-2">
+            Hi {data.candidateName.split(" ")[0]}, your application for <strong className="text-gray-200">{data.jobTitle}</strong> passed initial screening.
+          </p>
+          <p className="text-gray-500 text-sm leading-6 mb-6">
+            When you click below, your written assessment will be prepared. After you complete it, the hiring team will review your results and decide whether you proceed to the next round.
+          </p>
+          {startError && <p className="text-rose-400 text-sm mb-4">{startError}</p>}
+          <button
+            type="button"
+            onClick={handleStartAssessment}
+            disabled={starting}
+            className="w-full rounded-xl bg-indigo-500 px-6 py-3.5 text-sm font-bold text-white hover:bg-indigo-400 transition disabled:opacity-60"
+          >
+            {starting ? "Preparing your assessment…" : "Start Assessment →"}
+          </button>
+        </div>
       </div>
     );
   }
@@ -319,18 +363,18 @@ export default function AssessmentPage({ params }: { params: Promise<{ token: st
               </div>
             )}
 
-            <div className="rounded-2xl sm:rounded-3xl border border-white/[0.08] bg-gray-50 p-5 sm:p-6 mb-5">
+            <div className="rounded-2xl sm:rounded-3xl border border-slate-200 bg-white p-5 sm:p-6 mb-5 shadow-sm">
               <div className="flex items-start gap-3 mb-4">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-xl bg-indigo-500/15 text-[11px] font-bold text-indigo-400 mt-0.5">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-[11px] font-bold text-indigo-700 mt-0.5">
                   {currentQ + 1}
                 </span>
-                <p className="text-sm sm:text-base font-medium text-white leading-7">
+                <p className="text-sm sm:text-base font-medium text-slate-900 leading-7">
                   {currentQuestion?.text}
                 </p>
               </div>
 
-              <div className="rounded-xl border border-white/[0.06] bg-gray-50 px-1 py-1 mb-1">
-                <p className="px-3 pt-2 text-[10px] text-zinc-700 flex items-center gap-1 mb-1">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-1 py-1 mb-1">
+                <p className="px-3 pt-2 text-[10px] text-slate-600 flex items-center gap-1 mb-1">
                   <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
                   Answer in your own words — be specific, reference real situations
                 </p>
@@ -340,10 +384,10 @@ export default function AssessmentPage({ params }: { params: Promise<{ token: st
                   onChange={e => currentQuestion && handleAnswerChange(currentQuestion.id, e.target.value)}
                   rows={8}
                   placeholder="Write your answer here. Be specific — describe the actual situation, what you did, and what the outcome was..."
-                  className="w-full rounded-xl border-0 bg-transparent px-3 py-2 text-sm text-white placeholder-zinc-700 outline-none resize-none leading-7"
+                  className="w-full rounded-xl border-0 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 outline-none resize-none leading-7 caret-indigo-600"
                 />
                 <div className="px-3 pb-2 flex items-center justify-between">
-                  <span className={`text-[10px] ${wordCount < 30 && currentAnswer.length > 0 ? "text-amber-600" : "text-zinc-700"}`}>
+                  <span className={`text-[10px] ${wordCount < 30 && currentAnswer.length > 0 ? "text-amber-700" : "text-slate-500"}`}>
                     {wordCount} words
                     {wordCount > 0 && wordCount < 30 ? " — add more detail" : wordCount >= 80 ? " ✓" : ""}
                   </span>

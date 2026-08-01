@@ -84,7 +84,8 @@ function wipeToken() {
 // ─── Profile helper ───────────────────────────────────────────────────────────
 
 async function fetchOrCreateProfile(
-  token: string
+  token: string,
+  authEmail?: string,
 ): Promise<RecruitProfile | null> {
   try {
     const headers = { Authorization: `Bearer ${token}` };
@@ -96,7 +97,7 @@ async function fetchOrCreateProfile(
     const postRes = await fetch(apiUrl("/recruit/auth/profile"), {
       method: "POST",
       headers: { ...headers, "Content-Type": "application/json" },
-      body: JSON.stringify({ role: "creator" }),
+      body: JSON.stringify({ role: "creator", email: authEmail ?? "" }),
     });
     if (postRes.ok) return await postRes.json();
     return null;
@@ -158,7 +159,7 @@ export function RecruitAuthProvider({ children }: { children: ReactNode }) {
         // Re-sync both stores to keep expiry fresh
         persistToken(stored);
 
-        const profile = await fetchOrCreateProfile(stored);
+        const profile = await fetchOrCreateProfile(stored, user.email);
         if (profile) {
           setRecruitProfile(profile);
           setProfileError(null);
@@ -192,7 +193,7 @@ export function RecruitAuthProvider({ children }: { children: ReactNode }) {
         setAuthUser({ id: data.id, email: data.email, name: data.name });
 
         setProfileError(null);
-        const profile = await fetchOrCreateProfile(token);
+        const profile = await fetchOrCreateProfile(token, data.email);
         if (profile) {
           setRecruitProfile(profile);
         } else {
@@ -231,7 +232,7 @@ export function RecruitAuthProvider({ children }: { children: ReactNode }) {
         setAuthUser(authUser);
 
         setProfileError(null);
-        const profile = await fetchOrCreateProfile(token);
+        const profile = await fetchOrCreateProfile(token, user.email);
         if (profile) {
           setRecruitProfile(profile);
         } else {
@@ -259,13 +260,13 @@ export function RecruitAuthProvider({ children }: { children: ReactNode }) {
   const refreshProfile = useCallback(async () => {
     if (!sessionToken) return;
     setProfileError(null);
-    const profile = await fetchOrCreateProfile(sessionToken);
+    const profile = await fetchOrCreateProfile(sessionToken, authUser?.email);
     if (profile) {
       setRecruitProfile(profile);
     } else {
       setProfileError("Could not reach the server. Please try again.");
     }
-  }, [sessionToken]);
+  }, [sessionToken, authUser?.email]);
 
   return (
     <RecruitAuthContext.Provider

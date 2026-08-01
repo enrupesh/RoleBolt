@@ -3,6 +3,11 @@
 
 export type EmailPayload = { subject: string; html: string; text: string };
 
+/** Optional footer data for candidate-facing emails. */
+export type CandidateEmailContext = {
+  officialContactEmail?: string;
+};
+
 function esc(s: string) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
@@ -11,7 +16,34 @@ function nl2br(s: string) {
   return esc(s).replace(/\n/g, "<br>");
 }
 
-function shell(candidateName: string, subject: string, bodyHtml: string): string {
+function officialContactHtml(email?: string): string {
+  if (!email?.trim()) return "";
+  const e = email.trim();
+  return `
+    <p style="margin:20px 0 0;padding-top:16px;border-top:1px solid #e2e8f0;font-size:13px;color:#475569;line-height:1.65;">
+      <strong>Official contact email:</strong>
+      <a href="mailto:${esc(e)}" style="color:#0a66c2;text-decoration:none;">${esc(e)}</a><br>
+      You may also receive communication from this email address.
+    </p>`;
+}
+
+function officialContactPlain(email?: string): string {
+  if (!email?.trim()) return "";
+  return `\n\nOfficial contact email: ${email.trim()}\nYou may also receive communication from this email address.`;
+}
+
+const WHAT_HAPPENS_NEXT = `
+  <p style="margin:0 0 16px;font-size:14px;color:#475569;line-height:1.65;background:#f8fafc;border-radius:10px;padding:14px 16px;border:1px solid #e2e8f0;">
+    <strong style="color:#0f172a;">What happens next:</strong> After you complete each step, the hiring team reviews your progress and decides whether you move forward — for example, to an interview or the next stage.
+  </p>`;
+
+function shell(
+  candidateName: string,
+  subject: string,
+  bodyHtml: string,
+  ctx?: CandidateEmailContext,
+): string {
+  const contactBlock = officialContactHtml(ctx?.officialContactEmail);
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -34,6 +66,7 @@ function shell(candidateName: string, subject: string, bodyHtml: string): string
           <td style="padding:32px 36px 24px;">
             <p style="margin:0 0 18px 0;font-size:15px;color:#0f172a;">Hi <strong>${esc(candidateName.split(" ")[0] || candidateName)}</strong>,</p>
             ${bodyHtml}
+            ${contactBlock}
           </td>
         </tr>
         <tr>
@@ -61,48 +94,94 @@ function btn(text: string, href: string) {
   </table>`;
 }
 
-// ── 1. Screened ───────────────────────────────────────────────────────────────
-export function screened(candidateName: string, jobTitle: string, companyName: string): EmailPayload {
+// ── 1. Screened (no assessment) ───────────────────────────────────────────────
+export function screened(
+  candidateName: string,
+  jobTitle: string,
+  companyName: string,
+  ctx?: CandidateEmailContext,
+): EmailPayload {
   const co = companyName ? ` at <strong>${esc(companyName)}</strong>` : "";
-  const subject = `Your application for ${jobTitle}${companyName ? ` at ${companyName}` : ""} has been shortlisted`;
+  const subject = `You've been screened — ${jobTitle}${companyName ? ` at ${companyName}` : ""}`;
   const html = shell(candidateName, subject, `
     <p style="margin:0 0 16px;font-size:15px;color:#333;line-height:1.65;">
-      Great news — your application for <strong>${esc(jobTitle)}</strong>${co} has been reviewed and you've been <strong>shortlisted</strong> for the next stage of our hiring process.
+      Congratulations! Your application for <strong>${esc(jobTitle)}</strong>${co} has been reviewed and you have been <strong>screened</strong> for the next stage of our hiring process.
     </p>
-    <p style="margin:0 0 16px;font-size:15px;color:#333;line-height:1.65;">
-      Our team will now review your profile in detail and reach out with next steps. Please keep an eye on your inbox over the next few days.
-    </p>
+    ${WHAT_HAPPENS_NEXT}
     <p style="margin:0 0 24px;font-size:15px;color:#333;line-height:1.65;">
-      Thank you for the time and effort you put into your application — it made a strong impression.
+      Our team will reach out with next steps soon. Please keep an eye on your inbox.
     </p>
     <p style="margin:0;font-size:15px;color:#333;">Warm regards,<br><strong>The Hiring Team${companyName ? `, ${esc(companyName)}` : ""}</strong></p>
-  `);
-  const text = `Hi ${candidateName},\n\nGreat news — your application for ${jobTitle}${companyName ? ` at ${companyName}` : ""} has been shortlisted.\n\nOur team will reach out with next steps soon.\n\nWarm regards,\nThe Hiring Team`;
+  `, ctx);
+  const text = `Hi ${candidateName},\n\nCongratulations! Your application for ${jobTitle}${companyName ? ` at ${companyName}` : ""} has been screened for the next stage.\n\nWhat happens next: After each step, the hiring team reviews your progress and decides whether you move forward.${officialContactPlain(ctx?.officialContactEmail)}\n\nWarm regards,\nThe Hiring Team`;
   return { subject, html, text };
 }
 
-// ── 2. Assessment ─────────────────────────────────────────────────────────────
-export function assessment(candidateName: string, jobTitle: string, companyName: string, assessmentUrl: string): EmailPayload {
+// ── 1b. Screened + assessment invite (single email) ───────────────────────────
+export function screenedWithAssessmentInvite(
+  candidateName: string,
+  jobTitle: string,
+  companyName: string,
+  assessmentUrl: string,
+  ctx?: CandidateEmailContext,
+): EmailPayload {
   const co = companyName ? ` at <strong>${esc(companyName)}</strong>` : "";
-  const subject = `Action required: Complete your assessment for ${jobTitle}${companyName ? ` at ${companyName}` : ""}`;
+  const subject = `You've been screened — complete your assessment for ${jobTitle}${companyName ? ` at ${companyName}` : ""}`;
   const html = shell(candidateName, subject, `
     <p style="margin:0 0 16px;font-size:15px;color:#333;line-height:1.65;">
-      Congratulations on advancing to the next stage! We've prepared a written assessment for your application to <strong>${esc(jobTitle)}</strong>${co}.
+      Congratulations! You have been <strong>screened</strong> for the <strong>${esc(jobTitle)}</strong>${co} position.
     </p>
     <p style="margin:0 0 16px;font-size:15px;color:#333;line-height:1.65;">
-      The assessment has <strong>5 written questions</strong> and typically takes <strong>20–40 minutes</strong> to complete. There's no timer — take your time and write thoughtful answers. Quality matters more than speed.
+      To continue, please complete a short written assessment. Click the button below when you are ready — the assessment will open on the next page.
     </p>
-    ${btn("Start Your Assessment →", assessmentUrl)}
+    ${btn("Start Assessment →", assessmentUrl)}
     <p style="margin:8px 0 6px;font-size:12px;color:#999;">Or copy this link into your browser:</p>
-    <p style="margin:0 0 24px;font-size:11px;color:#bbb;word-break:break-all;">${esc(assessmentUrl)}</p>
+    <p style="margin:0 0 20px;font-size:11px;color:#bbb;word-break:break-all;">${esc(assessmentUrl)}</p>
+    ${WHAT_HAPPENS_NEXT}
+    <p style="margin:0 0 24px;font-size:14px;color:#475569;line-height:1.65;">
+      After you complete the assessment, the hiring team will review your results and decide whether you proceed to the next round, such as an interview.
+    </p>
     <p style="margin:0;font-size:15px;color:#333;">Best of luck,<br><strong>The Hiring Team${companyName ? `, ${esc(companyName)}` : ""}</strong></p>
-  `);
-  const text = `Hi ${candidateName},\n\nCongratulations! You've been selected to complete a written assessment for the ${jobTitle} role${companyName ? ` at ${companyName}` : ""}.\n\nPlease complete it here: ${assessmentUrl}\n\nBest of luck,\nThe Hiring Team`;
+  `, ctx);
+  const text = `Hi ${candidateName},\n\nCongratulations! You have been screened for ${jobTitle}${companyName ? ` at ${companyName}` : ""}.\n\nTo receive your assessment, open this link when you are ready:\n${assessmentUrl}\n\nAfter you complete the assessment, the hiring team will review your results and decide whether you proceed to the next round.${officialContactPlain(ctx?.officialContactEmail)}\n\nBest of luck,\nThe Hiring Team`;
+  return { subject, html, text };
+}
+
+// ── 2. Assessment reminder / standalone invite ────────────────────────────────
+export function assessment(
+  candidateName: string,
+  jobTitle: string,
+  companyName: string,
+  assessmentUrl: string,
+  ctx?: CandidateEmailContext,
+): EmailPayload {
+  const co = companyName ? ` at <strong>${esc(companyName)}</strong>` : "";
+  const subject = `Complete your assessment — ${jobTitle}${companyName ? ` at ${companyName}` : ""}`;
+  const html = shell(candidateName, subject, `
+    <p style="margin:0 0 16px;font-size:15px;color:#333;line-height:1.65;">
+      Your written assessment for <strong>${esc(jobTitle)}</strong>${co} is ready. Click below when you are ready to begin.
+    </p>
+    <p style="margin:0 0 16px;font-size:15px;color:#333;line-height:1.65;">
+      The assessment has <strong>5 written questions</strong> and typically takes <strong>20–40 minutes</strong>. There is no timer — take your time and write thoughtful answers.
+    </p>
+    ${btn("Start Assessment →", assessmentUrl)}
+    <p style="margin:8px 0 6px;font-size:12px;color:#999;">Or copy this link into your browser:</p>
+    <p style="margin:0 0 20px;font-size:11px;color:#bbb;word-break:break-all;">${esc(assessmentUrl)}</p>
+    ${WHAT_HAPPENS_NEXT}
+    <p style="margin:0;font-size:15px;color:#333;">Best of luck,<br><strong>The Hiring Team${companyName ? `, ${esc(companyName)}` : ""}</strong></p>
+  `, ctx);
+  const text = `Hi ${candidateName},\n\nYour assessment for ${jobTitle}${companyName ? ` at ${companyName}` : ""} is ready.\n\nStart here: ${assessmentUrl}${officialContactPlain(ctx?.officialContactEmail)}\n\nBest of luck,\nThe Hiring Team`;
   return { subject, html, text };
 }
 
 // ── 3. Assessment Reminder ────────────────────────────────────────────────────
-export function assessmentReminder(candidateName: string, jobTitle: string, companyName: string, assessmentUrl: string): EmailPayload {
+export function assessmentReminder(
+  candidateName: string,
+  jobTitle: string,
+  companyName: string,
+  assessmentUrl: string,
+  ctx?: CandidateEmailContext,
+): EmailPayload {
   const subject = `Reminder: Your assessment for ${jobTitle} is pending`;
   const html = shell(candidateName, subject, `
     <p style="margin:0 0 16px;font-size:15px;color:#333;line-height:1.65;">
@@ -115,13 +194,44 @@ export function assessmentReminder(candidateName: string, jobTitle: string, comp
     <p style="margin:8px 0 6px;font-size:12px;color:#999;">Or copy this link:</p>
     <p style="margin:0 0 24px;font-size:11px;color:#bbb;word-break:break-all;">${esc(assessmentUrl)}</p>
     <p style="margin:0;font-size:15px;color:#333;">Warm regards,<br><strong>The Hiring Team${companyName ? `, ${esc(companyName)}` : ""}</strong></p>
-  `);
-  const text = `Hi ${candidateName},\n\nJust a reminder — your assessment for ${jobTitle}${companyName ? ` at ${companyName}` : ""} is still pending.\n\nComplete it here: ${assessmentUrl}\n\nWarm regards,\nThe Hiring Team`;
+  `, ctx);
+  const text = `Hi ${candidateName},\n\nJust a reminder — your assessment for ${jobTitle}${companyName ? ` at ${companyName}` : ""} is still pending.\n\nComplete it here: ${assessmentUrl}${officialContactPlain(ctx?.officialContactEmail)}\n\nWarm regards,\nThe Hiring Team`;
+  return { subject, html, text };
+}
+
+// ── 3b. Assessed stage (assessment completed, under review) ─────────────────────
+export function assessedStageEmail(
+  candidateName: string,
+  jobTitle: string,
+  companyName: string,
+  ctx?: CandidateEmailContext,
+): EmailPayload {
+  const co = companyName ? ` at <strong>${esc(companyName)}</strong>` : "";
+  const subject = `Assessment received — ${jobTitle}${companyName ? ` at ${companyName}` : ""}`;
+  const html = shell(candidateName, subject, `
+    <p style="margin:0 0 16px;font-size:15px;color:#333;line-height:1.65;">
+      Thank you for completing your assessment for the <strong>${esc(jobTitle)}</strong>${co} role.
+    </p>
+    <p style="margin:0 0 16px;font-size:15px;color:#333;line-height:1.65;">
+      Our hiring team is now reviewing your responses. We appreciate the time and effort you put into your answers.
+    </p>
+    ${WHAT_HAPPENS_NEXT}
+    <p style="margin:0 0 24px;font-size:15px;color:#333;line-height:1.65;">
+      We will contact you if you are selected to move forward — for example, to an interview.
+    </p>
+    <p style="margin:0;font-size:15px;color:#333;">Warm regards,<br><strong>The Hiring Team${companyName ? `, ${esc(companyName)}` : ""}</strong></p>
+  `, ctx);
+  const text = `Hi ${candidateName},\n\nThank you for completing your assessment for ${jobTitle}${companyName ? ` at ${companyName}` : ""}.\n\nOur hiring team is now reviewing your responses.${officialContactPlain(ctx?.officialContactEmail)}\n\nWarm regards,\nThe Hiring Team`;
   return { subject, html, text };
 }
 
 // ── 4. Interview Invitation ───────────────────────────────────────────────────
-export function interview(candidateName: string, jobTitle: string, companyName: string): EmailPayload {
+export function interview(
+  candidateName: string,
+  jobTitle: string,
+  companyName: string,
+  ctx?: CandidateEmailContext,
+): EmailPayload {
   const co = companyName ? ` at <strong>${esc(companyName)}</strong>` : "";
   const subject = `Interview Invitation — ${jobTitle}${companyName ? ` at ${companyName}` : ""}`;
   const html = shell(candidateName, subject, `
@@ -135,13 +245,19 @@ export function interview(candidateName: string, jobTitle: string, companyName: 
       In the meantime, feel free to review the job description and prepare any questions you'd like to ask.
     </p>
     <p style="margin:0;font-size:15px;color:#333;">Looking forward to meeting you,<br><strong>The Hiring Team${companyName ? `, ${esc(companyName)}` : ""}</strong></p>
-  `);
-  const text = `Hi ${candidateName},\n\nWe'd like to invite you for an interview for the ${jobTitle} role${companyName ? ` at ${companyName}` : ""}.\n\nOur team will reach out shortly to schedule.\n\nLooking forward to meeting you,\nThe Hiring Team`;
+  `, ctx);
+  const text = `Hi ${candidateName},\n\nWe'd like to invite you for an interview for the ${jobTitle} role${companyName ? ` at ${companyName}` : ""}.\n\nOur team will reach out shortly to schedule.${officialContactPlain(ctx?.officialContactEmail)}\n\nLooking forward to meeting you,\nThe Hiring Team`;
   return { subject, html, text };
 }
 
 // ── 5. Offer Letter ───────────────────────────────────────────────────────────
-export function offerEmail(candidateName: string, jobTitle: string, companyName: string, offerBody: string): EmailPayload {
+export function offerEmail(
+  candidateName: string,
+  jobTitle: string,
+  companyName: string,
+  offerBody: string,
+  ctx?: CandidateEmailContext,
+): EmailPayload {
   const subject = `Job Offer — ${jobTitle}${companyName ? ` at ${companyName}` : ""}`;
   const html = shell(candidateName, subject, `
     <p style="margin:0 0 20px;font-size:15px;color:#333;line-height:1.65;">
@@ -151,13 +267,19 @@ export function offerEmail(candidateName: string, jobTitle: string, companyName:
       <p style="margin:0;font-size:13.5px;color:#333;line-height:1.9;white-space:pre-wrap;font-family:Georgia,serif;">${nl2br(offerBody)}</p>
     </div>
     <p style="margin:0;font-size:13px;color:#666;">To accept this offer, please reply to this email with your confirmation.</p>
-  `);
-  const text = `Hi ${candidateName},\n\nPlease find your offer letter below.\n\n${offerBody}\n\nTo accept, please reply to this email.`;
+  `, ctx);
+  const text = `Hi ${candidateName},\n\nPlease find your offer letter below.\n\n${offerBody}${officialContactPlain(ctx?.officialContactEmail)}\n\nTo accept, please reply to this email.`;
   return { subject, html, text };
 }
 
 // ── 6. Hired / Welcome ────────────────────────────────────────────────────────
-export function hired(candidateName: string, jobTitle: string, companyName: string, startDate?: string): EmailPayload {
+export function hired(
+  candidateName: string,
+  jobTitle: string,
+  companyName: string,
+  startDate?: string,
+  ctx?: CandidateEmailContext,
+): EmailPayload {
   const subject = `Welcome to the team, ${candidateName.split(" ")[0]}! 🎉`;
   const html = shell(candidateName, subject, `
     <p style="margin:0 0 16px;font-size:15px;color:#333;line-height:1.65;">
@@ -170,13 +292,18 @@ export function hired(candidateName: string, jobTitle: string, companyName: stri
       You'll be hearing from us very soon with onboarding details and everything you need to get started. We're genuinely excited to have you with us and can't wait to see what you'll accomplish.
     </p>
     <p style="margin:0;font-size:15px;color:#333;">Welcome aboard,<br><strong>The Hiring Team${companyName ? `, ${esc(companyName)}` : ""}</strong></p>
-  `);
-  const text = `Hi ${candidateName},\n\nWe're thrilled to welcome you to the team!\n\nYou've been selected for ${jobTitle}${companyName ? ` at ${companyName}` : ""}${startDate ? `, starting ${startDate}` : ""}.\n\nYou'll hear from us soon with onboarding details.\n\nWelcome aboard,\nThe Hiring Team`;
+  `, ctx);
+  const text = `Hi ${candidateName},\n\nWe're thrilled to welcome you to the team!\n\nYou've been selected for ${jobTitle}${companyName ? ` at ${companyName}` : ""}${startDate ? `, starting ${startDate}` : ""}.${officialContactPlain(ctx?.officialContactEmail)}\n\nWelcome aboard,\nThe Hiring Team`;
   return { subject, html, text };
 }
 
 // ── 7. Review Zone (Under Review) ────────────────────────────────────────────
-export function reviewZoneEmail(candidateName: string, jobTitle: string, companyName: string): EmailPayload {
+export function reviewZoneEmail(
+  candidateName: string,
+  jobTitle: string,
+  companyName: string,
+  ctx?: CandidateEmailContext,
+): EmailPayload {
   const co = companyName ? ` at <strong>${esc(companyName)}</strong>` : "";
   const subject = `Your application is under review`;
   const html = shell(candidateName, subject, `
@@ -190,25 +317,36 @@ export function reviewZoneEmail(candidateName: string, jobTitle: string, company
       If your profile is selected for the next stage, we will contact you with further details.
     </p>
     <p style="margin:0;font-size:15px;color:#333;">Thank you for your interest in joining <strong>${companyName ? esc(companyName) : "our team"}</strong>.<br><br>Best regards,<br><strong>${companyName ? esc(companyName) : "The Hiring Team"}</strong></p>
-  `);
-  const text = `Hi ${candidateName},\n\nThank you for applying for the ${jobTitle}${companyName ? ` position at ${companyName}` : " position"}.\n\nWe have successfully received your application, and it is currently under review by our hiring team.\n\nIf your profile is selected for the next stage, we will contact you with further details.\n\nThank you for your interest in joining ${companyName || "our team"}.\n\nBest regards,\n${companyName || "The Hiring Team"}`;
+  `, ctx);
+  const text = `Hi ${candidateName},\n\nThank you for applying for the ${jobTitle}${companyName ? ` position at ${companyName}` : " position"}.\n\nYour application is under review.${officialContactPlain(ctx?.officialContactEmail)}\n\nBest regards,\n${companyName || "The Hiring Team"}`;
   return { subject, html, text };
 }
 
 // ── 8. Rejection ──────────────────────────────────────────────────────────────
-export function rejectionEmailHtml(candidateName: string, jobTitle: string, companyName: string, body: string): EmailPayload {
+export function rejectionEmailHtml(
+  candidateName: string,
+  jobTitle: string,
+  companyName: string,
+  body: string,
+  ctx?: CandidateEmailContext,
+): EmailPayload {
   const subject = `Update on your application — ${jobTitle}${companyName ? ` at ${companyName}` : ""}`;
   const html = shell(candidateName, subject, `
     <p style="margin:0;font-size:15px;color:#333;line-height:1.8;">${nl2br(body)}</p>
-  `);
-  return { subject, html, text: body };
+  `, ctx);
+  return { subject, html, text: body + officialContactPlain(ctx?.officialContactEmail) };
 }
 
 // ── 8. Generic (custom / manually composed) ───────────────────────────────────
-export function genericEmail(candidateName: string, subject: string, body: string): string {
+export function genericEmail(
+  candidateName: string,
+  subject: string,
+  body: string,
+  ctx?: CandidateEmailContext,
+): string {
   return shell(candidateName, subject, `
     <p style="margin:0;font-size:15px;color:#333;line-height:1.8;">${nl2br(body)}</p>
-  `);
+  `, ctx);
 }
 
 // ── 9. Daily Recruiter Briefing ───────────────────────────────────────────────
@@ -314,7 +452,8 @@ export function dailyBriefing(
 // ── 10. Offer Reminder (to candidate) ─────────────────────────────────────────
 export function offerReminderEmail(
   candidateName: string, jobTitle: string, companyName: string,
-  offerUrl: string, daysLeft?: number
+  offerUrl: string, daysLeft?: number,
+  ctx?: CandidateEmailContext,
 ): EmailPayload {
   const subject = `Reminder: Your offer from ${companyName || 'us'} is waiting`;
   const expiryLine = daysLeft !== undefined && daysLeft > 0
@@ -330,15 +469,16 @@ export function offerReminderEmail(
     </p>
     ${btn('Review & Respond to Offer', offerUrl)}
     <p style='margin:20px 0 0;font-size:13px;color:#888;'>Or copy this link: <a href='${offerUrl}' style='color:#0a66c2;'>${offerUrl}</a></p>
-  `);
-  const text = `Hi ${candidateName},\n\nThis is a reminder that your offer for ${jobTitle}${companyName ? ` at ${companyName}` : ''} is still awaiting your response.\n${daysLeft ? `\nThis offer expires in ${daysLeft} day${daysLeft === 1 ? '' : 's'}.\n` : ''}\nPlease review and respond: ${offerUrl}`;
+  `, ctx);
+  const text = `Hi ${candidateName},\n\nThis is a reminder that your offer for ${jobTitle}${companyName ? ` at ${companyName}` : ''} is still awaiting your response.\n${daysLeft ? `\nThis offer expires in ${daysLeft} day${daysLeft === 1 ? '' : 's'}.\n` : ''}\nPlease review and respond: ${offerUrl}${officialContactPlain(ctx?.officialContactEmail)}`;
   return { subject, html, text };
 }
 
 // ── 11. Offer Email with Review Link (to candidate) ───────────────────────────
 export function offerEmailWithLink(
   candidateName: string, jobTitle: string, companyName: string,
-  offerBody: string, offerUrl: string
+  offerBody: string, offerUrl: string,
+  ctx?: CandidateEmailContext,
 ): EmailPayload {
   const subject = `Job Offer — ${jobTitle}${companyName ? ` at ${companyName}` : ''}`;
   const html = shell(candidateName, subject, `
@@ -350,8 +490,8 @@ export function offerEmailWithLink(
     </div>
     ${btn('Review & Sign Offer', offerUrl)}
     <p style='margin:16px 0 0;font-size:13px;color:#666;'>Or copy this link: <a href='${offerUrl}' style='color:#0a66c2;'>${offerUrl}</a></p>
-  `);
-  const text = `Hi ${candidateName},\n\nWe are pleased to extend you an offer for ${jobTitle}${companyName ? ` at ${companyName}` : ''}.\n\n${offerBody}\n\nReview and respond here: ${offerUrl}`;
+  `, ctx);
+  const text = `Hi ${candidateName},\n\nWe are pleased to extend you an offer for ${jobTitle}${companyName ? ` at ${companyName}` : ''}.\n\n${offerBody}\n\nReview and respond here: ${offerUrl}${officialContactPlain(ctx?.officialContactEmail)}`;
   return { subject, html, text };
 }
 
@@ -404,7 +544,8 @@ export function offerResponseEmail(
 // ── 13a. Offer Extended / Reactivated Notification (to candidate) ─────────────
 export function offerExtendedEmail(
   candidateName: string, jobTitle: string, companyName: string,
-  newExpiryDate: string, offerUrl: string, reactivated = false
+  newExpiryDate: string, offerUrl: string, reactivated = false,
+  ctx?: CandidateEmailContext,
 ): EmailPayload {
   const subject = reactivated
     ? `Your offer for ${jobTitle}${companyName ? ` at ${companyName}` : ''} has been reactivated`
@@ -423,8 +564,8 @@ export function offerExtendedEmail(
     </p>
     ${btn('Review & Respond to Offer', offerUrl)}
     <p style='margin:16px 0 0;font-size:13px;color:#888;'>Or copy this link: <a href='${offerUrl}' style='color:#0a66c2;'>${offerUrl}</a></p>
-  `);
-  const text = `Hi ${candidateName},\n\n${reactivated ? 'Your offer for ' : 'The deadline on your offer for '}${jobTitle}${companyName ? ` at ${companyName}` : ''} has been ${reactivated ? 'reactivated' : 'extended'}.\n\nNew expiry date: ${newExpiryDate}\n\nPlease review and respond: ${offerUrl}`;
+  `, ctx);
+  const text = `Hi ${candidateName},\n\n${reactivated ? 'Your offer for ' : 'The deadline on your offer for '}${jobTitle}${companyName ? ` at ${companyName}` : ''} has been ${reactivated ? 'reactivated' : 'extended'}.\n\nNew expiry date: ${newExpiryDate}\n\nPlease review and respond: ${offerUrl}${officialContactPlain(ctx?.officialContactEmail)}`;
   return { subject, html, text };
 }
 

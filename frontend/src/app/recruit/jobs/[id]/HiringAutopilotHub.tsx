@@ -626,7 +626,7 @@ export default function HiringAutopilotHub({
                     <p className="text-[10px] font-bold text-rose-600 uppercase">Rejected</p>
                     <p className="text-xl font-bold text-rose-600">{stats.rejected}</p>
                   </button>
-                  <button type="button" onClick={() => onGoToPipeline("applied")} className="rounded-2xl border border-amber-400/20 bg-amber-500/5 px-3 py-2 text-left hover:bg-amber-500/10 transition">
+                  <button type="button" onClick={() => onGoToPipeline("review_zone")} className="rounded-2xl border border-amber-400/20 bg-amber-500/5 px-3 py-2 text-left hover:bg-amber-500/10 transition">
                     <p className="text-[10px] font-bold text-amber-700 uppercase">In review</p>
                     <p className="text-xl font-bold text-amber-700">{stats.reviewZone}</p>
                   </button>
