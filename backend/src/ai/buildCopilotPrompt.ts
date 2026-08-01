@@ -14,7 +14,7 @@ import type { IRecruitJob } from "../models/RecruitJob";
 import type { IRecruitCandidate } from "../models/RecruitCandidate";
 import type { JobPipelineStat } from "./globalHiringStats";
 
-export type CopilotContextLevel = "global" | "job" | "candidate";
+export type CopilotContextLevel = "global" | "job" | "candidate" | "form";
 export type CopilotPromptMode = "json" | "stream";
 
 export interface GlobalCandidateSummary {
@@ -46,6 +46,9 @@ export interface FormResponseSummary {
   strengths?: string[];
   redFlags?: string[];
   submittedAt?: Date;
+  assessmentStatus?: string;
+  assessmentScore?: number;
+  assessmentScoringStatus?: string;
 }
 
 export interface CopilotPromptContext {
@@ -67,6 +70,9 @@ export interface CopilotPromptContext {
   formResponses?: FormResponseSummary[];
   /** When set, this is a synthetic instruction (e.g. "generate today's insights card") rather than a real recruiter question. */
   syntheticInstruction?: string;
+  // Form context (single form deep view)
+  form?: any;
+  formDetailedResponses?: any[];
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -442,7 +448,10 @@ function formResponseLine(r: FormResponseSummary, rank: number): string {
   const strengths = (r.strengths || []).slice(0, 3).join(", ") || "—";
   const redFlags = (r.redFlags || []).slice(0, 2).join(", ") || "None";
   const score = r.scoringFailed ? "not scored" : `${r.aiScore}%`;
-  return `[F${rank}] ${r.name || "Applicant"} — responseId: ${String(r._id)} | Email: ${r.email || "(not available)"} | Form: ${r.formTitle} | Score: ${score} | Stage: ${r.stage} | Strengths: ${strengths} | Red flags: ${redFlags}`;
+  const assessmentPart = r.assessmentStatus && r.assessmentStatus !== "not_sent"
+    ? ` | Assessment: ${r.assessmentStatus}${r.assessmentScore ? ` (${r.assessmentScore}%)` : ""}`
+    : "";
+  return `[F${rank}] ${r.name || "Applicant"} — responseId: ${String(r._id)} | Email: ${r.email || "(not available)"} | Form: ${r.formTitle} | Score: ${score} | Stage: ${r.stage}${assessmentPart} | Strengths: ${strengths} | Red flags: ${redFlags}`;
 }
 
 function formResponsesBlock(responses: FormResponseSummary[]): string {
@@ -512,9 +521,105 @@ ${sharedBehaviourRules()}
 - When citing a job, use type "job_description" and mention the job title in the label.
 - If the recruiter's question is really about one specific job or candidate, still answer using the data above — do not ask them to "select a job first"; you already have everything.
 - Form Job applicants are scored 0–100 directly from their written answers (no rubric), so their scores are not strictly comparable to Standard Job candidates — compare within a job type, and say so if the recruiter asks you to rank across both.
-- Form applicants have a shorter pipeline (new → shortlisted → interview → hired/rejected) and no assessments or offer letters. Never suggest an action for them that only exists on Standard Jobs.
+- Form applicants support assessments (a separate scored test sent after submission). When an applicant has assessmentStatus "completed", their assessmentScore is a second data point to factor in alongside the AI submission score.
 - Never guess a number. If organization stats don't cover something (e.g. a specific skill not tracked), say the data isn't available rather than inventing it.
 `;
+}
+
+// ─── Form Context Prompt (single form deep analysis) ──────────────────────────
+
+function buildFormContextPrompt(ctx: CopilotPromptContext): string {
+  const mode = ctx.mode ?? "json";
+  const company = ctx.companyName || "the company";
+  const recruiter = ctx.recruiterName || "the recruiter";
+  const form = ctx.form;
+  const responses = ctx.formDetailedResponses || [];
+
+  const formTitle = form?.title || "Unknown Form";
+  const formDesc = form?.description || "";
+  const questions = (form?.questions || []) as Array<{ question: string; type?: string }>;
+
+  const stageBreakdown = (() => {
+    const counts: Record<string, number> = {};
+    for (const r of responses) counts[r.stage] = (counts[r.stage] || 0) + 1;
+    return Object.entries(counts).map(([stage, count]) => `  • ${stage}: ${count}`).join("\n") || "  (none yet)";
+  })();
+
+  const scored = responses.filter((r: any) => !r.scoringFailed && r.aiScore > 0);
+  const avgScore = scored.length
+    ? Math.round(scored.reduce((s: number, r: any) => s + r.aiScore, 0) / scored.length)
+    : null;
+
+  const assessmentSent = responses.filter((r: any) => r.assessmentStatus && r.assessmentStatus !== "not_sent").length;
+  const assessmentCompleted = responses.filter((r: any) => r.assessmentStatus === "completed").length;
+  const scoringFailed = responses.filter((r: any) => r.scoringFailed).length;
+
+  const questionsBlock = questions.length
+    ? questions.map((q, i) => `  Q${i + 1}: ${q.question}`).join("\n")
+    : "  (no questions)";
+
+  const responseLines = responses
+    .slice(0, 60)
+    .map((r: any, i: number) => {
+      const score = r.scoringFailed ? "not scored" : `${r.aiScore}%`;
+      const strengths = (r.strengths || []).slice(0, 3).join(", ") || "—";
+      const redFlags = (r.redFlags || []).slice(0, 2).join(", ") || "None";
+      const assessmentPart = r.assessmentStatus && r.assessmentStatus !== "not_sent"
+        ? ` | Assessment: ${r.assessmentStatus}${r.assessmentScore ? ` (${r.assessmentScore}%)` : ""}`
+        : "";
+      const summaryLine = `[${i + 1}] ${r.submittedName || "Applicant"} — responseId: ${String(r._id)} | Email: ${r.submittedEmail || "(not available)"} | Score: ${score} | Stage: ${r.stage}${assessmentPart} | Strengths: ${strengths} | Red flags: ${redFlags}`;
+
+      // Include a brief per-answer summary if answers exist
+      const answers = (r.answers || []) as Array<{ question: string; answer: string; aiScore?: number; signal?: string }>;
+      const answerLines = answers
+        .slice(0, 5)
+        .map((a, qi) => `    Q${qi + 1} (${a.signal || "—"}): ${(a.answer || "").slice(0, 200)}`)
+        .join("\n");
+      return answerLines ? `${summaryLine}\n${answerLines}` : summaryLine;
+    })
+    .join("\n\n");
+
+  const truncatedNote = responses.length > 60
+    ? `\n(Showing ${60} of ${responses.length} applicants.)`
+    : "";
+
+  return `You are Rolebolt AI — an expert AI Hiring Copilot for ${company}, assisting ${recruiter}.
+
+## Your Role
+You are acting as ${recruiter}'s expert hiring analyst focused on a SINGLE application form. You have access to every applicant's profile, their written answers, AI scores, assessment results, and pipeline stage. Reason from the actual data — do not generalise beyond what you can see.
+
+## Form Details
+Title: ${formTitle}
+${formDesc ? `Description: ${formDesc}` : ""}
+
+## Form Questions
+${questionsBlock}
+
+## Pipeline Summary
+Total applicants: ${responses.length}
+Average AI score: ${avgScore !== null ? `${avgScore}%` : "N/A (none scored yet)"}
+Scoring failed: ${scoringFailed}
+Assessments sent: ${assessmentSent} | Completed: ${assessmentCompleted}
+
+Stage breakdown:
+${stageBreakdown}
+
+## Applicants (sorted by score, highest first)
+${responseLines || "(no applicants yet)"}${truncatedNote}
+
+---
+
+${mode === "stream" ? streamResponseFormat() : jsonResponseFormat()}
+
+${sharedBehaviourRules()}
+
+## Form Context Rules
+- Always use responseId (not candidateId) when citing a Form applicant in sources. Use source type "candidate_profile" with the responseId in the candidateId field so the frontend can link correctly.
+- AI scores (0–100) come from evaluating written answers. Assessment scores (0–100) come from a separate timed test — use both when available.
+- scoringFailed = true means AI could not score the response; do NOT treat it as a low-quality applicant. Tell the recruiter to retry scoring.
+- When suggesting stages, respect the form pipeline: new → scored → review_zone → shortlisted → assessment → interview → offer → hired / rejected / withdrawn.
+- Never suggest sending an offer letter for Form applicants (not yet supported); recommend advancing to interview or noting as a top candidate instead.
+- Focus recommendations on concrete next actions: shortlist X, reject Y, send assessment to Z, schedule interview with W.`;
 }
 
 // ─── Main Export ──────────────────────────────────────────────────────────────
@@ -524,6 +629,9 @@ export function buildCopilotPrompt(ctx: CopilotPromptContext): string {
     case "job":
       return buildJobContextPrompt(ctx);
     case "global":
+      return buildGlobalContextPrompt(ctx);
+    case "form":
+      if (ctx.form) return buildFormContextPrompt(ctx);
       return buildGlobalContextPrompt(ctx);
     case "candidate":
       if (ctx.candidate) return buildCandidateContextPrompt(ctx);
