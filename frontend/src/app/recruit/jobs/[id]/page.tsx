@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, use } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useCallback, useRef, use, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { RecruitGuard } from "@/components/RecruitGuard";
 import Link from "next/link";
@@ -154,7 +154,7 @@ type PipelineRule = {
   condition: "score_above" | "score_below" | "assessment_passed" | "assessment_failed" | "stage_age_days";
   threshold: number;
   fromStage?: string;
-  action: "move_to_screened" | "move_to_interview" | "move_to_offer" | "move_to_rejected" | "send_assessment" | "send_reminder";
+  action: "move_to_screened" | "move_to_assessed" | "move_to_interview" | "move_to_offer" | "move_to_rejected" | "send_assessment" | "send_reminder";
   enabled: boolean;
   triggerCount: number;
 };
@@ -1969,10 +1969,11 @@ function AiRecommendationBadge({
   );
 }
 
-function CandidateCard({ c, jobId, job, token, onUpdate, onDelete }: {
+function CandidateCard({ c, jobId, job, token, onUpdate, onDelete, highlighted }: {
   c: Candidate; jobId: string; job: Job; token: string;
   onUpdate: (id: string, update: Partial<Candidate>) => void;
   onDelete: (id: string) => void;
+  highlighted?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [loadingBrief, setLoadingBrief] = useState(false);
@@ -2230,7 +2231,12 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete }: {
         />
       )}
 
-      <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-card)] transition hover:shadow-[var(--shadow-card-hover)] overflow-hidden">
+      <div
+        id={`candidate-${c._id}`}
+        className={`rounded-3xl border bg-[var(--surface)] shadow-[var(--shadow-card)] transition hover:shadow-[var(--shadow-card-hover)] overflow-hidden ${
+          highlighted ? "border-indigo-500 ring-2 ring-indigo-500/30" : "border-[var(--border)]"
+        }`}
+      >
         <div className="p-5">
           <div className="flex items-start justify-between gap-3 mb-3">
             <div className="flex-1 min-w-0">
@@ -2595,12 +2601,20 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete }: {
 function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const validTabs = ["pipeline", "jd", "rubric", "post", "rules", "performance", "agent-log", "assessment-analytics", "live", "collaboration", "ai-hiring", "job-analysis"] as const;
+  type JobTab = typeof validTabs[number];
+  const tabFromUrl = searchParams.get("tab");
+  const initialTab: JobTab = validTabs.includes(tabFromUrl as JobTab) ? (tabFromUrl as JobTab) : "pipeline";
+  const highlightCandidateId = searchParams.get("candidate");
+
   const [token, setToken] = useState<string | null>(null);
   const [job, setJob] = useState<Job | null>(null);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<"pipeline" | "jd" | "rubric" | "post" | "rules" | "performance" | "agent-log" | "assessment-analytics" | "live" | "collaboration" | "ai-hiring" | "job-analysis">("pipeline");
+  const [activeTab, setActiveTab] = useState<JobTab>(initialTab);
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [pipelineRules, setPipelineRules] = useState<PipelineRule[]>([]);
   const [perfAlerts, setPerfAlerts] = useState<PerformanceAlert[]>([]);
@@ -2618,6 +2632,7 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
   const fetchData = useCallback(async () => {
     if (!token) return;
     setLoading(true);
+    setFetchError(null);
     try {
       const [jobRes, candRes, rulesRes, agentLogRes] = await Promise.all([
         fetch(apiUrl(`/recruit/jobs/${id}`), { headers: { Authorization: `Bearer ${token}` } }),
@@ -2625,20 +2640,34 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
         fetch(apiUrl(`/recruit/jobs/${id}/pipeline-rules`), { headers: { Authorization: `Bearer ${token}` } }),
         fetch(apiUrl(`/recruit/jobs/${id}/agent-log`), { headers: { Authorization: `Bearer ${token}` } }),
       ]);
+      if (!jobRes.ok) {
+        const errData = await jobRes.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to load job.");
+      }
       const jobData = await readApiJson(jobRes);
       const candData = await readApiJson(candRes);
-      const rulesData = await readApiJson(rulesRes);
-      const agentLogData = await readApiJson(agentLogRes).catch(() => ({ total: 0 }));
+      const rulesData = rulesRes.ok ? await readApiJson(rulesRes) : { rules: jobData.job?.pipelineRules ?? [] };
+      const agentLogData = agentLogRes.ok ? await readApiJson(agentLogRes) : { total: 0 };
       setJob(jobData.job ?? null);
       setCandidates(candData.candidates ?? []);
-      setPipelineRules(rulesData.rules ?? []);
+      setPipelineRules(rulesData.rules ?? jobData.job?.pipelineRules ?? []);
       setPerfAlerts(jobData.job?.performanceAlerts?.filter((a: PerformanceAlert) => !a.dismissed) ?? []);
       setAgentLogCount(agentLogData.total ?? 0);
-    } catch { /* silent */ }
+    } catch (err: any) {
+      setFetchError(err.message || "Failed to load job data.");
+    }
     finally { setLoading(false); }
   }, [token, id]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  useEffect(() => {
+    if (!highlightCandidateId || loading) return;
+    const el = document.getElementById(`candidate-${highlightCandidateId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [highlightCandidateId, loading, candidates.length]);
 
   // ── AI synthesis polling ───────────────────────────────────────────────────
   // Poll every 30 s when on the pipeline tab to keep recommendation badges current.
@@ -2777,6 +2806,21 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
             ))}
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (!loading && fetchError) {
+    return (
+      <div className="min-h-screen bg-[var(--background)] flex flex-col items-center justify-center gap-4 px-4">
+        <p className="text-sm text-rose-600">{fetchError}</p>
+        <button
+          type="button"
+          onClick={() => fetchData()}
+          className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 transition"
+        >
+          Retry
+        </button>
       </div>
     );
   }
@@ -3094,7 +3138,16 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
                       ) : (
                         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                           {visibleCandidates.map(c => (
-                            <CandidateCard key={c._id} c={c} jobId={id} job={job} token={token!} onUpdate={handleUpdate} onDelete={handleDelete} />
+                            <CandidateCard
+                              key={c._id}
+                              c={c}
+                              jobId={id}
+                              job={job}
+                              token={token!}
+                              onUpdate={handleUpdate}
+                              onDelete={handleDelete}
+                              highlighted={highlightCandidateId === c._id}
+                            />
                           ))}
                         </div>
                       )}
@@ -3503,7 +3556,7 @@ function AgentLogTab({
 
                     {/* Link to candidate */}
                     <a
-                      href={`/recruit/jobs/${jobId}/candidates/${entry.candidateId}`}
+                      href={`/recruit/jobs/${jobId}?tab=pipeline&candidate=${entry.candidateId}`}
                       className="flex items-center justify-center gap-1.5 w-full rounded-xl border border-indigo-500/30 bg-indigo-500/5 px-3 py-2 text-xs font-semibold text-indigo-500 hover:bg-indigo-500/10 transition"
                     >
                       View {entry.candidateName.split(" ")[0]}&apos;s Profile
@@ -4029,6 +4082,7 @@ const CONDITION_LABELS: Record<PipelineRule["condition"], string> = {
 
 const ACTION_LABELS: Record<PipelineRule["action"], string> = {
   move_to_screened:  "Move to Screened",
+  move_to_assessed:  "Move to Assessed",
   move_to_interview: "Move to Interview",
   move_to_offer:     "Move to Offer",
   move_to_rejected:  "Move to Rejected",
@@ -4514,5 +4568,11 @@ ${jobDescription}`;
 }
 
 export default function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  return <RecruitGuard requiredRole="creator"><JobDetailContent params={params} /></RecruitGuard>;
+  return (
+    <RecruitGuard requiredRole="creator">
+      <Suspense fallback={<div className="p-10 text-center text-sm text-[var(--text-muted)]">Loading job…</div>}>
+        <JobDetailContent params={params} />
+      </Suspense>
+    </RecruitGuard>
+  );
 }
