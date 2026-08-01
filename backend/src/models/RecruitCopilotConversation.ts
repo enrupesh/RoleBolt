@@ -1,11 +1,12 @@
 import mongoose, { Document, Schema } from "mongoose";
 
-export type CopilotContextLevel = "global" | "job" | "candidate";
+export type CopilotContextLevel = "global" | "job" | "candidate" | "form";
 
 export interface ICopilotContext {
   level: CopilotContextLevel;
   jobId?: string;
   candidateId?: string;
+  formId?: string;
 }
 
 export interface ICopilotSource {
@@ -79,9 +80,10 @@ export interface IRecruitCopilotConversation extends Document {
 
 const CopilotContextSchema = new Schema<ICopilotContext>(
   {
-    level: { type: String, enum: ["global", "job", "candidate"], required: true },
+    level: { type: String, enum: ["global", "job", "candidate", "form"], required: true },
     jobId: { type: String },
     candidateId: { type: String },
+    formId: { type: String },
   },
   { _id: false }
 );
