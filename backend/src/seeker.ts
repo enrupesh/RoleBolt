@@ -1,8 +1,10 @@
 import express from "express";
+import mongoose from "mongoose";
 import { connectMongo } from "./db";
 import { RecruitSeekerProfile } from "./models/RecruitSeekerProfile";
 import { RecruitCandidate } from "./models/RecruitCandidate";
 import { RecruitJob } from "./models/RecruitJob";
+import { RecruitSeekerWorkspace } from "./models/RecruitSeekerWorkspace";
 import { callGeminiChain } from "./ai/geminiClient";
 import { callMeshChatCompletions } from "./ai/meshClient";
 import { callNvidia } from "./ai/nvidiaClient";
@@ -43,6 +45,174 @@ function safeParseJson(text: string): any {
   return null;
 }
 
+function cleanHtmlText(html: string): string {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
+    .replace(/<svg[\s\S]*?<\/svg>/gi, " ")
+    .replace(/<!--[\s\S]*?-->/g, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function htmlMeta(html: string, name: string): string {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = html.match(new RegExp(`<meta[^>]+(?:name|property)=["']${escaped}["'][^>]+content=["']([^"']+)["']`, "i"))
+    ?? html.match(new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+(?:name|property)=["']${escaped}["']`, "i"));
+  return match?.[1]?.trim() ?? "";
+}
+
+function isSafeExternalUrl(raw: string): URL | null {
+  try {
+    const url = new URL(raw);
+    if (!["http:", "https:"].includes(url.protocol)) return null;
+    const hostname = url.hostname.toLowerCase();
+    if (
+      hostname === "localhost" ||
+      hostname.endsWith(".localhost") ||
+      hostname.endsWith(".local") ||
+      hostname === "127.0.0.1" ||
+      hostname === "0.0.0.0" ||
+      hostname === "::1" ||
+      /^10\./.test(hostname) ||
+      /^192\.168\./.test(hostname) ||
+      /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname)
+    ) return null;
+    return url;
+  } catch {
+    return null;
+  }
+}
+
+async function extractJobFromUrl(rawUrl: string): Promise<{ title: string; description: string }> {
+  const url = isSafeExternalUrl(rawUrl);
+  if (!url) throw new Error("Please enter a valid public http or https job URL.");
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12000);
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": "Rolebolt Job Workspace/1.0 (+https://rolebolt.tech)",
+        Accept: "text/html,application/xhtml+xml,text/plain;q=0.9",
+      },
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(`The job page returned HTTP ${response.status}.`);
+    const html = await response.text();
+    const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+    const title = cleanHtmlText(
+      htmlMeta(html, "og:title") || htmlMeta(html, "twitter:title") || titleMatch?.[1] || ""
+    ).slice(0, 240);
+    const description = cleanHtmlText(
+      htmlMeta(html, "og:description") || htmlMeta(html, "description") || html
+    ).slice(0, 30000);
+    return { title, description };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function workspaceDto(workspace: any) {
+  return {
+    id: workspace._id?.toString?.() ?? workspace.id,
+    sourceUrl: workspace.sourceUrl ?? "",
+    sourceType: workspace.sourceType ?? "manual",
+    title: workspace.title ?? "Untitled job",
+    companyName: workspace.companyName ?? "",
+    location: workspace.location ?? "",
+    workMode: workspace.workMode ?? "",
+    salaryText: workspace.salaryText ?? "",
+    applicationDeadline: workspace.applicationDeadline ?? null,
+    jobDescription: workspace.jobDescription ?? "",
+    status: workspace.status ?? "saved",
+    notes: workspace.notes ?? "",
+    analysis: workspace.analysis ?? null,
+    createdAt: workspace.createdAt,
+    updatedAt: workspace.updatedAt,
+  };
+}
+
+function clampScore(value: unknown): number {
+  const score = Number(value);
+  return Number.isFinite(score) ? Math.max(0, Math.min(100, Math.round(score))) : 0;
+}
+
+function workspaceIdIsValid(id: string): boolean {
+  return mongoose.Types.ObjectId.isValid(id);
+}
+
+async function analyzeWorkspaceForSeeker(uid: string, workspace: any) {
+  const profile = await RecruitSeekerProfile.findOne({ uid }).lean() as any;
+  const resumeText = String(profile?.resumeText || "").slice(0, 6000);
+  const skills = Array.isArray(profile?.skills) ? profile.skills.join(", ") : "";
+  const targetRole = profile?.preferredNiche || profile?.headline || "";
+  const prompt = `You are a precise career matching analyst. Analyze whether this job is a good fit for the job seeker.
+
+JOB:
+Title: ${workspace.title || "Unknown"}
+Company: ${workspace.companyName || "Unknown"}
+Location: ${workspace.location || "Not specified"}
+Work mode: ${workspace.workMode || "Not specified"}
+Salary: ${workspace.salaryText || "Not specified"}
+Description:
+${String(workspace.jobDescription || "").slice(0, 18000)}
+
+SEEKER:
+Target area: ${targetRole || "Not specified"}
+Skills: ${skills || "Not listed"}
+Resume:
+${resumeText || "Not provided"}
+
+Return ONLY valid JSON:
+{
+  "matchScore": 0,
+  "matchLabel": "Strong match | Good match | Stretch opportunity | Low match",
+  "summary": "One clear, honest sentence for the seeker.",
+  "matchReasons": ["specific reason"],
+  "strengths": ["specific requirement the seeker appears to meet"],
+  "missingSkills": ["specific missing or unclear skill"],
+  "profileSuggestions": ["specific action before applying"],
+  "salaryInsight": "Brief note about salary fit, or say salary was not provided."
+}
+
+Rules:
+- Score 0-100 and be conservative when resume details are missing.
+- Do not invent experience, salary data, or company facts.
+- Keep each array to at most 5 concise items.
+- If there is no resume, explain that the score is an initial JD-based estimate in the summary.
+- Distinguish a missing skill from a skill that is simply not visible in the resume.`;
+
+  const parsed = safeParseJson(await callAI(prompt));
+  if (!parsed || typeof parsed !== "object") {
+    throw new Error("AI returned an invalid job analysis.");
+  }
+  const matchScore = clampScore(parsed.matchScore);
+  const analysis = {
+    matchScore,
+    matchLabel: String(parsed.matchLabel || (matchScore >= 75 ? "Strong match" : matchScore >= 55 ? "Good match" : "Needs review")),
+    summary: String(parsed.summary || "Review this role against your current profile."),
+    matchReasons: Array.isArray(parsed.matchReasons) ? parsed.matchReasons.map(String).slice(0, 5) : [],
+    strengths: Array.isArray(parsed.strengths) ? parsed.strengths.map(String).slice(0, 5) : [],
+    missingSkills: Array.isArray(parsed.missingSkills) ? parsed.missingSkills.map(String).slice(0, 5) : [],
+    profileSuggestions: Array.isArray(parsed.profileSuggestions) ? parsed.profileSuggestions.map(String).slice(0, 5) : [],
+    salaryInsight: String(parsed.salaryInsight || ""),
+    analyzedAt: new Date(),
+  };
+  workspace.analysis = analysis;
+  if (workspace.status === "saved") workspace.status = "analyzed";
+  await workspace.save();
+  return analysis;
+}
+
 // ── GET /recruit/seeker/profile ───────────────────────────────────────────────
 seekerRouter.get("/profile", async (req, res) => {
   try {
@@ -77,6 +247,156 @@ seekerRouter.put("/profile", async (req, res) => {
       { returnDocument: "after", upsert: true, setDefaultsOnInsert: true }
     ).lean();
     return res.json({ profile });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Seeker Universal Job Workspace ────────────────────────────────────────────
+// A workspace item can represent any job, including jobs found outside Rolebolt.
+seekerRouter.get("/workspace", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const status = typeof req.query.status === "string" ? req.query.status : "";
+    const filter: Record<string, any> = { uid };
+    if (["saved", "analyzed", "applied", "archived"].includes(status)) filter.status = status;
+    const workspaces = await RecruitSeekerWorkspace.find(filter).sort({ updatedAt: -1 }).lean();
+    return res.json({ workspaces: workspaces.map(workspaceDto) });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+seekerRouter.post("/workspace", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    let {
+      sourceUrl = "",
+      title = "",
+      companyName = "",
+      location = "",
+      workMode = "",
+      salaryText = "",
+      jobDescription = "",
+      notes = "",
+      status = "saved",
+    } = req.body as Record<string, string>;
+
+    sourceUrl = String(sourceUrl || "").trim();
+    jobDescription = String(jobDescription || "").trim();
+    if (!jobDescription && !sourceUrl) {
+      return res.status(400).json({ error: "Add a job URL or paste the job description." });
+    }
+    if (sourceUrl && !isSafeExternalUrl(sourceUrl)) {
+      return res.status(400).json({ error: "Please enter a valid public http or https job URL." });
+    }
+
+    let extractedTitle = "";
+    if (sourceUrl && !jobDescription) {
+      try {
+        const extracted = await extractJobFromUrl(sourceUrl);
+        jobDescription = extracted.description;
+        extractedTitle = extracted.title;
+      } catch (err: any) {
+        return res.status(422).json({
+          error: err.message || "We could not read that job page. Paste the job description instead.",
+          needsManualDescription: true,
+        });
+      }
+    }
+    if (jobDescription.length < 40) {
+      return res.status(400).json({ error: "Please provide a fuller job description (at least 40 characters)." });
+    }
+
+    const workspace = await RecruitSeekerWorkspace.create({
+      uid,
+      sourceUrl,
+      sourceType: sourceUrl ? "url" : "manual",
+      title: String(title || extractedTitle || "Untitled job").trim().slice(0, 240),
+      companyName: String(companyName || "").trim().slice(0, 180),
+      location: String(location || "").trim().slice(0, 180),
+      workMode: String(workMode || "").trim().slice(0, 80),
+      salaryText: String(salaryText || "").trim().slice(0, 180),
+      jobDescription: jobDescription.slice(0, 30000),
+      notes: String(notes || "").trim().slice(0, 3000),
+      status: ["saved", "applied", "archived"].includes(status) ? status : "saved",
+    });
+
+    let analysisError = "";
+    try {
+      await analyzeWorkspaceForSeeker(uid, workspace);
+    } catch (err: any) {
+      analysisError = err.message || "The job was saved, but AI analysis could not be completed.";
+    }
+    return res.status(201).json({
+      workspace: workspaceDto(workspace),
+      analysisError: analysisError || undefined,
+    });
+  } catch (err: any) {
+    console.error("[seeker] workspace create error:", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+seekerRouter.get("/workspace/:id", async (req, res) => {
+  try {
+    await connectMongo();
+    if (!workspaceIdIsValid(req.params.id)) return res.status(400).json({ error: "Invalid workspace id." });
+    const workspace = await RecruitSeekerWorkspace.findOne({ _id: req.params.id, uid: getUid(req) }).lean();
+    if (!workspace) return res.status(404).json({ error: "Workspace item not found." });
+    return res.json({ workspace: workspaceDto(workspace) });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+seekerRouter.patch("/workspace/:id", async (req, res) => {
+  try {
+    await connectMongo();
+    if (!workspaceIdIsValid(req.params.id)) return res.status(400).json({ error: "Invalid workspace id." });
+    const allowed = ["title", "companyName", "location", "workMode", "salaryText", "notes", "status"];
+    const update: Record<string, any> = {};
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) update[key] = typeof req.body[key] === "string" ? req.body[key].trim() : req.body[key];
+    }
+    if (update.status && !["saved", "analyzed", "applied", "archived"].includes(update.status)) {
+      return res.status(400).json({ error: "Invalid workspace status." });
+    }
+    const workspace = await RecruitSeekerWorkspace.findOneAndUpdate(
+      { _id: req.params.id, uid: getUid(req) },
+      { $set: update },
+      { new: true }
+    ).lean();
+    if (!workspace) return res.status(404).json({ error: "Workspace item not found." });
+    return res.json({ workspace: workspaceDto(workspace) });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+seekerRouter.post("/workspace/:id/analyze", async (req, res) => {
+  try {
+    await connectMongo();
+    if (!workspaceIdIsValid(req.params.id)) return res.status(400).json({ error: "Invalid workspace id." });
+    const workspace = await RecruitSeekerWorkspace.findOne({ _id: req.params.id, uid: getUid(req) });
+    if (!workspace) return res.status(404).json({ error: "Workspace item not found." });
+    const analysis = await analyzeWorkspaceForSeeker(getUid(req), workspace);
+    return res.json({ workspace: workspaceDto(workspace), analysis });
+  } catch (err: any) {
+    console.error("[seeker] workspace analyze error:", err);
+    return res.status(500).json({ error: err.message || "Job analysis failed. Please try again." });
+  }
+});
+
+seekerRouter.delete("/workspace/:id", async (req, res) => {
+  try {
+    await connectMongo();
+    if (!workspaceIdIsValid(req.params.id)) return res.status(400).json({ error: "Invalid workspace id." });
+    const deleted = await RecruitSeekerWorkspace.findOneAndDelete({ _id: req.params.id, uid: getUid(req) });
+    if (!deleted) return res.status(404).json({ error: "Workspace item not found." });
+    return res.json({ ok: true });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
