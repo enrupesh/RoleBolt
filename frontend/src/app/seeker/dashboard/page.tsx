@@ -29,6 +29,7 @@ const STAGE_COLORS: Record<string, string> = {
 };
 
 const AI_TOOLS = [
+  { href: "/seeker/workspace",      icon: "✦",  label: "Universal Job Workspace", desc: "Analyze any job from any website" },
   { href: "/seeker/resume",         icon: "📄", label: "AI Resume Builder",       desc: "Build or improve your resume" },
   { href: "/seeker/cover-letter",   icon: "✉️",  label: "Cover Letter Generator",  desc: "Personalized cover letters in seconds" },
   { href: "/seeker/interview-prep", icon: "🎤",  label: "Interview Prep",           desc: "Mock interviews with AI feedback" },
