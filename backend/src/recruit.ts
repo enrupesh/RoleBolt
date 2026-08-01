@@ -22,6 +22,19 @@ import { RecruitCandidateCollaboration } from "./models/RecruitCandidateCollabor
 import { RecruitForm } from "./models/RecruitForm";
 import { RecruitFormResponse } from "./models/RecruitFormResponse";
 import { verifyRecaptcha, RECAPTCHA_REJECTION_MESSAGE } from "./publicSubmissionGuard";
+import {
+  type AgentAction,
+  validatePipelineRuleInput,
+  isPipelineRuleEnabled,
+  normalizeAgentThresholds,
+  computeAgentTriage,
+  agentReason,
+  candidateDayInStage,
+  pipelineRuleMarker,
+  shouldSkipPipelineRule,
+  isPipelineConditionMet,
+  shouldMigrateLegacyReviewZoneStage,
+} from "./automation/standardJobCore";
 
 // ─── Resume parser (in-memory only, no disk storage) ──────────────────────────
 const RESUME_ALLOWED_TYPES = [
@@ -105,88 +118,44 @@ async function getJobWithCollaborationPermission(
 
 // ── AI Agent + Pipeline Rules shared automation ───────────────────────────────
 
-type AgentAction = "shortlisted" | "rejected" | "review_zone";
+const EARLY_PIPELINE_STAGES = new Set(["applied", "review_zone"]);
 
-const PIPELINE_CONDITIONS = new Set([
-  "score_above", "score_below", "assessment_passed", "assessment_failed", "stage_age_days",
-]);
-const PIPELINE_ACTIONS = new Set([
-  "move_to_screened", "move_to_assessed", "move_to_interview", "move_to_offer",
-  "move_to_rejected", "send_assessment", "send_reminder",
-]);
-const PIPELINE_CONDITIONS_NEED_THRESHOLD = new Set(["score_above", "score_below", "stage_age_days"]);
-
-function validatePipelineRuleInput(body: {
-  condition?: string;
-  threshold?: number;
-  action?: string;
-}): string | null {
-  if (!body.condition || !PIPELINE_CONDITIONS.has(body.condition)) {
-    return "Invalid or missing condition.";
-  }
-  if (!body.action || !PIPELINE_ACTIONS.has(body.action)) {
-    return "Invalid or missing action.";
-  }
-  if (PIPELINE_CONDITIONS_NEED_THRESHOLD.has(body.condition)) {
-    const t = Number(body.threshold);
-    if (!Number.isFinite(t)) return "threshold is required for this condition.";
-  }
-  return null;
+async function getCreatorOfficialEmail(jobUid: string): Promise<string> {
+  if (!jobUid) return "";
+  try {
+    const user = await User.findById(jobUid).select("email").lean();
+    if (user?.email?.trim()) return user.email.trim();
+  } catch { /* ignore */ }
+  const profile = await RecruitProfile.findOne({ uid: jobUid }).select("email").lean();
+  return profile?.email?.trim() ?? "";
 }
 
-function isPipelineRuleEnabled(rule: { enabled?: boolean }): boolean {
-  return rule.enabled !== false;
-}
-
-function normalizeAgentThresholds(agentMode: Record<string, unknown>) {
-  let shortlistThreshold = Number(agentMode.shortlistThreshold ?? 75);
-  let rejectThreshold = Number(agentMode.rejectThreshold ?? 40);
-  shortlistThreshold = Math.min(100, Math.max(0, shortlistThreshold));
-  rejectThreshold = Math.min(100, Math.max(0, rejectThreshold));
-  if (rejectThreshold >= shortlistThreshold) {
-    rejectThreshold = Math.max(0, shortlistThreshold - 5);
+async function ensureScreenedStage(candidateId: string): Promise<void> {
+  const candidate = await RecruitCandidate.findById(candidateId).select("stage").lean();
+  if (!candidate) return;
+  if (EARLY_PIPELINE_STAGES.has(candidate.stage)) {
+    await RecruitCandidate.updateOne(
+      { _id: candidateId },
+      { $set: { stage: "screened", stageMovedAt: new Date() } },
+    );
   }
-  return { shortlistThreshold, rejectThreshold };
 }
 
-function computeAgentTriage(
-  agentMode: Record<string, unknown>,
-  scorePct: number,
-  scoringFailed: boolean,
+async function pushCandidateEmailLog(
+  candidateId: string,
+  entry: {
+    type: string;
+    to: string;
+    subject: string;
+    body: string;
+    status: "sent" | "failed" | "skipped";
+    error?: string;
+  },
 ) {
-  const { shortlistThreshold, rejectThreshold } = normalizeAgentThresholds(agentMode);
-  const agentEnabled = agentMode.enabled === true && !scoringFailed;
-  let initialStage = "applied";
-  let agentAction: AgentAction | null = null;
-
-  if (agentEnabled) {
-    if (scorePct >= shortlistThreshold) {
-      initialStage = "screened";
-      agentAction = "shortlisted";
-    } else if (scorePct < rejectThreshold) {
-      initialStage = "rejected";
-      agentAction = "rejected";
-    } else {
-      agentAction = "review_zone";
-    }
-  }
-
-  return { initialStage, agentAction, shortlistThreshold, rejectThreshold, agentEnabled };
-}
-
-function agentReason(
-  agentAction: AgentAction,
-  scorePct: number,
-  shortlistThreshold: number,
-  rejectThreshold: number,
-): string {
-  if (agentAction === "shortlisted") {
-    return `Score ${scorePct}% ≥ shortlist threshold ${shortlistThreshold}%`;
-  }
-  if (agentAction === "rejected") {
-    return `Score ${scorePct}% < reject threshold ${rejectThreshold}%`;
-  }
-  return `Score ${scorePct}% is in review zone (${rejectThreshold}%–${shortlistThreshold}%)`;
+  await RecruitCandidate.updateOne(
+    { _id: candidateId },
+    { $push: { emailLog: { ...entry, sentAt: new Date() } } },
+  );
 }
 
 async function sendCandidateStageEmail(
@@ -195,16 +164,22 @@ async function sendCandidateStageEmail(
   stage: string,
   candName: string,
   candEmail: string,
+  jobUid?: string,
 ) {
   if (!candEmail) return;
   try {
     const job = await RecruitJob.findById(jobId).lean();
     const jobTitle = (job as any)?.title ?? "";
     const companyName = (job as any)?.companyName ?? "";
+    const officialContactEmail = await getCreatorOfficialEmail(jobUid ?? (job as any)?.uid ?? "");
+    const ctx = { officialContactEmail };
     let payload: emailTemplates.EmailPayload | null = null;
-    if (stage === "screened") payload = emailTemplates.screened(candName, jobTitle, companyName);
-    if (stage === "interview") payload = emailTemplates.interview(candName, jobTitle, companyName);
-    if (stage === "hired") payload = emailTemplates.hired(candName, jobTitle, companyName);
+    if (stage === "screened") {
+      await ensureScreenedStage(candidateId);
+      payload = emailTemplates.screened(candName, jobTitle, companyName, ctx);
+    }
+    if (stage === "interview") payload = emailTemplates.interview(candName, jobTitle, companyName, ctx);
+    if (stage === "hired") payload = emailTemplates.hired(candName, jobTitle, companyName, undefined, ctx);
     if (!payload) return;
     const result = await sendEmail({
       to: candEmail,
@@ -213,32 +188,139 @@ async function sendCandidateStageEmail(
       text: payload.text,
       from: CANDIDATE_FROM,
     });
-    await RecruitCandidate.findByIdAndUpdate(candidateId, {
-      $push: {
-        emailLog: {
-          type: stage,
-          to: candEmail,
-          subject: payload.subject,
-          body: payload.text,
-          sentAt: new Date(),
-          status: result.ok ? "sent" : "failed",
-          error: result.error,
-        },
-      },
+    await pushCandidateEmailLog(candidateId, {
+      type: stage,
+      to: candEmail,
+      subject: payload.subject,
+      body: payload.text,
+      status: result.ok ? "sent" : "failed",
+      error: result.error,
     });
   } catch (err) {
     console.error("[mailer] stage-change email failed:", err);
   }
 }
 
-/** Atomically claim the right to send an assessment (prevents agent + rule double-send). */
-async function claimAssessmentSend(candidateId: string): Promise<boolean> {
+async function getOrCreateAssessmentInvite(candidateId: string): Promise<string | null> {
+  const existing = await RecruitCandidate.findById(candidateId)
+    .select("assessmentStatus assessmentToken")
+    .lean();
+  if (!existing) return null;
+  if (existing.assessmentStatus === "completed") return null;
+  if (existing.assessmentToken && (existing.assessmentStatus === "invited" || existing.assessmentStatus === "sent")) {
+    return existing.assessmentToken;
+  }
+  if (existing.assessmentStatus !== "not_sent") return null;
+
+  const token = generateToken();
   const claimed = await RecruitCandidate.findOneAndUpdate(
     { _id: candidateId, assessmentStatus: "not_sent" },
-    { $set: { assessmentStatus: "sent", assessmentSentAt: new Date() } },
+    {
+      $set: {
+        assessmentStatus: "invited",
+        assessmentToken: token,
+        assessmentSentAt: new Date(),
+      },
+    },
     { new: true },
   ).lean();
-  return !!claimed;
+  return claimed ? token : null;
+}
+
+async function activateAssessmentByToken(token: string): Promise<{ ok: boolean; error?: string }> {
+  const candidate = await RecruitCandidate.findOne({ assessmentToken: token });
+  if (!candidate) return { ok: false, error: "Assessment not found." };
+  if (candidate.assessmentStatus === "completed") return { ok: true };
+  if (candidate.assessmentQuestions?.length && candidate.assessmentStatus === "sent") return { ok: true };
+
+  const job = await RecruitJob.findById(candidate.jobId).lean();
+  if (!job) return { ok: false, error: "Job not found." };
+
+  let questions: Awaited<ReturnType<typeof generateAssessmentQuestions>>;
+  try {
+    questions = await generateAssessmentQuestions({
+      jobTitle: (job as any).title,
+      rubric: (job as any).rubric,
+      jd: (job as any).generatedJD,
+      niche: (job as any).niche,
+      nicheDetails: (job as any).nicheDetails,
+      languageRequirement: (job as any).languageRequirement,
+    });
+  } catch (err) {
+    console.error("[assessment] activate generation failed:", err);
+    return { ok: false, error: "Could not prepare assessment. Please try again shortly." };
+  }
+
+  await RecruitCandidate.updateOne(
+    { _id: candidate._id },
+    {
+      $set: {
+        assessmentQuestions: questions,
+        assessmentStatus: "sent",
+        assessmentSentAt: new Date(),
+        previousResumeScore: candidate.previousResumeScore ?? candidate.totalScore,
+      },
+    },
+  );
+  await ensureScreenedStage(String(candidate._id));
+  return { ok: true };
+}
+
+type AssessmentInviteMode = "unified_screened" | "assessment_only";
+
+async function sendAssessmentInviteEmail(args: {
+  job: any;
+  candidateId: string;
+  candidateName: string;
+  candidateEmail: string;
+  mode: AssessmentInviteMode;
+  logTag: string;
+}): Promise<boolean> {
+  const { job, candidateId, candidateName, candidateEmail, mode, logTag } = args;
+  if (!candidateEmail?.trim()) return false;
+
+  const token = await getOrCreateAssessmentInvite(candidateId);
+  if (!token) return false;
+
+  await ensureScreenedStage(candidateId);
+
+  const officialContactEmail = await getCreatorOfficialEmail(job.uid ?? "");
+  const ctx = { officialContactEmail };
+  const assessmentUrl = `${FRONTEND_URL}/recruit/assessment/${token}`;
+  const payload = mode === "unified_screened"
+    ? emailTemplates.screenedWithAssessmentInvite(
+        candidateName,
+        job.title,
+        job.companyName ?? "",
+        assessmentUrl,
+        ctx,
+      )
+    : emailTemplates.assessment(
+        candidateName,
+        job.title,
+        job.companyName ?? "",
+        assessmentUrl,
+        ctx,
+      );
+
+  const result = await sendEmail({
+    to: candidateEmail,
+    subject: payload.subject,
+    html: payload.html,
+    text: payload.text,
+    from: CANDIDATE_FROM,
+  });
+
+  await pushCandidateEmailLog(candidateId, {
+    type: mode === "unified_screened" ? `${logTag}_screened_assessment` : `${logTag}_assessment_invite`,
+    to: candidateEmail,
+    subject: payload.subject,
+    body: payload.text,
+    status: result.ok ? "sent" : "failed",
+    error: result.error,
+  });
+
+  return result.ok;
 }
 
 async function sendAssessmentToCandidate(args: {
@@ -248,73 +330,26 @@ async function sendAssessmentToCandidate(args: {
   candidateEmail: string;
   previousResumeScore: number;
   logTag: string;
+  unifiedWithScreened?: boolean;
 }): Promise<boolean> {
-  const claimed = await claimAssessmentSend(args.candidateId);
-  if (!claimed) return false;
-
-  let questions: Awaited<ReturnType<typeof generateAssessmentQuestions>>;
-  const token = generateToken();
-  try {
-    questions = await generateAssessmentQuestions({
-      jobTitle: args.job.title,
-      rubric: args.job.rubric,
-      jd: args.job.generatedJD,
-      niche: args.job.niche,
-      nicheDetails: args.job.nicheDetails,
-      languageRequirement: args.job.languageRequirement,
-    });
-  } catch (err) {
-    await RecruitCandidate.findByIdAndUpdate(args.candidateId, {
-      $set: { assessmentStatus: "not_sent" },
-      $unset: { assessmentSentAt: "" },
-    });
-    throw err;
-  }
-
-  await RecruitCandidate.findByIdAndUpdate(args.candidateId, {
-    assessmentToken: token,
-    assessmentQuestions: questions,
-    previousResumeScore: args.previousResumeScore,
-  });
-  const assessmentUrl = `${FRONTEND_URL}/recruit/assessment/${token}`;
-  if (args.candidateEmail) {
-    const payload = emailTemplates.assessment(
-      args.candidateName,
-      args.job.title,
-      args.job.companyName ?? "",
-      assessmentUrl,
+  if (args.previousResumeScore != null) {
+    await RecruitCandidate.updateOne(
+      { _id: args.candidateId },
+      { $set: { previousResumeScore: args.previousResumeScore } },
     );
-    setImmediate(async () => {
-      try {
-        const result = await sendEmail({
-          to: args.candidateEmail,
-          subject: payload.subject,
-          html: payload.html,
-          text: payload.text,
-          from: CANDIDATE_FROM,
-        });
-        await RecruitCandidate.updateOne(
-          { _id: args.candidateId },
-          {
-            $push: {
-              emailLog: {
-                type: `${args.logTag}_assessment`,
-                to: args.candidateEmail,
-                subject: payload.subject,
-                body: payload.text,
-                sentAt: new Date(),
-                status: result.ok ? "sent" : "failed",
-                error: result.error,
-              },
-            },
-          },
-        );
-      } catch (e) {
-        console.error(`[${args.logTag}] assessment email failed:`, e);
-      }
-    });
   }
-  return true;
+  const stageRow = await RecruitCandidate.findById(args.candidateId).select("stage").lean();
+  const useUnified = args.unifiedWithScreened === true
+    || (args.unifiedWithScreened !== false && EARLY_PIPELINE_STAGES.has(stageRow?.stage ?? "applied"));
+
+  return sendAssessmentInviteEmail({
+    job: args.job,
+    candidateId: args.candidateId,
+    candidateName: args.candidateName,
+    candidateEmail: args.candidateEmail,
+    mode: useUnified ? "unified_screened" : "assessment_only",
+    logTag: args.logTag,
+  });
 }
 
 async function dispatchAgentActions(args: {
@@ -348,53 +383,49 @@ async function dispatchAgentActions(args: {
   let emailStatus: "sent" | "failed" | "skipped" | "disabled" = "disabled";
 
   try {
-    if (agentAction === "shortlisted" && agentMode.autoEmailShortlist !== false && candidateEmail?.trim()) {
-      const tpl = emailTemplates.screened(candidateName, job.title, job.companyName || "");
-      const result = await sendEmail({
-        to: candidateEmail, subject: tpl.subject, html: tpl.html, text: tpl.text, from: CANDIDATE_FROM,
-      });
-      emailSent = result.ok;
-      emailStatus = result.ok ? "sent" : "failed";
-      await RecruitCandidate.updateOne(
-        { _id: candidateId },
-        {
-          $push: {
-            emailLog: {
-              type: "agent_shortlisted",
-              to: candidateEmail,
-              subject: tpl.subject,
-              body: tpl.text,
-              sentAt: new Date(),
-              status: emailStatus,
-              error: result.error,
-            },
-          },
-        },
-      );
-      console.log(`[${logPrefix}] Auto-shortlisted & emailed: ${candidateName} (${scorePct}% ≥ ${shortlistThreshold}%)`);
-    } else if (agentAction === "shortlisted") {
-      emailStatus = "disabled";
-    }
+    if (agentAction === "shortlisted") {
+      await ensureScreenedStage(candidateId);
+      const officialContactEmail = await getCreatorOfficialEmail(job.uid ?? "");
+      const ctx = { officialContactEmail };
+      const withAssessment = agentMode.autoSendAssessment === true;
 
-    if (agentAction === "shortlisted" && agentMode.autoSendAssessment === true) {
-      try {
-        await sendAssessmentToCandidate({
+      if (withAssessment && candidateEmail?.trim()) {
+        const ok = await sendAssessmentInviteEmail({
           job,
           candidateId,
           candidateName,
           candidateEmail,
-          previousResumeScore: candidateTotalScore,
+          mode: "unified_screened",
           logTag: logPrefix,
         });
-        console.log(`[${logPrefix}] Auto-sent assessment to shortlisted candidate: ${candidateName}`);
-      } catch (e) {
-        console.error(`[${logPrefix}] Auto-send assessment failed:`, e);
+        emailSent = ok;
+        emailStatus = ok ? "sent" : "failed";
+        console.log(`[${logPrefix}] Screened + assessment invite (single email): ${candidateName} (${scorePct}% ≥ ${shortlistThreshold}%)`);
+      } else if (agentMode.autoEmailShortlist !== false && candidateEmail?.trim()) {
+        const tpl = emailTemplates.screened(candidateName, job.title, job.companyName || "", ctx);
+        const result = await sendEmail({
+          to: candidateEmail, subject: tpl.subject, html: tpl.html, text: tpl.text, from: CANDIDATE_FROM,
+        });
+        emailSent = result.ok;
+        emailStatus = result.ok ? "sent" : "failed";
+        await pushCandidateEmailLog(candidateId, {
+          type: "agent_screened",
+          to: candidateEmail,
+          subject: tpl.subject,
+          body: tpl.text,
+          status: emailStatus,
+          error: result.error,
+        });
+        console.log(`[${logPrefix}] Screened email sent: ${candidateName} (${scorePct}% ≥ ${shortlistThreshold}%)`);
+      } else {
+        emailStatus = "disabled";
       }
     }
 
     if (agentAction === "rejected" && agentMode.autoEmailReject === true && candidateEmail?.trim()) {
+      const officialContactEmail = await getCreatorOfficialEmail(job.uid ?? "");
       const rejBody = `Hi ${candidateName.split(" ")[0]},\n\nThank you for applying for the ${job.title} role${job.companyName ? ` at ${job.companyName}` : ""}. After reviewing your application, we've decided to move forward with other candidates at this time.\n\nWe appreciate your interest and wish you the best in your search.\n\nWarm regards,\nThe Hiring Team`;
-      const tpl = emailTemplates.rejectionEmailHtml(candidateName, job.title, job.companyName || "", rejBody);
+      const tpl = emailTemplates.rejectionEmailHtml(candidateName, job.title, job.companyName || "", rejBody, { officialContactEmail });
       const result = await sendEmail({
         to: candidateEmail, subject: tpl.subject, html: tpl.html, text: tpl.text, from: CANDIDATE_FROM,
       });
@@ -420,7 +451,8 @@ async function dispatchAgentActions(args: {
     } else if (agentAction === "rejected") {
       emailStatus = "disabled";
     } else if (agentAction === "review_zone" && agentMode.emailReviewZoneCandidates === true && candidateEmail?.trim()) {
-      const tpl = emailTemplates.reviewZoneEmail(candidateName, job.title, job.companyName || "");
+      const officialContactEmail = await getCreatorOfficialEmail(job.uid ?? "");
+      const tpl = emailTemplates.reviewZoneEmail(candidateName, job.title, job.companyName || "", { officialContactEmail });
       const result = await sendEmail({
         to: candidateEmail, subject: tpl.subject, html: tpl.html, text: tpl.text, from: CANDIDATE_FROM,
       });
@@ -563,36 +595,6 @@ async function finalizeScoredCandidate(args: {
   );
 }
 
-function candidateDayInStage(candidate: any): number {
-  const movedAt = candidate.stageMovedAt ?? candidate.createdAt;
-  if (!movedAt) return 0;
-  return (Date.now() - new Date(movedAt).getTime()) / (1000 * 60 * 60 * 24);
-}
-
-function pipelineRuleMarker(rule: any, candidate: any, scorePct: number, dayInStage: number): string {
-  if (rule.condition === "score_above" || rule.condition === "score_below") {
-    return `score:${scorePct}`;
-  }
-  if (rule.condition === "assessment_passed" || rule.condition === "assessment_failed") {
-    return `assessment:${candidate.hiringDecision ?? "none"}`;
-  }
-  if (rule.condition === "stage_age_days") {
-    return "fired";
-  }
-  return "fired";
-}
-
-function shouldSkipPipelineRule(rule: any, candidate: any, scorePct: number, dayInStage: number): boolean {
-  const state = ((candidate as any).pipelineRuleState ?? {}) as Record<string, string>;
-  const prev = state[rule.id];
-
-  if (rule.action === "send_assessment" && candidate.assessmentStatus !== "not_sent") return true;
-  if (rule.action === "send_reminder" && candidate.assessmentStatus !== "sent") return true;
-
-  if (prev === undefined) return false;
-  return prev === pipelineRuleMarker(rule, candidate, scorePct, dayInStage);
-}
-
 async function clearScorePipelineRuleState(jobId: string, candidateId: string) {
   const job = await RecruitJob.findById(jobId).lean();
   const candidate = await RecruitCandidate.findById(candidateId).lean();
@@ -625,23 +627,8 @@ export async function evaluatePipelineRules(jobId: string, candidateId: string) 
       const dayInStage = candidateDayInStage(candidate);
 
       if (rule.fromStage && candidate.stage !== rule.fromStage) continue;
-      if (shouldSkipPipelineRule(rule, candidate, scorePct, dayInStage)) continue;
-
-      // Do not treat AI scoring failures as genuine low scores.
-      if (
-        (rule.condition === "score_above" || rule.condition === "score_below") &&
-        candidate.scoringFailed === true
-      ) {
-        continue;
-      }
-
-      let conditionMet = false;
-      if (rule.condition === "score_above" && scorePct >= rule.threshold) conditionMet = true;
-      if (rule.condition === "score_below" && scorePct < rule.threshold) conditionMet = true;
-      if (rule.condition === "assessment_passed" && candidate.assessmentStatus === "completed" && candidate.hiringDecision === "strong_yes") conditionMet = true;
-      if (rule.condition === "assessment_failed" && candidate.assessmentStatus === "completed" && candidate.hiringDecision === "no") conditionMet = true;
-      if (rule.condition === "stage_age_days" && dayInStage >= rule.threshold) conditionMet = true;
-      if (!conditionMet) continue;
+      if (shouldSkipPipelineRule(rule, candidate as any, scorePct)) continue;
+      if (!isPipelineConditionMet(rule, candidate as any, scorePct, dayInStage)) continue;
 
       const stageMap: Record<string, string> = {
         move_to_screened: "screened",
@@ -651,7 +638,7 @@ export async function evaluatePipelineRules(jobId: string, candidateId: string) 
         move_to_rejected: "rejected",
       };
 
-      const marker = pipelineRuleMarker(rule, candidate, scorePct, dayInStage);
+      const marker = pipelineRuleMarker(rule, candidate as any, scorePct);
       let fired = false;
 
       if (stageMap[rule.action]) {
@@ -672,7 +659,7 @@ export async function evaluatePipelineRules(jobId: string, candidateId: string) 
           console.log(`[pipeline-rule] "${rule.id}" fired: ${rule.condition} → ${rule.action} for candidate ${candidateId}`);
           if (["screened", "interview", "hired"].includes(newStage) && candidate.email) {
             setImmediate(() =>
-              sendCandidateStageEmail(jobId, candidateId, newStage, candidate.name, candidate.email!),
+              sendCandidateStageEmail(jobId, candidateId, newStage, candidate.name, candidate.email!, job.uid),
             );
           }
           fired = true;
@@ -698,6 +685,7 @@ export async function evaluatePipelineRules(jobId: string, candidateId: string) 
             candidateEmail: candidate.email,
             previousResumeScore: candidate.totalScore,
             logTag: "pipeline-rule",
+            unifiedWithScreened: EARLY_PIPELINE_STAGES.has(candidate.stage) || candidate.stage === "screened",
           });
           if (sent) {
             await RecruitCandidate.updateOne(
@@ -714,14 +702,16 @@ export async function evaluatePipelineRules(jobId: string, candidateId: string) 
         } catch (e) {
           console.error("[pipeline-rule] send_assessment failed:", e);
         }
-      } else if (rule.action === "send_reminder" && candidate.assessmentStatus === "sent" && candidate.email) {
+      } else if (rule.action === "send_reminder" && ["sent", "invited"].includes(candidate.assessmentStatus) && candidate.email) {
         try {
           const assessmentUrl = `${FRONTEND_URL}/recruit/assessment/${candidate.assessmentToken}`;
+          const officialContactEmail = await getCreatorOfficialEmail((job as any).uid ?? "");
           const payload = emailTemplates.assessmentReminder(
             candidate.name,
             (job as any).title,
             (job as any).companyName ?? "",
             assessmentUrl,
+            { officialContactEmail },
           );
           const result = await sendEmail({
             to: candidate.email,
@@ -810,11 +800,17 @@ recruitRouter.post("/auth/profile", async (req, res) => {
     if (!role || !["creator", "seeker"].includes(role)) {
       return res.status(400).json({ error: "Invalid role. Must be 'creator' or 'seeker'." });
     }
+    const jwtEmail = (req as any).user?.email ?? "";
     const existing = await RecruitProfile.findOne({ uid });
     if (existing) {
-      return res.json({ uid: existing.uid, role: existing.role, name: existing.name, email: existing.email });
+      return res.json({ uid: existing.uid, role: existing.role, name: existing.name, email: existing.email || jwtEmail });
     }
-    const profile = await RecruitProfile.create({ uid, role, name: name ?? "", email: email ?? "" });
+    const profile = await RecruitProfile.create({
+      uid,
+      role,
+      name: name ?? "",
+      email: (email ?? jwtEmail ?? "").trim(),
+    });
     trackEvent("recruit_profile_created", uid, { role });
     return res.json({ uid: profile.uid, role: profile.role, name: profile.name, email: profile.email });
   } catch (err) {
@@ -3098,6 +3094,22 @@ recruitRouter.get("/jobs/:jobId/candidates", async (req, res) => {
     const candidates = await RecruitCandidate.find(filter)
       .sort({ totalScore: -1 })
       .lean();
+
+    const legacyIds = candidates
+      .filter(c => shouldMigrateLegacyReviewZoneStage(c as any))
+      .map(c => c._id);
+    if (legacyIds.length > 0) {
+      await RecruitCandidate.updateMany(
+        { _id: { $in: legacyIds } },
+        { $set: { stage: "review_zone" } },
+      );
+      for (const c of candidates) {
+        if (legacyIds.some(id => String(id) === String(c._id))) {
+          (c as any).stage = "review_zone";
+        }
+      }
+    }
+
     return res.json({ candidates });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
@@ -3144,36 +3156,19 @@ recruitRouter.patch("/jobs/:jobId/candidates/:candidateId", async (req, res) => 
       schedulePipelineRules(req.params.jobId, req.params.candidateId);
     }
 
-    // Auto-send stage-change emails for screened / interview / hired.
-    // Fire-and-forget: never block the API response on email delivery.
+    // Auto-send stage-change emails for screened / interview / hired (unless recruiter
+    // will compose manually via the stage-change email flow).
     const AUTO_EMAIL_STAGES = ["screened", "interview", "hired"];
-    if (update.stage && AUTO_EMAIL_STAGES.includes(update.stage) && (candidate as any).email) {
+    const skipAutoEmail = req.body.skipAutoEmail === true;
+    if (update.stage && !skipAutoEmail && AUTO_EMAIL_STAGES.includes(update.stage) && (candidate as any).email) {
       const candId    = (candidate as any)._id;
       const candName  = (candidate as any).name  as string;
       const candEmail = (candidate as any).email as string;
       const jobId     = req.params.jobId;
       const stage     = update.stage as string;
-      setImmediate(async () => {
-        try {
-          const job = await RecruitJob.findById(jobId).lean();
-          const jobTitle   = (job as any)?.title       || "";
-          const companyName = (job as any)?.companyName || "";
-          let payload: emailTemplates.EmailPayload | null = null;
-          if (stage === "screened")  payload = emailTemplates.screened(candName,  jobTitle, companyName);
-          if (stage === "interview") payload = emailTemplates.interview(candName, jobTitle, companyName);
-          if (stage === "hired")     payload = emailTemplates.hired(candName,     jobTitle, companyName);
-          if (!payload) return;
-          const result = await sendEmail({ to: candEmail, subject: payload.subject, html: payload.html, text: payload.text, from: CANDIDATE_FROM });
-          await RecruitCandidate.findByIdAndUpdate(candId, {
-            $push: {
-              emailLog: {
-                type: stage, to: candEmail, subject: payload.subject, body: payload.text,
-                sentAt: new Date(), status: result.ok ? "sent" : "failed", error: result.error,
-              },
-            },
-          });
-        } catch (err) { console.error("[mailer] stage-change email failed:", err); }
-      });
+      setImmediate(() =>
+        sendCandidateStageEmail(jobId, String(candId), stage, candName, candEmail, uid),
+      );
     }
 
     return res.json({ candidate });
@@ -3201,7 +3196,7 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/retry-score", async (re
 
     const scorePct = scored.maxScore > 0 ? Math.round((scored.totalScore / scored.maxScore) * 100) : 0;
     const agentMode = (job as any).agentMode ?? {};
-    const EARLY_AGENT_STAGES = ["applied", "screened", "rejected"];
+    const EARLY_AGENT_STAGES = ["applied", "review_zone", "screened", "rejected"];
     let agentAction: AgentAction | null = null;
     let shortlistThreshold = 75;
     let rejectThreshold = 40;
@@ -3327,8 +3322,8 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/assessment/send", async
     if (candidate.assessmentStatus === "completed") {
       return res.status(400).json({ error: "Assessment already completed by candidate." });
     }
-    if (candidate.assessmentStatus !== "not_sent") {
-      return res.status(400).json({ error: "Assessment has already been sent." });
+    if (!["not_sent"].includes(candidate.assessmentStatus)) {
+      return res.status(400).json({ error: "Assessment has already been invited or sent." });
     }
 
     const sent = await sendAssessmentToCandidate({
@@ -3338,6 +3333,7 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/assessment/send", async
       candidateEmail: candidate.email,
       previousResumeScore: candidate.totalScore,
       logTag: "manual",
+      unifiedWithScreened: EARLY_PIPELINE_STAGES.has(candidate.stage) || candidate.stage === "screened",
     });
     if (!sent) {
       return res.status(409).json({ error: "Assessment could not be sent — it may already be in progress." });
@@ -3402,15 +3398,17 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/send-email", async (req
     const job = await RecruitJob.findOne({ _id: req.params.jobId, uid }).lean();
     const jobTitle    = (job as any)?.title       || "";
     const companyName = (job as any)?.companyName || "";
+    const officialContactEmail = await getCreatorOfficialEmail(uid);
+    const ctx = { officialContactEmail };
 
     // Build branded HTML from body text based on email type
     let html: string;
     if (type === "rejected") {
-      html = emailTemplates.rejectionEmailHtml(candidate.name, jobTitle, companyName, body).html;
+      html = emailTemplates.rejectionEmailHtml(candidate.name, jobTitle, companyName, body, ctx).html;
     } else if (type === "offer") {
-      html = emailTemplates.offerEmail(candidate.name, jobTitle, companyName, body).html;
+      html = emailTemplates.offerEmail(candidate.name, jobTitle, companyName, body, ctx).html;
     } else {
-      html = emailTemplates.genericEmail(candidate.name, subject.trim(), body);
+      html = emailTemplates.genericEmail(candidate.name, subject.trim(), body, ctx);
     }
 
     const result = await sendEmail({ to: candidate.email, subject: subject.trim(), html, text: body, from: CANDIDATE_FROM });
@@ -3444,7 +3442,7 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/reminder", async (req, 
     const candidate = await RecruitCandidate.findOne({ _id: req.params.candidateId, jobId: req.params.jobId, uid });
     if (!candidate) return res.status(404).json({ error: "Candidate not found." });
 
-    if (candidate.assessmentStatus !== "sent") {
+    if (!["sent", "invited"].includes(candidate.assessmentStatus)) {
       return res.status(400).json({ error: "Assessment not in pending state." });
     }
 
@@ -3464,7 +3462,8 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/reminder", async (req, 
           const job     = await RecruitJob.findById(req.params.jobId).lean();
           const jobTitle     = (job as any)?.title       || "";
           const companyName  = (job as any)?.companyName || "";
-          const payload = emailTemplates.assessmentReminder(candName, jobTitle, companyName, reminderUrl);
+          const officialContactEmail = await getCreatorOfficialEmail(uid);
+          const payload = emailTemplates.assessmentReminder(candName, jobTitle, companyName, reminderUrl, { officialContactEmail });
           const result  = await sendEmail({ to: candEmail, subject: payload.subject, html: payload.html, text: payload.text, from: CANDIDATE_FROM });
           await RecruitCandidate.findByIdAndUpdate(candId, {
             $push: {
@@ -3500,13 +3499,59 @@ recruitPublicRouter.get("/assessment/:token", async (req, res) => {
       .select("title department location workMode")
       .lean();
 
-    return res.json({
-      completed: false,
+    const base = {
+      completed: false as const,
       candidateName: candidate.name,
       jobTitle: job?.title ?? "the role",
       jobDepartment: job?.department ?? "",
       jobLocation: job?.location ?? "",
+    };
+
+    const needsStart = candidate.assessmentStatus === "invited"
+      || !(candidate.assessmentQuestions?.length);
+
+    if (needsStart) {
+      return res.json({ ...base, needsStart: true, questions: [] });
+    }
+
+    return res.json({
+      ...base,
+      needsStart: false,
       questions: candidate.assessmentQuestions,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+recruitPublicRouter.post("/assessment/:token/start", async (req, res) => {
+  try {
+    await connectMongo();
+    const result = await activateAssessmentByToken(req.params.token);
+    if (!result.ok) {
+      return res.status(result.error === "Assessment not found." ? 404 : 500).json({ error: result.error });
+    }
+
+    const candidate = await RecruitCandidate.findOne({ assessmentToken: req.params.token })
+      .select("name assessmentQuestions assessmentStatus assessmentCompletedAt jobId")
+      .lean();
+    if (!candidate) return res.status(404).json({ error: "Assessment not found." });
+    if (candidate.assessmentStatus === "completed") {
+      return res.json({ completed: true, candidateName: candidate.name });
+    }
+
+    const job = await RecruitJob.findById(candidate.jobId)
+      .select("title department location workMode")
+      .lean();
+
+    return res.json({
+      completed: false,
+      needsStart: false,
+      candidateName: candidate.name,
+      jobTitle: job?.title ?? "the role",
+      jobDepartment: job?.department ?? "",
+      jobLocation: job?.location ?? "",
+      questions: candidate.assessmentQuestions ?? [],
     });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
@@ -3522,7 +3567,7 @@ recruitPublicRouter.post("/assessment/:token/progress", async (req, res) => {
 
     const candidate = await RecruitCandidate.findOne({
       assessmentToken: req.params.token,
-      assessmentStatus: "sent",
+      assessmentStatus: { $in: ["sent", "invited"] },
     }).select("_id assessmentStartedAt");
     if (!candidate) return res.json({ ok: false });
 
@@ -3608,7 +3653,7 @@ recruitRouter.get("/analytics", async (req, res) => {
     const totalCandidates = totalStandardCandidates + totalFormResponses;
 
     // Stage funnel (all candidates across all jobs)
-    const STAGES = ["applied", "screened", "assessed", "interview", "offer", "hired", "rejected"] as const;
+    const STAGES = ["applied", "review_zone", "screened", "assessed", "interview", "offer", "hired", "rejected"] as const;
     const stageCounts: Record<string, number> = {};
     for (const s of STAGES) stageCounts[s] = 0;
     for (const c of allCandidates) {
@@ -4215,7 +4260,7 @@ recruitRouter.get("/jobs/:jobId/job-analysis", async (req, res) => {
     const topScore = allScores.length > 0 ? Math.max(...allScores) : null;
 
     // ── Stage counts ──────────────────────────────────────────────────────────
-    const STAGES = ["applied", "screened", "assessed", "interview", "offer", "hired", "rejected"] as const;
+    const STAGES = ["applied", "review_zone", "screened", "assessed", "interview", "offer", "hired", "rejected"] as const;
     const stageCounts: Record<string, number> = {};
     for (const s of STAGES) stageCounts[s] = 0;
     for (const c of allCandidates) {
@@ -4224,12 +4269,12 @@ recruitRouter.get("/jobs/:jobId/job-analysis", async (req, res) => {
 
     const hiredCount      = stageCounts["hired"];
     const rejectedCount   = stageCounts["rejected"];
-    const activeStages    = ["applied", "screened", "assessed", "interview", "offer"] as const;
+    const activeStages    = ["applied", "review_zone", "screened", "assessed", "interview", "offer"] as const;
     const totalActive     = activeStages.reduce((s, st) => s + stageCounts[st], 0);
     const totalCandidates = allCandidates.length;
 
     // ── Pipeline funnel ───────────────────────────────────────────────────────
-    const FUNNEL_STAGES = ["applied", "screened", "assessed", "interview", "offer", "hired"] as const;
+    const FUNNEL_STAGES = ["applied", "review_zone", "screened", "assessed", "interview", "offer", "hired"] as const;
     const funnelStages = FUNNEL_STAGES.map((stage, i) => {
       const count = stageCounts[stage] ?? 0;
       // Cumulative count through this stage = everyone at this stage or further (except rejected)
@@ -4628,7 +4673,7 @@ recruitRouter.get("/talent-pool", async (req, res) => {
         },
       ],
     })
-      .populate<{ jobId: { title: string; department: string; status: string } }>("jobId", "title department status")
+      .populate<{ jobId: { _id: string; title: string; department: string; status: string } }>("jobId", "title department status")
       .sort({ totalScore: -1 })
       .lean();
 
@@ -4657,6 +4702,106 @@ recruitRouter.patch("/talent-pool/:candidateId", async (req, res) => {
     if (!candidate) return res.status(404).json({ error: "Candidate not found." });
     return res.json({ candidate: { ...candidate, autoEligible: isAutoEligibleForTalentPool(candidate) } });
   } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+/** Re-score a talent-pool candidate into another Standard Job using stored resume text. */
+recruitRouter.post("/talent-pool/:candidateId/reuse", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = getUid(req);
+    const targetJobId = String(req.body?.targetJobId ?? "").trim();
+    if (!targetJobId) return res.status(400).json({ error: "targetJobId is required." });
+
+    const source = await RecruitCandidate.findOne({ _id: req.params.candidateId, uid }).lean();
+    if (!source) return res.status(404).json({ error: "Candidate not found." });
+    if (!source.resumeText?.trim()) {
+      return res.status(400).json({ error: "This candidate has no stored resume text to reuse." });
+    }
+
+    const access = await getJobWithCollaborationPermission(targetJobId, uid, "review_candidates");
+    if (!access) return res.status(403).json({ error: "You do not have permission to add candidates to that job." });
+    const job = access.job;
+
+    if (String(source.jobId) === String(job._id)) {
+      return res.status(400).json({ error: "Pick a different job — candidate is already on this role." });
+    }
+
+    if (source.email) {
+      const existing = await RecruitCandidate.findOne({ jobId: job._id, email: source.email }).lean();
+      if (existing) {
+        return res.status(409).json({
+          error: "A candidate with this email already exists on the target job.",
+          candidateId: existing._id,
+        });
+      }
+    }
+
+    const scored = await scoreCandidate({
+      resumeText: source.resumeText,
+      jobTitle: job.title,
+      rubric: job.rubric,
+    });
+
+    const agentMode = (job as any).agentMode ?? {};
+    const scorePct = scored.maxScore > 0 ? Math.round((scored.totalScore / scored.maxScore) * 100) : 0;
+    const { initialStage, agentAction, shortlistThreshold, rejectThreshold } = computeAgentTriage(
+      agentMode,
+      scorePct,
+      scored.scoringFailed,
+    );
+
+    const candidate = await RecruitCandidate.create({
+      jobId: job._id,
+      uid: job.uid,
+      name: scored.name || source.name,
+      email: scored.email || source.email,
+      resumeText: source.resumeText,
+      totalScore: scored.totalScore,
+      maxScore: scored.maxScore,
+      scoreBreakdown: scored.scoreBreakdown,
+      aiSummary: scored.aiSummary,
+      redFlags: scored.redFlags,
+      strengths: scored.strengths,
+      stage: initialStage,
+      stageMovedAt: new Date(),
+      assessmentStatus: "not_sent",
+      previousResumeScore: scored.totalScore,
+      scoringFailed: scored.scoringFailed,
+      source: "talent_pool",
+      inTalentPool: true,
+      talentPoolNote: source.talentPoolNote
+        ? `Reused from prior role. ${source.talentPoolNote}`
+        : "Reused from talent pool.",
+    });
+
+    await RecruitJob.updateOne({ _id: job._id }, { $inc: { candidateCount: 1 } });
+
+    schedulePostIntakeAutomation(
+      job,
+      candidate,
+      agentAction,
+      agentAction
+        ? {
+            job,
+            candidateId: String(candidate._id),
+            candidateName: candidate.name,
+            candidateEmail: scored.email || source.email || "",
+            candidateTotalScore: candidate.totalScore,
+            scorePct,
+            shortlistThreshold,
+            rejectThreshold,
+            agentMode,
+            logPrefix: "agent",
+          }
+        : null,
+    );
+
+    trackEvent("talent_pool_reuse", uid, { sourceId: source._id, jobId: job._id });
+    return res.json({ ok: true, candidateId: candidate._id, jobId: job._id, stage: candidate.stage });
+  } catch (err: any) {
+    console.error("[recruit] POST /talent-pool/:candidateId/reuse", err);
     return res.status(500).json({ error: err.message });
   }
 });
@@ -4890,7 +5035,10 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/offer-letter/send", asy
     const offerUrl = `${FRONTEND_URL}/recruit/offer/${offerToken}`;
 
     // Use the link-based email template so candidate gets a review/sign button
-    const payload = emailTemplates.offerEmailWithLink(candidate.name, jobTitle, companyName, candidate.offerLetter, offerUrl);
+    const officialContactEmail = await getCreatorOfficialEmail(uid);
+    const payload = emailTemplates.offerEmailWithLink(
+      candidate.name, jobTitle, companyName, candidate.offerLetter, offerUrl, { officialContactEmail },
+    );
     const result  = await sendEmail({ to: candidate.email, subject: payload.subject, html: payload.html, text: payload.text, from: CANDIDATE_FROM });
 
     // Log offer_approved + offer_sent in offerLog
@@ -5177,7 +5325,10 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/offer-letter/extend-exp
       const companyName = (job as any)?.companyName || (candidate.offerDetails as any)?.companyName || "";
       const offerUrl    = `${FRONTEND_URL}/recruit/offer/${(candidate as any).offerToken}`;
       const formatted   = new Date(newExpiryDate).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-      const payload     = emailTemplates.offerExtendedEmail(candidate.name, jobTitle, companyName, formatted, offerUrl, isReactivating);
+      const officialContactEmail = await getCreatorOfficialEmail(uid);
+      const payload     = emailTemplates.offerExtendedEmail(
+        candidate.name, jobTitle, companyName, formatted, offerUrl, isReactivating, { officialContactEmail },
+      );
       const result      = await sendEmail({ to: candidate.email, subject: payload.subject, html: payload.html, text: payload.text, from: CANDIDATE_FROM });
       const sentAt      = new Date();
       (candidate.offerLog as any[]).push({

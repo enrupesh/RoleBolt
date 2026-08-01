@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { RecruitGuard } from "@/components/RecruitGuard";
-import { useRouter } from "next/navigation";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import Link from "next/link";
 import { apiUrl, readApiJson } from "@/lib/api";
@@ -23,10 +22,12 @@ type PoolCandidate = {
   talentPoolNote: string;
   source: string;
   createdAt: string;
-  jobId: { title: string; department: string; status: string } | string;
+  jobId: { _id: string; title: string; department: string; status: string } | string;
   /** Server-computed: true if this candidate would appear here even without being manually starred. */
   autoEligible?: boolean;
 };
+
+type JobOption = { _id: string; title: string; status: string };
 
 function BackIcon() {
   return <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>;
@@ -70,10 +71,11 @@ function scoreBadgeClass(pct: number) {
 }
 
 function CandidateCard({
-  c, token, onUpdate, onRemove,
+  c, token, jobs, onUpdate, onRemove,
 }: {
   c: PoolCandidate;
   token: string;
+  jobs: JobOption[];
   onUpdate: (id: string, update: Partial<PoolCandidate>) => void;
   onRemove: (id: string) => void;
 }) {
@@ -88,10 +90,16 @@ function CandidateCard({
   }, [c.talentPoolNote, editingNote]);
   const [togglingPool, setTogglingPool] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [reuseOpen, setReuseOpen] = useState(false);
+  const [targetJobId, setTargetJobId] = useState("");
+  const [reusing, setReusing] = useState(false);
+  const [reuseMsg, setReuseMsg] = useState<string | null>(null);
 
   const scorePct = c.maxScore > 0 ? Math.round((c.totalScore / c.maxScore) * 100) : 0;
   const jobInfo = typeof c.jobId === "object" ? c.jobId : null;
+  const sourceJobId = jobInfo?._id || (typeof c.jobId === "string" ? c.jobId : "");
   const badge = decisionBadge(c.hiringDecision);
+  const reuseJobs = jobs.filter(j => j.status === "active" && j._id !== sourceJobId);
 
   async function togglePool() {
     setTogglingPool(true);
@@ -140,6 +148,26 @@ function CandidateCard({
     }
   }
 
+  async function reuseIntoJob() {
+    if (!targetJobId) return;
+    setReusing(true);
+    setReuseMsg(null);
+    try {
+      const res = await fetch(apiUrl(`/recruit/talent-pool/${c._id}/reuse`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ targetJobId }),
+      });
+      const data = await readApiJson(res);
+      if (!res.ok) throw new Error(data.error || "Reuse failed.");
+      setReuseMsg("Added to job — opening pipeline…");
+      window.location.href = `/recruit/jobs/${data.jobId}?candidate=${data.candidateId}`;
+    } catch (e: unknown) {
+      setReuseMsg(e instanceof Error ? e.message : "Reuse failed.");
+      setReusing(false);
+    }
+  }
+
   return (
     <div
       className={`group relative flex flex-col rounded-2xl bg-white p-5 transition-all duration-200
@@ -175,13 +203,67 @@ function CandidateCard({
       <div className="mt-3 flex items-center gap-2 flex-wrap text-[11px]">
         {badge && <span className={`rounded-full border px-2 py-0.5 font-bold uppercase tracking-wide ${badge.cls}`}>{badge.label}</span>}
         {c.inTalentPool && <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 font-bold text-blue-700 flex items-center gap-1"><StarIcon filled size={10} /> In Pool</span>}
-        <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 font-semibold capitalize text-slate-500">{c.stage}</span>
+        <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 font-semibold capitalize text-slate-500">{c.stage.replace("_", " ")}</span>
       </div>
 
       <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-slate-400">
-        {jobInfo && <span className="truncate">{jobInfo.title}{jobInfo.department ? ` · ${jobInfo.department}` : ""}</span>}
+        {jobInfo && sourceJobId ? (
+          <Link href={`/recruit/jobs/${sourceJobId}?candidate=${c._id}`} className="truncate text-blue-600 hover:underline font-medium">
+            {jobInfo.title}{jobInfo.department ? ` · ${jobInfo.department}` : ""}
+          </Link>
+        ) : jobInfo ? (
+          <span className="truncate">{jobInfo.title}{jobInfo.department ? ` · ${jobInfo.department}` : ""}</span>
+        ) : null}
         {c.source && <span>via {c.source}</span>}
       </div>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        {sourceJobId && (
+          <Link
+            href={`/recruit/jobs/${sourceJobId}?candidate=${c._id}`}
+            className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-bold text-slate-600 hover:border-blue-300 hover:text-blue-700 transition"
+          >
+            Open in job
+          </Link>
+        )}
+        <button
+          type="button"
+          onClick={() => setReuseOpen(o => !o)}
+          className="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700 hover:bg-blue-100 transition"
+        >
+          Reuse in another job
+        </button>
+      </div>
+
+      {reuseOpen && (
+        <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50/50 p-3 space-y-2">
+          {reuseJobs.length === 0 ? (
+            <p className="text-[11px] text-slate-500">No other active jobs to reuse into. Create a new Standard Job first.</p>
+          ) : (
+            <>
+              <select
+                value={targetJobId}
+                onChange={e => setTargetJobId(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[12px] outline-none focus:border-blue-400"
+              >
+                <option value="">Select target job…</option>
+                {reuseJobs.map(j => (
+                  <option key={j._id} value={j._id}>{j.title}</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                disabled={!targetJobId || reusing}
+                onClick={reuseIntoJob}
+                className="w-full rounded-lg bg-[#0a66c2] px-3 py-1.5 text-[12px] font-bold text-white disabled:opacity-50"
+              >
+                {reusing ? "Scoring into job…" : "Add & open pipeline"}
+              </button>
+            </>
+          )}
+          {reuseMsg && <p className="text-[11px] text-slate-600">{reuseMsg}</p>}
+        </div>
+      )}
 
       <button
         onClick={() => setExpanded(e => !e)}
@@ -204,34 +286,38 @@ function CandidateCard({
           {c.redFlags.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {c.redFlags.map((f, i) => (
-                <span key={i} className="inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-medium text-rose-700"><svg width="9" height="9" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="m10.29 3.86-8.58 14.86A1 1 0 0 0 2.57 20h18.86a1 1 0 0 0 .86-1.5L13.71 3.86a1 1 0 0 0-1.74 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>{f}</span>
+                <span key={i} className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-medium text-rose-700">{f}</span>
               ))}
             </div>
           )}
           <div>
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Pool note</p>
+              {!editingNote && (
+                <button type="button" onClick={() => setEditingNote(true)} className="text-[10px] font-bold text-blue-600">Edit</button>
+              )}
+            </div>
             {editingNote ? (
               <div className="space-y-2">
                 <textarea
-                  value={note} onChange={e => setNote(e.target.value)} rows={2}
-                  placeholder="Add a note about this candidate…"
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 placeholder-slate-400 outline-none focus:border-[#0a66c2] focus:ring-2 focus:ring-[#0a66c2]/12 resize-none transition"
+                  value={note}
+                  onChange={e => setNote(e.target.value)}
+                  rows={3}
+                  className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-[12px] outline-none focus:border-blue-400"
+                  placeholder="Why keep this person warm?"
                 />
                 <div className="flex gap-2">
-                  <button onClick={saveNote} disabled={savingNote} className="rounded-lg bg-[#0a66c2] px-3 py-1.5 text-[11px] font-bold text-white hover:bg-blue-700 disabled:opacity-50 transition">
+                  <button type="button" disabled={savingNote} onClick={saveNote} className="rounded-lg bg-blue-600 px-2.5 py-1 text-[11px] font-bold text-white disabled:opacity-50">
                     {savingNote ? "Saving…" : "Save"}
                   </button>
-                  <button onClick={() => { setEditingNote(false); setNote(c.talentPoolNote || ""); }} className="rounded-lg border border-slate-200 px-3 py-1.5 text-[11px] text-slate-600 hover:bg-slate-50 transition">
+                  <button type="button" onClick={() => { setEditingNote(false); setNote(c.talentPoolNote || ""); }} className="text-[11px] font-semibold text-slate-500">
                     Cancel
                   </button>
                 </div>
               </div>
             ) : (
-              <button onClick={() => setEditingNote(true)} className="text-[11px] text-slate-400 hover:text-blue-600 transition flex items-center gap-1">
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                {c.talentPoolNote ? "Edit note" : "Add note"}
-              </button>
+              <p className="text-[12px] text-slate-500">{c.talentPoolNote || "No note yet."}</p>
             )}
-            {c.talentPoolNote && !editingNote && <p className="mt-1.5 text-[12px] text-slate-500 italic leading-relaxed">{c.talentPoolNote}</p>}
           </div>
         </div>
       )}
@@ -240,9 +326,9 @@ function CandidateCard({
 }
 
 function TalentPoolContent() {
-  const router = useRouter();
   const [token, setToken] = useState<string | null>(null);
   const [candidates, setCandidates] = useState<PoolCandidate[]>([]);
+  const [jobs, setJobs] = useState<JobOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "pinned" | "strong_yes" | "maybe">("all");
   const [search, setSearch] = useState("");
@@ -256,11 +342,14 @@ function TalentPoolContent() {
     if (!token) return;
     setLoading(true);
     try {
-      const res = await fetch(apiUrl("/recruit/talent-pool"), {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await readApiJson(res);
+      const [poolRes, jobsRes] = await Promise.all([
+        fetch(apiUrl("/recruit/talent-pool"), { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(apiUrl("/recruit/jobs"), { headers: { Authorization: `Bearer ${token}` } }),
+      ]);
+      const data = await readApiJson(poolRes);
+      const jobsData = await readApiJson(jobsRes);
       setCandidates(data.candidates ?? []);
+      setJobs((jobsData.jobs ?? []).map((j: JobOption) => ({ _id: j._id, title: j.title, status: j.status })));
     } catch { /* silent */ }
     finally { setLoading(false); }
   }, [token]);
@@ -349,13 +438,9 @@ function TalentPoolContent() {
         <div className="mb-8">
           <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-[28px] font-bold tracking-tight text-slate-900 leading-tight">Talent Pool</h1>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-              <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
-              Coming Soon – Full Features
-            </span>
           </div>
           <p className="mt-1.5 text-[13px] text-slate-500 leading-relaxed">
-            Strong candidates who weren&apos;t hired — starred and kept warm for future roles.
+            Strong candidates kept warm for future roles — star from any job, then reuse into another opening.
           </p>
         </div>
 
@@ -459,7 +544,7 @@ function TalentPoolContent() {
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {filtered.map(c => (
-              <CandidateCard key={c._id} c={c} token={token!} onUpdate={handleUpdate} onRemove={handleRemove} />
+              <CandidateCard key={c._id} c={c} token={token!} jobs={jobs} onUpdate={handleUpdate} onRemove={handleRemove} />
             ))}
           </div>
         )}

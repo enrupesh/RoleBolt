@@ -105,6 +105,7 @@ export default function JobTabNav({
             <button
               key={g.id}
               type="button"
+              data-tour={g.id === "pipeline" ? "pipeline-tab" : g.id === "autopilot" ? "autopilot-tab" : undefined}
               onClick={() => onSelectTab(isActive && g.tabs.includes(activeTab) ? activeTab : g.defaultTab)}
               className={`relative whitespace-nowrap px-4 py-2.5 text-sm transition border-b-2 -mb-px flex items-center gap-1.5 ${
                 isActive

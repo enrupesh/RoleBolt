@@ -1,5 +1,6 @@
 export type CandidateStage =
   | "applied"
+  | "review_zone"
   | "screened"
   | "assessed"
   | "interview"

@@ -19,6 +19,11 @@ import CollaborationTab from "./CollaborationTab";
 import AiHiringSummaryTab from "./AiHiringSummaryTab";
 import WhatIfSimulator from "./WhatIfSimulator";
 import JobAnalysisTab from "./JobAnalysisTab";
+import HiringTimeline from "./HiringTimeline";
+import JobPageTour from "./JobPageTour";
+import CopilotDrawer from "./CopilotDrawer";
+import StageEmailFlow, { isStageEmailNotifyStage } from "./StageEmailFlow";
+import { markChecklistStep } from "@/components/PostCreateChecklist";
 
 function getFrontendUrl(): string {
   if (typeof window !== "undefined" && window.location?.origin) return window.location.origin;
@@ -27,8 +32,8 @@ function getFrontendUrl(): string {
 
 type Confidence = "high" | "medium" | "low";
 type ScoreBreakdown = { criterion: string; score: number; maxScore: number; reasoning: string; confidence?: Confidence; tier?: 1 | 2 | 3 };
-type CandidateStage = "applied" | "screened" | "assessed" | "interview" | "offer" | "hired" | "rejected";
-type AssessmentStatus = "not_sent" | "sent" | "completed";
+type CandidateStage = "applied" | "review_zone" | "screened" | "assessed" | "interview" | "offer" | "hired" | "rejected";
+type AssessmentStatus = "not_sent" | "invited" | "sent" | "completed";
 type HiringDecision = "strong_yes" | "maybe" | "no" | null;
 
 type AssessmentImpact = {
@@ -119,6 +124,9 @@ type Candidate = {
     changeSummary: string;
   }>;
   offerLog?: OfferLogEntry[];
+  inTalentPool?: boolean;
+  talentPoolNote?: string;
+  pipelineRuleState?: Record<string, string>;
   aiHiringSynthesis?: {
     recommendation: "hire" | "hold" | "pass";
     executiveSummary: string;
@@ -171,6 +179,7 @@ type Job = {
   department: string;
   seniority: string;
   location: string;
+  companyName?: string;
   pipelineRules?: PipelineRule[];
   performanceAlerts?: PerformanceAlert[];
   workMode: string;
@@ -185,6 +194,7 @@ type Job = {
 
 const STAGES: { id: CandidateStage; label: string; color: string; bg: string }[] = [
   { id: "applied", label: "Applied", color: "text-slate-700", bg: "bg-slate-200/70 border-slate-400/40" },
+  { id: "review_zone", label: "Review", color: "text-amber-800", bg: "bg-amber-100 border-amber-400/40" },
   { id: "screened", label: "Screened", color: "text-blue-700", bg: "bg-blue-100 border-blue-400/40" },
   { id: "assessed", label: "Assessed", color: "text-violet-700", bg: "bg-violet-100 border-violet-400/40" },
   { id: "interview", label: "Interview", color: "text-amber-800", bg: "bg-amber-100 border-amber-400/40" },
@@ -251,9 +261,10 @@ function decisionBadge(decision: HiringDecision) {
 }
 
 function assessmentStatusBadge(status: AssessmentStatus) {
-  const map = {
+  const map: Record<AssessmentStatus, { label: string; cls: string }> = {
     not_sent: { label: "Not Sent", cls: "bg-zinc-500/10 text-gray-500 border-zinc-500/20" },
-    sent: { label: "Pending", cls: "bg-amber-500/10 text-amber-700 border-amber-500/20" },
+    invited: { label: "Invited", cls: "bg-sky-500/10 text-sky-600 border-sky-500/20" },
+    sent: { label: "In Progress", cls: "bg-amber-500/10 text-amber-700 border-amber-500/20" },
     completed: { label: "Completed", cls: "bg-violet-500/10 text-violet-600 border-violet-500/20" },
   };
   return map[status] ?? map.not_sent;
@@ -1281,7 +1292,7 @@ function AddCandidateModal({ jobId, token, onClose, onAdded }: {
               onChange={e => setResumeText(e.target.value)}
               rows={10}
               placeholder="Paste the full resume text here — name, contact info, work experience, skills, education, projects, etc."
-              className="w-full rounded-2xl border border-white/[0.08] bg-white px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none transition focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/30 resize-none"
+              className="w-full rounded-2xl border border-slate-200/80 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/30 resize-none caret-indigo-600"
             />
           </div>
           <div>
@@ -1393,7 +1404,7 @@ function AgentModeToggle({ job, token, onUpdate, onOpenHub }: {
   }
 
   return (
-    <div className="relative">
+    <div className="relative" data-tour="agent-toggle">
       {/* ── Master Toggle Button ── */}
       <div className={`flex items-center gap-2 rounded-2xl border px-3 py-2 transition ${
         enabled
@@ -2032,8 +2043,35 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete, highlighted, 
   const [assessmentEmailSent, setAssessmentEmailSent] = useState(false);
   const [showEmailHistory, setShowEmailHistory] = useState(false);
   const [deleteMode, setDeleteMode] = useState(false);
+  const [togglingPool, setTogglingPool] = useState(false);
+  const [interviewFeedback, setInterviewFeedback] = useState<Array<{
+    body?: string;
+    rating?: number;
+    ratings?: Record<string, number>;
+    author?: { name?: string };
+    createdAt?: string;
+  }> | null>(null);
+  const [pendingStageEmail, setPendingStageEmail] = useState<CandidateStage | null>(null);
 
-  // Keep local email log in sync when parent refreshes the candidate (e.g. after re-fetch)
+  useEffect(() => {
+    if (!expanded || !token) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(
+          apiUrl(`/recruit/collaboration/jobs/${jobId}/candidates/${c._id}/collaboration`),
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+        const data = await res.json();
+        if (!cancelled && res.ok) {
+          setInterviewFeedback(data.collaboration?.interviewFeedback ?? []);
+        }
+      } catch {
+        if (!cancelled) setInterviewFeedback([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [expanded, c._id, jobId, token]);
   // Using c._id as the key so we only reset when the candidate identity changes, not on every render
   const prevCandidateId = useRef(c._id);
   useEffect(() => {
@@ -2056,29 +2094,17 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete, highlighted, 
   const scoreChanged = c.assessmentStatus === "completed" && prevPct !== null && prevPct !== pct;
 
   async function updateStage(stage: CandidateStage) {
+    if (stage === c.stage) return;
     try {
       const res = await fetch(apiUrl(`/recruit/jobs/${jobId}/candidates/${c._id}`), {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ stage }),
+        body: JSON.stringify({ stage, skipAutoEmail: true }),
       });
       if (res.ok) {
         onUpdate(c._id, { stage });
-        // Optimistically show auto-sent email in history so recruiter sees it immediately
-        const autoStages: Record<string, string> = {
-          screened: "Your application has been shortlisted",
-          interview: "Interview Invitation",
-          hired: "Welcome to the team!",
-        };
-        if (autoStages[stage] && c.email) {
-          setLocalEmailLog(prev => [...prev, {
-            type: stage, to: c.email, subject: autoStages[stage],
-            body: "", sentAt: new Date().toISOString(), status: "sent",
-          }]);
-        }
-        // Auto-open offer letter modal when candidate reaches Offer stage
-        if (stage === "offer") {
-          setShowOfferLetterModal(true);
+        if (c.email && isStageEmailNotifyStage(stage)) {
+          setPendingStageEmail(stage);
         }
       }
     } catch { /* silent */ }
@@ -2111,7 +2137,7 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete, highlighted, 
       setAssessmentLink(link);
       setAssessmentEmailSent(Boolean(data.emailSent));
       setShowAssessmentModal(true);
-      onUpdate(c._id, { assessmentStatus: "sent", assessmentSentAt: new Date().toISOString() });
+      onUpdate(c._id, { assessmentStatus: "invited", assessmentSentAt: new Date().toISOString(), stage: "screened" });
       if (data.emailSent && c.email) {
         setLocalEmailLog(prev => [...prev, {
           type: "assessment", to: c.email, subject: `Complete your assessment`, body: "",
@@ -2190,6 +2216,9 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete, highlighted, 
         redFlags: data.candidate.redFlags,
         strengths: data.candidate.strengths,
         scoringFailed: data.candidate.scoringFailed,
+        stage: data.candidate.stage,
+        stageMovedAt: data.candidate.stageMovedAt,
+        agentLog: data.candidate.agentLog,
       });
     } catch (e: any) {
       setRetryError(e.message || "Retry failed. Please try again.");
@@ -2224,6 +2253,20 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete, highlighted, 
       });
       if (res.ok) onDelete(c._id);
     } catch { /* silent */ }
+  }
+
+  async function toggleTalentPool() {
+    setTogglingPool(true);
+    try {
+      const next = !c.inTalentPool;
+      const res = await fetch(apiUrl(`/recruit/jobs/${jobId}/candidates/${c._id}`), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ inTalentPool: next }),
+      });
+      if (res.ok) onUpdate(c._id, { inTalentPool: next });
+    } catch { /* silent */ }
+    finally { setTogglingPool(false); }
   }
 
   return (
@@ -2267,6 +2310,21 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete, highlighted, 
           jobId={jobId}
           token={token}
           onClose={() => setShowApplicantDetails(false)}
+        />
+      )}
+      {pendingStageEmail && isStageEmailNotifyStage(pendingStageEmail) && (
+        <StageEmailFlow
+          stage={pendingStageEmail}
+          candidateId={c._id}
+          candidateName={c.name}
+          candidateEmail={c.email}
+          jobId={jobId}
+          jobTitle={job.title}
+          companyName={job.companyName || ""}
+          token={token}
+          onClose={() => setPendingStageEmail(null)}
+          onSent={(entry) => setLocalEmailLog(prev => [...prev, entry])}
+          onOpenOfferLetter={() => setShowOfferLetterModal(true)}
         />
       )}
 
@@ -2357,7 +2415,7 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete, highlighted, 
             <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-semibold ${assessBadge.cls}`}>
               Assessment: {assessBadge.label}
             </span>
-            {c.assessmentSentAt && c.assessmentStatus === "sent" && (
+            {c.assessmentSentAt && (c.assessmentStatus === "sent" || c.assessmentStatus === "invited") && (
               <span className="text-[10px] text-[var(--text-muted)]">
                 Sent {new Date(c.assessmentSentAt).toLocaleDateString()}
               </span>
@@ -2444,7 +2502,7 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete, highlighted, 
               </button>
             )}
 
-            {c.assessmentStatus === "sent" && (
+            {(c.assessmentStatus === "sent" || c.assessmentStatus === "invited") && (
               <button
                 onClick={sendReminder}
                 disabled={loadingReminder}
@@ -2644,6 +2702,29 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete, highlighted, 
               </div>
             )}
 
+            <HiringTimeline
+              candidate={{
+                ...c,
+                interviewFeedback: interviewFeedback ?? undefined,
+              }}
+              jobTitle={job.title}
+            />
+
+            <div className="flex flex-wrap gap-2 pt-1">
+              <button
+                type="button"
+                disabled={togglingPool}
+                onClick={toggleTalentPool}
+                className={`rounded-lg border px-2.5 py-1.5 text-[11px] font-bold transition ${
+                  c.inTalentPool
+                    ? "border-blue-500/30 bg-blue-500/10 text-blue-700"
+                    : "border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)]"
+                }`}
+              >
+                {c.inTalentPool ? "★ In Talent Pool" : "☆ Add to Talent Pool"}
+              </button>
+            </div>
+
           </div>
         )}
       </div>
@@ -2697,6 +2778,7 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkMessage, setBulkMessage] = useState<string | null>(null);
+  const [showCopilot, setShowCopilot] = useState(false);
 
   const { sessionToken } = useRecruitAuth();
   useEffect(() => {
@@ -2800,7 +2882,7 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
         const res = await fetch(apiUrl(`/recruit/jobs/${id}/candidates/${cid}`), {
           method: "PATCH",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ stage }),
+          body: JSON.stringify({ stage, skipAutoEmail: true }),
         });
         if (res.ok) {
           const data = await res.json();
@@ -2812,7 +2894,7 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
     }
     setSelectedIds(new Set());
     setBulkBusy(false);
-    setBulkMessage(`Moved ${ok} candidate${ok !== 1 ? "s" : ""} to ${stage}${fail ? ` · ${fail} failed` : ""}`);
+    setBulkMessage(`Moved ${ok} candidate${ok !== 1 ? "s" : ""} to ${stage}${fail ? ` · ${fail} failed` : ""} · compose emails individually from each card`);
   }
 
   async function runBulkSendAssessment() {
@@ -2919,7 +3001,12 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
 
   function handleAgentModeUpdate(agentMode: AgentMode) {
     setJob(prev => prev ? { ...prev, agentMode } : null);
+    if (agentMode.enabled) markChecklistStep(id, "autopilotEnabled");
   }
+
+  useEffect(() => {
+    if (candidates.length > 0) markChecklistStep(id, "reviewedApplicant");
+  }, [candidates.length, id]);
 
   if (loading) {
     return (
@@ -3008,7 +3095,7 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
 
   const topCandidates = [...candidates].sort((a, b) => b.totalScore - a.totalScore).slice(0, 3);
   const byStage: Record<CandidateStage, Candidate[]> = {
-    applied: [], screened: [], assessed: [], interview: [], offer: [], hired: [], rejected: [],
+    applied: [], review_zone: [], screened: [], assessed: [], interview: [], offer: [], hired: [], rejected: [],
   };
   candidates.forEach(c => { if (byStage[c.stage]) byStage[c.stage].push(c); });
   const attentionCount = buildAttentionItems({
@@ -3062,12 +3149,24 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <button
+              type="button"
+              onClick={() => setShowCopilot(true)}
+              className="flex items-center gap-1.5 rounded-full border border-violet-500/30 bg-violet-500/10 px-3.5 py-2 text-xs font-bold text-violet-700 transition hover:bg-violet-500/20"
+              title="Ask Copilot about this pipeline"
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z" />
+              </svg>
+              Copilot
+            </button>
+            <button
               onClick={() => {
                 const url = `${getFrontendUrl()}/recruit/opportunities/${id}`;
                 navigator.clipboard.writeText(url).then(() => {
                   setLinkCopied(true);
                   setTimeout(() => setLinkCopied(false), 2000);
                 });
+                markChecklistStep(id, "shared");
                 trackEvent("recruiter_profile_viewed", { jobId: id, action: "share_link_copied" });
               }}
               className={`flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-semibold transition ${
@@ -3560,6 +3659,23 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
           />
         )}
       </main>
+
+      <JobPageTour
+        onGoAutopilot={() => {
+          setActiveTab("autopilot");
+          setAutopilotSection("overview");
+        }}
+      />
+
+      {token && (
+        <CopilotDrawer
+          jobId={id}
+          jobTitle={job.title}
+          token={token}
+          open={showCopilot}
+          onClose={() => setShowCopilot(false)}
+        />
+      )}
     </div>
   );
 }
@@ -3569,7 +3685,7 @@ type AgentLogEntry = {
   candidateId: string;
   candidateName: string;
   candidateEmail: string;
-  action: "shortlisted" | "rejected";
+  action: "shortlisted" | "rejected" | "review_zone";
   score: number;
   reason: string;
   emailSent: boolean;
@@ -3599,7 +3715,7 @@ function AgentLogTab({
 }) {
   const [entries, setEntries]   = useState<AgentLogEntry[]>([]);
   const [loading, setLoading]   = useState(true);
-  const [filter, setFilter]     = useState<"all" | "shortlisted" | "rejected">("all");
+  const [filter, setFilter]     = useState<"all" | "shortlisted" | "rejected" | "review_zone">("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -3622,6 +3738,7 @@ function AgentLogTab({
   const filtered = filter === "all" ? entries : entries.filter(e => e.action === filter);
   const totalShortlisted = entries.filter(e => e.action === "shortlisted").length;
   const totalRejected    = entries.filter(e => e.action === "rejected").length;
+  const totalReviewZone  = entries.filter(e => e.action === "review_zone").length;
   const totalEmailed     = entries.filter(e => e.emailSent).length;
 
   if (loading) {
@@ -3649,7 +3766,7 @@ function AgentLogTab({
             Agent Activity Log
           </h2>
           <p className="mt-0.5 text-xs text-[var(--text-muted)]">
-            Every action taken by the AI Agent — who was shortlisted, who was rejected, and why.
+            Every action taken by the AI Agent — shortlist, reject, and Review Zone triage with reasons.
           </p>
         </div>
 
@@ -3666,10 +3783,14 @@ function AgentLogTab({
 
       {/* ── Stats row ── */}
       {entries.length > 0 && (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-center">
             <p className="text-2xl font-bold text-emerald-600">{totalShortlisted}</p>
             <p className="text-[11px] text-emerald-700/70 mt-0.5">Shortlisted</p>
+          </div>
+          <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-center">
+            <p className="text-2xl font-bold text-amber-700">{totalReviewZone}</p>
+            <p className="text-[11px] text-amber-800/70 mt-0.5">Review Zone</p>
           </div>
           <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 px-4 py-3 text-center">
             <p className="text-2xl font-bold text-rose-600">{totalRejected}</p>
@@ -3685,7 +3806,7 @@ function AgentLogTab({
       {/* ── Filter tabs ── */}
       {entries.length > 0 && (
         <div className="flex gap-1">
-          {(["all", "shortlisted", "rejected"] as const).map(f => (
+          {(["all", "shortlisted", "review_zone", "rejected"] as const).map(f => (
             <button
               key={f}
               onClick={() => setFilter(f)}
@@ -3695,11 +3816,19 @@ function AgentLogTab({
                     ? "bg-indigo-500 text-white"
                     : f === "shortlisted"
                       ? "bg-emerald-500 text-white"
-                      : "bg-rose-500 text-white"
+                      : f === "review_zone"
+                        ? "bg-amber-500 text-white"
+                        : "bg-rose-500 text-white"
                   : "bg-[var(--surface-muted)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
               }`}
             >
-              {f === "all" ? `All (${entries.length})` : f === "shortlisted" ? `✅ Shortlisted (${totalShortlisted})` : `❌ Rejected (${totalRejected})`}
+              {f === "all"
+                ? `All (${entries.length})`
+                : f === "shortlisted"
+                  ? `✅ Shortlisted (${totalShortlisted})`
+                  : f === "review_zone"
+                    ? `⏳ Review Zone (${totalReviewZone})`
+                    : `❌ Rejected (${totalRejected})`}
             </button>
           ))}
         </div>
@@ -3730,15 +3859,17 @@ function AgentLogTab({
             const key = `${entry.candidateId}-${idx}`;
             const isOpen = expandedId === key;
             const isShortlisted = entry.action === "shortlisted";
+            const isReviewZone = entry.action === "review_zone";
+            const rowStyle = isShortlisted
+              ? "border-emerald-500/20 bg-emerald-500/[0.03] hover:bg-emerald-500/[0.06]"
+              : isReviewZone
+                ? "border-amber-500/20 bg-amber-500/[0.03] hover:bg-amber-500/[0.06]"
+                : "border-rose-500/20 bg-rose-500/[0.03] hover:bg-rose-500/[0.06]";
 
             return (
               <div
                 key={key}
-                className={`rounded-2xl border transition-all ${
-                  isShortlisted
-                    ? "border-emerald-500/20 bg-emerald-500/[0.03] hover:bg-emerald-500/[0.06]"
-                    : "border-rose-500/20 bg-rose-500/[0.03] hover:bg-rose-500/[0.06]"
-                }`}
+                className={`rounded-2xl border transition-all ${rowStyle}`}
               >
                 {/* ── Row summary ── */}
                 <button
@@ -3747,9 +3878,13 @@ function AgentLogTab({
                 >
                   {/* Action icon */}
                   <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm ${
-                    isShortlisted ? "bg-emerald-100 text-emerald-600" : "bg-rose-100 text-rose-600"
+                    isShortlisted
+                      ? "bg-emerald-100 text-emerald-600"
+                      : isReviewZone
+                        ? "bg-amber-100 text-amber-700"
+                        : "bg-rose-100 text-rose-600"
                   }`}>
-                    {isShortlisted ? "✅" : "❌"}
+                    {isShortlisted ? "✅" : isReviewZone ? "⏳" : "❌"}
                   </div>
 
                   {/* Candidate info */}
@@ -3757,9 +3892,13 @@ function AgentLogTab({
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-sm font-semibold text-[var(--foreground)] truncate">{entry.candidateName}</p>
                       <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                        isShortlisted ? "bg-emerald-500/15 text-emerald-700" : "bg-rose-500/15 text-rose-700"
+                        isShortlisted
+                          ? "bg-emerald-500/15 text-emerald-700"
+                          : isReviewZone
+                            ? "bg-amber-500/15 text-amber-800"
+                            : "bg-rose-500/15 text-rose-700"
                       }`}>
-                        {isShortlisted ? "Shortlisted" : "Rejected"}
+                        {isShortlisted ? "Shortlisted" : isReviewZone ? "Review Zone" : "Rejected"}
                       </span>
                     </div>
                     <p className="text-[11px] text-[var(--text-muted)] mt-0.5 truncate">{entry.reason}</p>
@@ -4142,11 +4281,11 @@ function AgentStatsCard({
 
             {/* In Review */}
             <button
-              onClick={() => onGoToStage("applied")}
+              onClick={() => onGoToStage("review_zone")}
               className="group flex flex-col gap-1 rounded-2xl border border-amber-400/20 bg-amber-500/5 px-4 py-3 text-left transition hover:border-amber-400/40 hover:bg-amber-500/10"
-              title="View candidates in review"
+              title="View candidates in Review Zone"
             >
-              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-700">⏳ In Review</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-700">⏳ Review Zone</span>
               <span className="text-2xl font-bold text-amber-700">{stats.reviewZone}</span>
             </button>
 
@@ -4637,6 +4776,7 @@ function PipelineRulesTab({
                 >
                   <option value="">Any stage</option>
                   <option value="applied">Applied</option>
+                  <option value="review_zone">Review Zone</option>
                   <option value="screened">Screened</option>
                   <option value="assessed">Assessed</option>
                   <option value="interview">Interview</option>

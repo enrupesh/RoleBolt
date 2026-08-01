@@ -2,6 +2,7 @@ import mongoose, { Document, Schema } from "mongoose";
 
 export type CandidateStage =
   | "applied"
+  | "review_zone"
   | "screened"
   | "assessed"
   | "interview"
@@ -9,7 +10,7 @@ export type CandidateStage =
   | "hired"
   | "rejected";
 
-export type AssessmentStatus = "not_sent" | "sent" | "completed";
+export type AssessmentStatus = "not_sent" | "invited" | "sent" | "completed";
 export type HiringDecision = "strong_yes" | "maybe" | "no" | null;
 
 export interface IScoreBreakdown {
@@ -222,14 +223,14 @@ const RecruitCandidateSchema = new Schema<IRecruitCandidate>(
     strengths: { type: [String], default: [] },
     stage: {
       type: String,
-      enum: ["applied", "screened", "assessed", "interview", "offer", "hired", "rejected"],
+      enum: ["applied", "review_zone", "screened", "assessed", "interview", "offer", "hired", "rejected"],
       default: "applied",
     },
     notes: { type: String, default: "" },
     interviewBrief: { type: String, default: "" },
     assessmentStatus: {
       type: String,
-      enum: ["not_sent", "sent", "completed"],
+      enum: ["not_sent", "invited", "sent", "completed"],
       default: "not_sent",
     },
     assessmentToken: { type: String, index: true, sparse: true },
