@@ -39,6 +39,7 @@ export interface IRecruitTeamMember extends Document {
   permissions: CollaborationPermission[];
   status: TeamMemberStatus;
   inviteToken?: string;
+  inviteExpiresAt?: Date;
   notifyByEmail: boolean;
   joinedAt?: Date;
   lastSeenAt?: Date;
@@ -62,6 +63,7 @@ const RecruitTeamMemberSchema = new Schema<IRecruitTeamMember>(
     permissions: { type: [String], default: [] },
     status: { type: String, enum: ["pending", "active", "revoked"], default: "pending" },
     inviteToken: { type: String, index: true, sparse: true },
+    inviteExpiresAt: { type: Date },
     notifyByEmail: { type: Boolean, default: true },
     joinedAt: { type: Date },
     lastSeenAt: { type: Date },

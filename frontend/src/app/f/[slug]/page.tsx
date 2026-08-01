@@ -346,6 +346,12 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
             <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-1">You applied to</p>
             <p className="text-sm font-bold text-slate-900">{form?.title}</p>
           </div>
+          <Link
+            href={`/f/${slug}/status`}
+            className="mt-4 inline-block text-sm font-semibold text-violet-600 hover:text-violet-800 hover:underline"
+          >
+            Check your application status →
+          </Link>
           <Link href="/" className="mt-6 inline-block text-xs text-slate-400 hover:text-slate-600 transition">
             Powered by Rolebolt <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" className="inline -mt-0.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
           </Link>

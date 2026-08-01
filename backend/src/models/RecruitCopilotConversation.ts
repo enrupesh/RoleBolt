@@ -1,12 +1,22 @@
 import mongoose, { Document, Schema } from "mongoose";
 
-export type CopilotContextLevel = "global" | "job" | "candidate" | "form";
+export type CopilotWorkspace = "standard" | "form";
+
+export type CopilotContextLevel =
+  | "global"
+  | "job"
+  | "candidate"
+  | "form_global"
+  | "form"
+  | "form_applicant";
 
 export interface ICopilotContext {
+  workspace?: CopilotWorkspace;
   level: CopilotContextLevel;
   jobId?: string;
   candidateId?: string;
   formId?: string;
+  responseId?: string;
 }
 
 export interface ICopilotSource {
@@ -17,7 +27,9 @@ export interface ICopilotSource {
     | "interview_brief"
     | "score_breakdown"
     | "candidate_profile"
-    | "job_description";
+    | "job_description"
+    | "form_description"
+    | "form_response";
   /** Human-readable chip label shown in the UI, e.g. "Rahul — Resume" */
   label: string;
   /** MongoDB _id of the candidate this source belongs to */
@@ -69,6 +81,11 @@ export interface IRecruitCopilotConversation extends Document {
   /** Candidate context — set when level === "candidate" */
   selectedCandidateId?: string;
   selectedCandidateName?: string;
+  /** Form context — denormalised for sidebar */
+  selectedFormId?: string;
+  selectedFormTitle?: string;
+  selectedResponseId?: string;
+  selectedResponseName?: string;
   lastActiveAt: Date;
   totalMessages: number;
   messages: ICopilotMessage[];
@@ -80,10 +97,16 @@ export interface IRecruitCopilotConversation extends Document {
 
 const CopilotContextSchema = new Schema<ICopilotContext>(
   {
-    level: { type: String, enum: ["global", "job", "candidate", "form"], required: true },
+    workspace: { type: String, enum: ["standard", "form"] },
+    level: {
+      type: String,
+      enum: ["global", "job", "candidate", "form_global", "form", "form_applicant"],
+      required: true,
+    },
     jobId: { type: String },
     candidateId: { type: String },
     formId: { type: String },
+    responseId: { type: String },
   },
   { _id: false }
 );
@@ -99,6 +122,8 @@ const CopilotSourceSchema = new Schema<ICopilotSource>(
         "score_breakdown",
         "candidate_profile",
         "job_description",
+        "form_description",
+        "form_response",
       ],
       required: true,
     },
@@ -143,6 +168,10 @@ const RecruitCopilotConversationSchema = new Schema<IRecruitCopilotConversation>
     selectedJobTitle: { type: String },
     selectedCandidateId: { type: String },
     selectedCandidateName: { type: String },
+    selectedFormId: { type: String },
+    selectedFormTitle: { type: String },
+    selectedResponseId: { type: String },
+    selectedResponseName: { type: String },
     lastActiveAt: { type: Date, default: () => new Date() },
     totalMessages: { type: Number, default: 0 },
     messages: { type: [CopilotMessageSchema], default: [] },

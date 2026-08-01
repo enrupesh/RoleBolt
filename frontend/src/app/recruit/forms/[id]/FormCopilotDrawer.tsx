@@ -11,20 +11,21 @@ type Msg = {
 };
 
 const STARTERS = [
-  "Who should I interview first?",
-  "Summarize candidates stuck in Review Zone",
-  "Any scoring failures I should retry?",
+  "Who are the top applicants?",
+  "Which applicants should I shortlist?",
+  "Summarize overall applicant quality",
+  "Who has red flags?",
 ];
 
-export default function CopilotDrawer({
-  jobId,
-  jobTitle,
+export default function FormCopilotDrawer({
+  formId,
+  formTitle,
   token,
   open,
   onClose,
 }: {
-  jobId: string;
-  jobTitle: string;
+  formId: string;
+  formTitle: string;
   token: string;
   open: boolean;
   onClose: () => void;
@@ -33,7 +34,6 @@ export default function CopilotDrawer({
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [conversationId, setConversationId] = useState<string | undefined>();
-  const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -63,9 +63,6 @@ export default function CopilotDrawer({
     setInput("");
     setStreaming(true);
 
-    const controller = new AbortController();
-    abortRef.current = controller;
-
     try {
       const res = await fetch(apiUrl("/recruit/copilot/chat/stream"), {
         method: "POST",
@@ -75,10 +72,9 @@ export default function CopilotDrawer({
         },
         body: JSON.stringify({
           message: trimmed,
-          context: { workspace: "standard", level: "job", jobId },
+          context: { workspace: "form", level: "form", formId },
           conversationId,
         }),
-        signal: controller.signal,
       });
 
       if (!res.ok || !res.body) throw new Error("Stream failed");
@@ -117,23 +113,20 @@ export default function CopilotDrawer({
                   } : m),
                 );
               }
-            } catch { /* ignore parse */ }
+            } catch { /* ignore */ }
           }
         }
       }
-    } catch (err: unknown) {
-      if ((err as { name?: string })?.name !== "AbortError") {
-        setMessages(prev =>
-          prev.map(m => m.id === aiId ? {
-            ...m,
-            isStreaming: false,
-            content: m.content || "Something went wrong. Please try again.",
-          } : m),
-        );
-      }
+    } catch {
+      setMessages(prev =>
+        prev.map(m => m.id === aiId ? {
+          ...m,
+          isStreaming: false,
+          content: m.content || "Something went wrong. Please try again.",
+        } : m),
+      );
     } finally {
       setStreaming(false);
-      abortRef.current = null;
     }
   }
 
@@ -151,12 +144,12 @@ export default function CopilotDrawer({
         className="fixed right-0 top-0 z-[71] flex h-full w-full max-w-md flex-col border-l border-[var(--border)] bg-[var(--surface)] shadow-2xl"
         role="dialog"
         aria-modal="true"
-        aria-label="Hiring Copilot"
+        aria-label="Form Copilot"
       >
         <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] px-4 py-3">
           <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-violet-600">Copilot</p>
-            <p className="truncate text-sm font-semibold text-[var(--foreground)]">{jobTitle}</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-violet-600">Form Copilot</p>
+            <p className="truncate text-sm font-semibold text-[var(--foreground)]">{formTitle}</p>
           </div>
           <button
             type="button"
@@ -171,14 +164,14 @@ export default function CopilotDrawer({
           {messages.length === 0 && (
             <div className="space-y-2">
               <p className="text-xs text-[var(--text-muted)]">
-                Ask about this job&apos;s pipeline without leaving the page.
+                Ask about applicants, scores, and pipeline — Form Job workspace only.
               </p>
               {STARTERS.map(s => (
                 <button
                   key={s}
                   type="button"
                   onClick={() => send(s)}
-                  className="block w-full rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2 text-left text-xs font-medium text-[var(--text-secondary)] hover:border-violet-400/40 hover:text-[var(--foreground)] transition"
+                  className="block w-full rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2 text-left text-xs font-medium text-[var(--text-secondary)] hover:border-violet-400/40 transition"
                 >
                   {s}
                 </button>
@@ -190,7 +183,7 @@ export default function CopilotDrawer({
               key={m.id}
               className={`rounded-2xl px-3 py-2 text-[13px] leading-relaxed whitespace-pre-wrap ${
                 m.role === "user"
-                  ? "ml-8 bg-indigo-500 text-white"
+                  ? "ml-8 bg-violet-600 text-white"
                   : "mr-4 border border-[var(--border)] bg-[var(--surface-muted)] text-[var(--foreground)]"
               }`}
             >
@@ -210,7 +203,7 @@ export default function CopilotDrawer({
           <input
             value={input}
             onChange={e => setInput(e.target.value)}
-            placeholder="Ask about this pipeline…"
+            placeholder="Ask about this form…"
             disabled={streaming}
             className="flex-1 rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20"
           />
