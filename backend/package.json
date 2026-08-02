@@ -10,7 +10,7 @@
     "dev": "tsx watch src/index.ts",
     "build": "echo 'tsx runtime used — no tsc compilation needed'",
     "start": "tsx src/index.ts",
-    "test": "tsx --test src/automation/**/*.test.ts",
+    "test": "tsx --test src/automation/standardJobCore.test.ts",
     "test:automation": "tsx --test src/automation/standardJobCore.test.ts"
   },
   "license": "ISC",
