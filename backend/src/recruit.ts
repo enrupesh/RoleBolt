@@ -796,23 +796,40 @@ recruitRouter.post("/auth/profile", async (req, res) => {
     await connectMongo();
     const uid = getUid(req);
     if (!uid) return res.status(401).json({ error: "Unauthorized" });
-    const { role, name, email } = req.body as { role?: string; name?: string; email?: string };
+    const { role, name, email, username } = req.body as {
+      role?: string; name?: string; email?: string; username?: string;
+    };
     if (!role || !["creator", "seeker"].includes(role)) {
       return res.status(400).json({ error: "Invalid role. Must be 'creator' or 'seeker'." });
     }
     const jwtEmail = (req as any).user?.email ?? "";
+    const authUser = await User.findById(uid).lean();
+    const resolvedUsername = username?.trim().toLowerCase() || authUser?.username || "";
     const existing = await RecruitProfile.findOne({ uid });
     if (existing) {
-      return res.json({ uid: existing.uid, role: existing.role, name: existing.name, email: existing.email || jwtEmail });
+      return res.json({
+        uid: existing.uid,
+        role: existing.role,
+        username: existing.username || resolvedUsername,
+        name: existing.name,
+        email: existing.email || jwtEmail,
+      });
     }
     const profile = await RecruitProfile.create({
       uid,
       role,
+      username: resolvedUsername,
       name: name ?? "",
       email: (email ?? jwtEmail ?? "").trim(),
     });
     trackEvent("recruit_profile_created", uid, { role });
-    return res.json({ uid: profile.uid, role: profile.role, name: profile.name, email: profile.email });
+    return res.json({
+      uid: profile.uid,
+      role: profile.role,
+      username: profile.username,
+      name: profile.name,
+      email: profile.email,
+    });
   } catch (err) {
     console.error("recruit profile create error", err);
     return res.status(500).json({ error: "Internal server error" });
@@ -826,7 +843,18 @@ recruitRouter.get("/auth/profile", async (req, res) => {
     if (!uid) return res.status(401).json({ error: "Unauthorized" });
     const profile = await RecruitProfile.findOne({ uid });
     if (!profile) return res.status(404).json({ error: "No recruit profile found" });
-    return res.json({ uid: profile.uid, role: profile.role, name: profile.name, email: profile.email });
+    let username = profile.username;
+    if (!username) {
+      const authUser = await User.findById(uid).lean();
+      username = authUser?.username ?? "";
+    }
+    return res.json({
+      uid: profile.uid,
+      role: profile.role,
+      username,
+      name: profile.name,
+      email: profile.email,
+    });
   } catch (err) {
     console.error("recruit profile get error", err);
     return res.status(500).json({ error: "Internal server error" });
@@ -838,8 +866,8 @@ recruitRouter.patch("/auth/profile", async (req, res) => {
     await connectMongo();
     const uid = getUid(req);
     if (!uid) return res.status(401).json({ error: "Unauthorized" });
-    const { role, name, email, designation, bio, photoUrl, companyName, socialLinks } = req.body as {
-      role?: string; name?: string; email?: string;
+    const { role, name, email, username, designation, bio, photoUrl, companyName, socialLinks } = req.body as {
+      role?: string; name?: string; email?: string; username?: string;
       designation?: string; bio?: string; photoUrl?: string;
       companyName?: string; socialLinks?: Record<string, string>;
     };
@@ -853,6 +881,7 @@ recruitRouter.patch("/auth/profile", async (req, res) => {
     if (role) $set.role = role;
     if (name !== undefined) $set.name = name;
     if (email !== undefined) $set.email = email;
+    if (username !== undefined) $set.username = String(username).trim().toLowerCase();
     if (designation !== undefined) $set.designation = designation;
     if (bio !== undefined) $set.bio = bio;
     if (photoUrl !== undefined) $set.photoUrl = photoUrl;
@@ -864,7 +893,20 @@ recruitRouter.patch("/auth/profile", async (req, res) => {
       { $set },
       { returnDocument: "after", upsert: true, setDefaultsOnInsert: true }
     ).lean() as any;
-    return res.json({ uid: profile.uid, role: profile.role, name: profile.name, email: profile.email });
+
+    let resolvedUsername = profile.username;
+    if (!resolvedUsername) {
+      const authUser = await User.findById(uid).lean();
+      resolvedUsername = authUser?.username ?? "";
+    }
+
+    return res.json({
+      uid: profile.uid,
+      role: profile.role,
+      username: resolvedUsername,
+      name: profile.name,
+      email: profile.email,
+    });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }

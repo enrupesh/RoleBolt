@@ -648,7 +648,7 @@ function WelcomeScreen({ recruiterName, jobSelected, contextMode, candidateName,
   onPrompt: (t: string) => void;
   loadingInsights?: boolean;
 }) {
-  const firstName = recruiterName?.split(" ")[0] ?? "there";
+  const handle = recruiterName?.trim() || "there";
   const prompts =
     contextMode === "candidate" ? CANDIDATE_PROMPTS
     : contextMode === "form_applicant" ? FORM_APPLICANT_PROMPTS
@@ -690,7 +690,7 @@ function WelcomeScreen({ recruiterName, jobSelected, contextMode, candidateName,
         <Sparkles size={20} color="#fff" />
       </div>
       <h1 className="text-2xl font-bold mb-2" style={{ color: T.text }}>
-        {hourGreeting()}, {firstName} 👋
+        {hourGreeting()}, {handle} 👋
       </h1>
 
       {contextMode === "candidate" && candidateName ? (
@@ -2696,7 +2696,7 @@ function CopilotPageContent() {
         <div className="flex-1 overflow-y-auto scrollbar-none">
           {messages.length === 0 ? (
             <WelcomeScreen
-              recruiterName={recruitProfile?.name}
+              recruiterName={recruitProfile?.username ?? recruitProfile?.name}
               jobSelected={!!selectedJob}
               contextMode={contextMode}
               workspace={workspace}

@@ -41,6 +41,40 @@ const BCRYPT_ROUNDS    = 12;
 const TOKEN_TTL_MS     = 24 * 60 * 60 * 1000;       // 24 h  (email verification)
 const RESET_TTL_MS     =  1 * 60 * 60 * 1000;       //  1 h  (password reset)
 
+const USERNAME_MIN = 3;
+const USERNAME_MAX = 30;
+const USERNAME_PATTERN = /^[a-z][a-z0-9_]*$/;
+const RESERVED_USERNAMES = new Set([
+  "admin", "administrator", "api", "auth", "help", "login", "logout", "me",
+  "profile", "recruit", "recruiter", "rolebolt", "root", "seeker", "signup",
+  "support", "system", "www", "null", "undefined",
+]);
+
+function normalizeUsername(raw: unknown): string {
+  return String(raw ?? "").trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
+}
+
+function validateUsername(raw: unknown): { username: string } | { error: string } {
+  const username = normalizeUsername(raw);
+  if (!username) return { error: "Username is required." };
+  if (username.length < USERNAME_MIN) return { error: `Username must be at least ${USERNAME_MIN} characters.` };
+  if (username.length > USERNAME_MAX) return { error: `Username must be at most ${USERNAME_MAX} characters.` };
+  if (!USERNAME_PATTERN.test(username)) {
+    return { error: "Username must start with a letter and contain only letters, numbers, and underscores." };
+  }
+  if (RESERVED_USERNAMES.has(username)) return { error: "This username is reserved. Please choose another." };
+  return { username };
+}
+
+function userPublicDto(user: { _id: { toString(): string }; email?: string; username?: string; name?: string }) {
+  return {
+    id: user._id.toString(),
+    email: user.email ?? "",
+    username: user.username ?? "",
+    name: user.name ?? "",
+  };
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function makeToken(): string {
@@ -206,7 +240,7 @@ authRouter.post("/social", async (req, res) => {
       const token = signToken({ sub: user._id.toString(), email: user.email || user.phoneNumber || firebaseUid });
       return res.json({
         token,
-        user: { id: user._id.toString(), email: user.email || "", name: user.name, phoneNumber: user.phoneNumber },
+        user: { ...userPublicDto(user), phoneNumber: user.phoneNumber },
       });
     }
 
@@ -240,7 +274,7 @@ authRouter.post("/social", async (req, res) => {
     const token = signToken({ sub: user._id.toString(), email: user.email! });
     return res.json({
       token,
-      user: { id: user._id.toString(), email: user.email, name: user.name },
+      user: userPublicDto(user),
     });
   } catch (err: any) {
     console.error("[auth/social] error:", err?.message);
@@ -376,17 +410,37 @@ authRouter.get("/github/callback", async (req, res) => {
   }
 });
 
+// ─── GET /auth/check-username ─────────────────────────────────────────────────
+
+authRouter.get("/check-username", async (req, res) => {
+  try {
+    await connectMongo();
+    const parsed = validateUsername(req.query.username);
+    if ("error" in parsed) {
+      return res.json({ available: false, error: parsed.error });
+    }
+    const taken = await User.findOne({ username: parsed.username }).select("_id").lean();
+    return res.json({ available: !taken, username: parsed.username });
+  } catch (err: any) {
+    console.error("[auth] check-username error:", err?.message);
+    return res.status(500).json({ error: "Internal server error." });
+  }
+});
+
 // ─── POST /auth/signup ────────────────────────────────────────────────────────
 
 authRouter.post("/signup", async (req, res) => {
   try {
     await connectMongo();
 
-    const { email, password, name } = req.body as {
+    const { email, password, username } = req.body as {
       email?: string;
       password?: string;
-      name?: string;
+      username?: string;
     };
+
+    const usernameResult = validateUsername(username);
+    if ("error" in usernameResult) return res.status(400).json({ error: usernameResult.error });
 
     if (!email?.trim()) return res.status(400).json({ error: "Email is required." });
     if (!password)       return res.status(400).json({ error: "Password is required." });
@@ -394,6 +448,12 @@ authRouter.post("/signup", async (req, res) => {
       return res.status(400).json({ error: "Password must be at least 8 characters." });
 
     const normalizedEmail = email.trim().toLowerCase();
+    const normalizedUsername = usernameResult.username;
+
+    const existingUsername = await User.findOne({ username: normalizedUsername });
+    if (existingUsername) {
+      return res.status(400).json({ error: "This username is already taken." });
+    }
 
     // Check for existing account
     const existing = await User.findOne({ email: normalizedEmail });
@@ -404,7 +464,7 @@ authRouter.post("/signup", async (req, res) => {
         existing.verificationToken       = token;
         existing.verificationTokenExpiry = new Date(Date.now() + TOKEN_TTL_MS);
         await existing.save();
-        await sendVerificationEmail(normalizedEmail, existing.name, token);
+        await sendVerificationEmail(normalizedEmail, existing.username || existing.name, token);
         return res.status(400).json({
           code:  "EMAIL_NOT_VERIFIED",
           error: "An account with this email exists but hasn't been verified. We've sent a new verification link.",
@@ -418,22 +478,29 @@ authRouter.post("/signup", async (req, res) => {
 
     const user = await User.create({
       email:                   normalizedEmail,
+      username:                normalizedUsername,
       passwordHash,
-      name:                    name?.trim() ?? "",
+      name:                    "",
       isVerified:              false,
       verificationToken,
       verificationTokenExpiry: new Date(Date.now() + TOKEN_TTL_MS),
     });
 
     // Fire-and-forget — don't block the response on email delivery
-    sendVerificationEmail(normalizedEmail, user.name, verificationToken).catch((err) => {
+    sendVerificationEmail(normalizedEmail, user.username || user.name, verificationToken).catch((err) => {
       console.error("[auth] Failed to send verification email:", err?.message);
     });
 
     return res.status(201).json({
       message: "Account created. Please check your email to verify your account.",
+      username: user.username,
     });
   } catch (err: any) {
+    if (err?.code === 11000) {
+      const field = Object.keys(err.keyPattern ?? {})[0];
+      if (field === "username") return res.status(400).json({ error: "This username is already taken." });
+      if (field === "email") return res.status(400).json({ error: "An account with this email already exists." });
+    }
     console.error("[auth] signup error:", err?.message);
     return res.status(500).json({ error: "Internal server error." });
   }
@@ -445,25 +512,50 @@ authRouter.post("/login", async (req, res) => {
   try {
     await connectMongo();
 
-    const { email, password } = req.body as { email?: string; password?: string };
+    const { email, username, password } = req.body as {
+      email?: string;
+      username?: string;
+      password?: string;
+    };
 
-    if (!email?.trim() || !password)
-      return res.status(400).json({ error: "Email and password are required." });
+    if (!password) {
+      return res.status(400).json({ error: "Password is required." });
+    }
 
-    const user = await User.findOne({ email: email.trim().toLowerCase() });
+    const hasEmail = !!email?.trim();
+    const hasUsername = !!username?.trim();
+
+    if (hasEmail === hasUsername) {
+      return res.status(400).json({ error: "Provide either email or username to sign in." });
+    }
+
+    let user = null;
+    let invalidMessage = "Invalid credentials.";
+
+    if (hasEmail) {
+      invalidMessage = "Invalid email or password.";
+      user = await User.findOne({ email: email!.trim().toLowerCase() });
+    } else {
+      invalidMessage = "Invalid username or password.";
+      const parsed = validateUsername(username);
+      if ("error" in parsed) return res.status(400).json({ error: parsed.error });
+      user = await User.findOne({ username: parsed.username });
+    }
+
     if (!user) {
       // Constant-time response to prevent user enumeration
       await bcrypt.compare(password, "$2b$12$invalidhashpadding000000000000000000000000000000000000");
-      return res.status(401).json({ error: "Invalid email or password." });
+      return res.status(401).json({ error: invalidMessage });
     }
 
     const valid = await bcrypt.compare(password, user.passwordHash);
-    if (!valid) return res.status(401).json({ error: "Invalid email or password." });
+    if (!valid) return res.status(401).json({ error: invalidMessage });
 
     if (!user.isVerified) {
       return res.status(403).json({
         code:  "EMAIL_NOT_VERIFIED",
         error: "Please verify your email before signing in. Check your inbox for a verification link.",
+        email: user.email,
       });
     }
 
@@ -471,11 +563,7 @@ authRouter.post("/login", async (req, res) => {
 
     return res.json({
       token,
-      user: {
-        id:    user._id.toString(),
-        email: user.email,
-        name:  user.name,
-      },
+      user: userPublicDto(user),
     });
   } catch (err: any) {
     console.error("[auth] login error:", err?.message);
@@ -714,6 +802,7 @@ authRouter.get("/me", requireAuth, async (req, res) => {
     return res.json({
       id:         user._id.toString(),
       email:      user.email,
+      username:   user.username ?? "",
       name:       user.name,
       isVerified: user.isVerified,
     });

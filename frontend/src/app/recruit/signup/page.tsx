@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { apiUrl } from "@/lib/api";
 import { RoleboltLogo } from "@/components/RoleboltLogo";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
+import { UsernameField } from "@/components/UsernameField";
+import { validateUsername } from "@/lib/username";
 import { firebaseAuth, googleProvider } from "@/lib/firebaseClient";
 import { signInWithPopup, RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from "firebase/auth";
 
@@ -61,7 +63,8 @@ export default function RecruitSignUpPage() {
   }, [authLoading, authUser, recruitProfile, router, nextPath]);
 
   const [step, setStep] = useState<Step>("form");
-  const [name, setName]         = useState("");
+  const [username, setUsername]     = useState("");
+  const [usernameOk, setUsernameOk] = useState(false);
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading]   = useState(false);
@@ -172,13 +175,16 @@ export default function RecruitSignUpPage() {
     if (!email.trim()) { setError("Email is required."); return; }
     if (!password)     { setError("Password is required."); return; }
     if (password.length < 8) { setError("Password must be at least 8 characters."); return; }
+    const usernameError = validateUsername(username);
+    if (usernameError) { setError(usernameError); return; }
+    if (!usernameOk) { setError("Please choose an available username."); return; }
 
     setLoading(true);
     try {
       const res = await fetch(apiUrl("/auth/signup"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), password, name: name.trim() }),
+        body: JSON.stringify({ email: email.trim(), password, username: username.trim() }),
       });
       const data = await res.json();
 
@@ -414,21 +420,7 @@ export default function RecruitSignUpPage() {
                 </div>
               )}
 
-              {/* Full name (optional) */}
-              <div className="space-y-1.5">
-                <label htmlFor="name" className="block text-xs font-semibold text-slate-700 uppercase tracking-wide">
-                  Full name <span className="font-normal text-slate-400 normal-case tracking-normal">(optional)</span>
-                </label>
-                <input
-                  id="name"
-                  type="text"
-                  autoComplete="name"
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                  placeholder="Alex Johnson"
-                  className="w-full h-11 rounded-xl border border-slate-200 px-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#0a66c2] focus:ring-2 focus:ring-[#0a66c2]/15 outline-none transition-all"
-                />
-              </div>
+              <UsernameField value={username} onChange={setUsername} onValidChange={setUsernameOk} accent="recruit" />
 
               {/* Email */}
               <div className="space-y-1.5">

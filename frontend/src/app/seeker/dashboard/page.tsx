@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { RecruitGuard } from "@/components/RecruitGuard";
 import { SeekerHeader } from "@/components/SeekerHeader";
-import { apiUrl } from "@/lib/api";
+import { displayHandle } from "@/lib/username";
 
 import type { CareerGpsPayload } from "@/lib/seekerTypes";
 
@@ -79,7 +79,7 @@ function DashboardContent() {
         {/* Welcome */}
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-slate-900">
-            Welcome back, {authUser?.name?.split(" ")[0] ?? "there"} 👋
+            Hey {displayHandle(authUser ?? recruitProfile)}!
           </h1>
           <p className="mt-1 text-sm text-slate-500">Here&apos;s your job search overview.</p>
         </div>

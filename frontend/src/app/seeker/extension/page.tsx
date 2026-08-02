@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { RecruitGuard } from "@/components/RecruitGuard";
 import { SeekerHeader } from "@/components/SeekerHeader";
-import { apiUrl } from "@/lib/api";
+import { displayHandle } from "@/lib/username";
 
 const EXTENSION_ID = process.env.NEXT_PUBLIC_ROLEBOLT_EXTENSION_ID || "";
 
@@ -91,7 +91,7 @@ function ExtensionContent() {
               </p>
             </div>
             <p className="text-xs text-slate-600">
-              Signed in as <strong>{authUser?.email || authUser?.name || "your account"}</strong>.
+              Signed in as <strong>{displayHandle(authUser)}</strong>.
               {extensionConnected
                 ? " Your session is synced — browse any job posting to use the Live AI panel."
                 : " Install the extension, then refresh this page to connect automatically."}

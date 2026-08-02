@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import Link from "next/link";
+import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { apiUrl, readApiJson } from "@/lib/api";
+import { displayHandle } from "@/lib/username";
 import { RecruitGuard } from "@/components/RecruitGuard";
 import { SkStatCard, SkJobCard } from "@/components/Skeleton";
 import { RoleboltLogo } from "@/components/RoleboltLogo";
@@ -366,7 +367,7 @@ function RecruitDashboardContent() {
   const [jobToDelete, setJobToDelete] = useState<Job | null>(null);
   const [formToDelete, setFormToDelete] = useState<Form | null>(null);
 
-  const { sessionToken } = useRecruitAuth();
+  const { sessionToken, authUser, recruitProfile } = useRecruitAuth();
   useEffect(() => {
     if (sessionToken) setToken(sessionToken);
   }, [sessionToken]);
@@ -508,6 +509,9 @@ function RecruitDashboardContent() {
 
         {/* ── Page title ────────────────────────────────────────────────── */}
         <div className="mb-8">
+          <p className="text-sm font-medium text-slate-500 mb-1">
+            Hey {displayHandle(authUser ?? recruitProfile)}!
+          </p>
           <h1 className="text-[28px] font-bold tracking-tight text-slate-900 leading-tight">
             {activeTab === "jobs" ? "Recruitment Pipeline" : "Form Jobs"}
           </h1>
