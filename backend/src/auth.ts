@@ -19,6 +19,8 @@ import { User } from "./models/User";
 import { signToken, verifyToken, requireAuth } from "./authMiddleware";
 import { sendEmail } from "./mailer";
 import { verifyFirebaseToken } from "./firebaseAdmin";
+import { RecruitProfile } from "./models/RecruitProfile";
+import { RecruitSeekerProfile } from "./models/RecruitSeekerProfile";
 
 export const authRouter = express.Router();
 
@@ -51,7 +53,9 @@ const RESERVED_USERNAMES = new Set([
 ]);
 
 function normalizeUsername(raw: unknown): string {
-  return String(raw ?? "").trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
+  // Canonicalise case and whitespace, but do not silently remove invalid
+  // characters. Validation must reject malformed API requests consistently.
+  return String(raw ?? "").trim().toLowerCase();
 }
 
 function validateUsername(raw: unknown): { username: string } | { error: string } {
@@ -423,6 +427,57 @@ authRouter.get("/check-username", async (req, res) => {
     return res.json({ available: !taken, username: parsed.username });
   } catch (err: any) {
     console.error("[auth] check-username error:", err?.message);
+    return res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+// ─── PATCH /auth/username — complete username onboarding ─────────────────────
+//
+// Social accounts are created without a username because the provider's
+// display name is not a stable, unique public handle. A username can only be
+// assigned once, and the same validation is enforced again on the server.
+authRouter.patch("/username", requireAuth, async (req, res) => {
+  try {
+    await connectMongo();
+
+    const uid = (req as any).user?.uid;
+    if (!uid) return res.status(401).json({ error: "Unauthorized" });
+
+    const parsed = validateUsername(req.body?.username);
+    if ("error" in parsed) return res.status(400).json({ error: parsed.error });
+
+    const user = await User.findById(uid);
+    if (!user) return res.status(404).json({ error: "User not found." });
+
+    // This endpoint completes onboarding; it must not become an accidental
+    // username-change endpoint later.
+    if (user.username) {
+      if (user.username === parsed.username) return res.json({ user: userPublicDto(user) });
+      return res.status(409).json({ error: "Your username has already been set." });
+    }
+
+    const taken = await User.findOne({
+      username: parsed.username,
+      _id: { $ne: user._id },
+    }).select("_id").lean();
+    if (taken) return res.status(409).json({ error: "This username is already taken." });
+
+    user.username = parsed.username;
+    await user.save();
+
+    // Keep the role-specific profile records aligned with the auth user. This
+    // makes all existing and future profile consumers use one canonical handle.
+    await Promise.all([
+      RecruitProfile.updateOne({ uid }, { $set: { username: parsed.username } }),
+      RecruitSeekerProfile.updateOne({ uid }, { $set: { username: parsed.username } }),
+    ]);
+
+    return res.json({ user: userPublicDto(user) });
+  } catch (err: any) {
+    if (err?.code === 11000 && err?.keyPattern?.username) {
+      return res.status(409).json({ error: "This username is already taken." });
+    }
+    console.error("[auth] username onboarding error:", err?.message);
     return res.status(500).json({ error: "Internal server error." });
   }
 });

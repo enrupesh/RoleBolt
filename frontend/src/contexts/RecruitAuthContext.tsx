@@ -41,7 +41,7 @@ interface RecruitAuthState {
   loading: boolean;
   profileError: string | null;
   signIn: (credentials: SignInCredentials) => Promise<{ error?: string; code?: string; email?: string }>;
-  signInWithToken: (token: string) => Promise<{ error?: string }>;
+  signInWithToken: (token: string) => Promise<{ error?: string; username?: string }>;
   signOut: () => void;
   signOutFromRecruit: () => void;
   refreshProfile: () => Promise<void>;
@@ -176,7 +176,7 @@ export function RecruitAuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signInWithToken = useCallback(
-    async (token: string): Promise<{ error?: string }> => {
+    async (token: string): Promise<{ error?: string; username?: string }> => {
       try {
         const res = await fetch(apiUrl("/auth/me"), {
           headers: { Authorization: `Bearer ${token}` },
@@ -196,7 +196,7 @@ export function RecruitAuthProvider({ children }: { children: ReactNode }) {
         } else {
           setProfileError("Could not reach the server. Please try again.");
         }
-        return {};
+        return { username: user.username };
       } catch {
         return { error: "Network error. Please check your connection." };
       }
@@ -264,7 +264,19 @@ export function RecruitAuthProvider({ children }: { children: ReactNode }) {
   const refreshProfile = useCallback(async () => {
     if (!sessionToken) return;
     setProfileError(null);
-    const profile = await fetchOrCreateProfile(sessionToken, authUser);
+    let currentUser = authUser;
+    try {
+      const meRes = await fetch(apiUrl("/auth/me"), {
+        headers: { Authorization: `Bearer ${sessionToken}` },
+      });
+      if (meRes.ok) {
+        currentUser = toAuthUser(await meRes.json());
+        setAuthUser(currentUser);
+      }
+    } catch {
+      // Keep the current session and let profile refresh report a useful error.
+    }
+    const profile = await fetchOrCreateProfile(sessionToken, currentUser);
     if (profile) {
       setRecruitProfile(profile);
     } else {
