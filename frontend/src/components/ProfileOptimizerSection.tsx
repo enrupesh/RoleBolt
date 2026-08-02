@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { apiUrl } from "@/lib/api";
+import { apiErrorFromPayload, apiUrl } from "@/lib/api";
+import { SeekerErrorNotice } from "@/components/SeekerErrorNotice";
 
 type Improvement = {
   priority: "high" | "medium" | "low";
@@ -38,7 +39,7 @@ export function ProfileOptimizerSection({
 }) {
   const [loading, setLoading]   = useState(false);
   const [result, setResult]     = useState<OptimizeResult | null>(null);
-  const [error, setError]       = useState("");
+  const [error, setError]       = useState<unknown>("");
   const [expanded, setExpanded] = useState(false);
 
   async function handleAnalyze() {
@@ -51,10 +52,10 @@ export function ProfileOptimizerSection({
         body: JSON.stringify({ resumeText, currentSkills: skills, targetRole: targetRole || "" }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Analysis failed.");
+      if (!res.ok) throw apiErrorFromPayload(res.status, data, "Analysis failed.");
       setResult(data);
       setExpanded(true);
-    } catch (e: any) { setError(e.message); }
+    } catch (e: unknown) { setError(e); }
     finally { setLoading(false); }
   }
 
@@ -82,7 +83,7 @@ export function ProfileOptimizerSection({
         </button>
       </div>
 
-      {error && <p className="mt-3 text-sm text-rose-600">{error}</p>}
+      <SeekerErrorNotice error={error} className="mt-3" />
 
       {result && expanded && (
         <div className="mt-6 space-y-5 animate-[rb-fade-in_0.3s_ease_both]">

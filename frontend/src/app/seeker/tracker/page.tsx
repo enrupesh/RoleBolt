@@ -6,6 +6,8 @@ import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { RecruitGuard } from "@/components/RecruitGuard";
 import { SeekerHeader } from "@/components/SeekerHeader";
 import { apiUrl } from "@/lib/api";
+import { apiErrorFromPayload } from "@/lib/api";
+import { SeekerErrorNotice } from "@/components/SeekerErrorNotice";
 import { PLATFORM_LABELS, SOURCE_LABELS, STAGE_COLORS, type UnifiedTrackerItem } from "@/lib/seekerTypes";
 import { Plus, ExternalLink } from "lucide-react";
 
@@ -17,7 +19,7 @@ function TrackerContent() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
   const [showAdd, setShowAdd] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<unknown>("");
   const [form, setForm] = useState({
     title: "", companyName: "", platform: "other", sourceUrl: "", stage: "applied", notes: "",
   });
@@ -29,11 +31,11 @@ function TrackerContent() {
       const res = await fetch(apiUrl("/recruit/seeker/tracker"), {
         headers: { Authorization: `Bearer ${sessionToken}` },
       });
-      if (!res.ok) throw new Error("Failed to load tracker");
-      const d = await res.json();
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw apiErrorFromPayload(res.status, d, "Failed to load tracker");
       setItems(d.items ?? []);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Load failed");
+      setError(e);
     } finally {
       setLoading(false);
     }
@@ -56,12 +58,12 @@ function TrackerContent() {
         body: JSON.stringify(form),
       });
       const d = await res.json();
-      if (!res.ok) throw new Error(d.error || "Could not add application");
+      if (!res.ok) throw apiErrorFromPayload(res.status, d, "Could not add application");
       setShowAdd(false);
       setForm({ title: "", companyName: "", platform: "other", sourceUrl: "", stage: "applied", notes: "" });
       await load();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Add failed");
+      setError(e);
     }
   }
 
@@ -85,9 +87,7 @@ function TrackerContent() {
           </button>
         </div>
 
-        {error && (
-          <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
-        )}
+        <SeekerErrorNotice error={error} className="mb-4" />
 
         <div className="flex flex-wrap gap-2 mb-6">
           {STAGES.map(s => (

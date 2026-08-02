@@ -2,6 +2,7 @@ import type express from "express";
 import type { BillingCategory } from "../billingTypes";
 import { getEntitlement } from "./entitlements";
 import { serializeBillingError } from "./enforcement";
+import { assertMeteredAccessAllowed } from "./enforcement";
 import { requireBillingOwnerUid, type BillingOwnerResource } from "./billingOwner";
 import {
   commitUsage,
@@ -67,9 +68,7 @@ export async function executeBillingOperation<T>(
   if (!ownerUid) throw new Error("Billing owner UID is required.");
 
   const entitlement = await getEntitlement(ownerUid, input.category);
-  if (!entitlement.meteredAccessAllowed) {
-    throw new Error("Metered billing access is not available for this account.");
-  }
+  assertMeteredAccessAllowed(entitlement);
 
   const reservation = await reserveUsage({
     userId: ownerUid,

@@ -31,6 +31,7 @@ import {
   runSeekerBillingOperation,
   seekerContentHash,
   seekerIdempotencyKey,
+  seekerRequestIdempotencyKey,
   isSeekerBillingError,
 } from "./billing/seekerEnforcement";
 
@@ -50,6 +51,14 @@ function requireUid(req: express.Request, res: express.Response): string | null 
   }
   return uid;
 }
+
+const ACTIVE_TRACKER_STAGES = new Set([
+  "applied",
+  "screening",
+  "assessment",
+  "interview",
+  "offer",
+]);
 
 // Fallback AI chain
 async function callAI(prompt: string): Promise<string> {
@@ -274,7 +283,7 @@ async function analyzeWorkspaceForSeeker(uid: string, workspace: any) {
   return runSeekerBillingOperation({
     uid,
     operation: "job_fit_analysis",
-    idempotencyKey: seekerIdempotencyKey(uid, ["job-fit", "workspace", workspaceId]),
+    idempotencyKey: seekerRequestIdempotencyKey(uid, "job-fit-workspace"),
     resourceType: "workspace",
     resourceId: workspaceId,
     work: async () => {
@@ -428,7 +437,11 @@ seekerRouter.post("/workspace", async (req, res) => {
       return res.status(400).json({ error: "Please provide a fuller job description (at least 40 characters)." });
     }
 
-    await assertSeekerResourceLimit(uid, "workspace_items");
+     await assertSeekerResourceLimit(uid, "workspace_items");
+     const normalizedStatus = ["saved", "applied", "archived"].includes(status) ? status : "saved";
+     if (normalizedStatus === "applied") {
+       await assertSeekerResourceLimit(uid, "active_applications");
+     }
 
     const workspace = await RecruitSeekerWorkspace.create({
       uid,
@@ -441,7 +454,7 @@ seekerRouter.post("/workspace", async (req, res) => {
       salaryText: String(salaryText || "").trim().slice(0, 180),
       jobDescription: jobDescription.slice(0, 30000),
       notes: String(notes || "").trim().slice(0, 3000),
-      status: ["saved", "applied", "archived"].includes(status) ? status : "saved",
+       status: normalizedStatus,
     });
 
     let analysisError = "";
@@ -459,7 +472,7 @@ seekerRouter.post("/workspace", async (req, res) => {
       analysisError: analysisError || undefined,
     });
   } catch (err: any) {
-    if (respondSeekerBillingError(res, err)) return;
+    if (await respondSeekerBillingError(res, err, getUid(req))) return;
     console.error("[seeker] workspace create error:", err);
     return res.status(500).json({ error: err.message });
   }
@@ -481,6 +494,7 @@ seekerRouter.patch("/workspace/:id", async (req, res) => {
   try {
     await connectMongo();
     if (!workspaceIdIsValid(req.params.id)) return res.status(400).json({ error: "Invalid workspace id." });
+    const uid = getUid(req);
     const allowed = ["title", "companyName", "location", "workMode", "salaryText", "notes", "status"];
     const update: Record<string, any> = {};
     for (const key of allowed) {
@@ -489,14 +503,25 @@ seekerRouter.patch("/workspace/:id", async (req, res) => {
     if (update.status && !["saved", "analyzed", "applied", "archived"].includes(update.status)) {
       return res.status(400).json({ error: "Invalid workspace status." });
     }
+    if (update.status === "applied") {
+      const current = await RecruitSeekerWorkspace.findOne({ _id: req.params.id, uid })
+        .select({ status: 1 })
+        .lean()
+        .exec();
+      if (!current) return res.status(404).json({ error: "Workspace item not found." });
+      if (current.status !== "applied") {
+        await assertSeekerResourceLimit(uid, "active_applications");
+      }
+    }
     const workspace = await RecruitSeekerWorkspace.findOneAndUpdate(
-      { _id: req.params.id, uid: getUid(req) },
+      { _id: req.params.id, uid },
       { $set: update },
       { new: true }
     ).lean();
     if (!workspace) return res.status(404).json({ error: "Workspace item not found." });
     return res.json({ workspace: workspaceDto(workspace) });
   } catch (err: any) {
+    if (await respondSeekerBillingError(res, err, getUid(req))) return;
     return res.status(500).json({ error: err.message });
   }
 });
@@ -510,7 +535,7 @@ seekerRouter.post("/workspace/:id/analyze", async (req, res) => {
     const analysis = await analyzeWorkspaceForSeeker(getUid(req), workspace);
     return res.json({ workspace: workspaceDto(workspace), analysis });
   } catch (err: any) {
-    if (respondSeekerBillingError(res, err)) return;
+    if (await respondSeekerBillingError(res, err, getUid(req))) return;
     console.error("[seeker] workspace analyze error:", err);
     return res.status(500).json({ error: err.message || "Job analysis failed. Please try again." });
   }
@@ -600,8 +625,7 @@ seekerRouter.post("/tracker", async (req, res) => {
       return res.status(400).json({ error: "Invalid stage." });
     }
 
-    const activeStages = new Set(["applied", "screening", "assessment", "interview", "offer"]);
-    if (activeStages.has(stage)) {
+    if (ACTIVE_TRACKER_STAGES.has(stage)) {
       await assertSeekerResourceLimit(uid, "active_applications");
     }
 
@@ -622,7 +646,7 @@ seekerRouter.post("/tracker", async (req, res) => {
 
     return res.status(201).json({ entry: trackerEntryDto(entry) });
   } catch (err: any) {
-    if (respondSeekerBillingError(res, err)) return;
+    if (await respondSeekerBillingError(res, err, getUid(req))) return;
     return res.status(500).json({ error: err.message });
   }
 });
@@ -646,6 +670,20 @@ seekerRouter.patch("/tracker/:id", async (req, res) => {
     if (req.body.nextFollowUpAt !== undefined) update.nextFollowUpAt = req.body.nextFollowUpAt ? new Date(req.body.nextFollowUpAt) : null;
     if (req.body.lastContactAt !== undefined) update.lastContactAt = req.body.lastContactAt ? new Date(req.body.lastContactAt) : null;
 
+    // Status edits are manual and remain available after AI exhaustion, but
+    // moving an inactive entry into the active pipeline consumes capacity.
+    // Check the current row first so a normal edit does not spend capacity.
+    if (update.stage && ACTIVE_TRACKER_STAGES.has(update.stage)) {
+      const current = await RecruitSeekerTrackerEntry.findOne({ _id: req.params.id, uid })
+        .select({ stage: 1 })
+        .lean()
+        .exec();
+      if (!current) return res.status(404).json({ error: "Tracker entry not found." });
+      if (!ACTIVE_TRACKER_STAGES.has(current.stage)) {
+        await assertSeekerResourceLimit(uid, "active_applications");
+      }
+    }
+
     const entry = await RecruitSeekerTrackerEntry.findOneAndUpdate(
       { _id: req.params.id, uid },
       { $set: update },
@@ -654,6 +692,7 @@ seekerRouter.patch("/tracker/:id", async (req, res) => {
     if (!entry) return res.status(404).json({ error: "Tracker entry not found." });
     return res.json({ entry: trackerEntryDto(entry) });
   } catch (err: any) {
+    if (await respondSeekerBillingError(res, err, getUid(req))) return;
     return res.status(500).json({ error: err.message });
   }
 });
@@ -789,7 +828,7 @@ Rules:
       entry: entry ? trackerEntryDto(entry) : null,
     });
   } catch (err: any) {
-    if (respondSeekerBillingError(res, err)) return;
+    if (await respondSeekerBillingError(res, err, getUid(req))) return;
     console.error("[seeker] email/parse error:", err);
     return res.status(500).json({ error: err.message || "Email parsing failed." });
   }
@@ -822,7 +861,7 @@ seekerRouter.post("/workspace/extension-analyze", async (req, res) => {
       job: payload,
     });
   } catch (err: any) {
-    if (respondSeekerBillingError(res, err)) return;
+    if (await respondSeekerBillingError(res, err, getUid(req))) return;
     console.error("[seeker] extension-analyze error:", err);
     return res.status(err.message?.includes("valid job page") ? 400 : 500).json({ error: err.message || "Analysis failed." });
   }
@@ -884,7 +923,7 @@ seekerRouter.post("/workspace/extension-save", async (req, res) => {
       updated: !created,
     });
   } catch (err: any) {
-    if (respondSeekerBillingError(res, err)) return;
+    if (await respondSeekerBillingError(res, err, getUid(req))) return;
     return res.status(err.message?.includes("valid job page") ? 400 : 500).json({ error: err.message });
   }
 });
@@ -941,7 +980,7 @@ seekerRouter.post("/jobs/:id/save", async (req, res) => {
     ).lean();
     return res.json({ ok: true, savedJobIds: (profile as any).savedJobIds });
   } catch (err: any) {
-    if (respondSeekerBillingError(res, err)) return;
+    if (await respondSeekerBillingError(res, err, getUid(req))) return;
     return res.status(500).json({ error: err.message });
   }
 });
@@ -1043,7 +1082,7 @@ Rules:
 
     return res.json({ resume: parsed });
   } catch (err: any) {
-    if (respondSeekerBillingError(res, err)) return;
+    if (await respondSeekerBillingError(res, err, getUid(req))) return;
     console.error("[seeker] resume/build error:", err);
     return res.status(500).json({ error: err.message });
   }
@@ -1107,11 +1146,11 @@ seekerRouter.post("/resume/export", async (req, res) => {
     const { buffer, mimeType, extension } = await runSeekerBillingOperation({
       uid,
       operation: "export_seeker",
-      idempotencyKey: seekerIdempotencyKey(uid, [
+       idempotencyKey: seekerIdempotencyKey(uid, [
         "export",
         format,
         template,
-        seekerContentHash(document.summary + document.fullText.slice(0, 500)),
+         seekerContentHash(document.summary + (document.fullText ?? "").slice(0, 500)),
       ]),
       work: async () => exportResume(document, format, template),
     });
@@ -1122,6 +1161,7 @@ seekerRouter.post("/resume/export", async (req, res) => {
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     return res.send(buffer);
   } catch (err: any) {
+    if (await respondSeekerBillingError(res, err, getUid(req))) return;
     console.error("[seeker] resume/export error:", err);
     return res.status(500).json({ error: err.message ?? "Export failed." });
   }
@@ -1131,6 +1171,8 @@ seekerRouter.post("/resume/export", async (req, res) => {
 seekerRouter.post("/resume/improve", async (req, res) => {
   try {
     await connectMongo();
+    const uid = requireUid(req, res);
+    if (!uid) return;
     const { resumeText, targetJobDescription } = req.body as {
       resumeText: string;
       targetJobDescription: string;
@@ -1160,7 +1202,13 @@ Rules:
 - Keep the same work history — do not invent new jobs or fake experience
 - Add missing keywords from the JD, strengthen action verbs, quantify achievements where possible`;
 
-    const raw = await callAI(prompt);
+    const raw = await runSeekerBillingOperation({
+      uid,
+      operation: "resume_improve",
+      idempotencyKey: seekerRequestIdempotencyKey(uid, "resume-improve", req.get("Idempotency-Key")),
+      resourceType: "resume",
+      work: async () => callAI(prompt),
+    });
     const parsed = safeParseJson(raw);
 
     if (!parsed?.improvedResume) {
@@ -1173,6 +1221,7 @@ Rules:
       atsScore: parsed.atsScore ?? 0,
     });
   } catch (err: any) {
+    if (await respondSeekerBillingError(res, err, getUid(req))) return;
     console.error("[seeker] resume/improve error:", err);
     return res.status(500).json({ error: err.message });
   }
@@ -1182,6 +1231,8 @@ Rules:
 seekerRouter.post("/cover-letter/generate", async (req, res) => {
   try {
     await connectMongo();
+    const uid = requireUid(req, res);
+    if (!uid) return;
     const { jobId, jobDescription, resumeText, tone = "professional" } = req.body as {
       jobId?: string;
       jobDescription?: string;
@@ -1222,11 +1273,19 @@ Rules:
 - NEVER start with "I am writing to express my interest"
 - Return ONLY the cover letter text (no subject line, no JSON, no markdown)`;
 
-    const coverLetter = await callAI(prompt);
+    const coverLetter = await runSeekerBillingOperation({
+      uid,
+      operation: "cover_letter",
+      idempotencyKey: seekerRequestIdempotencyKey(uid, "cover-letter", req.get("Idempotency-Key")),
+      resourceType: "cover_letter",
+      resourceId: jobId,
+      work: async () => callAI(prompt),
+    });
     const wordCount = coverLetter.trim().split(/\s+/).length;
 
     return res.json({ coverLetter: coverLetter.trim(), wordCount });
   } catch (err: any) {
+    if (await respondSeekerBillingError(res, err, getUid(req))) return;
     console.error("[seeker] cover-letter error:", err);
     return res.status(500).json({ error: err.message });
   }
@@ -1236,6 +1295,8 @@ Rules:
 seekerRouter.post("/interview-prep/questions", async (req, res) => {
   try {
     await connectMongo();
+    const uid = requireUid(req, res);
+    if (!uid) return;
     const { jobDescription, difficulty = "mid" } = req.body as {
       jobDescription: string;
       difficulty?: "entry" | "mid" | "senior";
@@ -1271,7 +1332,16 @@ Include a mix of: behavioral (2), technical (2), situational (1).
 Categories: "behavioral" | "technical" | "situational" | "culture"
 Make questions specific to the role and skills mentioned in the JD.`;
 
-    const raw = await callAI(prompt);
+    const raw = await runSeekerBillingOperation({
+      uid,
+      operation: "interview_questions",
+      idempotencyKey: seekerIdempotencyKey(uid, [
+        "interview-questions",
+        seekerContentHash(`${jobDescription}\n${difficulty}`),
+      ]),
+      resourceType: "interview",
+      work: async () => callAI(prompt),
+    });
     const parsed = safeParseJson(raw);
 
     if (!parsed?.questions?.length) {
@@ -1280,6 +1350,7 @@ Make questions specific to the role and skills mentioned in the JD.`;
 
     return res.json({ questions: parsed.questions });
   } catch (err: any) {
+    if (await respondSeekerBillingError(res, err, getUid(req))) return;
     console.error("[seeker] interview-prep/questions error:", err);
     return res.status(500).json({ error: err.message });
   }
@@ -1289,6 +1360,8 @@ Make questions specific to the role and skills mentioned in the JD.`;
 seekerRouter.post("/profile/optimize", async (req, res) => {
   try {
     await connectMongo();
+    const uid = requireUid(req, res);
+    if (!uid) return;
     const { resumeText, targetRole, currentSkills } = req.body as {
       resumeText?: string;
       targetRole?: string;
@@ -1333,7 +1406,16 @@ Rules:
 - salaryInsight: realistic salary range based on the profile (be specific, not generic)
 - Be specific and data-driven — reference actual skills/experience from the profile`;
 
-    const raw = await callAI(prompt);
+    const raw = await runSeekerBillingOperation({
+      uid,
+      operation: "profile_optimization",
+      idempotencyKey: seekerIdempotencyKey(uid, [
+        "profile-optimization",
+        seekerContentHash(`${resumeText || ""}\n${skillsList}\n${targetRole || ""}`),
+      ]),
+      resourceType: "profile",
+      work: async () => callAI(prompt),
+    });
     const parsed = safeParseJson(raw);
 
     if (!parsed || typeof parsed.profileScore !== "number") {
@@ -1349,6 +1431,7 @@ Rules:
       salaryInsight: parsed.salaryInsight ?? "",
     });
   } catch (err: any) {
+    if (await respondSeekerBillingError(res, err, getUid(req))) return;
     console.error("[seeker] profile/optimize error:", err);
     return res.status(500).json({ error: err.message });
   }
@@ -1358,6 +1441,8 @@ Rules:
 seekerRouter.post("/interview-prep/evaluate", async (req, res) => {
   try {
     await connectMongo();
+    const uid = requireUid(req, res);
+    if (!uid) return;
     const { question, answer, jobContext } = req.body as {
       question: string;
       answer: string;
@@ -1391,7 +1476,16 @@ Scoring guide:
 betterAnswer: 2-3 sentences showing HOW to improve (not a full rewrite)
 followUpQuestions: 1-2 natural follow-up questions an interviewer might ask`;
 
-    const raw = await callAI(prompt);
+    const raw = await runSeekerBillingOperation({
+      uid,
+      operation: "interview_evaluation",
+      idempotencyKey: seekerIdempotencyKey(uid, [
+        "interview-evaluation",
+        seekerContentHash(`${question}\n${answer}\n${jobContext || ""}`),
+      ]),
+      resourceType: "interview",
+      work: async () => callAI(prompt),
+    });
     const parsed = safeParseJson(raw);
 
     if (!parsed || typeof parsed.score !== "number") {
@@ -1407,6 +1501,7 @@ followUpQuestions: 1-2 natural follow-up questions an interviewer might ask`;
       followUpQuestions: parsed.followUpQuestions ?? [],
     });
   } catch (err: any) {
+    if (await respondSeekerBillingError(res, err, getUid(req))) return;
     console.error("[seeker] interview-prep/evaluate error:", err);
     return res.status(500).json({ error: err.message });
   }

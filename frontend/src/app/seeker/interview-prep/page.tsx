@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { RecruitGuard } from "@/components/RecruitGuard";
 import { SeekerHeader } from "@/components/SeekerHeader";
-import { apiUrl } from "@/lib/api";
+import { SeekerErrorNotice } from "@/components/SeekerErrorNotice";
+import { apiErrorFromPayload, apiUrl } from "@/lib/api";
 
 type Question = { id: string; question: string; category: string; tips: string };
 type Evaluation = { score: number; grade: string; strengths: string[]; improvements: string[]; betterAnswer: string; followUpQuestions: string[] };
@@ -30,7 +31,7 @@ function InterviewContent() {
   const [currentEval, setCurrentEval] = useState<Evaluation | null>(null);
   const [showBetter, setShowBetter] = useState(false);
   const [loading, setLoading]       = useState(false);
-  const [error, setError]           = useState("");
+  const [error, setError]           = useState<unknown>("");
 
   useEffect(() => {
     const workspaceId = new URLSearchParams(window.location.search).get("workspaceId");
@@ -56,12 +57,12 @@ function InterviewContent() {
         body: JSON.stringify({ jobDescription: jobDesc, difficulty }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Failed to load questions.");
+       if (!res.ok) throw apiErrorFromPayload(res.status, data, "Failed to load questions.");
       setQuestions(data.questions ?? []);
       setEvals(Array(data.questions?.length ?? 0).fill(null));
       setCurrentQ(0); setAnswer(""); setCurrentEval(null); setShowBetter(false);
       setScreen("interview");
-    } catch (e: any) { setError(e.message); }
+    } catch (e: unknown) { setError(e); }
     finally { setLoading(false); }
   }
 
@@ -75,11 +76,11 @@ function InterviewContent() {
         body: JSON.stringify({ question: questions[currentQ].question, answer, jobContext: jobDesc }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Evaluation failed.");
+       if (!res.ok) throw apiErrorFromPayload(res.status, data, "Evaluation failed.");
       setCurrentEval(data);
       setEvals(prev => prev.map((e, i) => i === currentQ ? data : e));
       setScreen("feedback");
-    } catch (e: any) { setError(e.message); }
+    } catch (e: unknown) { setError(e); }
     finally { setLoading(false); }
   }
 
@@ -130,7 +131,7 @@ function InterviewContent() {
                     ))}
                   </div>
                 </div>
-                {error && <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>}
+                <SeekerErrorNotice error={error} />
                 <button type="submit" disabled={loading}
                   className="w-full rounded-2xl bg-indigo-600 py-3 text-sm font-bold text-white transition hover:bg-indigo-700 disabled:opacity-60">
                   {loading ? (
@@ -172,7 +173,7 @@ function InterviewContent() {
                   placeholder="Type your answer here…"
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/20 transition resize-none" />
               </div>
-              {error && <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>}
+              <SeekerErrorNotice error={error} />
               <button onClick={handleSubmitAnswer} disabled={loading || !answer.trim()}
                 className="w-full rounded-2xl bg-indigo-600 py-3 text-sm font-bold text-white transition hover:bg-indigo-700 disabled:opacity-60">
                 {loading ? (
