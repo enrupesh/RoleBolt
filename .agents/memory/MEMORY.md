@@ -31,3 +31,4 @@
 - [Copilot surface distinction](copilot-surface-distinction.md) — Global workspace chat and contextual drawers are separate UI surfaces; redesign and verify both independently.
 - [Email sender architecture](email-sender-architecture.md) — All outbound mail uses one Resend mailer; auth defaults to verify@ while candidate/notification paths default to singular notification@.
 - [Public username profiles](public-profile-pages.md) — Server-rendered seeker/creator pages consume privacy-filtered DTOs; never reuse authenticated profile payloads for public identity.
+- [Root recruiter landing](root-recruit-landing.md) — Root renders the recruiter landing directly while `/recruit` remains a compatible deep link.
