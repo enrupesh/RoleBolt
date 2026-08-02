@@ -169,9 +169,17 @@ export async function processRazorpayWebhook(input: {
         providerLatestPaymentId: typeof entity.payment_id === "string" ? entity.payment_id : "",
         currentPeriodStart: unixSecondsToDate(entity.current_start) ?? unixSecondsToDate(entity.start_at),
         currentPeriodEnd: unixSecondsToDate(entity.current_end) ?? unixSecondsToDate(entity.end_at),
-        cancelAtPeriodEnd: entity.has_scheduled_changes === true,
+        cancelAtPeriodEnd:
+          entity.cancel_at_cycle_end === true ||
+          entity.has_scheduled_changes === true ||
+          (status === "cancelled" && Boolean(unixSecondsToDate(entity.current_end) ?? unixSecondsToDate(entity.end_at))),
         cancelledAt: status === "cancelled" ? new Date() : undefined,
-        endedAt: status === "cancelled" || status === "completed" ? new Date() : undefined,
+        endedAt:
+          status === "cancelled" && !entity.cancel_at_cycle_end && !entity.has_scheduled_changes
+            ? new Date()
+            : status === "completed"
+              ? new Date()
+              : undefined,
         lastWebhookAt: new Date(),
       },
       $setOnInsert: {

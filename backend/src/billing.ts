@@ -1,8 +1,7 @@
 import express from "express";
 import { connectMongo } from "./db";
-import { Subscription } from "./models/Subscription";
 import { getEntitlement } from "./billing/entitlements";
-import { isBillingCategory, type BillingCategory } from "./billingTypes";
+import { BILLING_CATEGORIES, isBillingCategory, type BillingCategory } from "./billingTypes";
 
 /**
  * Legacy billing compatibility surface.
@@ -23,19 +22,37 @@ billingRouter.get("/subscription", async (req, res) => {
     if (!uid) return res.status(401).json({ error: "Unauthorized" });
     await connectMongo();
 
-    const category: BillingCategory =
-      typeof req.query.category === "string" && isBillingCategory(req.query.category)
-        ? req.query.category
-        : "creator_standard";
-    const entitlement = await getEntitlement(uid, category);
+    const requestedCategory = typeof req.query.category === "string" && isBillingCategory(req.query.category)
+      ? req.query.category
+      : null;
+    const categories: BillingCategory[] = requestedCategory
+      ? [requestedCategory]
+      : [...BILLING_CATEGORIES];
+
+    const now = new Date();
+    const subscriptions = await Promise.all(
+      categories.map(async (category) => {
+        const entitlement = await getEntitlement(uid, category, now);
+        return {
+          category,
+          plan: entitlement.plan,
+          interval: entitlement.interval,
+          status: entitlement.status,
+          currentPeriodStart: entitlement.currentPeriodStart,
+          currentPeriodEnd: entitlement.currentPeriodEnd,
+          cancelAtPeriodEnd: entitlement.cancelAtPeriodEnd,
+          meteredAccessAllowed: entitlement.meteredAccessAllowed,
+          billingWarning: entitlement.billingWarning ?? null,
+          provider: "razorpay",
+        };
+      }),
+    );
+
     return res.json({
-      category,
-      plan: entitlement.plan,
-      status: entitlement.status,
-      currentPeriodStart: entitlement.currentPeriodStart,
-      currentPeriodEnd: entitlement.currentPeriodEnd,
-      cancelAtPeriodEnd: entitlement.cancelAtPeriodEnd,
-      provider: "razorpay",
+      version: 2,
+      subscriptions,
+      /** Prefer `/billing/entitlements` for usage counters and remaining quotas. */
+      entitlementsEndpoint: "/billing/entitlements",
     });
   } catch (error: any) {
     console.error("[billing] subscription read error:", error);

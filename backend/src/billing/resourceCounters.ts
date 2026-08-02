@@ -4,6 +4,8 @@ import { RecruitJob } from "../models/RecruitJob";
 import { RecruitCandidate } from "../models/RecruitCandidate";
 import { RecruitSeekerProfile } from "../models/RecruitSeekerProfile";
 import { RecruitSeekerWorkspace } from "../models/RecruitSeekerWorkspace";
+import { RecruitSeekerTrackerEntry } from "../models/RecruitSeekerTrackerEntry";
+import { RecruitTeamMember } from "../models/RecruitTeamMember";
 import type { BillingCategory } from "../billingTypes";
 
 export type ResourceCounterKey =
@@ -20,7 +22,8 @@ export type ResourceCounterKey =
   | "stored_responses"
   | "active_jobs"
   | "stored_jobs"
-  | "stored_candidates";
+  | "stored_candidates"
+  | "recruiter_seats";
 
 export class UnsupportedResourceCounterError extends Error {
   readonly code = "UNSUPPORTED_RESOURCE_COUNTER";
@@ -59,18 +62,38 @@ const formCounters: readonly ResourceCounterKey[] = [
   "active_forms",
   "stored_forms",
   "stored_responses",
+  "recruiter_seats",
 ];
 
 const standardCounters: readonly ResourceCounterKey[] = [
   "active_jobs",
   "stored_jobs",
   "stored_candidates",
+  "recruiter_seats",
 ];
 
 export function supportedResourceCounters(category: BillingCategory): readonly ResourceCounterKey[] {
   if (category === "seeker") return seekerCounters;
   if (category === "creator_form") return formCounters;
   return standardCounters;
+}
+
+async function countRecruiterSeats(ownerUid: string): Promise<number> {
+  return RecruitTeamMember.countDocuments({
+    ownerUid,
+    status: { $in: ["pending", "active"] },
+  }).exec();
+}
+
+/**
+ * Resume versions are stored on the single seeker profile document today.
+ * When a dedicated version collection is added, update this counter to query it.
+ */
+function countResumeVersions(profile: {
+  resumeText?: string;
+  resumeFileName?: string;
+} | null): number {
+  return profile && (profile.resumeText || profile.resumeFileName) ? 1 : 0;
 }
 
 export async function countOwnedResources(
@@ -81,6 +104,10 @@ export async function countOwnedResources(
   if (!uid.trim()) throw new Error("An owner ID is required to count billing resources.");
   const allowed = supportedResourceCounters(category);
   assertCategoryCounter(category, counter, allowed);
+
+  if (counter === "recruiter_seats") {
+    return countRecruiterSeats(uid);
+  }
 
   if (category === "creator_standard") {
     if (counter === "active_jobs") {
@@ -111,10 +138,17 @@ export async function countOwnedResources(
   if (counter === "projects") return profile?.projects?.length ?? 0;
   if (counter === "certifications") return profile?.certifications?.length ?? 0;
   if (counter === "active_resume_versions" || counter === "stored_resume_versions") {
-    return profile && (profile.resumeText || profile.resumeFileName) ? 1 : 0;
+    return countResumeVersions(profile);
   }
   if (counter === "active_applications") {
-    return RecruitSeekerWorkspace.countDocuments({ uid, status: "applied" }).exec();
+    const [workspaceApplied, trackerActive] = await Promise.all([
+      RecruitSeekerWorkspace.countDocuments({ uid, status: "applied" }).exec(),
+      RecruitSeekerTrackerEntry.countDocuments({
+        uid,
+        stage: { $in: ["applied", "screening", "assessment", "interview", "offer"] },
+      }).exec(),
+    ]);
+    return workspaceApplied + trackerActive;
   }
   if (counter === "application_history") {
     return RecruitSeekerWorkspace.countDocuments({ uid }).exec();

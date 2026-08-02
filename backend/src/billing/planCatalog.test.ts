@@ -7,7 +7,7 @@ import {
 } from "../billingTypes";
 import { assertCatalogComplete, getPlanDefinition } from "./planCatalog";
 import { getCalendarPeriod, getPeriodWindow } from "./periods";
-import { getBillingOperation } from "./operationCatalog";
+import { getBillingOperation, assertOperationCatalogComplete } from "./operationCatalog";
 
 describe("billing plan catalog", () => {
   it("contains every category, plan, and interval", () => {
@@ -51,6 +51,10 @@ describe("billing periods", () => {
 });
 
 describe("billing operation catalog", () => {
+  it("covers every Phase -1 required operation key", () => {
+    assertOperationCatalogComplete();
+  });
+
   it("assigns the documented AI weights", () => {
     assert.equal(getBillingOperation("cover_letter").units, 2);
     assert.equal(getBillingOperation("interview_session").units, 3);
