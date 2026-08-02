@@ -15,6 +15,7 @@ import { UsageEvent } from "./models/UsageEvent";
 import { RecruitProfile } from "./models/RecruitProfile";
 import { RecruitImage } from "./models/RecruitImage";
 import { sendEmail, verifySMTP } from "./mailer";
+import { NOTIFICATION_FROM } from "./emailConfig";
 import * as emailTemplates from "./emailTemplates";
 import { User } from "./models/User";
 import { getCollaborationAccess, hasPermission, recordCollaborationActivity } from "./collaboration";
@@ -89,9 +90,6 @@ const FRONTEND_URL = (
     ? _rawRecruitFrontendUrl
     : "https://www.rolebolt.tech"
 ).replace(/\/$/, "");
-const CANDIDATE_FROM     = `Rolebolt <${process.env.CANDIDATE_FROM_EMAIL ?? "notification@rolebolt.tech"}>`;
-const NOTIFICATION_FROM  = `Rolebolt <${process.env.NOTIFICATION_FROM_EMAIL ?? "notification@rolebolt.tech"}>`;
-
 function getUid(req: express.Request): string {
   return (req as any).user?.uid ?? "";
 }
@@ -186,7 +184,7 @@ async function sendCandidateStageEmail(
       subject: payload.subject,
       html: payload.html,
       text: payload.text,
-      from: CANDIDATE_FROM,
+      from: NOTIFICATION_FROM,
     });
     await pushCandidateEmailLog(candidateId, {
       type: stage,
@@ -308,7 +306,7 @@ async function sendAssessmentInviteEmail(args: {
     subject: payload.subject,
     html: payload.html,
     text: payload.text,
-    from: CANDIDATE_FROM,
+    from: NOTIFICATION_FROM,
   });
 
   await pushCandidateEmailLog(candidateId, {
@@ -404,7 +402,7 @@ async function dispatchAgentActions(args: {
       } else if (agentMode.autoEmailShortlist !== false && candidateEmail?.trim()) {
         const tpl = emailTemplates.screened(candidateName, job.title, job.companyName || "", ctx);
         const result = await sendEmail({
-          to: candidateEmail, subject: tpl.subject, html: tpl.html, text: tpl.text, from: CANDIDATE_FROM,
+          to: candidateEmail, subject: tpl.subject, html: tpl.html, text: tpl.text, from: NOTIFICATION_FROM,
         });
         emailSent = result.ok;
         emailStatus = result.ok ? "sent" : "failed";
@@ -427,7 +425,7 @@ async function dispatchAgentActions(args: {
       const rejBody = `Hi ${candidateName.split(" ")[0]},\n\nThank you for applying for the ${job.title} role${job.companyName ? ` at ${job.companyName}` : ""}. After reviewing your application, we've decided to move forward with other candidates at this time.\n\nWe appreciate your interest and wish you the best in your search.\n\nWarm regards,\nThe Hiring Team`;
       const tpl = emailTemplates.rejectionEmailHtml(candidateName, job.title, job.companyName || "", rejBody, { officialContactEmail });
       const result = await sendEmail({
-        to: candidateEmail, subject: tpl.subject, html: tpl.html, text: tpl.text, from: CANDIDATE_FROM,
+        to: candidateEmail, subject: tpl.subject, html: tpl.html, text: tpl.text, from: NOTIFICATION_FROM,
       });
       emailSent = result.ok;
       emailStatus = result.ok ? "sent" : "failed";
@@ -454,7 +452,7 @@ async function dispatchAgentActions(args: {
       const officialContactEmail = await getCreatorOfficialEmail(job.uid ?? "");
       const tpl = emailTemplates.reviewZoneEmail(candidateName, job.title, job.companyName || "", { officialContactEmail });
       const result = await sendEmail({
-        to: candidateEmail, subject: tpl.subject, html: tpl.html, text: tpl.text, from: CANDIDATE_FROM,
+        to: candidateEmail, subject: tpl.subject, html: tpl.html, text: tpl.text, from: NOTIFICATION_FROM,
       });
       emailSent = result.ok;
       emailStatus = result.ok ? "sent" : "failed";
@@ -718,7 +716,7 @@ export async function evaluatePipelineRules(jobId: string, candidateId: string) 
             subject: payload.subject,
             html: payload.html,
             text: payload.text,
-            from: CANDIDATE_FROM,
+            from: NOTIFICATION_FROM,
           });
           await RecruitCandidate.updateOne(
             { _id: candidateId },
@@ -3453,7 +3451,7 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/send-email", async (req
       html = emailTemplates.genericEmail(candidate.name, subject.trim(), body, ctx);
     }
 
-    const result = await sendEmail({ to: candidate.email, subject: subject.trim(), html, text: body, from: CANDIDATE_FROM });
+    const result = await sendEmail({ to: candidate.email, subject: subject.trim(), html, text: body, from: NOTIFICATION_FROM });
 
     const logEntry = {
       type: type || "custom",
@@ -3506,7 +3504,7 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/reminder", async (req, 
           const companyName  = (job as any)?.companyName || "";
           const officialContactEmail = await getCreatorOfficialEmail(uid);
           const payload = emailTemplates.assessmentReminder(candName, jobTitle, companyName, reminderUrl, { officialContactEmail });
-          const result  = await sendEmail({ to: candEmail, subject: payload.subject, html: payload.html, text: payload.text, from: CANDIDATE_FROM });
+          const result  = await sendEmail({ to: candEmail, subject: payload.subject, html: payload.html, text: payload.text, from: NOTIFICATION_FROM });
           await RecruitCandidate.findByIdAndUpdate(candId, {
             $push: {
               emailLog: {
@@ -5081,7 +5079,7 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/offer-letter/send", asy
     const payload = emailTemplates.offerEmailWithLink(
       candidate.name, jobTitle, companyName, candidate.offerLetter, offerUrl, { officialContactEmail },
     );
-    const result  = await sendEmail({ to: candidate.email, subject: payload.subject, html: payload.html, text: payload.text, from: CANDIDATE_FROM });
+    const result  = await sendEmail({ to: candidate.email, subject: payload.subject, html: payload.html, text: payload.text, from: NOTIFICATION_FROM });
 
     // Log offer_approved + offer_sent in offerLog
     (candidate.offerLog as any[]).push({ action: "offer_approved", note: "Recruiter approved the offer letter", timestamp: new Date() });
@@ -5371,7 +5369,7 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/offer-letter/extend-exp
       const payload     = emailTemplates.offerExtendedEmail(
         candidate.name, jobTitle, companyName, formatted, offerUrl, isReactivating, { officialContactEmail },
       );
-      const result      = await sendEmail({ to: candidate.email, subject: payload.subject, html: payload.html, text: payload.text, from: CANDIDATE_FROM });
+      const result      = await sendEmail({ to: candidate.email, subject: payload.subject, html: payload.html, text: payload.text, from: NOTIFICATION_FROM });
       const sentAt      = new Date();
       (candidate.offerLog as any[]).push({
         action: "offer_extension_notified",
