@@ -29,3 +29,4 @@
 - [Frontend dependency hoisting](frontend-build-hoisting.md) — imported standalone Recruit workspace needs Next webpack mode because Turbopack mis-resolves hoisted root dependencies.
 - [Standard Job UX direction](standard-job-ux.md) — Standard Jobs are decision-oriented hiring command centers; Form Jobs remain lighter and intake-oriented.
 - [Copilot surface distinction](copilot-surface-distinction.md) — Global workspace chat and contextual drawers are separate UI surfaces; redesign and verify both independently.
+- [Email sender architecture](email-sender-architecture.md) — All outbound mail uses one Resend mailer; auth defaults to verify@ while candidate/notification paths default to singular notification@.
