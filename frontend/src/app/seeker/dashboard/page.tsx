@@ -7,6 +7,8 @@ import { RecruitGuard } from "@/components/RecruitGuard";
 import { SeekerHeader } from "@/components/SeekerHeader";
 import { apiUrl } from "@/lib/api";
 
+import type { CareerGpsPayload } from "@/lib/seekerTypes";
+
 type Application = {
   id: string; jobId: string; jobTitle: string; companyName: string;
   location: string; workMode: string; stage: string;
@@ -29,11 +31,15 @@ const STAGE_COLORS: Record<string, string> = {
 };
 
 const AI_TOOLS = [
-  { href: "/seeker/workspace",      icon: "✦",  label: "Universal Job Workspace", desc: "Analyze any job from any website" },
-  { href: "/seeker/resume",         icon: "📄", label: "AI Resume Builder",       desc: "Build or improve your resume" },
-  { href: "/seeker/cover-letter",   icon: "✉️",  label: "Cover Letter Generator",  desc: "Personalized cover letters in seconds" },
-  { href: "/seeker/interview-prep", icon: "🎤",  label: "Interview Prep",           desc: "Mock interviews with AI feedback" },
-  { href: "/recruit/opportunities", icon: "🔍",  label: "Browse Jobs",              desc: "Explore all open positions" },
+  { href: "/seeker/career",         icon: "🧭", label: "Career GPS",                  desc: "Your personalized next actions" },
+  { href: "/seeker/tracker",        icon: "📋", label: "Application Tracker",         desc: "All applications — any platform" },
+  { href: "/seeker/workspace",      icon: "✦",  label: "Universal Job Workspace",     desc: "Analyze any job from any website" },
+  { href: "/seeker/email",          icon: "📧", label: "Email Intelligence",          desc: "Parse recruiter emails instantly" },
+  { href: "/seeker/extension",      icon: "🧩", label: "Browser Extension",           desc: "Live AI on LinkedIn, Indeed & more" },
+  { href: "/seeker/resume",         icon: "📄", label: "AI Resume Builder",           desc: "Build or improve your resume" },
+  { href: "/seeker/cover-letter",   icon: "✉️",  label: "Cover Letter Generator",      desc: "Personalized cover letters in seconds" },
+  { href: "/seeker/interview-prep", icon: "🎤",  label: "Interview Prep",               desc: "Mock interviews with AI feedback" },
+  { href: "/recruit/opportunities", icon: "🔍",  label: "Browse Jobs",                  desc: "Explore all open positions" },
 ];
 
 function DashboardContent() {
@@ -41,19 +47,26 @@ function DashboardContent() {
   const [token, setToken] = useState<string | null>(null);
   const [applications, setApplications] = useState<Application[]>([]);
   const [savedJobs, setSavedJobs]       = useState<SavedJob[]>([]);
+  const [gps, setGps]                   = useState<CareerGpsPayload | null>(null);
   const [loading, setLoading]           = useState(true);
+  const [fetchError, setFetchError]     = useState("");
 
   useEffect(() => { if (sessionToken) setToken(sessionToken); }, [sessionToken]);
 
   useEffect(() => {
     if (!token) return;
+    setFetchError("");
     Promise.all([
-      fetch(apiUrl("/recruit/seeker/applications"), { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
-      fetch(apiUrl("/recruit/seeker/saved-jobs"),   { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
-    ]).then(([apps, saved]) => {
+      fetch(apiUrl("/recruit/seeker/applications"), { headers: { Authorization: `Bearer ${token}` } }),
+      fetch(apiUrl("/recruit/seeker/saved-jobs"),   { headers: { Authorization: `Bearer ${token}` } }),
+      fetch(apiUrl("/recruit/seeker/career-gps"),   { headers: { Authorization: `Bearer ${token}` } }),
+    ]).then(async ([appsRes, savedRes, gpsRes]) => {
+      if (!appsRes.ok || !savedRes.ok) throw new Error("Could not load dashboard data");
+      const [apps, saved, gpsData] = await Promise.all([appsRes.json(), savedRes.json(), gpsRes.ok ? gpsRes.json() : { gps: null }]);
       setApplications(apps.applications ?? []);
       setSavedJobs(saved.jobs ?? []);
-    }).finally(() => setLoading(false));
+      setGps(gpsData.gps ?? null);
+    }).catch(e => setFetchError(e.message)).finally(() => setLoading(false));
   }, [token]);
 
   const recentApps = applications.slice(0, 4);
@@ -70,6 +83,23 @@ function DashboardContent() {
           </h1>
           <p className="mt-1 text-sm text-slate-500">Here&apos;s your job search overview.</p>
         </div>
+
+        {fetchError && (
+          <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{fetchError}</div>
+        )}
+
+        {gps && !loading && (
+          <Link href="/seeker/career" className="mb-6 block rounded-3xl border border-indigo-200 bg-gradient-to-r from-indigo-600 to-violet-600 p-5 text-white shadow-lg transition hover:shadow-xl">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-indigo-200">Career GPS</p>
+                <p className="mt-1 text-lg font-black">Momentum: {gps.momentumScore}/100</p>
+                <p className="mt-1 text-sm text-indigo-100">{gps.nextActions[0]?.title ?? "You're on track"}</p>
+              </div>
+              <span className="text-3xl">🧭</span>
+            </div>
+          </Link>
+        )}
 
         {/* Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
@@ -91,8 +121,8 @@ function DashboardContent() {
           <div className="lg:col-span-2 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex items-center justify-between mb-5">
               <h2 className="font-bold text-slate-900">Recent Applications</h2>
-              <Link href="/seeker/applications" className="text-xs font-semibold text-indigo-600 hover:text-indigo-700">
-                View all →
+              <Link href="/seeker/tracker" className="text-xs font-semibold text-indigo-600 hover:text-indigo-700">
+                Full tracker →
               </Link>
             </div>
             {loading ? (

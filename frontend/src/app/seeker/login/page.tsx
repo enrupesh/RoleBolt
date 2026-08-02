@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { RoleboltLogo } from "@/components/RoleboltLogo";
 import { apiUrl } from "@/lib/api";
@@ -40,13 +40,19 @@ type PhoneStep = "idle" | "entering" | "otp";
 
 export default function SeekerLoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirect") || "/seeker/dashboard";
   const { authUser, recruitProfile, loading, signInWithToken } = useRecruitAuth();
+
+  function goAfterLogin() {
+    router.replace(redirectTo.startsWith("/") ? redirectTo : "/seeker/dashboard");
+  }
 
   useEffect(() => {
     if (!loading && authUser && recruitProfile?.role === "seeker") {
-      router.replace("/seeker/dashboard");
+      goAfterLogin();
     }
-  }, [loading, authUser, recruitProfile, router]);
+  }, [loading, authUser, recruitProfile, router, redirectTo]);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -69,10 +75,23 @@ export default function SeekerLoginPage() {
   const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
 
   async function syncSeekerSession(token: string, profile?: { name?: string; email?: string }) {
+    const existingRes = await fetch(apiUrl("/recruit/auth/profile"), {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const existingData = existingRes.ok ? await existingRes.json().catch(() => ({})) : {};
+    const patchBody: Record<string, string | undefined> = {
+      name: profile?.name,
+      email: profile?.email,
+    };
+    // Don't overwrite recruiter accounts when signing in via seeker login
+    if (existingData.profile?.role !== "creator") {
+      patchBody.role = "seeker";
+    }
+
     await fetch(apiUrl("/recruit/auth/profile"), {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ role: "seeker", name: profile?.name, email: profile?.email }),
+      body: JSON.stringify(patchBody),
     });
 
     await fetch(apiUrl("/recruit/seeker/profile"), {
@@ -112,7 +131,7 @@ export default function SeekerLoginPage() {
         name: data.user?.name ?? result.user.displayName ?? "",
         email: data.user?.email ?? result.user.email ?? "",
       });
-      router.replace("/seeker/dashboard");
+      goAfterLogin();
     } catch (err: any) {
       if (err?.code !== "auth/popup-closed-by-user") {
         setError("Sign-in was cancelled or failed. Please try again.");
@@ -186,7 +205,7 @@ export default function SeekerLoginPage() {
       }
 
       await syncSeekerSession(data.token, { name: data.user?.name ?? "", email: data.user?.email ?? "" });
-      router.replace("/seeker/dashboard");
+      goAfterLogin();
     } catch (err: any) {
       setPhoneError(err?.code === "auth/invalid-verification-code" ? "Incorrect OTP. Please try again." : (err?.message ?? "Verification failed."));
     } finally {
@@ -218,7 +237,7 @@ export default function SeekerLoginPage() {
       }
 
       await syncSeekerSession(data.token, { name: data.user?.name, email: data.user?.email });
-      router.replace("/seeker/dashboard");
+      goAfterLogin();
     } catch {
       setError("Network error. Please try again.");
     } finally {
