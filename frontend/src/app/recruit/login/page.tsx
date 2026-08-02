@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { RoleboltLogo } from "@/components/RoleboltLogo";
+import { LoginMethodSwitch } from "@/components/LoginMethodSwitch";
+import { normalizeUsernameInput } from "@/lib/username";
 import { apiUrl } from "@/lib/api";
 import { firebaseAuth, googleProvider } from "@/lib/firebaseClient";
 import { signInWithPopup, RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from "firebase/auth";
@@ -59,7 +61,9 @@ export default function RecruitLoginPage() {
     }
   }, [loading, authUser, recruitProfile, router, nextPath]);
 
+  const [loginMode, setLoginMode] = useState<"email" | "username">("email");
   const [email, setEmail]       = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError]       = useState("");
@@ -168,15 +172,24 @@ export default function RecruitLoginPage() {
     setUnverified(false);
     setResendSuccess(false);
 
-    if (!email.trim()) { setError("Email is required."); return; }
-    if (!password)     { setError("Password is required."); return; }
+    if (loginMode === "email" && !email.trim()) { setError("Email is required."); return; }
+    if (loginMode === "username" && !username.trim()) { setError("Username is required."); return; }
+    if (!password) { setError("Password is required."); return; }
 
     setSubmitting(true);
-    const result = await signIn(email.trim(), password);
+    const result = await signIn(
+      loginMode === "email"
+        ? { email: email.trim(), password }
+        : { username: normalizeUsernameInput(username), password },
+    );
     setSubmitting(false);
 
     if (result.error) {
       if (result.code === "EMAIL_NOT_VERIFIED") {
+        if (result.email) {
+          setEmail(result.email);
+          emailRef.current = result.email;
+        }
         setUnverified(true);
       } else {
         setError(result.error);
@@ -184,7 +197,7 @@ export default function RecruitLoginPage() {
       return;
     }
 
-    router.replace("/recruit/dashboard");
+    router.replace(nextPath);
   }
 
   async function handleResend() {
@@ -405,22 +418,45 @@ export default function RecruitLoginPage() {
                 </div>
               )}
 
-              {/* Email */}
-              <div className="space-y-1.5">
-                <label htmlFor="email" className="block text-xs font-semibold text-slate-700 uppercase tracking-wide">
-                  Email address
-                </label>
-                <input
-                  id="email"
-                  type="email"
-                  autoComplete="email"
-                  value={email}
-                  onChange={e => { setEmail(e.target.value); setError(""); setUnverified(false); }}
-                  placeholder="you@example.com"
-                  className="w-full h-11 rounded-xl border border-slate-200 px-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#0a66c2] focus:ring-2 focus:ring-[#0a66c2]/15 outline-none transition-all"
-                  required
-                />
-              </div>
+              <LoginMethodSwitch mode={loginMode} onChange={setLoginMode} accent="recruit" />
+
+              {loginMode === "email" ? (
+                <div className="space-y-1.5">
+                  <label htmlFor="email" className="block text-xs font-semibold text-slate-700 uppercase tracking-wide">
+                    Email address
+                  </label>
+                  <input
+                    id="email"
+                    type="email"
+                    autoComplete="email"
+                    value={email}
+                    onChange={e => { setEmail(e.target.value); setError(""); setUnverified(false); }}
+                    placeholder="you@example.com"
+                    className="w-full h-11 rounded-xl border border-slate-200 px-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#0a66c2] focus:ring-2 focus:ring-[#0a66c2]/15 outline-none transition-all"
+                    required
+                  />
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <label htmlFor="username" className="block text-xs font-semibold text-slate-700 uppercase tracking-wide">
+                    Username
+                  </label>
+                  <div className="relative">
+                    <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-slate-400">@</span>
+                    <input
+                      id="username"
+                      type="text"
+                      autoComplete="username"
+                      spellCheck={false}
+                      value={username}
+                      onChange={e => { setUsername(normalizeUsernameInput(e.target.value)); setError(""); setUnverified(false); }}
+                      placeholder="rupesh"
+                      className="w-full h-11 rounded-xl border border-slate-200 pl-8 pr-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#0a66c2] focus:ring-2 focus:ring-[#0a66c2]/15 outline-none transition-all"
+                      required
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Password */}
               <div className="space-y-1.5">

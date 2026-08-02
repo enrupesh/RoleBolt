@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { RoleboltLogo } from "@/components/RoleboltLogo";
+import { displayHandle } from "@/lib/username";
 import { Menu, X } from "lucide-react";
 
 const NAV = [
@@ -27,7 +28,7 @@ const TOOLS = [
 
 export function SeekerHeader() {
   const pathname = usePathname();
-  const { authUser, signOut } = useRecruitAuth();
+  const { authUser, recruitProfile, signOut } = useRecruitAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const linkClass = (href: string) =>
@@ -76,7 +77,7 @@ export function SeekerHeader() {
         <div className="flex items-center gap-2">
           {authUser && (
             <span className="hidden sm:block text-xs text-slate-500 font-medium truncate max-w-[120px]">
-              {authUser.name || authUser.email}
+              {displayHandle(authUser ?? recruitProfile)}
             </span>
           )}
           <button

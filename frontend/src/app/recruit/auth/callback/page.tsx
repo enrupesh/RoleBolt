@@ -64,13 +64,13 @@ function OAuthCallbackInner() {
           await fetch(apiUrl("/recruit/auth/profile"), {
             method: "PATCH",
             headers: { ...headers, "Content-Type": "application/json" },
-            body: JSON.stringify({ role: "seeker", name: me?.name, email: me?.email }),
+            body: JSON.stringify({ role: "seeker", username: me?.username, email: me?.email }),
           });
 
           await fetch(apiUrl("/recruit/seeker/profile"), {
             method: "PUT",
             headers: { ...headers, "Content-Type": "application/json" },
-            body: JSON.stringify({ name: me?.name, email: me?.email }),
+            body: JSON.stringify({ username: me?.username, email: me?.email }),
           });
         }
 

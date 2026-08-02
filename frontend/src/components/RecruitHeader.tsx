@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { RoleboltLogo } from "@/components/RoleboltLogo";
+import { displayHandle } from "@/lib/username";
 
 const CREATOR_NAV = [
   { href: "/recruit/dashboard", label: "Dashboard" },
@@ -97,6 +98,12 @@ export default function RecruitHeader() {
 
         {/* Actions */}
         <div className="flex items-center gap-2 shrink-0">
+
+          {isLoggedIn && authUser && (
+            <span className="hidden sm:block text-xs text-slate-500 font-medium truncate max-w-[120px]">
+              {displayHandle(authUser ?? recruitProfile)}
+            </span>
+          )}
 
           {isLoggedIn ? (
             <>

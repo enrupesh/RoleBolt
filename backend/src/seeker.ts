@@ -331,7 +331,7 @@ seekerRouter.put("/profile", async (req, res) => {
     await connectMongo();
     const uid = getUid(req);
     const allowed = [
-      "name", "email", "phone", "headline", "bio", "skills",
+      "name", "username", "email", "phone", "headline", "bio", "skills",
       "experience", "education", "preferredJobType", "preferredWorkMode",
       "preferredLocation", "preferredSalaryMin", "preferredSalaryMax",
       "preferredNiche", "experienceLevel", "resumeText", "resumeFileName",
