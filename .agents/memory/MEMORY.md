@@ -28,3 +28,4 @@
 - [Universal seeker job workspace](universal-job-workspace.md) — jobs from any public URL or pasted JD persist independently and feed matching, resume, cover-letter, and interview flows.
 - [Frontend dependency hoisting](frontend-build-hoisting.md) — imported standalone Recruit workspace needs Next webpack mode because Turbopack mis-resolves hoisted root dependencies.
 - [Standard Job UX direction](standard-job-ux.md) — Standard Jobs are decision-oriented hiring command centers; Form Jobs remain lighter and intake-oriented.
+- [Copilot surface distinction](copilot-surface-distinction.md) — Global workspace chat and contextual drawers are separate UI surfaces; redesign and verify both independently.
