@@ -2,7 +2,7 @@ import { connectMongo } from "../db";
 import { UsagePeriod } from "../models/UsagePeriod";
 import { getEntitlement } from "./entitlements";
 import { getPeriodWindow } from "./periods";
-import { UsageLimitError } from "./usage";
+import { UsageIdempotencyConflictError, UsageLimitError } from "./usage";
 import { countOwnedResources, type ResourceCounterKey } from "./resourceCounters";
 import type { BillingCategory, ResolvedEntitlement } from "../billingTypes";
 
@@ -171,6 +171,17 @@ export function serializeBillingError(
       },
     };
   }
+  if (error instanceof UsageIdempotencyConflictError) {
+    return {
+      status: 409,
+      body: {
+        error: "IDEMPOTENCY_KEY_REUSED",
+        code: error.code,
+        message: "This request key was already used for a different operation.",
+        upgradeRequired: false,
+      },
+    };
+  }
   if (error instanceof FeatureNotAvailableError) {
     return {
       status: 403,
@@ -200,6 +211,19 @@ export function serializeBillingError(
     return {
       status: 500,
       body: { error: error.code, message: "Billing configuration is incomplete." },
+    };
+  }
+  if ((error as { code?: string })?.code === "IDEMPOTENT_OPERATION_ALREADY_COMPLETED") {
+    return {
+      status: 409,
+      body: {
+        error: "IDEMPOTENT_OPERATION_ALREADY_COMPLETED",
+        code: "IDEMPOTENT_OPERATION_ALREADY_COMPLETED",
+        category: entitlement?.category,
+        plan: entitlement?.plan ?? "free",
+        message: "This request was already completed. Submit a new change to run it again.",
+        upgradeRequired: false,
+      },
     };
   }
   return {

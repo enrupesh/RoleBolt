@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { RecruitGuard } from "@/components/RecruitGuard";
 import { SeekerHeader } from "@/components/SeekerHeader";
-import { apiUrl } from "@/lib/api";
+import { SeekerErrorNotice } from "@/components/SeekerErrorNotice";
+import { apiErrorFromPayload, apiUrl } from "@/lib/api";
 
 const TONES = [
   { key: "professional", label: "Professional", desc: "Formal and polished" },
@@ -19,7 +20,7 @@ function CoverLetterContent() {
   const [tone, setTone]                     = useState<"professional"|"enthusiastic"|"concise">("professional");
   const [loading, setLoading]               = useState(false);
   const [result, setResult]                 = useState<{ coverLetter: string; wordCount: number } | null>(null);
-  const [error, setError]                   = useState("");
+  const [error, setError]                   = useState<unknown>("");
   const [copied, setCopied]                 = useState(false);
 
   useEffect(() => {
@@ -56,9 +57,9 @@ function CoverLetterContent() {
         body: JSON.stringify({ jobDescription, resumeText, tone }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Generation failed.");
+      if (!res.ok) throw apiErrorFromPayload(res.status, data, "Generation failed.");
       setResult(data);
-    } catch (e: any) { setError(e.message); }
+    } catch (e: unknown) { setError(e); }
     finally { setLoading(false); }
   }
 
@@ -114,7 +115,7 @@ function CoverLetterContent() {
                   ))}
                 </div>
               </div>
-              {error && <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>}
+              <SeekerErrorNotice error={error} />
               <button type="submit" disabled={loading}
                 className="w-full rounded-2xl bg-indigo-600 py-3 text-sm font-bold text-white transition hover:bg-indigo-700 disabled:opacity-60">
                 {loading ? (

@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
-import { apiUrl } from "@/lib/api";
+import { apiErrorFromPayload, apiUrl } from "@/lib/api";
+import { SeekerErrorNotice } from "@/components/SeekerErrorNotice";
 
 export default function SeekerJobActions({
   jobId,
@@ -16,7 +17,7 @@ export default function SeekerJobActions({
   const [saved, setSaved] = useState(false);
   const [applied, setApplied] = useState(false);
   const [loading, setLoading] = useState<"save" | "apply" | null>(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<unknown>("");
   const [success, setSuccess] = useState("");
 
   const isSeeker = recruitProfile?.role === "seeker";
@@ -61,13 +62,13 @@ export default function SeekerJobActions({
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
-        throw new Error(d.error || "Could not update saved jobs.");
+        throw apiErrorFromPayload(res.status, d, "Could not update saved jobs.");
       }
       setSaved(!saved);
       setSuccess(saved ? "Removed from saved jobs" : "Job saved!");
       setTimeout(() => setSuccess(""), 2500);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Save failed.");
+      setError(e);
     } finally {
       setLoading(null);
     }
@@ -82,17 +83,17 @@ export default function SeekerJobActions({
         headers: { Authorization: `Bearer ${token}` },
       });
       const d = await res.json().catch(() => ({}));
-      if (res.status === 409) {
+      if (res.status === 409 && (d.code === "DUPLICATE_APPLICATION" || d.error === "DUPLICATE_APPLICATION")) {
         setApplied(true);
         setSuccess("You already applied to this job.");
         return;
       }
-      if (!res.ok) throw new Error(d.error || "Application failed.");
+      if (!res.ok) throw apiErrorFromPayload(res.status, d, "Application failed.");
       setApplied(true);
       setSuccess("Application submitted with your saved profile!");
       setTimeout(() => setSuccess(""), 4000);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Apply failed.");
+      setError(e);
     } finally {
       setLoading(null);
     }
@@ -124,7 +125,7 @@ export default function SeekerJobActions({
           Full apply form
         </Link>
       </div>
-      {error && <p className="text-xs font-medium text-rose-600">{error}</p>}
+      <SeekerErrorNotice error={error} className="text-xs" />
       {success && <p className="text-xs font-medium text-emerald-600">{success}</p>}
       {!applied && (
         <p className="text-[11px] text-slate-500">

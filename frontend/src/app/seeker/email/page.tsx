@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { RecruitGuard } from "@/components/RecruitGuard";
 import { SeekerHeader } from "@/components/SeekerHeader";
-import { apiUrl } from "@/lib/api";
+import { apiErrorFromPayload, apiUrl } from "@/lib/api";
+import { SeekerErrorNotice } from "@/components/SeekerErrorNotice";
 import { STAGE_COLORS } from "@/lib/seekerTypes";
 
 type ParsedIntel = {
@@ -25,7 +26,7 @@ function EmailIntelContent() {
   const { sessionToken } = useRecruitAuth();
   const [emailText, setEmailText] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<unknown>("");
   const [result, setResult] = useState<ParsedIntel | null>(null);
   const [trackerEntry, setTrackerEntry] = useState<TrackerEntryRef | null>(null);
   const [history, setHistory] = useState<ParsedIntel[]>([]);
@@ -51,7 +52,7 @@ function EmailIntelContent() {
         body: JSON.stringify({ emailText }),
       });
       const d = await res.json();
-      if (!res.ok) throw new Error(d.error || "Parse failed");
+      if (!res.ok) throw apiErrorFromPayload(res.status, d, "Parse failed");
       const intel = d.intel as ParsedIntel;
       setResult(intel);
       if (d.entry?.id) {
@@ -62,7 +63,7 @@ function EmailIntelContent() {
       localStorage.setItem("seeker_email_intel_history", JSON.stringify(next));
       setEmailText("");
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Parse failed");
+      setError(e);
     } finally {
       setLoading(false);
     }
@@ -87,7 +88,7 @@ function EmailIntelContent() {
             placeholder="Paste the full email from a recruiter, hiring manager, or ATS notification…"
             className="w-full min-h-[200px] rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-800 outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10"
           />
-          {error && <p className="mt-2 text-sm text-rose-600">{error}</p>}
+          <SeekerErrorNotice error={error} className="mt-2" />
           <button
             type="submit"
             disabled={loading || !emailText.trim()}
