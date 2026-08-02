@@ -57,7 +57,9 @@ export default function RecruitLoginPage() {
 
   useEffect(() => {
     if (!loading && authUser && recruitProfile) {
-      router.replace(nextPath);
+      router.replace(authUser.username?.trim()
+        ? nextPath
+        : `/recruit/choose-username?next=${encodeURIComponent(nextPath)}`);
     }
   }, [loading, authUser, recruitProfile, router, nextPath]);
 
@@ -101,8 +103,11 @@ export default function RecruitLoginPage() {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Google sign-in failed. Please try again."); return; }
-      await signInWithToken(data.token);
-      router.replace("/recruit/dashboard");
+      const session = await signInWithToken(data.token);
+      if (session.error) { setError(session.error); return; }
+      router.replace(session.username?.trim()
+        ? nextPath
+        : `/recruit/choose-username?next=${encodeURIComponent(nextPath)}`);
     } catch (err: any) {
       if (err?.code !== "auth/popup-closed-by-user") {
         setError("Sign-in was cancelled or failed. Please try again.");
@@ -115,7 +120,7 @@ export default function RecruitLoginPage() {
   function handleGitHubLogin() {
     if (socialLoading) return;
     setSocialLoading("github");
-    window.location.href = apiUrl("/auth/github");
+    window.location.href = apiUrl("/auth/github?target=recruit&intent=login");
   }
 
   async function handleSendOtp() {
@@ -156,8 +161,11 @@ export default function RecruitLoginPage() {
       });
       const data = await res.json();
       if (!res.ok) { setPhoneError(data.error ?? "Phone sign-in failed."); return; }
-      await signInWithToken(data.token);
-      router.replace("/recruit/dashboard");
+      const session = await signInWithToken(data.token);
+      if (session.error) { setPhoneError(session.error); return; }
+      router.replace(session.username?.trim()
+        ? nextPath
+        : `/recruit/choose-username?next=${encodeURIComponent(nextPath)}`);
     } catch (err: any) {
       setPhoneError(err?.code === "auth/invalid-verification-code" ? "Incorrect OTP. Please try again." : (err?.message ?? "Verification failed."));
     } finally {

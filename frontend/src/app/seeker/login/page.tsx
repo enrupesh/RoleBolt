@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { Suspense, useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
@@ -40,7 +40,7 @@ function PhoneIcon() {
 
 type PhoneStep = "idle" | "entering" | "otp";
 
-export default function SeekerLoginPage() {
+function SeekerLoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirect") || "/seeker/dashboard";
@@ -52,7 +52,11 @@ export default function SeekerLoginPage() {
 
   useEffect(() => {
     if (!loading && authUser && recruitProfile?.role === "seeker") {
-      goAfterLogin();
+      if (authUser.username?.trim()) {
+        goAfterLogin();
+      } else {
+        router.replace(`/recruit/choose-username?role=seeker&next=${encodeURIComponent(redirectTo.startsWith("/") ? redirectTo : "/seeker/dashboard")}`);
+      }
     }
   }, [loading, authUser, recruitProfile, router, redirectTo]);
 
@@ -133,11 +137,17 @@ export default function SeekerLoginPage() {
         return;
       }
 
-      await syncSeekerSession(data.token, {
+      await ensureSeekerProfile(data.token, {
         username: data.user?.username,
         email: data.user?.email ?? result.user.email ?? "",
       });
-      goAfterLogin();
+      const session = await signInWithToken(data.token);
+      if (session.error) throw new Error(session.error);
+      if (!session.username?.trim()) {
+        router.replace(`/recruit/choose-username?role=seeker&next=${encodeURIComponent(redirectTo.startsWith("/") ? redirectTo : "/seeker/dashboard")}`);
+      } else {
+        goAfterLogin();
+      }
     } catch (err: any) {
       if (err?.code !== "auth/popup-closed-by-user") {
         setError("Sign-in was cancelled or failed. Please try again.");
@@ -210,8 +220,14 @@ export default function SeekerLoginPage() {
         return;
       }
 
-      await syncSeekerSession(data.token, { username: data.user?.username, email: data.user?.email ?? "" });
-      goAfterLogin();
+      await ensureSeekerProfile(data.token, { username: data.user?.username, email: data.user?.email ?? "" });
+      const session = await signInWithToken(data.token);
+      if (session.error) throw new Error(session.error);
+      if (!session.username?.trim()) {
+        router.replace(`/recruit/choose-username?role=seeker&next=${encodeURIComponent(redirectTo.startsWith("/") ? redirectTo : "/seeker/dashboard")}`);
+      } else {
+        goAfterLogin();
+      }
     } catch (err: any) {
       setPhoneError(err?.code === "auth/invalid-verification-code" ? "Incorrect OTP. Please try again." : (err?.message ?? "Verification failed."));
     } finally {
@@ -600,5 +616,13 @@ export default function SeekerLoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SeekerLoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <SeekerLoginPageContent />
+    </Suspense>
   );
 }
