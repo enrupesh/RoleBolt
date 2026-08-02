@@ -14,7 +14,6 @@ import type { IRecruitJob } from "../models/RecruitJob";
 import type { IRecruitCandidate } from "../models/RecruitCandidate";
 import type { JobPipelineStat } from "./globalHiringStats";
 import type { FormPipelineStat } from "./globalFormStats";
-import type { FormPipelineStat } from "./globalFormStats";
 
 export type CopilotContextLevel =
   | "global"

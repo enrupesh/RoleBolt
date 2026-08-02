@@ -33,3 +33,4 @@
 - [Public username profiles](public-profile-pages.md) — Server-rendered seeker/creator pages consume privacy-filtered DTOs; never reuse authenticated profile payloads for public identity.
 - [Root recruiter landing](root-recruit-landing.md) — Root renders the recruiter landing directly while `/recruit` remains a compatible deep link.
 - [Monetization contract](monetization-contract.md) — `payment.md` is the India-first Razorpay pricing, entitlement, quota, lifecycle, and enforcement source of truth.
+- [Billing foundation](billing-foundation.md) — Phase 1 uses category-aware Razorpay-ready entitlements, atomic usage reservations, and an explicit Free fallback; provider activation remains disabled.
