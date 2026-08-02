@@ -20,6 +20,7 @@ function entitlement(plan: "free" | "pro" = "free"): ResolvedEntitlement {
     currentPeriodStart: new Date("2026-08-01T00:00:00.000Z"),
     currentPeriodEnd: new Date("2026-08-31T23:59:59.999Z"),
     cancelAtPeriodEnd: false,
+    meteredAccessAllowed: true,
     definition: getPlanDefinition("creator_standard", plan),
   };
 }
