@@ -34,6 +34,49 @@ export function apiUrl(path: string): string {
   return `${API_BASE_URL}${normalizedPath}`;
 }
 
+export type BillingErrorPayload = {
+  error?: string;
+  message?: string;
+  code?: string;
+  category?: string;
+  feature?: string;
+  plan?: string;
+  used?: number;
+  limit?: number | null;
+  resetAt?: string;
+  upgradeRequired?: boolean;
+};
+
+export class ApiError extends Error {
+  readonly status: number;
+  readonly payload: BillingErrorPayload;
+
+  constructor(status: number, payload: BillingErrorPayload, fallback: string) {
+    super(payload.message || payload.error || fallback);
+    this.name = "ApiError";
+    this.status = status;
+    this.payload = payload;
+  }
+}
+
+export function apiErrorFromPayload(
+  status: number,
+  payload: BillingErrorPayload,
+  fallback: string,
+): ApiError {
+  return new ApiError(status, payload, fallback);
+}
+
+/** Read a failed response while preserving stable billing fields for the UI. */
+export async function throwApiError(res: Response, fallback: string): Promise<never> {
+  const payload = await res.json().catch(() => ({})) as BillingErrorPayload;
+  throw apiErrorFromPayload(res.status, payload, fallback);
+}
+
+export function errorText(error: unknown, fallback = "Something went wrong."): string {
+  return error instanceof Error ? error.message : fallback;
+}
+
 /** Routes that go through the public (unauthenticated) prefix */
 export function apiPublicUrl(path: string): string {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;

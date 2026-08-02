@@ -24,6 +24,12 @@ import { RecruitForm } from "./models/RecruitForm";
 import { RecruitFormResponse } from "./models/RecruitFormResponse";
 import { verifyRecaptcha, RECAPTCHA_REJECTION_MESSAGE } from "./publicSubmissionGuard";
 import {
+  assertSeekerResourceLimit,
+  respondSeekerBillingError,
+  runSeekerBillingOperation,
+  seekerRequestIdempotencyKey,
+} from "./billing/seekerEnforcement";
+import {
   type AgentAction,
   validatePipelineRuleInput,
   isPipelineRuleEnabled,
@@ -5865,12 +5871,27 @@ recruitRouter.post("/seeker/jobs/:jobId/apply", async (req, res) => {
     const job = await RecruitJob.findOne({ _id: req.params.jobId, status: "active" }).lean() as any;
     if (!job) return res.status(404).json({ error: "Job not found." });
     const existing = await RecruitCandidate.findOne({ jobId: req.params.jobId, email: seekerProfile.email }).lean();
-    if (existing) return res.status(409).json({ error: "You have already applied to this job." });
+    if (existing) {
+      return res.status(409).json({
+        error: "DUPLICATE_APPLICATION",
+        code: "DUPLICATE_APPLICATION",
+        message: "You have already applied to this job.",
+      });
+    }
 
-    const scored = await scoreCandidate({
-      resumeText: seekerProfile.resumeText,
-      jobTitle: job.title,
-      rubric: job.rubric ?? [],
+    await assertSeekerResourceLimit(uid, "active_applications");
+
+    const scored = await runSeekerBillingOperation({
+      uid,
+      operation: "job_fit_analysis",
+      idempotencyKey: seekerRequestIdempotencyKey(uid, "one-click-apply", req.get("Idempotency-Key")),
+      resourceType: "application",
+      resourceId: String(job._id),
+      work: async () => scoreCandidate({
+        resumeText: seekerProfile.resumeText,
+        jobTitle: job.title,
+        rubric: job.rubric ?? [],
+      }),
     });
 
     const agentMode = job.agentMode ?? {};
@@ -5926,6 +5947,7 @@ recruitRouter.post("/seeker/jobs/:jobId/apply", async (req, res) => {
 
     return res.status(201).json({ ok: true, candidateId: candidate._id.toString() });
   } catch (err: any) {
+    if (await respondSeekerBillingError(res, err, getUid(req))) return;
     return res.status(500).json({ error: err.message });
   }
 });

@@ -130,7 +130,7 @@ export async function countOwnedResources(
   }
 
   const profile = await RecruitSeekerProfile.findOne({ uid })
-    .select({ savedJobIds: 1, resumeText: 1, resumeFileName: 1, projects: 1, certifications: 1 })
+    .select({ email: 1, savedJobIds: 1, resumeText: 1, resumeFileName: 1, projects: 1, certifications: 1 })
     .lean()
     .exec();
 
@@ -141,14 +141,21 @@ export async function countOwnedResources(
     return countResumeVersions(profile);
   }
   if (counter === "active_applications") {
-    const [workspaceApplied, trackerActive] = await Promise.all([
+    const activeCandidateStages = ["applied", "review_zone", "screened", "assessed", "interview", "offer"];
+    const [workspaceApplied, trackerActive, roleboltActive] = await Promise.all([
       RecruitSeekerWorkspace.countDocuments({ uid, status: "applied" }).exec(),
       RecruitSeekerTrackerEntry.countDocuments({
         uid,
         stage: { $in: ["applied", "screening", "assessment", "interview", "offer"] },
       }).exec(),
+      profile?.email
+        ? RecruitCandidate.countDocuments({
+            email: profile.email,
+            stage: { $in: activeCandidateStages },
+          }).exec()
+        : Promise.resolve(0),
     ]);
-    return workspaceApplied + trackerActive;
+    return workspaceApplied + trackerActive + roleboltActive;
   }
   if (counter === "application_history") {
     return RecruitSeekerWorkspace.countDocuments({ uid }).exec();

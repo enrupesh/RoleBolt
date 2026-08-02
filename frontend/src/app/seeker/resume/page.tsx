@@ -5,7 +5,8 @@ import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { RecruitGuard } from "@/components/RecruitGuard";
 import { SeekerHeader } from "@/components/SeekerHeader";
 import { ResumeExportPanel } from "@/components/ResumeExportPanel";
-import { apiUrl } from "@/lib/api";
+import { SeekerErrorNotice } from "@/components/SeekerErrorNotice";
+import { apiErrorFromPayload, apiUrl } from "@/lib/api";
 
 const BUILD_QUESTIONS = [
   "What's your full name and what job role are you targeting?",
@@ -40,14 +41,14 @@ function ResumeContent() {
   const [targetRole, setTargetRole] = useState("");
   const [buildLoading, setBuildLoading] = useState(false);
   const [builtResume, setBuiltResume]   = useState<ResumeJson | null>(null);
-  const [buildError, setBuildError]     = useState("");
+  const [buildError, setBuildError]     = useState<unknown>("");
 
   // Improve existing state
   const [existingResume, setExistingResume] = useState("");
   const [jobDescription, setJobDescription] = useState("");
   const [improveLoading, setImproveLoading] = useState(false);
   const [improvedResult, setImprovedResult] = useState<{ improvedResume: string; changes: string[]; atsScore: number } | null>(null);
-  const [improveError, setImproveError]     = useState("");
+  const [improveError, setImproveError]     = useState<unknown>("");
 
   // Copy state
   const [copied, setCopied] = useState(false);
@@ -92,10 +93,10 @@ function ResumeContent() {
           answers: BUILD_QUESTIONS.map((q, i) => ({ question: q, answer: answers[i] })),
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Build failed.");
+       const data = await res.json().catch(() => ({}));
+       if (!res.ok) throw apiErrorFromPayload(res.status, data, "Build failed.");
       setBuiltResume(data.resume);
-    } catch (e: any) { setBuildError(e.message); }
+    } catch (e: unknown) { setBuildError(e); }
     finally { setBuildLoading(false); }
   }
 
@@ -109,10 +110,10 @@ function ResumeContent() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${sessionToken}` },
         body: JSON.stringify({ resumeText: existingResume, targetJobDescription: jobDescription }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Improve failed.");
+       const data = await res.json().catch(() => ({}));
+       if (!res.ok) throw apiErrorFromPayload(res.status, data, "Improve failed.");
       setImprovedResult(data);
-    } catch (e: any) { setImproveError(e.message); }
+    } catch (e: unknown) { setImproveError(e); }
     finally { setImproveLoading(false); }
   }
 
@@ -198,7 +199,7 @@ function ResumeContent() {
                 </div>
               ))}
 
-              {buildError && <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{buildError}</div>}
+              <SeekerErrorNotice error={buildError} />
 
               <button type="submit" disabled={buildLoading}
                 className="w-full rounded-2xl bg-indigo-600 py-3 text-sm font-bold text-white transition hover:bg-indigo-700 disabled:opacity-60">
@@ -334,7 +335,7 @@ function ResumeContent() {
                   className={`${inputCls} resize-none`} />
               </div>
 
-              {improveError && <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{improveError}</div>}
+               <SeekerErrorNotice error={improveError} />
 
               <button type="submit" disabled={improveLoading}
                 className="w-full rounded-2xl bg-indigo-600 py-3 text-sm font-bold text-white transition hover:bg-indigo-700 disabled:opacity-60">

@@ -6,7 +6,8 @@ import Link from "next/link";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { RecruitGuard } from "@/components/RecruitGuard";
 import { SeekerHeader } from "@/components/SeekerHeader";
-import { apiUrl } from "@/lib/api";
+import { apiErrorFromPayload, apiUrl } from "@/lib/api";
+import { SeekerErrorNotice } from "@/components/SeekerErrorNotice";
 
 type Profile = {
   username: string; name: string; email: string; phone: string; headline: string; bio: string;
@@ -335,7 +336,7 @@ type OptimizeResult = {
 function ProfileOptimizer({ token, profile }: { token: string | null; profile: Profile }) {
   const [loading, setLoading]   = useState(false);
   const [result, setResult]     = useState<OptimizeResult | null>(null);
-  const [error, setError]       = useState("");
+  const [error, setError]       = useState<unknown>("");
   const [expanded, setExpanded] = useState(false);
 
   async function handleAnalyze() {
@@ -352,10 +353,10 @@ function ProfileOptimizer({ token, profile }: { token: string | null; profile: P
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Optimization failed.");
+      if (!res.ok) throw apiErrorFromPayload(res.status, data, "Optimization failed.");
       setResult(data);
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e);
     } finally {
       setLoading(false);
     }
@@ -399,7 +400,7 @@ function ProfileOptimizer({ token, profile }: { token: string | null; profile: P
             </button>
           )}
 
-          {error && <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>}
+          <SeekerErrorNotice error={error} />
 
           {result && (
             <div className="space-y-5">

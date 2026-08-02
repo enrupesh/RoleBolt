@@ -162,7 +162,7 @@ export function requireUsageReservation(
 export async function commitBillingReservation(req: express.Request): Promise<void> {
   const reservation = (req as express.Request & BillingRequestState).billingReservation;
   if (!reservation || reservation.status !== "reserved") return;
-  const { commitUsage } = await import("./usage");
+  const { commitUsage } = await import("./usage.js");
   await commitUsage(reservation.reservationId);
   reservation.status = "committed";
 }
@@ -170,7 +170,7 @@ export async function commitBillingReservation(req: express.Request): Promise<vo
 export async function releaseBillingReservation(req: express.Request): Promise<void> {
   const reservation = (req as express.Request & BillingRequestState).billingReservation;
   if (!reservation || reservation.status !== "reserved") return;
-  const { releaseUsage } = await import("./usage");
+  const { releaseUsage } = await import("./usage.js");
   await releaseUsage(reservation.reservationId);
   reservation.status = "released";
 }

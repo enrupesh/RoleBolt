@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { apiUrl } from "@/lib/api";
+import { apiErrorFromPayload, apiUrl } from "@/lib/api";
 import {
   RESUME_TEMPLATES,
   type ResumeExportFormat,
   type ResumeExportPayload,
   type ResumeTemplateId,
 } from "@/lib/resumeTypes";
+import { SeekerErrorNotice } from "@/components/SeekerErrorNotice";
 
 type Props = ResumeExportPayload & {
   sessionToken: string;
@@ -38,7 +39,7 @@ function filenameFromDisposition(header: string | null): string | null {
 export function ResumeExportPanel({ sessionToken, compact, ...payload }: Props) {
   const [template, setTemplate] = useState<ResumeTemplateId>("ats");
   const [exporting, setExporting] = useState<ResumeExportFormat | null>(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<unknown>("");
 
   async function handleExport(format: ResumeExportFormat) {
     if (!sessionToken) return;
@@ -57,7 +58,7 @@ export function ResumeExportPanel({ sessionToken, compact, ...payload }: Props) 
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? "Export failed.");
+        throw apiErrorFromPayload(res.status, data, "Export failed.");
       }
 
       const blob = await res.blob();
@@ -65,7 +66,7 @@ export function ResumeExportPanel({ sessionToken, compact, ...payload }: Props) 
       const filename = filenameFromDisposition(res.headers.get("Content-Disposition")) ?? fallback;
       triggerDownload(blob, filename);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Export failed.");
+      setError(e);
     } finally {
       setExporting(null);
     }
@@ -134,11 +135,7 @@ export function ResumeExportPanel({ sessionToken, compact, ...payload }: Props) 
         </div>
       </div>
 
-      {error && (
-        <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
-          {error}
-        </div>
-      )}
+      <SeekerErrorNotice error={error} className="mt-3 text-xs" />
     </div>
   );
 }

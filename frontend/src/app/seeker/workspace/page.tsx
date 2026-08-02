@@ -21,7 +21,8 @@ import {
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { RecruitGuard } from "@/components/RecruitGuard";
 import { SeekerHeader } from "@/components/SeekerHeader";
-import { apiUrl, readApiJson } from "@/lib/api";
+import { SeekerErrorNotice } from "@/components/SeekerErrorNotice";
+import { apiErrorFromPayload, apiUrl, readApiJson } from "@/lib/api";
 
 type Analysis = {
   matchScore: number;
@@ -89,7 +90,7 @@ function WorkspaceContent() {
   const [showAdd, setShowAdd] = useState(false);
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<unknown>("");
   const [notice, setNotice] = useState("");
   const [form, setForm] = useState({
     sourceUrl: "",
@@ -120,7 +121,7 @@ function WorkspaceContent() {
         headers: { Authorization: `Bearer ${sessionToken}` },
       });
       const data = await readApiJson<{ workspaces?: WorkspaceItem[]; error?: string }>(res);
-      if (!res.ok) throw new Error(data.error ?? "Could not load your workspace.");
+      if (!res.ok) throw apiErrorFromPayload(res.status, data, "Could not load your workspace.");
       const nextItems = data.workspaces ?? [];
       setItems(nextItems);
       const urlId = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("id") : null;
@@ -129,8 +130,8 @@ function WorkspaceContent() {
         if (preferred && nextItems.some((item) => item.id === preferred)) return preferred;
         return nextItems[0]?.id ?? null;
       });
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err);
     } finally {
       setLoading(false);
     }
@@ -168,13 +169,13 @@ function WorkspaceContent() {
         body: JSON.stringify(payload),
       });
       const data = await readApiJson<{ workspace?: WorkspaceItem; error?: string; analysisError?: string }>(res);
-      if (!res.ok || !data.workspace) throw new Error(data.error ?? "Could not add this job.");
+      if (!res.ok || !data.workspace) throw apiErrorFromPayload(res.status, data, "Could not add this job.");
       setItems((current) => [data.workspace!, ...current]);
       setSelectedId(data.workspace.id);
       resetForm();
       setNotice(data.analysisError ? "Job saved. Analysis could not finish, so you can retry it below." : "Job saved and analyzed.");
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err);
     } finally {
       setSaving(false);
     }
@@ -191,11 +192,11 @@ function WorkspaceContent() {
         body: JSON.stringify(update),
       });
       const data = await readApiJson<{ workspace?: WorkspaceItem; error?: string }>(res);
-      if (!res.ok || !data.workspace) throw new Error(data.error ?? "Could not update this job.");
+      if (!res.ok || !data.workspace) throw apiErrorFromPayload(res.status, data, "Could not update this job.");
       setItems((current) => current.map((item) => (item.id === id ? data.workspace! : item)));
       setNotice("Workspace updated.");
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err);
     } finally {
       setBusyId(null);
     }
@@ -211,11 +212,11 @@ function WorkspaceContent() {
         headers: { Authorization: `Bearer ${sessionToken}` },
       });
       const data = await readApiJson<{ workspace?: WorkspaceItem; error?: string }>(res);
-      if (!res.ok || !data.workspace) throw new Error(data.error ?? "Analysis failed. Please try again.");
+      if (!res.ok || !data.workspace) throw apiErrorFromPayload(res.status, data, "Analysis failed. Please try again.");
       setItems((current) => current.map((item) => (item.id === id ? data.workspace! : item)));
       setNotice("Fresh match analysis is ready.");
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err);
     } finally {
       setBusyId(null);
     }
@@ -236,8 +237,8 @@ function WorkspaceContent() {
       setItems(nextItems);
       setSelectedId(nextItems[0]?.id ?? null);
       setNotice("Job removed from your workspace.");
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err);
     } finally {
       setBusyId(null);
     }
@@ -285,8 +286,10 @@ function WorkspaceContent() {
         </section>
 
         {(error || notice) && (
-          <div className={`mt-5 flex items-start justify-between gap-4 rounded-2xl border px-4 py-3 text-sm ${error ? "border-rose-200 bg-rose-50 text-rose-700" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}>
-            <span>{error || notice}</span>
+          <div className="mt-5 flex items-start justify-between gap-4">
+            {error ? <SeekerErrorNotice error={error} className="flex-1" /> : (
+              <div className="flex-1 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{notice}</div>
+            )}
             <button onClick={() => { setError(""); setNotice(""); }} aria-label="Dismiss message"><X className="h-4 w-4" /></button>
           </div>
         )}
