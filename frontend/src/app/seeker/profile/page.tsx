@@ -2,29 +2,33 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { RecruitGuard } from "@/components/RecruitGuard";
 import { SeekerHeader } from "@/components/SeekerHeader";
 import { apiUrl } from "@/lib/api";
 
 type Profile = {
-  name: string; email: string; phone: string; headline: string; bio: string;
+  username: string; name: string; email: string; phone: string; headline: string; bio: string;
   skills: string[]; resumeText: string; resumeFileName: string;
   experienceLevel: string; preferredJobType: string; preferredWorkMode: string;
   preferredLocation: string; preferredSalaryMin: number; preferredSalaryMax: number;
   preferredNiche: string;
   experience: { title: string; company: string; startDate: string; endDate: string; current: boolean; description: string }[];
   education: { degree: string; institution: string; year: string }[];
+  projects: { name: string; description: string; url: string; technologies: string[] }[];
+  certifications: { name: string; issuer: string; year: string; url: string }[];
   socialLinks: { linkedin: string; github: string; portfolio: string };
 };
 
 const BLANK: Profile = {
-  name: "", email: "", phone: "", headline: "", bio: "",
+  username: "", name: "", email: "", phone: "", headline: "", bio: "",
   skills: [], resumeText: "", resumeFileName: "",
   experienceLevel: "", preferredJobType: "", preferredWorkMode: "",
   preferredLocation: "", preferredSalaryMin: 0, preferredSalaryMax: 0,
   preferredNiche: "",
   experience: [], education: [],
+  projects: [], certifications: [],
   socialLinks: { linkedin: "", github: "", portfolio: "" },
 };
 
@@ -63,6 +67,13 @@ function ProfileContent() {
   const [saving, setSaving]   = useState(false);
   const [saved, setSaved]     = useState(false);
   const [error, setError]     = useState("");
+
+  function updateList<K extends "projects" | "certifications">(key: K, index: number, patch: Partial<Profile[K][number]>) {
+    setProfile(prev => ({
+      ...prev,
+      [key]: prev[key].map((entry, entryIndex) => entryIndex === index ? { ...entry, ...patch } : entry),
+    }));
+  }
 
   useEffect(() => { if (sessionToken) setToken(sessionToken); }, [sessionToken]);
 
@@ -120,10 +131,19 @@ function ProfileContent() {
       <SeekerHeader />
       <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-slate-900">{onboarding ? "Set up your profile 🎉" : "My Profile"}</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            {onboarding ? "Complete your profile to start applying to jobs with one click." : "Keep your info up to date to get the best job matches."}
-          </p>
+          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">{onboarding ? "Set up your profile" : "My Profile"}</h1>
+              <p className="mt-1 text-sm text-slate-500">
+                {onboarding ? "Complete your profile to start applying to jobs with one click." : "Keep your info up to date to get the best job matches."}
+              </p>
+            </div>
+            {!onboarding && profile.username && (
+              <Link href={`/seeker/${encodeURIComponent(profile.username)}`} target="_blank" className="inline-flex items-center justify-center rounded-full border border-indigo-200 bg-white px-4 py-2 text-xs font-bold text-indigo-700 transition hover:bg-indigo-50">
+                View public profile <span className="ml-1.5">↗</span>
+              </Link>
+            )}
+          </div>
         </div>
 
         <form onSubmit={handleSave} className="space-y-6">
@@ -177,6 +197,68 @@ function ProfileContent() {
                 placeholder="Paste your full resume text here…"
                 className={`${inputCls} resize-none font-mono text-xs`} />
             </Field>
+          </section>
+
+          {/* Selected work */}
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <h2 className="font-bold text-slate-900">Selected Work</h2>
+                <p className="mt-1 text-xs text-slate-400">Showcase projects that make your public portfolio memorable.</p>
+              </div>
+              <button type="button" onClick={() => setProfile(p => ({ ...p, projects: [...p.projects, { name: "", description: "", url: "", technologies: [] }] }))} className="shrink-0 rounded-full border border-indigo-200 px-3 py-1.5 text-xs font-bold text-indigo-700 transition hover:bg-indigo-50">Add project</button>
+            </div>
+            {profile.projects.length === 0 ? (
+              <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-5 text-center text-xs text-slate-400">No projects added yet.</p>
+            ) : (
+              <div className="space-y-4">
+                {profile.projects.map((project, index) => (
+                  <div key={index} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="mb-3 flex items-center justify-between">
+                      <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Project {index + 1}</p>
+                      <button type="button" onClick={() => setProfile(p => ({ ...p, projects: p.projects.filter((_, i) => i !== index) }))} className="text-xs font-semibold text-rose-500 hover:text-rose-700">Remove</button>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <input value={project.name} onChange={e => updateList("projects", index, { name: e.target.value })} placeholder="Project name" className={inputCls} />
+                      <input value={project.url} onChange={e => updateList("projects", index, { url: e.target.value })} placeholder="Project URL (optional)" className={inputCls} />
+                    </div>
+                    <textarea rows={3} value={project.description} onChange={e => updateList("projects", index, { description: e.target.value })} placeholder="What did you build or accomplish?" className={`${inputCls} mt-3 resize-none`} />
+                    <input value={project.technologies.join(", ")} onChange={e => updateList("projects", index, { technologies: e.target.value.split(",").map(v => v.trim()).filter(Boolean) })} placeholder="Technologies, separated by commas" className={`${inputCls} mt-3`} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* Certifications */}
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <h2 className="font-bold text-slate-900">Certifications</h2>
+                <p className="mt-1 text-xs text-slate-400">Add credentials that strengthen your professional story.</p>
+              </div>
+              <button type="button" onClick={() => setProfile(p => ({ ...p, certifications: [...p.certifications, { name: "", issuer: "", year: "", url: "" }] }))} className="shrink-0 rounded-full border border-indigo-200 px-3 py-1.5 text-xs font-bold text-indigo-700 transition hover:bg-indigo-50">Add certification</button>
+            </div>
+            {profile.certifications.length === 0 ? (
+              <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-5 text-center text-xs text-slate-400">No certifications added yet.</p>
+            ) : (
+              <div className="space-y-4">
+                {profile.certifications.map((certification, index) => (
+                  <div key={index} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="mb-3 flex items-center justify-between">
+                      <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Credential {index + 1}</p>
+                      <button type="button" onClick={() => setProfile(p => ({ ...p, certifications: p.certifications.filter((_, i) => i !== index) }))} className="text-xs font-semibold text-rose-500 hover:text-rose-700">Remove</button>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <input value={certification.name} onChange={e => updateList("certifications", index, { name: e.target.value })} placeholder="Certification name" className={inputCls} />
+                      <input value={certification.issuer} onChange={e => updateList("certifications", index, { issuer: e.target.value })} placeholder="Issuing organization" className={inputCls} />
+                      <input value={certification.year} onChange={e => updateList("certifications", index, { year: e.target.value })} placeholder="Year" className={inputCls} />
+                      <input value={certification.url} onChange={e => updateList("certifications", index, { url: e.target.value })} placeholder="Credential URL (optional)" className={inputCls} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
 
           {/* Preferences */}
