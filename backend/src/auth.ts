@@ -18,6 +18,7 @@ import { connectMongo } from "./db";
 import { User } from "./models/User";
 import { signToken, verifyToken, requireAuth } from "./authMiddleware";
 import { sendEmail } from "./mailer";
+import { AUTH_FROM } from "./emailConfig";
 import { verifyFirebaseToken } from "./firebaseAdmin";
 import { RecruitProfile } from "./models/RecruitProfile";
 import { RecruitSeekerProfile } from "./models/RecruitSeekerProfile";
@@ -36,9 +37,6 @@ const FRONTEND_URL = (
     ? _rawFrontendUrl
     : "https://www.rolebolt.tech"
 ).replace(/\/$/, "");
-const FROM_NAME     = process.env.SMTP_FROM_NAME  || "Rolebolt";
-const FROM_EMAIL    = process.env.SMTP_FROM_EMAIL || "verify@rolebolt.tech";
-
 const BCRYPT_ROUNDS    = 12;
 const TOKEN_TTL_MS     = 24 * 60 * 60 * 1000;       // 24 h  (email verification)
 const RESET_TTL_MS     =  1 * 60 * 60 * 1000;       //  1 h  (password reset)
@@ -164,7 +162,7 @@ async function sendVerificationEmail(email: string, name: string, token: string)
 
   const text = `Welcome to Rolebolt${name ? `, ${name}` : ""}!\n\nVerify your email address by visiting this link:\n${link}\n\nThis link expires in 24 hours.\n\nIf you didn't create a Rolebolt account, you can safely ignore this email.`;
 
-  await sendEmail({ to: email, subject: "Verify your Rolebolt account", html, text, from: `${FROM_NAME} <${FROM_EMAIL}>` });
+  await sendEmail({ to: email, subject: "Verify your Rolebolt account", html, text, from: AUTH_FROM });
 }
 
 // ─── Config (backend base URL for OAuth callbacks) ───────────────────────────
@@ -791,7 +789,7 @@ authRouter.post("/forgot-password", async (req, res) => {
       subject: "Reset your Rolebolt password",
       html,
       text,
-      from:    `${FROM_NAME} <${FROM_EMAIL}>`,
+      from:    AUTH_FROM,
     }).catch((err) => {
       console.error("[auth] Failed to send reset email:", err?.message);
     });

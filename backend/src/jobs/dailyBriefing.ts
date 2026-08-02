@@ -7,6 +7,7 @@ import { RecruitJobAlert } from "../models/RecruitJobAlert";
 import { RecruitForm } from "../models/RecruitForm";
 import { RecruitFormResponse } from "../models/RecruitFormResponse";
 import { sendEmail } from "../mailer";
+import { NOTIFICATION_FROM } from "../emailConfig";
 import { callGeminiChain } from "../ai/geminiClient";
 import { callMeshChatCompletions } from "../ai/meshClient";
 import { callNvidia } from "../ai/nvidiaClient";
@@ -146,7 +147,7 @@ Rules: Under 220 words total. Conversational tone, not robotic. No bullet points
     subject: `☀️ Your Daily Hiring Briefing — ${new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}`,
     html,
     text: briefingText,
-    from: `Rolebolt <${process.env.NOTIFICATION_FROM_EMAIL ?? "notification@rolebolt.tech"}>`,
+    from: NOTIFICATION_FROM,
   });
 
   console.log(`[briefing] Sent to ${user.email}`);
@@ -201,7 +202,7 @@ export async function sendJobAlerts(): Promise<void> {
         subject: `🎯 ${topJobs.length} new job match${topJobs.length > 1 ? "es" : ""} — Rolebolt`,
         html,
         text: `${topJobs.length} new job${topJobs.length > 1 ? "s" : ""} match your alert. Visit https://www.rolebolt.tech/recruit/opportunities to apply.`,
-        from: `Rolebolt <${process.env.NOTIFICATION_FROM_EMAIL ?? "notification@rolebolt.tech"}>`,
+        from: NOTIFICATION_FROM,
       });
       await RecruitJobAlert.updateOne({ _id: alert._id }, { lastCheckedAt: new Date() });
       sent++;

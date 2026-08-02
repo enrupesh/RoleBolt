@@ -14,6 +14,7 @@ import { RecruitCollaborationActivity, CollaborationActivityType } from "./model
 import { RecruitNotification } from "./models/RecruitNotification";
 import { User } from "./models/User";
 import { sendEmail } from "./mailer";
+import { NOTIFICATION_FROM } from "./emailConfig";
 import { callMeshChatCompletions } from "./ai/meshClient";
 import * as emailTemplates from "./emailTemplates";
 
@@ -133,6 +134,7 @@ async function sendTeamInviteEmail(args: {
       subject: payload.subject,
       html: payload.html,
       text: payload.text,
+      from: NOTIFICATION_FROM,
     });
     if (!result.ok) console.error("[collaboration] team invite email failed:", result.error);
     return;
@@ -153,6 +155,7 @@ async function sendTeamInviteEmail(args: {
       subject: payload.subject,
       html: payload.html,
       text: payload.text,
+      from: NOTIFICATION_FROM,
     });
     if (!result.ok) console.error("[collaboration] team added email failed:", result.error);
   }
@@ -499,7 +502,7 @@ async function addCollaborativeEntry(req: express.Request, res: express.Response
     for (const member of team) {
       if (mentionNames.includes(member.name.split(/\s+/)[0].toLowerCase()) && member.memberUid !== uidOf(req)) {
         await notify(member.memberUid || "", { type: "mention", title: `${author.name} mentioned you`, body: `${author.name} mentioned you on ${context.candidate.name}.`, jobId, candidateId });
-        if (member.notifyByEmail) setImmediate(() => sendEmail({ to: member.email, subject: `${author.name} mentioned you in a candidate comment`, html: `<p>${author.name} mentioned you while discussing <strong>${context.candidate.name}</strong>.</p><p>${body.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>` }).catch(() => {}));
+        if (member.notifyByEmail) setImmediate(() => sendEmail({ to: member.email, subject: `${author.name} mentioned you in a candidate comment`, html: `<p>${author.name} mentioned you while discussing <strong>${context.candidate.name}</strong>.</p><p>${body.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>`, from: NOTIFICATION_FROM }).catch(() => {}));
       }
     }
   }
@@ -620,6 +623,7 @@ collaborationRouter.post("/jobs/:jobId/candidates/:candidateId/interview-feedbac
               to: ownerUser.email,
               subject: `All interview feedback received for ${context.candidate.name}`,
               html: `<p>All required interviewers have submitted their feedback for <strong>${context.candidate.name}</strong>.</p><p>You can now generate the AI Hiring Summary in your hiring dashboard.</p>`,
+              from: NOTIFICATION_FROM,
             }).catch(() => {});
           }
         }

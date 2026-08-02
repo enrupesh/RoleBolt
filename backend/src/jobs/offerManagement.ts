@@ -4,6 +4,7 @@ import { RecruitCandidate } from "../models/RecruitCandidate";
 import { RecruitJob } from "../models/RecruitJob";
 import { User } from "../models/User";
 import { sendEmail } from "../mailer";
+import { NOTIFICATION_FROM } from "../emailConfig";
 import * as emailTemplates from "../emailTemplates";
 
 const FRONTEND_URL = (() => {
@@ -11,9 +12,6 @@ const FRONTEND_URL = (() => {
   if (raw && !raw.includes("localhost") && !raw.includes("127.0.0.1")) return raw.replace(/\/$/, "");
   return "https://www.rolebolt.tech";
 })();
-const CANDIDATE_FROM     = `Rolebolt <${process.env.CANDIDATE_FROM_EMAIL ?? "notification@rolebolt.tech"}>`;
-const NOTIFICATION_FROM  = `Rolebolt <${process.env.NOTIFICATION_FROM_EMAIL ?? "notification@rolebolt.tech"}>`;
-
 // ── Auto-expire offers whose expiry date has passed ──────────────────────────
 export async function processOfferExpiry(): Promise<void> {
   await connectMongo();
@@ -192,7 +190,7 @@ export async function processOfferReminders(): Promise<void> {
           subject: payload.subject,
           html: payload.html,
           text: payload.text,
-          from: CANDIDATE_FROM,
+          from: NOTIFICATION_FROM,
         });
 
         if (result.ok) {

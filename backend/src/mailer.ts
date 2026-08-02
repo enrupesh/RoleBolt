@@ -1,8 +1,7 @@
 import { Resend } from "resend";
+import { DEFAULT_FROM } from "./emailConfig";
 
 const RESEND_API_KEY   = process.env.RESEND_API_KEY   || "";
-const SMTP_FROM_NAME   = process.env.SMTP_FROM_NAME   || "Rolebolt";
-const SMTP_FROM_EMAIL  = process.env.SMTP_FROM_EMAIL  || "verify@rolebolt.tech";
 
 let _client: Resend | null = null;
 
@@ -33,7 +32,7 @@ export async function sendEmail(opts: {
 
   try {
     const { error } = await client.emails.send({
-      from: opts.from ?? `${SMTP_FROM_NAME} <${SMTP_FROM_EMAIL}>`,
+      from: opts.from ?? DEFAULT_FROM,
       to:   [opts.to.trim()],
       subject: opts.subject,
       html: opts.html,

@@ -9,8 +9,8 @@ import { User } from "./models/User";
 import { RecruitProfile } from "./models/RecruitProfile";
 import { callMeshChatCompletions } from "./ai/meshClient";
 import { sendEmail } from "./mailer";
+import { NOTIFICATION_FROM } from "./emailConfig";
 
-const CANDIDATE_FROM = `Rolebolt <${process.env.CANDIDATE_FROM_EMAIL ?? "notification@rolebolt.tech"}>`;
 import * as emailTemplates from "./emailTemplates";
 import {
   verifyRecaptcha,
@@ -653,7 +653,7 @@ async function runFormAgent(args: {
 
     try {
       const result = await sendEmail({
-        to: email, subject: tpl.subject, html: tpl.html, text: tpl.text, from: CANDIDATE_FROM,
+        to: email, subject: tpl.subject, html: tpl.html, text: tpl.text, from: NOTIFICATION_FROM,
       });
       emailSent = result.ok;
       emailStatus = result.ok ? "sent" : "failed";
@@ -1585,7 +1585,7 @@ formRouter.post("/:formId/responses/:responseId/assessment/send", async (req, re
             subject: payload.subject,
             html: payload.html,
             text: payload.text,
-            from: CANDIDATE_FROM,
+            from: NOTIFICATION_FROM,
           });
           await RecruitFormResponse.findByIdAndUpdate(responseId, {
             $push: {
@@ -1697,7 +1697,7 @@ formRouter.post("/:formId/responses/:responseId/send-email", async (req, res) =>
       html = emailTemplates.genericEmail(candName, subject.trim(), body, ctx);
     }
 
-    const result = await sendEmail({ to: candEmail, subject: subject.trim(), html, text, from: CANDIDATE_FROM });
+    const result = await sendEmail({ to: candEmail, subject: subject.trim(), html, text, from: NOTIFICATION_FROM });
 
     const logEntry = {
       type: type || "custom",
@@ -2609,7 +2609,7 @@ formPublicRouter.post(
               { officialContactEmail: ctx.officialContactEmail, statusUrl },
             );
             const result = await sendEmail({
-              to: confirmEmail, subject: payload.subject, html: payload.html, text: payload.text, from: CANDIDATE_FROM,
+              to: confirmEmail, subject: payload.subject, html: payload.html, text: payload.text, from: NOTIFICATION_FROM,
             });
             await RecruitFormResponse.findByIdAndUpdate(response._id, {
               $push: {
