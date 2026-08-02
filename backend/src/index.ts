@@ -14,6 +14,7 @@ import { startPipelineRulesCron } from "./jobs/pipelineRulesCron";
 import { seekerRouter } from "./seeker";
 import { requireSeekerRole } from "./middleware/requireSeekerRole";
 import { billingRouter, handleStripeWebhook } from "./billing";
+import { billingCatalogRouter, billingFoundationRouter } from "./billing/api";
 import { collaborationRouter, collaborationPublicRouter } from "./collaboration";
 
 dotenv.config();
@@ -72,7 +73,11 @@ app.use("/recruit/seeker", requireAuth, requireSeekerRole, seekerRouter);
 app.use("/recruit/collaboration", requireAuth, collaborationRouter);
 app.use("/recruit", requireAuth, recruitRouter);
 app.use("/recruit/forms", requireAuth, formRouter);
+// Pricing metadata is safe to expose publicly; account entitlements and all
+// mutation/legacy billing routes remain behind JWT authentication.
+app.use("/billing", billingCatalogRouter);
 app.use("/billing", requireAuth, billingRouter);
+app.use("/billing", requireAuth, billingFoundationRouter);
 
 // ── Helper: ping one AI API ───────────────────────────────────────────────────
 async function pingApi(opts: {

@@ -654,7 +654,7 @@ Phase -1 is complete when:
 - implementation rules are locked;
 - the current application still builds and workflows remain healthy.
 
-This document satisfies the audit/documentation criteria. The application runtime remains on the existing legacy billing behavior until later phases replace it; therefore no paid Razorpay functionality should be advertised or enabled from this phase.
+This document satisfies the audit/documentation criteria. Phase 1 has since retired the legacy Stripe checkout, portal, and webhook mutation paths; Razorpay paid activation remains disabled until the provider integration phase completes.
 
 Because no production deployment currently exists, live deployment verification is explicitly deferred until a deployable implementation phase is complete and the user publishes the resulting build. This is not treated as a Phase -1 failure: this phase changed documentation only and did not create a runtime artifact that should be published.
 
@@ -662,8 +662,8 @@ Because no production deployment currently exists, live deployment verification 
 
 ## 12. Final review decision
 
-**Phase -1 decision: PASS — ready for Phase 1 implementation.**
+**Phase -1 decision: PASS — Phase 1 implementation was authorized.**
 
-This is an audit pass, not a billing-feature pass. The current application is not yet monetization-production-ready because the existing billing path is Stripe-based and route enforcement is not connected. That is an expected Phase -1 finding and is now explicitly tracked.
+This was an audit pass, not a billing-feature pass. Its findings were used to build the category-aware Phase 1 billing foundation. The application is still not monetization-production-ready because provider checkout, webhook verification, and route-level enforcement remain later-phase work.
 
 The next safe implementation step is the billing domain foundation. Do not begin by adding isolated `requirePlan` checks to individual routes; build the category-aware entitlement, plan catalog, period, reservation, ledger, and idempotency foundation first.
