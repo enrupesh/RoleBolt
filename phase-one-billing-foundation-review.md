@@ -36,7 +36,7 @@
 | Check | Result |
 |---|---|
 | `cd backend && npx tsc --noEmit` | PASS |
-| `cd backend && npm test` | PASS — 24 tests |
+| `cd backend && npm test` | PASS — 30 tests |
 | `cd frontend && npm run build` | PASS — 49 routes generated |
 | Backend workflow | PASS — listening on port 8080 |
 | Frontend workflow | PASS — root route returned HTTP 200 |
@@ -52,10 +52,10 @@ The development backend reports `MONGODB_URI` is missing, so database-backed res
 ## Deliberate non-goals
 
 - Razorpay SDK, checkout creation, signature verification, and webhook processing.
-- Route-by-route quota enforcement.
+- Route-by-route quota enforcement and feature wiring.
 - Public Form Job intake enforcement.
 - AI provider reservation wiring.
 - Frontend pricing/billing replacement.
 - Background worker and collaboration seat enforcement.
 
-These are Phase 2+ work. No paid Razorpay access should be enabled until those controls are implemented and integration-tested.
+These remain route-integration and provider phases. No paid Razorpay access should be enabled until those controls are implemented and integration-tested.
