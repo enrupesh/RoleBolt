@@ -96,9 +96,9 @@ export default function JobTabNav({
   const showSubNav = group.tabs.length > 1;
 
   return (
-    <div className="mb-6">
+    <div className="mb-6 rounded-2xl border border-[#e4dfe8] bg-white/80 px-3 pt-2 shadow-[0_4px_16px_rgba(62,44,87,0.04)] sm:px-4">
       {/* Primary groups */}
-      <div className="flex gap-1 border-b border-[var(--border)] overflow-x-auto">
+      <div className="flex gap-1 overflow-x-auto">
         {TAB_GROUPS.map(g => {
           const isActive = g.id === activeGroup;
           return (
@@ -107,10 +107,10 @@ export default function JobTabNav({
               type="button"
               data-tour={g.id === "pipeline" ? "pipeline-tab" : g.id === "autopilot" ? "autopilot-tab" : undefined}
               onClick={() => onSelectTab(isActive && g.tabs.includes(activeTab) ? activeTab : g.defaultTab)}
-              className={`relative whitespace-nowrap px-4 py-2.5 text-sm transition border-b-2 -mb-px flex items-center gap-1.5 ${
+              className={`relative whitespace-nowrap rounded-t-xl px-4 py-3 text-sm transition flex items-center gap-1.5 ${
                 isActive
-                  ? "border-indigo-500 text-[var(--foreground)] font-medium"
-                  : "border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                  ? "bg-[#f1ecff] text-[#5b45ad] font-extrabold"
+                  : "text-[var(--text-muted)] hover:bg-[#faf8fc] hover:text-[var(--text-secondary)]"
               }`}
               title={g.description}
             >
@@ -126,7 +126,7 @@ export default function JobTabNav({
 
       {/* Secondary sub-tabs for multi-tab groups */}
       {showSubNav && (
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 border-t border-[#eee9f0] py-3">
           {group.tabs.map(tab => {
             const selected = activeTab === tab;
             return (
@@ -134,9 +134,9 @@ export default function JobTabNav({
                 key={tab}
                 type="button"
                 onClick={() => onSelectTab(tab)}
-                className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition border ${
+                className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold transition border ${
                   selected
-                    ? "border-indigo-500/40 bg-indigo-500/10 text-indigo-700"
+                    ? "border-[#d8c9f4] bg-[#f7f3ff] text-[#624cae]"
                     : "border-[var(--border)] bg-[var(--surface-muted)] text-[var(--text-muted)] hover:text-[var(--foreground)] hover:border-[var(--border-strong)]"
                 }`}
               >

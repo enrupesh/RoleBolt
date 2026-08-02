@@ -123,18 +123,18 @@ export default function PostCreateChecklist({
   }
 
   return (
-    <div className="mb-6 rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
+    <div className="mb-6 rounded-2xl border border-[#dcd4ef] bg-gradient-to-br from-[#eee9fc] via-[#f7f4ff] to-white p-4 shadow-[0_5px_16px_rgba(62,44,87,0.05)]">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-widest text-blue-600/80">Get started</p>
-          <h2 className="mt-0.5 text-sm font-bold text-slate-900">
+          <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#654bb2]">Standard Job setup</p>
+          <h2 className="mt-0.5 text-sm font-extrabold text-[#322d41]">
             Finish setup for {active.jobTitle}
           </h2>
-          <p className="mt-1 text-[12px] text-slate-500">
+          <p className="mt-1 text-[12px] text-[#766d83]">
             Share job → Enable Autopilot → Review first applicant · {completed}/3 done
           </p>
         </div>
-        <button type="button" onClick={dismiss} className="text-[11px] font-semibold text-slate-400 hover:text-slate-700">
+        <button type="button" onClick={dismiss} className="text-[11px] font-semibold text-[#9a91a5] hover:text-[#4e4658]">
           Dismiss
         </button>
       </div>
@@ -149,19 +149,19 @@ export default function PostCreateChecklist({
               className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 transition ${
                 s.done
                   ? "border-emerald-200 bg-emerald-50/80"
-                  : "border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50/40"
+                   : "border-[#e3ddec] bg-white/90 hover:border-[#c6b8ef] hover:bg-[#faf8ff]"
               }`}
             >
               <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
-                s.done ? "bg-emerald-500 text-white" : "bg-slate-100 text-slate-500"
+                 s.done ? "bg-emerald-500 text-white" : "bg-[#f0edf5] text-[#766d83]"
               }`}>
                 {s.done ? "✓" : i + 1}
               </span>
               <span className="min-w-0">
-                <span className={`block text-[13px] font-semibold ${s.done ? "text-emerald-800" : "text-slate-800"}`}>
+                <span className={`block text-[13px] font-semibold ${s.done ? "text-emerald-800" : "text-[#3b3448]"}`}>
                   {s.label}
                 </span>
-                <span className="block text-[11px] text-slate-500">{s.hint}</span>
+                <span className="block text-[11px] text-[#877e92]">{s.hint}</span>
               </span>
             </Link>
           </li>
