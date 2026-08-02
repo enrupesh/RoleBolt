@@ -332,7 +332,7 @@ seekerRouter.put("/profile", async (req, res) => {
     const uid = getUid(req);
     const allowed = [
       "name", "username", "email", "phone", "headline", "bio", "skills",
-      "experience", "education", "preferredJobType", "preferredWorkMode",
+      "experience", "education", "projects", "certifications", "preferredJobType", "preferredWorkMode",
       "preferredLocation", "preferredSalaryMin", "preferredSalaryMax",
       "preferredNiche", "experienceLevel", "resumeText", "resumeFileName",
       "socialLinks", "photoUrl", "weeklyApplicationGoal", "careerObjective",
