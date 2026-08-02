@@ -530,6 +530,12 @@ export default function RecruitLoginPage() {
                   Create one free
                 </Link>
               </p>
+              <Link
+                href="/seeker"
+                className="mt-5 flex w-full items-center justify-center rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm font-bold text-indigo-700 transition-all hover:border-indigo-300 hover:bg-indigo-100"
+              >
+                Are you a job seeker? <span className="ml-1.5">Go to seeker →</span>
+              </Link>
             </div>
           </div>
         </div>
