@@ -10,8 +10,10 @@
     "dev": "tsx watch src/index.ts",
     "build": "echo 'tsx runtime used — no tsc compilation needed'",
     "start": "tsx src/index.ts",
-    "test": "tsx --test src/automation/standardJobCore.test.ts",
-    "test:automation": "tsx --test src/automation/standardJobCore.test.ts"
+    "billing:migrate-free": "tsx src/billing/migrateFreeEntitlements.ts",
+    "test": "tsx --test src/automation/standardJobCore.test.ts src/billing/planCatalog.test.ts",
+    "test:automation": "tsx --test src/automation/standardJobCore.test.ts",
+    "test:billing": "tsx --test src/billing/planCatalog.test.ts"
   },
   "license": "ISC",
   "type": "commonjs",
@@ -38,7 +40,6 @@
     "pdf-parse": "^1.1.1",
     "pdfkit": "^0.19.1",
     "resend": "^6.18.0",
-    "stripe": "^22.3.2",
     "tsx": "^4.21.0",
     "typescript": "^6.0.2"
   },

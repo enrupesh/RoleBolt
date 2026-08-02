@@ -3211,7 +3211,7 @@ recruitRouter.post(
       const uid = getUid(req);
       if (!uid) return res.status(401).json({ error: "Unauthorized" });
 
-      const access = await getJobWithCollaborationPermission(req.params.jobId, uid, "review_candidates");
+      const access = await getJobWithCollaborationPermission(String(req.params.jobId), uid, "review_candidates");
       if (!access) return res.status(403).json({ error: "You do not have permission to bulk import candidates." });
       const job = access.job;
 
