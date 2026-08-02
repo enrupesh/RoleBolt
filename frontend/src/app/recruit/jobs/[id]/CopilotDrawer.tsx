@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { apiUrl } from "@/lib/api";
+import { ArrowUp, Briefcase, CircleStop, Sparkles, X } from "lucide-react";
 
 type Msg = {
   id: string;
@@ -144,83 +145,118 @@ export default function CopilotDrawer({
       <button
         type="button"
         aria-label="Close copilot"
-        className="fixed inset-0 z-[70] bg-black/25"
+        className="fixed inset-0 z-[70] bg-slate-950/30 backdrop-blur-[2px]"
         onClick={onClose}
       />
       <aside
-        className="fixed right-0 top-0 z-[71] flex h-full w-full max-w-md flex-col border-l border-[var(--border)] bg-[var(--surface)] shadow-2xl"
+        className="fixed right-0 top-0 z-[71] flex h-full w-full max-w-lg flex-col border-l border-[var(--border)] bg-[var(--surface)] shadow-2xl"
         role="dialog"
         aria-modal="true"
         aria-label="Hiring Copilot"
       >
-        <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] px-4 py-3">
-          <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-violet-600">Copilot</p>
-            <p className="truncate text-sm font-semibold text-[var(--foreground)]">{jobTitle}</p>
+        <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] bg-[var(--surface)] px-5 py-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 text-white shadow-lg shadow-violet-500/20">
+              <Sparkles size={16} strokeWidth={2.2} />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-semibold text-[var(--foreground)]">Hiring Copilot</p>
+                <span className="rounded-full bg-violet-500/10 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-violet-600">STANDARD JOB</span>
+              </div>
+              <p className="mt-0.5 flex min-w-0 items-center gap-1.5 truncate text-xs text-[var(--text-muted)]">
+                <Briefcase size={11} />
+                {jobTitle}
+              </p>
+            </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg px-2 py-1 text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--foreground)]"
+            aria-label="Close copilot"
+            className="rounded-xl border border-[var(--border)] p-2 text-[var(--text-muted)] transition hover:bg-[var(--surface-muted)] hover:text-[var(--foreground)]"
           >
-            Close
+            <X size={16} />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+        <div className="flex-1 space-y-5 overflow-y-auto bg-[var(--surface-muted)] px-4 py-6 sm:px-6">
           {messages.length === 0 && (
-            <div className="space-y-2">
-              <p className="text-xs text-[var(--text-muted)]">
-                Ask about this job&apos;s pipeline without leaving the page.
+            <div className="mx-auto max-w-md pt-4">
+              <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-500/10 text-violet-600">
+                <Sparkles size={20} />
+              </div>
+              <h2 className="text-lg font-semibold tracking-tight text-[var(--foreground)]">What would you like to know?</h2>
+              <p className="mt-1.5 text-sm leading-6 text-[var(--text-muted)]">
+                Ask about this pipeline without leaving the page.
               </p>
-              {STARTERS.map(s => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => send(s)}
-                  className="block w-full rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2 text-left text-xs font-medium text-[var(--text-secondary)] hover:border-violet-400/40 hover:text-[var(--foreground)] transition"
-                >
-                  {s}
-                </button>
-              ))}
+              <div className="mt-5 space-y-2">
+                {STARTERS.map(s => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => send(s)}
+                    className="group flex w-full items-center justify-between rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-left text-sm font-medium text-[var(--text-secondary)] shadow-sm transition hover:-translate-y-0.5 hover:border-violet-400/50 hover:text-[var(--foreground)] hover:shadow-md"
+                  >
+                    <span>{s}</span>
+                    <ArrowUp size={14} className="rotate-45 text-[var(--text-muted)] transition group-hover:text-violet-600" />
+                  </button>
+                ))}
+              </div>
             </div>
           )}
           {messages.map(m => (
-            <div
-              key={m.id}
-              className={`rounded-2xl px-3 py-2 text-[13px] leading-relaxed whitespace-pre-wrap ${
-                m.role === "user"
-                  ? "ml-8 bg-indigo-500 text-white"
-                  : "mr-4 border border-[var(--border)] bg-[var(--surface-muted)] text-[var(--foreground)]"
-              }`}
-            >
-              {m.content || (m.isStreaming ? "…" : "")}
+            <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "items-start gap-2.5"}`}>
+              {m.role === "assistant" && (
+                <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 text-white shadow-sm">
+                  <Sparkles size={13} />
+                </div>
+              )}
+              <div
+                className={`max-w-[86%] whitespace-pre-wrap text-[13px] leading-6 ${
+                  m.role === "user"
+                    ? "rounded-[20px] rounded-tr-md bg-violet-600 px-4 py-3 text-white shadow-md shadow-violet-500/10"
+                    : "rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-[var(--foreground)] shadow-sm"
+                }`}
+              >
+                {m.content || (m.isStreaming ? <span className="inline-flex gap-1"><i className="h-1.5 w-1.5 animate-pulse rounded-full bg-violet-500" /><i className="h-1.5 w-1.5 animate-pulse rounded-full bg-violet-500 [animation-delay:150ms]" /><i className="h-1.5 w-1.5 animate-pulse rounded-full bg-violet-500 [animation-delay:300ms]" /></span> : "")}
+              </div>
             </div>
           ))}
           <div ref={bottomRef} />
         </div>
 
         <form
-          className="border-t border-[var(--border)] p-3 flex gap-2"
+          className="border-t border-[var(--border)] bg-[var(--surface)] px-4 pb-4 pt-3 sm:px-5"
           onSubmit={e => {
             e.preventDefault();
             send(input);
           }}
         >
-          <input
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            placeholder="Ask about this pipeline…"
-            disabled={streaming}
-            className="flex-1 rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20"
-          />
-          <button
-            type="submit"
-            disabled={streaming || !input.trim()}
-            className="rounded-xl bg-violet-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
-          >
-            Send
-          </button>
+          <div className="flex items-end gap-2 rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-muted)] p-2 transition focus-within:border-violet-500 focus-within:ring-4 focus-within:ring-violet-500/10">
+            <textarea
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  send(input);
+                }
+              }}
+              placeholder="Ask about this pipeline…"
+              rows={1}
+              className="min-h-10 flex-1 resize-none bg-transparent px-2 py-2 text-sm leading-5 text-[var(--foreground)] outline-none placeholder:text-[var(--text-muted)]"
+            />
+            <button
+              type="submit"
+              aria-label={streaming ? "Generating response" : "Send message"}
+              disabled={streaming || !input.trim()}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-600 text-white shadow-md shadow-violet-500/20 transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {streaming ? <CircleStop size={16} /> : <ArrowUp size={18} strokeWidth={2.5} />}
+            </button>
+          </div>
+          <p className="mt-2 text-center text-[10px] text-[var(--text-muted)]">Enter to send · Shift + Enter for a new line</p>
         </form>
       </aside>
     </>

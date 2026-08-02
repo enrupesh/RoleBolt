@@ -18,14 +18,15 @@ export default function WorkspacePicker({
   onSelect: (workspace: CopilotWorkspace) => void;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[calc(100vh-4rem)] px-6 py-12">
+    <div className="flex flex-col items-center justify-center min-h-screen px-6 py-12">
       <div
-        className="w-14 h-14 rounded-2xl flex items-center justify-center mb-6"
+        className="w-16 h-16 rounded-[20px] flex items-center justify-center mb-6"
         style={{ background: `linear-gradient(135deg, ${T.accent}, var(--rb-accent-dark))`, boxShadow: "0 0 40px var(--rb-accent-soft-border)" }}
       >
         <Sparkles size={24} color="#fff" />
       </div>
-      <h1 className="text-2xl font-bold mb-2 text-center" style={{ color: T.text }}>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] mb-3" style={{ color: T.accent }}>Rolebolt AI</p>
+      <h1 className="text-[2rem] tracking-[-0.04em] font-semibold mb-2 text-center" style={{ color: T.text }}>
         AI Hiring Copilot
       </h1>
       <p className="text-[0.9rem] max-w-md text-center mb-10 leading-relaxed" style={{ color: T.textSecondary }}>
@@ -36,8 +37,8 @@ export default function WorkspacePicker({
         <button
           type="button"
           onClick={() => onSelect("standard")}
-          className="group rounded-2xl border p-6 text-left transition hover:shadow-lg hover:-translate-y-0.5"
-          style={{ borderColor: T.border, background: T.card }}
+           className="group rounded-3xl border p-6 text-left transition hover:shadow-lg hover:-translate-y-0.5"
+           style={{ borderColor: T.border, background: T.card, boxShadow: "0 1px 2px var(--rb-shadow-color)" }}
         >
           <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600 mb-4">
             <Briefcase size={22} />
@@ -51,8 +52,8 @@ export default function WorkspacePicker({
         <button
           type="button"
           onClick={() => onSelect("form")}
-          className="group rounded-2xl border p-6 text-left transition hover:shadow-lg hover:-translate-y-0.5"
-          style={{ borderColor: T.border, background: T.card }}
+           className="group rounded-3xl border p-6 text-left transition hover:shadow-lg hover:-translate-y-0.5"
+           style={{ borderColor: T.border, background: T.card, boxShadow: "0 1px 2px var(--rb-shadow-color)" }}
         >
           <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-100 text-violet-600 mb-4">
             <FileText size={22} />
