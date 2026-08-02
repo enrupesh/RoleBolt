@@ -11,9 +11,10 @@
     "build": "echo 'tsx runtime used — no tsc compilation needed'",
     "start": "tsx src/index.ts",
     "billing:migrate-free": "tsx src/billing/migrateFreeEntitlements.ts",
-    "test": "tsx --test src/automation/standardJobCore.test.ts src/billing/planCatalog.test.ts src/billing/enforcement.test.ts",
+    "billing:sync-razorpay-plans": "tsx src/billing/syncRazorpayPlans.ts",
+    "test": "tsx --test src/automation/standardJobCore.test.ts src/billing/planCatalog.test.ts src/billing/enforcement.test.ts src/billing/razorpay.test.ts",
     "test:automation": "tsx --test src/automation/standardJobCore.test.ts",
-    "test:billing": "tsx --test src/billing/planCatalog.test.ts src/billing/enforcement.test.ts"
+    "test:billing": "tsx --test src/billing/planCatalog.test.ts src/billing/enforcement.test.ts src/billing/razorpay.test.ts"
   },
   "license": "ISC",
   "type": "commonjs",
