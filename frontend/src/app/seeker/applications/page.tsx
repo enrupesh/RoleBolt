@@ -49,9 +49,14 @@ function ApplicationsContent() {
 
   useEffect(() => {
     if (!token) return;
+    setLoading(true);
     fetch(apiUrl("/recruit/seeker/applications"), { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.json())
-      .then(d => setApps(d.applications ?? []))
+      .then(async r => {
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || "Could not load applications");
+        setApps(d.applications ?? []);
+      })
+      .catch(() => setApps([]))
       .finally(() => setLoading(false));
   }, [token]);
 
@@ -64,9 +69,14 @@ function ApplicationsContent() {
     <div className="min-h-screen bg-[#f0f2f5]">
       <SeekerHeader />
       <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-slate-900">My Applications</h1>
-          <p className="mt-1 text-sm text-slate-500">{applications.length} total applications</p>
+        <div className="mb-8 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Rolebolt Applications</h1>
+            <p className="mt-1 text-sm text-slate-500">{applications.length} applications on Rolebolt</p>
+          </div>
+          <Link href="/seeker/tracker" className="text-sm font-bold text-indigo-600 hover:text-indigo-700">
+            View full tracker (all platforms) →
+          </Link>
         </div>
 
         {/* Filter tabs */}
@@ -117,6 +127,11 @@ function ApplicationsContent() {
                       <p className="mt-1 text-sm text-slate-500">
                         {app.companyName}{app.location ? ` · ${app.location}` : ""}{app.workMode ? ` · ${app.workMode}` : ""}
                       </p>
+                      {app.jobId && (
+                        <Link href={`/recruit/opportunities/${app.jobId}`} className="mt-2 inline-block text-xs font-bold text-indigo-600 hover:text-indigo-700">
+                          View job posting →
+                        </Link>
+                      )}
                     </div>
                     <div className="shrink-0 text-right">
                       <ScoreBar score={app.totalScore} max={app.maxScore} />

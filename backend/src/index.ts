@@ -12,6 +12,7 @@ import { startDailyBriefingJob } from "./jobs/dailyBriefing";
 import { startOfferManagementJob } from "./jobs/offerManagement";
 import { startPipelineRulesCron } from "./jobs/pipelineRulesCron";
 import { seekerRouter } from "./seeker";
+import { requireSeekerRole } from "./middleware/requireSeekerRole";
 import { billingRouter, handleStripeWebhook } from "./billing";
 import { collaborationRouter, collaborationPublicRouter } from "./collaboration";
 
@@ -67,7 +68,7 @@ app.use("/recruit-public/site-guide", siteGuideRouter);
 
 // ── Protected routes (JWT required) ──────────────────────────────────────────
 app.use("/recruit/copilot", requireAuth, copilotRouter);
-app.use("/recruit/seeker", requireAuth, seekerRouter);
+app.use("/recruit/seeker", requireAuth, requireSeekerRole, seekerRouter);
 app.use("/recruit/collaboration", requireAuth, collaborationRouter);
 app.use("/recruit", requireAuth, recruitRouter);
 app.use("/recruit/forms", requireAuth, formRouter);

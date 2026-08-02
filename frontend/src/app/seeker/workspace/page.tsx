@@ -106,6 +106,12 @@ function WorkspaceContent() {
     [items, selectedId],
   );
 
+  useEffect(() => {
+    if (!sessionToken) return;
+    const urlId = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("id") : null;
+    if (urlId) setSelectedId(urlId);
+  }, [sessionToken]);
+
   const loadItems = useCallback(async () => {
     if (!sessionToken) return;
     setLoading(true);
@@ -117,7 +123,12 @@ function WorkspaceContent() {
       if (!res.ok) throw new Error(data.error ?? "Could not load your workspace.");
       const nextItems = data.workspaces ?? [];
       setItems(nextItems);
-      setSelectedId((current) => (current && nextItems.some((item) => item.id === current) ? current : nextItems[0]?.id ?? null));
+      const urlId = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("id") : null;
+      setSelectedId((current) => {
+        const preferred = urlId || current;
+        if (preferred && nextItems.some((item) => item.id === preferred)) return preferred;
+        return nextItems[0]?.id ?? null;
+      });
     } catch (err: any) {
       setError(err.message);
     } finally {

@@ -47,6 +47,8 @@ export interface IRecruitSeekerProfile extends Document {
   photoUrl?: string;
   savedJobIds: string[];
   resumeFileName?: string;
+  weeklyApplicationGoal?: number;
+  careerObjective?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -108,6 +110,8 @@ const RecruitSeekerProfileSchema = new Schema<IRecruitSeekerProfile>(
     photoUrl: { type: String, default: "" },
     savedJobIds: { type: [String], default: [] },
     resumeFileName: { type: String, default: "" },
+    weeklyApplicationGoal: { type: Number, default: 5 },
+    careerObjective: { type: String, default: "" },
   },
   { timestamps: true }
 );

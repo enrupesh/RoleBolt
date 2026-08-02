@@ -5,15 +5,42 @@ import { RecruitSeekerProfile } from "./models/RecruitSeekerProfile";
 import { RecruitCandidate } from "./models/RecruitCandidate";
 import { RecruitJob } from "./models/RecruitJob";
 import { RecruitSeekerWorkspace } from "./models/RecruitSeekerWorkspace";
+import { RecruitSeekerTrackerEntry } from "./models/RecruitSeekerTrackerEntry";
+import {
+  buildUnifiedTracker,
+  buildCareerGps,
+  trackerEntryDto,
+  VALID_TRACKER_STAGES,
+} from "./seekerCore";
 import { callGeminiChain } from "./ai/geminiClient";
 import { callMeshChatCompletions } from "./ai/meshClient";
 import { callNvidia } from "./ai/nvidiaClient";
+import {
+  exportResume,
+  resumeFromJson,
+  resumeFromPlainText,
+  sanitizeFilename,
+  RESUME_TEMPLATES,
+  type ResumeExportFormat,
+  type ResumeJsonInput,
+  type ResumeTemplateId,
+} from "./resumeExport";
 
 export const seekerRouter = express.Router();
 
 // Helper: get uid from request (set by requireAuth middleware)
 function getUid(req: express.Request): string {
-  return (req as any).user?.uid ?? (req as any).user?._id?.toString() ?? (req as any).user?.id?.toString() ?? "";
+  const uid = (req as any).user?.uid ?? (req as any).user?._id?.toString() ?? (req as any).user?.id?.toString() ?? "";
+  return uid;
+}
+
+function requireUid(req: express.Request, res: express.Response): string | null {
+  const uid = getUid(req);
+  if (!uid) {
+    res.status(401).json({ error: "Unauthorized" });
+    return null;
+  }
+  return uid;
 }
 
 // Fallback AI chain
@@ -122,6 +149,12 @@ async function extractJobFromUrl(rawUrl: string): Promise<{ title: string; descr
 }
 
 function workspaceDto(workspace: any) {
+  const analysis = workspace.analysis
+    ? {
+        ...workspace.analysis,
+        analyzedAt: workspace.analysis.analyzedAt?.toISOString?.() ?? workspace.analysis.analyzedAt ?? null,
+      }
+    : null;
   return {
     id: workspace._id?.toString?.() ?? workspace.id,
     sourceUrl: workspace.sourceUrl ?? "",
@@ -135,7 +168,7 @@ function workspaceDto(workspace: any) {
     jobDescription: workspace.jobDescription ?? "",
     status: workspace.status ?? "saved",
     notes: workspace.notes ?? "",
-    analysis: workspace.analysis ?? null,
+    analysis,
     createdAt: workspace.createdAt,
     updatedAt: workspace.updatedAt,
   };
@@ -150,7 +183,26 @@ function workspaceIdIsValid(id: string): boolean {
   return mongoose.Types.ObjectId.isValid(id);
 }
 
-async function analyzeWorkspaceForSeeker(uid: string, workspace: any) {
+function normalizeTrackerStage(stage: unknown): string | undefined {
+  const s = String(stage || "").toLowerCase();
+  const map: Record<string, string> = {
+    screened: "screening",
+    assessed: "assessment",
+    screening: "screening",
+    assessment: "assessment",
+  };
+  const normalized = map[s] || s;
+  return VALID_TRACKER_STAGES.includes(normalized as any) ? normalized : undefined;
+}
+
+async function buildWorkspaceAnalysis(uid: string, workspaceLike: {
+  title?: string;
+  companyName?: string;
+  location?: string;
+  workMode?: string;
+  salaryText?: string;
+  jobDescription?: string;
+}) {
   const profile = await RecruitSeekerProfile.findOne({ uid }).lean() as any;
   const resumeText = String(profile?.resumeText || "").slice(0, 6000);
   const skills = Array.isArray(profile?.skills) ? profile.skills.join(", ") : "";
@@ -158,13 +210,13 @@ async function analyzeWorkspaceForSeeker(uid: string, workspace: any) {
   const prompt = `You are a precise career matching analyst. Analyze whether this job is a good fit for the job seeker.
 
 JOB:
-Title: ${workspace.title || "Unknown"}
-Company: ${workspace.companyName || "Unknown"}
-Location: ${workspace.location || "Not specified"}
-Work mode: ${workspace.workMode || "Not specified"}
-Salary: ${workspace.salaryText || "Not specified"}
+Title: ${workspaceLike.title || "Unknown"}
+Company: ${workspaceLike.companyName || "Unknown"}
+Location: ${workspaceLike.location || "Not specified"}
+Work mode: ${workspaceLike.workMode || "Not specified"}
+Salary: ${workspaceLike.salaryText || "Not specified"}
 Description:
-${String(workspace.jobDescription || "").slice(0, 18000)}
+${String(workspaceLike.jobDescription || "").slice(0, 18000)}
 
 SEEKER:
 Target area: ${targetRole || "Not specified"}
@@ -196,7 +248,7 @@ Rules:
     throw new Error("AI returned an invalid job analysis.");
   }
   const matchScore = clampScore(parsed.matchScore);
-  const analysis = {
+  return {
     matchScore,
     matchLabel: String(parsed.matchLabel || (matchScore >= 75 ? "Strong match" : matchScore >= 55 ? "Good match" : "Needs review")),
     summary: String(parsed.summary || "Review this role against your current profile."),
@@ -207,10 +259,58 @@ Rules:
     salaryInsight: String(parsed.salaryInsight || ""),
     analyzedAt: new Date(),
   };
+}
+
+async function analyzeWorkspaceForSeeker(uid: string, workspace: any) {
+  const analysis = await buildWorkspaceAnalysis(uid, workspace);
   workspace.analysis = analysis;
   if (workspace.status === "saved") workspace.status = "analyzed";
   await workspace.save();
   return analysis;
+}
+
+function normalizeExtensionJobUrl(raw: string): string {
+  try {
+    const url = new URL(raw.trim());
+    url.hash = "";
+    // Strip common tracking params but keep job-identifying ones
+    const keep = new Set(["jk", "vjk", "currentJobId", "gh_jid", "jobId", "id"]);
+    for (const key of [...url.searchParams.keys()]) {
+      if (!keep.has(key)) url.searchParams.delete(key);
+    }
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return raw.trim();
+  }
+}
+
+async function resolveExtensionJobPayload(body: Record<string, string>) {
+  const sourceUrl = normalizeExtensionJobUrl(String(body.url || "").trim());
+  if (!sourceUrl || !isSafeExternalUrl(sourceUrl)) {
+    throw new Error("A valid job page URL is required.");
+  }
+
+  let jobDescription = String(body.pageText || "").trim();
+  let extractedTitle = String(body.title || "").trim();
+  if (!jobDescription || jobDescription.length < 40) {
+    try {
+      const extracted = await extractJobFromUrl(sourceUrl);
+      jobDescription = extracted.description;
+      if (!extractedTitle) extractedTitle = extracted.title;
+    } catch {
+      jobDescription = `Saved from browser extension.\nURL: ${sourceUrl}\nTitle: ${extractedTitle || body.title || "Job posting"}`;
+    }
+  }
+
+  return {
+    sourceUrl,
+    title: (extractedTitle || "Saved job").slice(0, 240),
+    companyName: String(body.companyName || "").trim().slice(0, 180),
+    location: String(body.location || "").trim().slice(0, 120),
+    workMode: String(body.workMode || "").trim().slice(0, 60),
+    salaryText: String(body.salaryText || "").trim().slice(0, 120),
+    jobDescription: jobDescription.slice(0, 30000),
+  };
 }
 
 // ── GET /recruit/seeker/profile ───────────────────────────────────────────────
@@ -235,7 +335,7 @@ seekerRouter.put("/profile", async (req, res) => {
       "experience", "education", "preferredJobType", "preferredWorkMode",
       "preferredLocation", "preferredSalaryMin", "preferredSalaryMax",
       "preferredNiche", "experienceLevel", "resumeText", "resumeFileName",
-      "socialLinks", "photoUrl",
+      "socialLinks", "photoUrl", "weeklyApplicationGoal", "careerObjective",
     ];
     const update: Record<string, any> = {};
     for (const key of allowed) {
@@ -403,36 +503,331 @@ seekerRouter.delete("/workspace/:id", async (req, res) => {
 });
 
 // ── GET /recruit/seeker/applications ─────────────────────────────────────────
+// Legacy endpoint — returns Rolebolt applications only (email-based lookup).
 seekerRouter.get("/applications", async (req, res) => {
   try {
     await connectMongo();
-    const uid = getUid(req);
-    // Candidates linked to this user's uid
-    const candidates = await RecruitCandidate.find({ uid }).sort({ createdAt: -1 }).lean();
-    if (!candidates.length) return res.json({ applications: [] });
+    const uid = requireUid(req, res);
+    if (!uid) return;
 
-    const jobIds = [...new Set(candidates.map((c: any) => c.jobId?.toString()).filter(Boolean))];
-    const jobs = await RecruitJob.find({ _id: { $in: jobIds } }).lean();
-    const jobMap: Record<string, any> = {};
-    for (const j of jobs) jobMap[j._id.toString()] = j;
+    const tracker = await buildUnifiedTracker(uid);
+    const rolebolt = tracker.filter(t => t.source === "rolebolt");
 
-    const applications = candidates.map((c: any) => ({
-      id: c._id.toString(),
-      jobId: c.jobId?.toString() ?? "",
-      jobTitle: jobMap[c.jobId?.toString()]?.title ?? "Unknown Role",
-      companyName: jobMap[c.jobId?.toString()]?.companyName ?? "",
-      location: jobMap[c.jobId?.toString()]?.location ?? "",
-      workMode: jobMap[c.jobId?.toString()]?.workMode ?? "",
-      stage: c.stage ?? "applied",
-      totalScore: c.totalScore ?? 0,
-      maxScore: c.maxScore ?? 0,
-      appliedAt: c.createdAt,
-      stageMovedAt: c.stageMovedAt ?? null,
+    const applications = rolebolt.map(t => ({
+      id: t.candidateId ?? t.id.replace(/^rb-/, ""),
+      jobId: t.jobId ?? "",
+      jobTitle: t.title,
+      companyName: t.companyName,
+      location: t.location,
+      workMode: t.workMode,
+      stage: t.stage,
+      totalScore: t.totalScore ?? 0,
+      maxScore: t.maxScore ?? 0,
+      appliedAt: t.appliedAt,
+      stageMovedAt: t.updatedAt ?? null,
+      source: "rolebolt" as const,
     }));
 
     return res.json({ applications });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Universal Application Tracker ─────────────────────────────────────────────
+seekerRouter.get("/tracker", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = requireUid(req, res);
+    if (!uid) return;
+    const items = await buildUnifiedTracker(uid);
+    return res.json({ items });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+seekerRouter.post("/tracker", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = requireUid(req, res);
+    if (!uid) return;
+
+    const {
+      title = "",
+      companyName = "",
+      location = "",
+      workMode = "",
+      platform = "other",
+      sourceUrl = "",
+      stage = "applied",
+      appliedAt,
+      nextAction = "",
+      nextFollowUpAt,
+      notes = "",
+    } = req.body as Record<string, string>;
+
+    if (!String(title).trim() && !String(companyName).trim()) {
+      return res.status(400).json({ error: "Add at least a job title or company name." });
+    }
+    if (!VALID_TRACKER_STAGES.includes(stage as any)) {
+      return res.status(400).json({ error: "Invalid stage." });
+    }
+
+    const entry = await RecruitSeekerTrackerEntry.create({
+      uid,
+      title: String(title).trim().slice(0, 240) || "Untitled role",
+      companyName: String(companyName).trim().slice(0, 180),
+      location: String(location).trim().slice(0, 180),
+      workMode: String(workMode).trim().slice(0, 80),
+      platform: String(platform).trim().slice(0, 80) || "other",
+      sourceUrl: String(sourceUrl).trim().slice(0, 2000),
+      stage,
+      appliedAt: appliedAt ? new Date(appliedAt) : stage === "applied" ? new Date() : undefined,
+      nextAction: String(nextAction).trim().slice(0, 500),
+      nextFollowUpAt: nextFollowUpAt ? new Date(nextFollowUpAt) : undefined,
+      notes: String(notes).trim().slice(0, 3000),
+    });
+
+    return res.status(201).json({ entry: trackerEntryDto(entry) });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+seekerRouter.patch("/tracker/:id", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = requireUid(req, res);
+    if (!uid) return;
+    if (!workspaceIdIsValid(req.params.id)) return res.status(400).json({ error: "Invalid id." });
+
+    const allowed = ["title", "companyName", "location", "workMode", "platform", "sourceUrl", "stage", "nextAction", "notes"];
+    const update: Record<string, any> = {};
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) update[key] = typeof req.body[key] === "string" ? req.body[key].trim() : req.body[key];
+    }
+    if (update.stage && !VALID_TRACKER_STAGES.includes(update.stage)) {
+      return res.status(400).json({ error: "Invalid stage." });
+    }
+    if (req.body.appliedAt !== undefined) update.appliedAt = req.body.appliedAt ? new Date(req.body.appliedAt) : null;
+    if (req.body.nextFollowUpAt !== undefined) update.nextFollowUpAt = req.body.nextFollowUpAt ? new Date(req.body.nextFollowUpAt) : null;
+    if (req.body.lastContactAt !== undefined) update.lastContactAt = req.body.lastContactAt ? new Date(req.body.lastContactAt) : null;
+
+    const entry = await RecruitSeekerTrackerEntry.findOneAndUpdate(
+      { _id: req.params.id, uid },
+      { $set: update },
+      { new: true }
+    ).lean();
+    if (!entry) return res.status(404).json({ error: "Tracker entry not found." });
+    return res.json({ entry: trackerEntryDto(entry) });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+seekerRouter.delete("/tracker/:id", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = requireUid(req, res);
+    if (!uid) return;
+    const deleted = await RecruitSeekerTrackerEntry.findOneAndDelete({ _id: req.params.id, uid });
+    if (!deleted) return res.status(404).json({ error: "Tracker entry not found." });
+    return res.json({ ok: true });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Career GPS ────────────────────────────────────────────────────────────────
+seekerRouter.get("/career-gps", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = requireUid(req, res);
+    if (!uid) return;
+    const gps = await buildCareerGps(uid);
+    return res.json({ gps });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Email Intelligence ────────────────────────────────────────────────────────
+seekerRouter.post("/email/parse", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = requireUid(req, res);
+    if (!uid) return;
+
+    const { emailText, trackerEntryId } = req.body as { emailText?: string; trackerEntryId?: string };
+    if (!emailText?.trim() || emailText.trim().length < 20) {
+      return res.status(400).json({ error: "Paste the full recruiter email (at least 20 characters)." });
+    }
+
+    const prompt = `You are an expert job-search assistant. Parse this recruiter/hiring email and extract structured updates for a job seeker's application tracker.
+
+EMAIL:
+${emailText.slice(0, 8000)}
+
+Return ONLY valid JSON:
+{
+  "companyName": "",
+  "jobTitle": "",
+  "suggestedStage": "applied|screening|assessment|interview|offer|rejected|ghosted",
+  "summary": "One sentence for the seeker",
+  "interviewDate": "ISO date string or null",
+  "nextAction": "Specific next step for the seeker",
+  "followUpDate": "ISO date string or null",
+  "subject": "Best guess at email subject"
+}
+
+Rules:
+- Be conservative — only extract what is clearly stated.
+- suggestedStage must reflect the email intent (interview invite → interview, rejection → rejected, etc.)
+- interviewDate only if a specific date/time is mentioned
+- followUpDate: suggest when to follow up if no response expected`;
+
+    const parsed = safeParseJson(await callAI(prompt));
+    if (!parsed || typeof parsed !== "object") {
+      return res.status(500).json({ error: "Could not parse this email. Try pasting the full message." });
+    }
+
+    const intel = {
+      subject: String(parsed.subject || "").slice(0, 300),
+      summary: String(parsed.summary || "Email parsed.").slice(0, 1000),
+      suggestedStage: normalizeTrackerStage(parsed.suggestedStage),
+      interviewDate: parsed.interviewDate ? new Date(parsed.interviewDate) : undefined,
+      nextAction: String(parsed.nextAction || "").slice(0, 500),
+      parsedAt: new Date(),
+    };
+
+    let entry = null;
+    if (trackerEntryId && workspaceIdIsValid(trackerEntryId)) {
+      entry = await RecruitSeekerTrackerEntry.findOneAndUpdate(
+        { _id: trackerEntryId, uid },
+        {
+          $push: { emailIntel: intel },
+          $set: {
+            ...(intel.suggestedStage ? { stage: intel.suggestedStage } : {}),
+            ...(parsed.followUpDate ? { nextFollowUpAt: new Date(parsed.followUpDate) } : {}),
+            ...(parsed.nextAction ? { nextAction: intel.nextAction } : {}),
+            lastContactAt: new Date(),
+            ...(parsed.companyName ? { companyName: String(parsed.companyName).slice(0, 180) } : {}),
+            ...(parsed.jobTitle ? { title: String(parsed.jobTitle).slice(0, 240) } : {}),
+          },
+        },
+        { new: true }
+      ).lean();
+    } else if (parsed.companyName || parsed.jobTitle) {
+      entry = await RecruitSeekerTrackerEntry.create({
+        uid,
+        title: String(parsed.jobTitle || "Recruiter update").slice(0, 240),
+        companyName: String(parsed.companyName || "").slice(0, 180),
+        platform: "other",
+        stage: intel.suggestedStage || "applied",
+        sourceUrl: "",
+        notes: "Created from Email Intelligence",
+        emailIntel: [intel],
+        nextAction: intel.nextAction || undefined,
+        nextFollowUpAt: parsed.followUpDate ? new Date(parsed.followUpDate) : undefined,
+        lastContactAt: new Date(),
+      });
+    }
+
+    return res.json({
+      intel: {
+        ...intel,
+        interviewDate: intel.interviewDate?.toISOString?.() ?? null,
+        parsedAt: intel.parsedAt.toISOString(),
+        companyName: parsed.companyName ?? "",
+        jobTitle: parsed.jobTitle ?? "",
+        followUpDate: parsed.followUpDate ?? null,
+      },
+      entry: entry ? trackerEntryDto(entry) : null,
+    });
+  } catch (err: any) {
+    console.error("[seeker] email/parse error:", err);
+    return res.status(500).json({ error: err.message || "Email parsing failed." });
+  }
+});
+
+// ── Extension: analyze job without saving ─────────────────────────────────────
+seekerRouter.post("/workspace/extension-analyze", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = requireUid(req, res);
+    if (!uid) return;
+
+    const payload = await resolveExtensionJobPayload(req.body as Record<string, string>);
+    const existing = await RecruitSeekerWorkspace.findOne({ uid, sourceUrl: payload.sourceUrl }).lean();
+
+    const analysis = await buildWorkspaceAnalysis(uid, payload);
+    return res.json({
+      analysis: {
+        ...analysis,
+        analyzedAt: analysis.analyzedAt.toISOString(),
+      },
+      existingWorkspaceId: existing?._id?.toString() ?? null,
+      job: payload,
+    });
+  } catch (err: any) {
+    console.error("[seeker] extension-analyze error:", err);
+    return res.status(err.message?.includes("valid job page") ? 400 : 500).json({ error: err.message || "Analysis failed." });
+  }
+});
+
+// ── Extension: quick-save job from browser ────────────────────────────────────
+seekerRouter.post("/workspace/extension-save", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = requireUid(req, res);
+    if (!uid) return;
+
+    const payload = await resolveExtensionJobPayload(req.body as Record<string, string>);
+
+    let workspace = await RecruitSeekerWorkspace.findOne({ uid, sourceUrl: payload.sourceUrl });
+    let created = false;
+
+    if (workspace) {
+      workspace.title = payload.title;
+      workspace.companyName = payload.companyName;
+      workspace.location = payload.location;
+      workspace.workMode = payload.workMode;
+      workspace.salaryText = payload.salaryText;
+      workspace.jobDescription = payload.jobDescription;
+      workspace.notes = workspace.notes || "Saved via Rolebolt browser extension";
+      await workspace.save();
+    } else {
+      workspace = await RecruitSeekerWorkspace.create({
+        uid,
+        sourceUrl: payload.sourceUrl,
+        sourceType: "url",
+        title: payload.title,
+        companyName: payload.companyName,
+        location: payload.location,
+        workMode: payload.workMode,
+        salaryText: payload.salaryText,
+        jobDescription: payload.jobDescription,
+        status: "saved",
+        notes: "Saved via Rolebolt browser extension",
+      });
+      created = true;
+    }
+
+    let analysisError = "";
+    try {
+      await analyzeWorkspaceForSeeker(uid, workspace);
+    } catch (err: any) {
+      analysisError = err.message || "Saved, but analysis could not run.";
+    }
+
+    return res.status(created ? 201 : 200).json({
+      workspace: workspaceDto(workspace),
+      analysisError: analysisError || undefined,
+      updated: !created,
+    });
+  } catch (err: any) {
+    return res.status(err.message?.includes("valid job page") ? 400 : 500).json({ error: err.message });
   }
 });
 
@@ -445,7 +840,11 @@ seekerRouter.get("/saved-jobs", async (req, res) => {
     const savedIds: string[] = profile?.savedJobIds ?? [];
     if (!savedIds.length) return res.json({ jobs: [] });
 
-    const jobDocs = await RecruitJob.find({ _id: { $in: savedIds }, publicVisibility: true }).lean();
+    const jobDocs = await RecruitJob.find({
+      _id: { $in: savedIds },
+      status: "active",
+      publicVisibility: { $ne: false },
+    }).lean();
     const jobs = jobDocs.map((j: any) => ({
       id: j._id.toString(),
       title: j.title,
@@ -467,8 +866,11 @@ seekerRouter.get("/saved-jobs", async (req, res) => {
 seekerRouter.post("/jobs/:id/save", async (req, res) => {
   try {
     await connectMongo();
-    const uid = getUid(req);
+    const uid = requireUid(req, res);
+    if (!uid) return;
     const jobId = req.params.id;
+    const job = await RecruitJob.findOne({ _id: jobId, status: "active", publicVisibility: { $ne: false } }).lean();
+    if (!job) return res.status(404).json({ error: "Job not found." });
     const profile = await RecruitSeekerProfile.findOneAndUpdate(
       { uid },
       { $addToSet: { savedJobIds: jobId } },
@@ -572,6 +974,74 @@ Rules:
   } catch (err: any) {
     console.error("[seeker] resume/build error:", err);
     return res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GET /recruit/seeker/resume/templates ──────────────────────────────────────
+seekerRouter.get("/resume/templates", (_req, res) => {
+  return res.json({ templates: RESUME_TEMPLATES });
+});
+
+// ── POST /recruit/seeker/resume/export ────────────────────────────────────────
+seekerRouter.post("/resume/export", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = requireUid(req, res);
+    if (!uid) return;
+
+    const {
+      format = "pdf",
+      template = "ats",
+      resume,
+      resumeText,
+      useProfile,
+    } = req.body as {
+      format?: ResumeExportFormat;
+      template?: ResumeTemplateId;
+      resume?: ResumeJsonInput;
+      resumeText?: string;
+      useProfile?: boolean;
+    };
+
+    const validFormats: ResumeExportFormat[] = ["pdf", "docx", "txt"];
+    const validTemplates: ResumeTemplateId[] = ["ats", "modern", "minimal", "creative"];
+    if (!validFormats.includes(format)) {
+      return res.status(400).json({ error: "Invalid format. Use pdf, docx, or txt." });
+    }
+    if (!validTemplates.includes(template)) {
+      return res.status(400).json({ error: "Invalid template." });
+    }
+
+    let document;
+    if (useProfile) {
+      const profile = await RecruitSeekerProfile.findOne({ uid }).lean();
+      const text = String(profile?.resumeText ?? "").trim();
+      if (!text) return res.status(400).json({ error: "No resume saved on your profile." });
+      document = resumeFromPlainText(text, {
+        name: profile?.name,
+        email: profile?.email,
+        phone: profile?.phone,
+        location: profile?.preferredLocation,
+        linkedin: profile?.socialLinks?.linkedin,
+      });
+    } else if (resume && (resume.summary || resume.experience?.length || resume.fullText || resume.contactInfo?.name)) {
+      document = resumeFromJson(resume);
+    } else if (resumeText?.trim()) {
+      document = resumeFromPlainText(resumeText.trim());
+    } else {
+      return res.status(400).json({ error: "Provide resume data, resumeText, or useProfile." });
+    }
+
+    const { buffer, mimeType, extension } = await exportResume(document, format, template);
+    const base = sanitizeFilename(document.contactInfo.name || "resume");
+    const filename = `${base}_${template}.${extension}`;
+
+    res.setHeader("Content-Type", mimeType);
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    return res.send(buffer);
+  } catch (err: any) {
+    console.error("[seeker] resume/export error:", err);
+    return res.status(500).json({ error: err.message ?? "Export failed." });
   }
 });
 
