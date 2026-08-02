@@ -13,6 +13,8 @@ export type SubscriptionStatus =
   | "pending"
   | "past_due"
   | "halted"
+  | "paused"
+  | "completed"
   | "cancelled"
   | "expired"
   // Transitional values retained so old records can be read safely while the
@@ -82,6 +84,8 @@ const SubscriptionSchema = new Schema<ISubscription>(
         "pending",
         "past_due",
         "halted",
+        "paused",
+        "completed",
         "cancelled",
         "expired",
         // Transitional reads for legacy records. New code must not create them.

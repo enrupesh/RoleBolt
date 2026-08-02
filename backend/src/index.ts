@@ -13,8 +13,9 @@ import { startOfferManagementJob } from "./jobs/offerManagement";
 import { startPipelineRulesCron } from "./jobs/pipelineRulesCron";
 import { seekerRouter } from "./seeker";
 import { requireSeekerRole } from "./middleware/requireSeekerRole";
-import { billingRouter, handleStripeWebhook } from "./billing";
+import { billingRouter } from "./billing";
 import { billingCatalogRouter, billingFoundationRouter } from "./billing/api";
+import { handleRazorpayWebhook, razorpayBillingRouter } from "./billing/razorpayApi";
 import { collaborationRouter, collaborationPublicRouter } from "./collaboration";
 
 dotenv.config();
@@ -48,8 +49,8 @@ app.use(
   })
 );
 
-// ── Stripe webhook (raw body BEFORE express.json) ────────────────────────────
-app.post("/billing/webhook", express.raw({ type: "application/json" }), handleStripeWebhook);
+// ── Razorpay webhook (raw body BEFORE express.json) ──────────────────────────
+app.post("/billing/webhook", express.raw({ type: "application/json" }), handleRazorpayWebhook);
 
 app.use(express.json({ limit: "6mb" }));
 
@@ -76,8 +77,11 @@ app.use("/recruit/forms", requireAuth, formRouter);
 // Pricing metadata is safe to expose publicly; account entitlements and all
 // mutation/legacy billing routes remain behind JWT authentication.
 app.use("/billing", billingCatalogRouter);
-app.use("/billing", requireAuth, billingRouter);
 app.use("/billing", requireAuth, billingFoundationRouter);
+app.use("/billing", requireAuth, razorpayBillingRouter);
+// Retired Stripe compatibility routes are mounted last so they cannot shadow
+// the active Razorpay checkout route with the same legacy path.
+app.use("/billing", requireAuth, billingRouter);
 
 // ── Helper: ping one AI API ───────────────────────────────────────────────────
 async function pingApi(opts: {
