@@ -3150,11 +3150,11 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
               <p className="truncate text-xs font-semibold text-[var(--text-secondary)] sm:max-w-xs">{job.title}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex max-w-[68%] flex-wrap items-center justify-end gap-1.5 sm:max-w-none sm:gap-2">
             <button
               type="button"
               onClick={() => setShowCopilot(true)}
-              className="hidden items-center gap-1.5 rounded-lg border border-violet-500/30 bg-violet-500/10 px-3 py-2 text-xs font-bold text-violet-700 transition hover:bg-violet-500/20 sm:flex"
+              className="flex items-center gap-1 rounded-lg border border-violet-500/30 bg-violet-500/10 px-2 py-2 text-[11px] font-bold text-violet-700 transition hover:bg-violet-500/20 sm:gap-1.5 sm:px-3 sm:text-xs"
               title="Ask Copilot about this pipeline"
             >
               <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -3172,7 +3172,7 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
                 markChecklistStep(id, "shared");
                 trackEvent("recruiter_profile_viewed", { jobId: id, action: "share_link_copied" });
               }}
-              className={`hidden items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition sm:flex ${
+              className={`flex items-center gap-1 rounded-lg border px-2 py-2 text-[11px] font-semibold transition sm:gap-1.5 sm:px-3 sm:text-xs ${
                 linkCopied
                   ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-600"
                   : "border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--accent)]"
@@ -3198,7 +3198,7 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
                   a.href = url; a.download = `${job.title.replace(/[^a-z0-9]/gi, "_")}_candidates.csv`;
                   a.click(); URL.revokeObjectURL(url);
                 }}
-                className="hidden items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] transition hover:text-[var(--foreground)] hover:border-[var(--accent)] sm:flex"
+                className="flex items-center gap-1 rounded-lg border border-[var(--border)] px-2 py-2 text-[11px] font-semibold text-[var(--text-secondary)] transition hover:text-[var(--foreground)] hover:border-[var(--accent)] sm:gap-1.5 sm:px-3 sm:text-xs"
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 Export CSV
@@ -3217,7 +3217,7 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
             )}
             <button
               onClick={() => setShowBulkModal(true)}
-              className="hidden items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2 text-xs font-bold text-[var(--text-secondary)] transition hover:text-[var(--foreground)] hover:border-indigo-500/40 sm:flex"
+              className="flex items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] px-2 py-2 text-[11px] font-bold text-[var(--text-secondary)] transition hover:text-[var(--foreground)] hover:border-indigo-500/40 sm:gap-1.5 sm:px-3 sm:text-xs"
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
               Bulk Import
