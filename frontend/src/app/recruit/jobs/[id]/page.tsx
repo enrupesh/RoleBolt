@@ -3109,7 +3109,7 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
   const assessedCount = candidates.filter(c => c.assessmentStatus === "completed").length;
 
   return (
-    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
+    <div className="min-h-screen bg-[#f4f1f8] text-[var(--foreground)]">
       
 
       {showBulkModal && job && (
@@ -3138,20 +3138,23 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
         />
       )}
 
-      <header className="relative z-10 border-b border-[var(--border)] bg-[var(--surface)] backdrop-blur-sm sticky top-0">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+      <header className="sticky top-0 z-20 border-b border-[#e4dfe8] bg-[#fffdfd]/95 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
-            <Link href="/recruit/dashboard" className="flex items-center gap-1 text-xs text-[var(--text-muted)] hover:text-[var(--foreground)] transition">
-              <ChevronLeftIcon /> Dashboard
+            <Link href="/recruit/dashboard" aria-label="Back to dashboard" className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#e2dce8] bg-white text-[var(--text-muted)] transition hover:border-[#b9a9eb] hover:text-[#5b45ad]">
+              <ChevronLeftIcon />
             </Link>
-            <span className="text-[var(--text-muted)]">·</span>
-            <span className="text-xs text-[var(--text-secondary)] font-medium truncate max-w-[180px] sm:max-w-xs">{job.title}</span>
+            <div className="hidden h-5 w-px bg-[#ddd6e2] sm:block" />
+            <div className="min-w-0">
+              <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#654bb2]">Standard Job</p>
+              <p className="truncate text-xs font-semibold text-[var(--text-secondary)] sm:max-w-xs">{job.title}</p>
+            </div>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => setShowCopilot(true)}
-              className="flex items-center gap-1.5 rounded-full border border-violet-500/30 bg-violet-500/10 px-3.5 py-2 text-xs font-bold text-violet-700 transition hover:bg-violet-500/20"
+              className="hidden items-center gap-1.5 rounded-lg border border-violet-500/30 bg-violet-500/10 px-3 py-2 text-xs font-bold text-violet-700 transition hover:bg-violet-500/20 sm:flex"
               title="Ask Copilot about this pipeline"
             >
               <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -3169,7 +3172,7 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
                 markChecklistStep(id, "shared");
                 trackEvent("recruiter_profile_viewed", { jobId: id, action: "share_link_copied" });
               }}
-              className={`flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-semibold transition ${
+              className={`hidden items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition sm:flex ${
                 linkCopied
                   ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-600"
                   : "border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--accent)]"
@@ -3195,7 +3198,7 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
                   a.href = url; a.download = `${job.title.replace(/[^a-z0-9]/gi, "_")}_candidates.csv`;
                   a.click(); URL.revokeObjectURL(url);
                 }}
-                className="flex items-center gap-1.5 rounded-full border border-[var(--border)] px-3.5 py-2 text-xs font-semibold text-[var(--text-secondary)] transition hover:text-[var(--foreground)] hover:border-[var(--accent)]"
+                className="hidden items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] transition hover:text-[var(--foreground)] hover:border-[var(--accent)] sm:flex"
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 Export CSV
@@ -3214,34 +3217,44 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
             )}
             <button
               onClick={() => setShowBulkModal(true)}
-              className="flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-2 text-xs font-bold text-[var(--text-secondary)] transition hover:text-[var(--foreground)] hover:border-indigo-500/40"
+              className="hidden items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2 text-xs font-bold text-[var(--text-secondary)] transition hover:text-[var(--foreground)] hover:border-indigo-500/40 sm:flex"
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
               Bulk Import
-            </button>
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="flex items-center gap-1.5 rounded-full bg-indigo-500 px-4 py-2 text-xs font-bold text-white shadow-lg shadow-indigo-500/20 transition hover:bg-indigo-400"
-            >
-              <PlusIcon /> Add Candidate
             </button>
           </div>
         </div>
       </header>
 
-      <main className="relative z-10 mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-8">
+      <main className="relative z-10 mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 sm:py-8">
+        <div className="mb-6 rounded-[26px] border border-[#e5e0ea] bg-[#fffdfd] p-5 shadow-[0_8px_22px_rgba(62,44,87,0.055)] sm:p-6">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div>
-              <h1 className="text-xl font-semibold text-[var(--foreground)]">{job.title}</h1>
-              <p className="mt-1 text-sm text-[var(--text-muted)]">
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-[#e9e2fb] px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#654bb2]">
+                  Hiring command center
+                </span>
+                <span className="flex items-center gap-1.5 text-[11px] font-bold text-[#3f927f]">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#49a891]" />
+                  {job.status || "Open"}
+                </span>
+              </div>
+              <h1 className="text-[27px] font-extrabold tracking-[-0.055em] text-[#2e283e] sm:text-[32px]">{job.title}</h1>
+              <p className="mt-2 text-sm text-[var(--text-muted)]">
                 {job.seniority}
                 {job.department ? ` · ${job.department}` : ""}
                 {" · "}{job.location}
                 {" · "}{job.workMode}
               </p>
             </div>
-            <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-3 flex-wrap sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setShowAddModal(true)}
+                className="inline-flex items-center gap-2 rounded-xl bg-[#6d59c8] px-4 py-2.5 text-xs font-extrabold text-white shadow-[0_7px_15px_rgba(109,89,200,.22)] transition hover:bg-[#5e4ab6]"
+              >
+                <PlusIcon /> Add candidate
+              </button>
               {assessedCount > 0 && (
                 <div className="rounded-2xl border border-violet-500/20 bg-violet-500/[0.07] px-4 py-2">
                   <p className="text-[10px] text-[var(--text-muted)]">Assessed</p>
@@ -3304,9 +3317,10 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
         />
 
         {activeTab === "pipeline" && (
-          <div>
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
+          <section className="min-w-0">
             {candidates.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 text-center">
+              <div className="flex flex-col items-center justify-center rounded-[26px] border border-dashed border-[#d8d0e1] bg-[#fffdfd] px-5 py-20 text-center shadow-[0_5px_16px_rgba(62,44,87,0.04)]">
                 <p className="text-[var(--text-secondary)] text-sm mb-2">No candidates yet</p>
                 <p className="text-[var(--text-muted)] text-xs mb-6 max-w-sm">
                   Add your first candidate — paste a resume and the AI will score it against your rubric.
@@ -3315,14 +3329,14 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
                 <div className="flex flex-wrap items-center justify-center gap-3">
                   <button
                     onClick={() => setShowAddModal(true)}
-                    className="flex items-center gap-2 rounded-2xl bg-indigo-500 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-indigo-500/20 transition hover:bg-indigo-400"
+                    className="flex items-center gap-2 rounded-xl bg-[#6d59c8] px-5 py-2.5 text-sm font-bold text-white shadow-[0_7px_15px_rgba(109,89,200,.22)] transition hover:bg-[#5e4ab6]"
                   >
                     <PlusIcon /> Add First Candidate
                   </button>
                   {!job.agentMode?.enabled && (
                     <button
                       onClick={() => { setActiveTab("autopilot"); setAutopilotSection("overview"); }}
-                      className="flex items-center gap-2 rounded-2xl border border-indigo-500/30 bg-indigo-500/5 px-5 py-2.5 text-sm font-semibold text-indigo-600 transition hover:bg-indigo-500/10"
+                      className="flex items-center gap-2 rounded-xl border border-[#d8c9f4] bg-[#f7f3ff] px-5 py-2.5 text-sm font-semibold text-[#624cae] transition hover:bg-[#eee9fc]"
                     >
                       Set up Autopilot
                     </button>
@@ -3514,6 +3528,86 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
                 })()}
               </>
             )}
+          </section>
+          <aside className="space-y-5">
+            <section className="rounded-2xl border border-[#e5e0ea] bg-[#fffdfd] p-4 shadow-[0_8px_22px_rgba(62,44,87,0.055)]">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-amber-600"><AlertIcon /></span>
+                    <h2 className="text-[13px] font-extrabold text-[#393144]">Next decision</h2>
+                  </div>
+                  <p className="mt-2 text-[12px] font-bold leading-5 text-[#4f465e]">
+                    {topCandidates[0] ? `Review ${topCandidates[0].name}` : "Review your pipeline"}
+                  </p>
+                  <p className="mt-1 text-[11px] leading-4 text-[#958c9e]">
+                    {attentionCount > 0
+                      ? `${attentionCount} item${attentionCount === 1 ? "" : "s"} need a recruiter decision.`
+                      : "Your pipeline is clear. Keep moving strong candidates forward."}
+                  </p>
+                </div>
+                <span className="rounded-full bg-[#fff0d6] px-2 py-1 text-[9px] font-extrabold uppercase tracking-wide text-[#a26e22]">
+                  Today
+                </span>
+              </div>
+              {topCandidates[0] && (
+                <button
+                  type="button"
+                  onClick={() => setFocusCandidateId(topCandidates[0]._id)}
+                  className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#332d43] px-3 py-2.5 text-[11px] font-extrabold text-white transition hover:bg-[#4b425b]"
+                >
+                  Open review <span aria-hidden="true">→</span>
+                </button>
+              )}
+            </section>
+
+            <section className="rounded-2xl border border-[#e5e0ea] bg-[#fffdfd] p-4 shadow-[0_8px_22px_rgba(62,44,87,0.055)]">
+              <h2 className="text-[13px] font-extrabold text-[#393144]">Pipeline health</h2>
+              <div className="mt-4 space-y-3">
+                {STAGES.filter(stage => !["hired", "rejected"].includes(stage.id)).map(stage => (
+                  <button
+                    type="button"
+                    key={stage.id}
+                    onClick={() => setStageFilter(stage.id)}
+                    className="group flex w-full items-center gap-2.5 text-left"
+                  >
+                    <span className="w-[68px] text-[10px] font-bold text-[#7d7488]">{stage.label}</span>
+                    <span className="h-2 flex-1 overflow-hidden rounded-full bg-[#eeeaf1]">
+                      <span
+                        className="block h-full rounded-full bg-[#8670d3] transition group-hover:bg-[#6d59c8]"
+                        style={{ width: `${Math.max(8, Math.min(100, (byStage[stage.id].length / Math.max(candidates.length, 1)) * 100))}%` }}
+                      />
+                    </span>
+                    <span className="w-5 text-right text-[11px] font-extrabold text-[#484052]">{byStage[stage.id].length}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-2 border-t border-[#eee9f0] pt-3">
+                <div>
+                  <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#948ca0]">Decision zone</p>
+                  <p className="mt-1 text-[16px] font-extrabold text-[#322d41]">{byStage.review_zone.length}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#948ca0]">Scored</p>
+                  <p className="mt-1 text-[16px] font-extrabold text-[#322d41]">{candidates.filter(c => !c.scoringFailed).length}</p>
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-[#dcd4ef] bg-[#eee9fc] p-4">
+              <p className="text-[12px] font-extrabold text-[#4c3a88]">Why this is a Standard Job</p>
+              <p className="mt-2 text-[11px] leading-5 text-[#685b91]">
+                Rubric signals, stage movement, assessments, and human decisions stay connected in one hiring command center.
+              </p>
+              <button
+                type="button"
+                onClick={() => setActiveTab("rubric")}
+                className="mt-3 text-[10px] font-extrabold text-[#604ab0] hover:underline"
+              >
+                View scoring rubric →
+              </button>
+            </section>
+          </aside>
           </div>
         )}
 
