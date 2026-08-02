@@ -654,6 +654,7 @@ function WelcomeScreen({ recruiterName, jobSelected, contextMode, candidateName,
   loadingInsights?: boolean;
 }) {
   const handle = recruiterName?.trim() || "there";
+  const isFormWorkspace = workspace === "form";
   const prompts =
     contextMode === "candidate" ? CANDIDATE_PROMPTS
     : contextMode === "form_applicant" ? FORM_APPLICANT_PROMPTS
@@ -668,35 +669,27 @@ function WelcomeScreen({ recruiterName, jobSelected, contextMode, candidateName,
     : contextMode === "form" ? !!formTitle
     : jobSelected;
 
-  const loadingGlobalInsights =
-    (contextMode === "global" || contextMode === "form_global") && loadingInsights;
-
-  if (loadingGlobalInsights) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full text-center px-6 pb-24">
-        <div
-          className="w-12 h-12 rounded-2xl flex items-center justify-center mb-6 animate-pulse"
-          style={{ background: `linear-gradient(135deg, ${T.accent}, var(--rb-accent-dark))`, boxShadow: "0 0 40px var(--rb-accent-soft-border)" }}
-        >
-          <Sparkles size={20} color="#fff" />
-        </div>
-        <h1 className="text-2xl font-bold mb-2" style={{ color: T.text }}>{hourGreeting()}, {handle} 👋</h1>
-        <p className="text-[0.9rem]" style={{ color: T.textSecondary }}>Pulling together today's hiring overview…</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex flex-col items-center justify-center h-full text-center px-6 py-12">
+    <div className="flex flex-col items-center justify-center h-full text-center px-6 py-10 sm:py-14">
       <div
-        className="w-14 h-14 rounded-[18px] flex items-center justify-center mb-6"
-        style={{ background: `linear-gradient(135deg, ${T.accent}, var(--rb-accent-dark))`, boxShadow: "0 0 40px var(--rb-accent-soft-border)" }}
+        className="w-14 h-14 rounded-[18px] flex items-center justify-center mb-5"
+        style={{
+          background: isFormWorkspace
+            ? "linear-gradient(135deg, #a78bfa, #6d5df6)"
+            : `linear-gradient(135deg, ${T.accent}, var(--rb-accent-dark))`,
+          boxShadow: "0 12px 30px -16px var(--rb-accent)",
+        }}
       >
         <Sparkles size={20} color="#fff" />
       </div>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] mb-3" style={{ color: T.accent }}>AI hiring copilot</p>
-      <h1 className="text-[1.8rem] tracking-[-0.03em] font-semibold mb-2" style={{ color: T.text }}>
-        {hourGreeting()}, {handle} 👋
+      <p
+        className="text-[10px] font-bold uppercase tracking-[0.2em] mb-3"
+        style={{ color: isFormWorkspace ? "#7c3aed" : T.accent }}
+      >
+        {isFormWorkspace ? "Form Job Copilot" : "Standard Job Copilot"}
+      </p>
+      <h1 className="text-[1.8rem] tracking-[-0.04em] font-semibold mb-2" style={{ color: T.text }}>
+        {hourGreeting()}, {handle}
       </h1>
 
       {contextMode === "candidate" && candidateName ? (
@@ -760,22 +753,47 @@ function WelcomeScreen({ recruiterName, jobSelected, contextMode, candidateName,
         </>
       )}
 
+      {loadingInsights && (contextMode === "global" || contextMode === "form_global") && (
+        <div
+          className="mb-6 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px]"
+          style={{
+            background: "var(--rb-accent-softer-bg)",
+            borderColor: "var(--rb-accent-soft-border)",
+            color: T.textSecondary,
+          }}
+        >
+          <span className="flex items-center gap-1">
+            <span className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ background: T.accent }} />
+            <span className="h-1.5 w-1.5 rounded-full animate-pulse [animation-delay:120ms]" style={{ background: T.accent }} />
+            <span className="h-1.5 w-1.5 rounded-full animate-pulse [animation-delay:240ms]" style={{ background: T.accent }} />
+          </span>
+          Preparing a quick hiring overview — you can start chatting now
+        </div>
+      )}
+
       {canChat && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full max-w-lg">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full max-w-2xl">
           {prompts.map((p, i) => (
             <button
               key={i}
               onClick={() => onPrompt(p.text)}
-              className="flex items-center gap-3 text-left px-4 py-3 rounded-2xl border transition-all group hover:shadow-md hover:-translate-y-0.5"
-              style={{ background: T.card, borderColor: T.border, boxShadow: "0 1px 2px var(--rb-shadow-color)" }}
+              className="group flex items-center gap-3 rounded-2xl border px-4 py-3.5 text-left transition-all hover:-translate-y-0.5 hover:shadow-md"
+              style={{
+                background: T.card,
+                borderColor: T.border,
+                boxShadow: "0 1px 2px var(--rb-shadow-color)",
+              }}
             >
               <span
-                className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
-                style={{ background: "var(--rb-accent-soft-bg)", color: T.accent }}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl"
+                style={{
+                  background: isFormWorkspace ? "rgba(124,58,237,0.1)" : "var(--rb-accent-soft-bg)",
+                  color: isFormWorkspace ? "#7c3aed" : T.accent,
+                }}
               >
                 <p.Icon size={15} strokeWidth={2.2} />
               </span>
-              <span className="text-[13px] transition-colors" style={{ color: T.textSecondary }}>{p.text}</span>
+              <span className="text-[13px] leading-5 transition-colors group-hover:text-[var(--rb-text)]" style={{ color: T.textSecondary }}>{p.text}</span>
             </button>
           ))}
         </div>
@@ -2567,9 +2585,20 @@ function CopilotPageContent() {
               </div>
               <span className="text-[13px] font-semibold" style={{ color: T.text }}>Ask Rolebolt</span>
             </div>
+            <div
+              className="flex items-center gap-1.5 rounded-full border px-2.5 py-1"
+              style={{
+                background: workspace === "form" ? "rgba(124,58,237,0.08)" : "var(--rb-accent-soft-bg)",
+                borderColor: workspace === "form" ? "rgba(124,58,237,0.18)" : "var(--rb-accent-soft-border)",
+                color: workspace === "form" ? "#7c3aed" : T.accent,
+              }}
+            >
+              {workspace === "form" ? <FileText size={11} strokeWidth={2.2} /> : <Briefcase size={11} strokeWidth={2.2} />}
+              <span className="text-[10px] font-semibold tracking-wide">{workspace === "form" ? "FORM JOB" : "STANDARD JOB"}</span>
+            </div>
 
             {/* Context breadcrumb */}
-            <div className="hidden sm:flex items-center gap-1">
+            <div className="hidden md:flex items-center gap-1">
               <span className="text-xs mr-0.5" style={{ color: "var(--rb-faint)" }}>·</span>
 
               {workspace === "standard" ? (
@@ -2731,7 +2760,7 @@ function CopilotPageContent() {
         {/* Input area */}
         <div
           className="shrink-0 px-4 pb-5 pt-3"
-          style={{ background: `linear-gradient(to top, ${T.bg} 78%, transparent)` }}
+          style={{ background: `linear-gradient(to top, ${T.bg} 80%, transparent)` }}
         >
           <div className="max-w-3xl mx-auto">
             {workspace === "standard" && !selectedJob && contextMode !== "global" && (
@@ -2747,7 +2776,7 @@ function CopilotPageContent() {
               <p className="text-center text-[12px] mb-2" style={{ color: T.accent }}>Loading applicant context…</p>
             )}
             <div
-              className="flex items-end gap-2.5 rounded-[24px] border px-4 py-3 transition-all duration-200 ease-out"
+              className="relative flex items-end gap-2 rounded-[24px] border px-4 py-2.5 transition-all duration-200 ease-out"
               style={{
                 background: T.card,
                 borderColor: isStreaming
@@ -2762,6 +2791,15 @@ function CopilotPageContent() {
                   : "0 8px 26px -18px var(--rb-shadow-color)",
               }}
             >
+              <div
+                className="mb-0.5 hidden h-7 w-7 shrink-0 items-center justify-center rounded-lg sm:flex"
+                style={{
+                  background: workspace === "form" ? "rgba(124,58,237,0.1)" : "var(--rb-accent-soft-bg)",
+                  color: workspace === "form" ? "#7c3aed" : T.accent,
+                }}
+              >
+                {workspace === "form" ? <FileText size={13} /> : <Sparkles size={13} />}
+              </div>
               <textarea
                 ref={textareaRef}
                 value={input}
@@ -2772,7 +2810,7 @@ function CopilotPageContent() {
                 placeholder={inputPlaceholder}
                 disabled={textDisabled}
                 rows={1}
-                className="flex-1 bg-transparent text-[0.925rem] resize-none appearance-none border-none outline-none focus:outline-none focus:ring-0 focus:border-none leading-relaxed tracking-[-0.01em] disabled:opacity-40 py-0.5"
+                className="flex-1 bg-transparent text-[0.925rem] resize-none appearance-none border-none outline-none focus:outline-none focus:ring-0 focus:border-none leading-relaxed tracking-[-0.01em] disabled:opacity-40 py-1"
                 style={{ maxHeight: "160px", color: T.text, boxShadow: "none" }}
               />
               <button
@@ -2793,7 +2831,7 @@ function CopilotPageContent() {
               </button>
             </div>
             <p className="text-center text-[10px] mt-2" style={{ color: "var(--rb-faint)" }}>
-              Rolebolt AI can make mistakes. Always verify important decisions.
+              Rolebolt AI can make mistakes. Verify important hiring decisions.
             </p>
           </div>
         </div>
