@@ -335,7 +335,8 @@ async function loadContextData(uid: string, rawContext: ApiContext): Promise<Con
     RecruitCompanyProfile.findOne({ uid }).lean(),
   ]);
 
-  const recruiterName = (profile as any)?.name as string | undefined;
+    const recruiterName =
+      ((profile as any)?.username || (profile as any)?.name || undefined) as string | undefined;
   const companyName = (companyProfile as any)?.name as string | undefined;
 
   // ── Form Job workspace ────────────────────────────────────────────────────

@@ -26,3 +26,4 @@
 - [Collaboration access boundary](collaboration-access-boundary.md) — existing recruiter actions must resolve job-scoped collaboration access before reading or mutating owner-owned candidates.
 - [Form assessment architecture](form-assessment-architecture.md) — Form assessments use separate tokenized routes, async idempotent scoring, explicit failures, and owner-scoped recruiter actions.
 - [Universal seeker job workspace](universal-job-workspace.md) — jobs from any public URL or pasted JD persist independently and feed matching, resume, cover-letter, and interview flows.
+- [Frontend dependency hoisting](frontend-build-hoisting.md) — imported standalone Recruit workspace needs Next webpack mode because Turbopack mis-resolves hoisted root dependencies.

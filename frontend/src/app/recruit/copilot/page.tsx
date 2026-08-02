@@ -675,7 +675,7 @@ function WelcomeScreen({ recruiterName, jobSelected, contextMode, candidateName,
         >
           <Sparkles size={20} color="#fff" />
         </div>
-        <h1 className="text-2xl font-bold mb-2" style={{ color: T.text }}>{hourGreeting()}, {firstName} 👋</h1>
+        <h1 className="text-2xl font-bold mb-2" style={{ color: T.text }}>{hourGreeting()}, {handle} 👋</h1>
         <p className="text-[0.9rem]" style={{ color: T.textSecondary }}>Pulling together today's hiring overview…</p>
       </div>
     );

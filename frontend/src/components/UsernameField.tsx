@@ -34,17 +34,21 @@ export function UsernameField({ id = "username", value, onChange, onValidChange,
     }
 
     setAvailability("checking");
+    let active = true;
     const timer = setTimeout(async () => {
       try {
         const res = await fetch(apiUrl(`/auth/check-username?username=${encodeURIComponent(normalized)}`));
         const data = await res.json();
-        setAvailability(data.available ? "available" : "taken");
+        if (active) setAvailability(data.available ? "available" : "taken");
       } catch {
-        setAvailability("idle");
+        if (active) setAvailability("idle");
       }
     }, 400);
 
-    return () => clearTimeout(timer);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
   }, [normalized, formatError]);
 
   const focusRing = accent === "seeker" ? "focus:border-indigo-400 focus:ring-indigo-400/20" : "focus:border-[#0a66c2] focus:ring-[#0a66c2]/15";

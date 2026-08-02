@@ -6,6 +6,7 @@ import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { RecruitGuard } from "@/components/RecruitGuard";
 import { SeekerHeader } from "@/components/SeekerHeader";
 import { displayHandle } from "@/lib/username";
+import { apiUrl } from "@/lib/api";
 
 import type { CareerGpsPayload } from "@/lib/seekerTypes";
 

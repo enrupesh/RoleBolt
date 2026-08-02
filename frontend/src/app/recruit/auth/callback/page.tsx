@@ -81,7 +81,11 @@ function OAuthCallbackInner() {
           return;
         }
 
-        router.replace(destination);
+        if (!result.username?.trim()) {
+          router.replace(`/recruit/choose-username?role=${target}&next=${encodeURIComponent(destination)}`);
+        } else {
+          router.replace(destination);
+        }
       } catch {
         setErrMsg("Something went wrong while completing sign-in. Please try again.");
         setStatus("error");

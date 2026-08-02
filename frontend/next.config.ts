@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const BACKEND_URL = (
   process.env.BACKEND_URL || "http://localhost:8080"
@@ -25,6 +26,11 @@ const nextConfig: NextConfig = {
   compress: true,
   productionBrowserSourceMaps: false,
   reactStrictMode: true,
+  // Dependencies are hoisted by the imported workspace. Keep Turbopack
+  // scoped to this Next app instead of inferring the wrong root from src/app.
+  turbopack: {
+    root: path.resolve(__dirname),
+  },
   allowedDevOrigins: allowedDevOrigins.size > 0 ? Array.from(allowedDevOrigins) : undefined,
   transpilePackages: [],
   async rewrites() {
