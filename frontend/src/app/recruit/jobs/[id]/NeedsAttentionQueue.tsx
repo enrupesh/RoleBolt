@@ -260,20 +260,23 @@ export default function NeedsAttentionQueue({
   const urgentCount = items.filter(i => i.severity === "critical" || i.severity === "high").length;
 
   return (
-    <div className={`mb-6 rounded-2xl border ${SEVERITY_STYLES[items[0].severity].border} ${SEVERITY_STYLES[items[0].severity].bg} overflow-hidden`}>
+    <div className={`mb-6 overflow-hidden rounded-2xl border ${SEVERITY_STYLES[items[0].severity].border} ${SEVERITY_STYLES[items[0].severity].bg} shadow-[0_4px_14px_rgba(62,44,87,0.04)]`}>
       <button
         type="button"
         onClick={() => setExpanded(e => !e)}
         className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
       >
         <div className="flex items-center gap-2.5 min-w-0">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-[var(--surface)] border border-[var(--border)] text-sm">
-            ⚡
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface)] text-amber-600">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 3 2.8 20h18.4L12 3Z" />
+              <path d="M12 9v4M12 17h.01" />
+            </svg>
           </span>
           <div className="min-w-0">
-            <p className="text-sm font-bold text-[var(--foreground)]">
+            <p className="text-sm font-extrabold text-[var(--foreground)]">
               Needs attention
-              <span className="ml-2 rounded-full bg-[var(--foreground)]/90 px-2 py-0.5 text-[10px] font-bold text-[var(--surface)]">
+              <span className="ml-2 rounded-md bg-[var(--foreground)]/90 px-1.5 py-0.5 text-[10px] font-bold text-[var(--surface)]">
                 {items.length}
               </span>
             </p>
@@ -297,7 +300,7 @@ export default function NeedsAttentionQueue({
           {items.map(item => {
             const s = SEVERITY_STYLES[item.severity];
             return (
-              <div key={item.id} className="flex items-start gap-3 px-4 py-3 hover:bg-[var(--surface)]/40 transition">
+              <div key={item.id} className="flex items-start gap-3 px-4 py-3.5 hover:bg-[var(--surface)]/40 transition">
                 <span className={`mt-0.5 shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide ${s.badge}`}>
                   {s.label}
                 </span>
@@ -308,7 +311,7 @@ export default function NeedsAttentionQueue({
                 <button
                   type="button"
                   onClick={() => onAction(item.action, item)}
-                  className="shrink-0 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-[11px] font-bold text-[var(--foreground)] transition hover:border-indigo-500/40 hover:text-indigo-600"
+                  className="shrink-0 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-[11px] font-bold text-[var(--foreground)] transition hover:border-indigo-500/40 hover:text-indigo-600"
                 >
                   {item.cta} →
                 </button>
