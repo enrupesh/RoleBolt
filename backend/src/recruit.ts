@@ -79,6 +79,135 @@ function trackEvent(event: string, uid?: string, data?: Record<string, unknown>)
 export const recruitRouter = express.Router();
 export const recruitPublicRouter = express.Router();
 
+function publicExternalUrl(raw: unknown): string {
+  const value = String(raw ?? "").trim();
+  if (!value) return "";
+  if (value.startsWith("/")) {
+    const apiOrigin = String(process.env.PUBLIC_API_URL || process.env.BACKEND_URL || "").trim().replace(/\/$/, "");
+    return apiOrigin ? `${apiOrigin}${value}` : value;
+  }
+  try {
+    const url = new URL(value);
+    return ["http:", "https:"].includes(url.protocol) ? url.toString() : "";
+  } catch {
+    return "";
+  }
+}
+
+function normalizePublicUsername(raw: unknown): string {
+  return String(raw ?? "").trim().toLowerCase();
+}
+
+function publicProfileUrl(path: string): string {
+  return `${FRONTEND_URL}${path}`;
+}
+
+function publicSeekerDto(profile: any, username: string) {
+  return {
+    username,
+    name: String(profile?.name ?? "").trim(),
+    headline: String(profile?.headline ?? "").trim(),
+    bio: String(profile?.bio ?? "").trim(),
+    skills: Array.isArray(profile?.skills) ? profile.skills.map(String).filter(Boolean).slice(0, 80) : [],
+    experienceLevel: String(profile?.experienceLevel ?? "").trim(),
+    preferredJobType: String(profile?.preferredJobType ?? "").trim(),
+    preferredWorkMode: String(profile?.preferredWorkMode ?? "").trim(),
+    preferredLocation: String(profile?.preferredLocation ?? "").trim(),
+    preferredNiche: String(profile?.preferredNiche ?? "").trim(),
+    careerObjective: String(profile?.careerObjective ?? "").trim(),
+    experience: Array.isArray(profile?.experience) ? profile.experience.slice(0, 30).map((entry: any) => ({
+      title: String(entry?.title ?? "").trim(),
+      company: String(entry?.company ?? "").trim(),
+      location: String(entry?.location ?? "").trim(),
+      startDate: String(entry?.startDate ?? "").trim(),
+      endDate: String(entry?.endDate ?? "").trim(),
+      current: Boolean(entry?.current),
+      description: String(entry?.description ?? "").trim(),
+    })).filter((entry: any) => entry.title || entry.company) : [],
+    education: Array.isArray(profile?.education) ? profile.education.slice(0, 20).map((entry: any) => ({
+      degree: String(entry?.degree ?? "").trim(),
+      institution: String(entry?.institution ?? "").trim(),
+      year: String(entry?.year ?? "").trim(),
+      description: String(entry?.description ?? "").trim(),
+    })).filter((entry: any) => entry.degree || entry.institution) : [],
+    projects: Array.isArray(profile?.projects) ? profile.projects.slice(0, 30).map((entry: any) => ({
+      name: String(entry?.name ?? "").trim(),
+      description: String(entry?.description ?? "").trim(),
+      url: publicExternalUrl(entry?.url),
+      technologies: Array.isArray(entry?.technologies) ? entry.technologies.map(String).filter(Boolean).slice(0, 20) : [],
+    })).filter((entry: any) => entry.name || entry.description) : [],
+    certifications: Array.isArray(profile?.certifications) ? profile.certifications.slice(0, 30).map((entry: any) => ({
+      name: String(entry?.name ?? "").trim(),
+      issuer: String(entry?.issuer ?? "").trim(),
+      year: String(entry?.year ?? "").trim(),
+      url: publicExternalUrl(entry?.url),
+    })).filter((entry: any) => entry.name || entry.issuer) : [],
+    socialLinks: {
+      linkedin: publicExternalUrl(profile?.socialLinks?.linkedin),
+      instagram: publicExternalUrl(profile?.socialLinks?.instagram),
+      twitter: publicExternalUrl(profile?.socialLinks?.twitter),
+      github: publicExternalUrl(profile?.socialLinks?.github),
+      portfolio: publicExternalUrl(profile?.socialLinks?.portfolio),
+    },
+    photoUrl: publicExternalUrl(profile?.photoUrl),
+    updatedAt: profile?.updatedAt ?? null,
+    publicUrl: publicProfileUrl(`/seeker/${encodeURIComponent(username)}`),
+  };
+}
+
+function publicCreatorDto(profile: any, username: string, jobs: any[]) {
+  const profileType = String(profile?.profileType ?? "company");
+  const isPerson = profileType === "individual" || profileType === "content_creator";
+  return {
+    username,
+    profileType,
+    isPerson,
+    name: String(profile?.companyName ?? "").trim(),
+    tagline: String(profile?.tagline ?? "").trim(),
+    companyType: String(profile?.companyType ?? "").trim(),
+    industry: String(profile?.industry ?? "").trim(),
+    companySize: String(profile?.companySize ?? "").trim(),
+    foundedYear: String(profile?.foundedYear ?? "").trim(),
+    website: publicExternalUrl(profile?.website),
+    location: String(profile?.location ?? "").trim(),
+    description: String(profile?.description ?? "").trim(),
+    mission: String(profile?.mission ?? "").trim(),
+    benefits: String(profile?.benefits ?? "").trim(),
+    instituteType: String(profile?.instituteType ?? "").trim(),
+    coursesOffered: String(profile?.coursesOffered ?? "").trim(),
+    niche: String(profile?.niche ?? "").trim(),
+    linkedinUrl: publicExternalUrl(profile?.linkedinUrl),
+    logoUrl: publicExternalUrl(profile?.logoUrl),
+    photoUrl: publicExternalUrl(profile?.photoUrl),
+    bio: String(profile?.bio ?? "").trim(),
+    personalLinkedinUrl: publicExternalUrl(profile?.personalLinkedinUrl),
+    socialLinks: {
+      instagram: publicExternalUrl(profile?.socialLinks?.instagram),
+      twitter: publicExternalUrl(profile?.socialLinks?.twitter),
+      github: publicExternalUrl(profile?.socialLinks?.github),
+      portfolio: publicExternalUrl(profile?.socialLinks?.portfolio),
+    },
+    verificationStatus: profile?.verificationStatus === "verified" ? "verified" : profile?.verificationStatus === "requested" ? "requested" : "none",
+    jobs: jobs.map((job) => ({
+      id: job._id.toString(),
+      title: String(job.title ?? "").trim(),
+      location: String(job.location ?? "").trim(),
+      workMode: String(job.workMode ?? "").trim(),
+      jobType: String(job.jobType ?? "").trim(),
+      seniority: String(job.seniority ?? "").trim(),
+      niche: String(job.niche ?? "").trim(),
+      salaryMin: job.salaryMin ?? null,
+      salaryMax: job.salaryMax ?? null,
+      salaryCurrency: String(job.salaryCurrency ?? "").trim(),
+      openings: job.openings ?? 1,
+      createdAt: job.createdAt ?? null,
+      url: `/recruit/opportunities/${job._id.toString()}`,
+    })),
+    updatedAt: profile?.updatedAt ?? null,
+    publicUrl: publicProfileUrl(`/creator/${encodeURIComponent(username)}`),
+  };
+}
+
 const GEMINI_MESH_KEY = process.env.GEMINI_MESH_KEY ?? "";
 // Guard: reject stale/incorrect FRONTEND_URL values so candidate links always point to the real domain.
 const _rawRecruitFrontendUrl = process.env.FRONTEND_URL ?? "";
@@ -2023,6 +2152,63 @@ recruitPublicRouter.get("/jobs", async (req, res) => {
     return res.json({ jobs: jobs.map(serializeRecruitJob) });
   } catch (err: any) {
     return res.status(500).json({ error: err.message || "Failed to load jobs." });
+  }
+});
+
+// ─── Public username profiles ─────────────────────────────────────────────────
+// These endpoints intentionally return curated DTOs rather than authenticated
+// profile documents. Private contact details, resume text, saved jobs, and
+// recruiter internals never leave the server.
+recruitPublicRouter.get("/profiles/seeker/:username", async (req, res) => {
+  try {
+    await connectMongo();
+    const username = normalizePublicUsername(req.params.username);
+    if (!username) return res.status(404).json({ error: "Profile not found." });
+
+    const identity = await RecruitProfile.findOne({ username, role: "seeker" })
+      .select("uid username")
+      .lean();
+    if (!identity) return res.status(404).json({ error: "Profile not found." });
+
+    const profile = await RecruitSeekerProfile.findOne({ uid: identity.uid }).lean();
+    if (!profile) return res.status(404).json({ error: "Profile not found." });
+
+    return res.json({ profile: publicSeekerDto(profile, username) });
+  } catch (err: any) {
+    console.error("[recruit-public] GET /profiles/seeker/:username", err);
+    return res.status(500).json({ error: "Failed to load profile." });
+  }
+});
+
+recruitPublicRouter.get("/profiles/creator/:username", async (req, res) => {
+  try {
+    await connectMongo();
+    const username = normalizePublicUsername(req.params.username);
+    if (!username) return res.status(404).json({ error: "Profile not found." });
+
+    const identity = await RecruitProfile.findOne({ username, role: "creator" })
+      .select("uid username")
+      .lean();
+    if (!identity) return res.status(404).json({ error: "Profile not found." });
+
+    const [profile, jobs] = await Promise.all([
+      RecruitCompanyProfile.findOne({ uid: identity.uid }).lean(),
+      RecruitJob.find({
+        uid: identity.uid,
+        status: "active",
+        publicVisibility: { $ne: false },
+      })
+        .select("_id title location workMode jobType seniority niche salaryMin salaryMax salaryCurrency openings createdAt")
+        .sort({ verifiedCompany: -1, createdAt: -1 })
+        .limit(50)
+        .lean(),
+    ]);
+    if (!profile) return res.status(404).json({ error: "Profile not found." });
+
+    return res.json({ profile: publicCreatorDto(profile, username, jobs) });
+  } catch (err: any) {
+    console.error("[recruit-public] GET /profiles/creator/:username", err);
+    return res.status(500).json({ error: "Failed to load profile." });
   }
 });
 

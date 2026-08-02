@@ -17,6 +17,20 @@ export interface IEducationEntry {
   description?: string;
 }
 
+export interface IProjectEntry {
+  name: string;
+  description: string;
+  url?: string;
+  technologies?: string[];
+}
+
+export interface ICertificationEntry {
+  name: string;
+  issuer: string;
+  year?: string;
+  url?: string;
+}
+
 export interface ISocialLinks {
   linkedin?: string;
   instagram?: string;
@@ -36,6 +50,8 @@ export interface IRecruitSeekerProfile extends Document {
   skills: string[];
   experience: IExperienceEntry[];
   education: IEducationEntry[];
+  projects: IProjectEntry[];
+  certifications: ICertificationEntry[];
   preferredJobType: string;
   preferredWorkMode: string;
   preferredLocation: string;
@@ -77,6 +93,26 @@ const EducationSchema = new Schema<IEducationEntry>(
   { _id: false }
 );
 
+const ProjectSchema = new Schema<IProjectEntry>(
+  {
+    name: { type: String, default: "" },
+    description: { type: String, default: "" },
+    url: { type: String },
+    technologies: { type: [String], default: [] },
+  },
+  { _id: false }
+);
+
+const CertificationSchema = new Schema<ICertificationEntry>(
+  {
+    name: { type: String, default: "" },
+    issuer: { type: String, default: "" },
+    year: { type: String },
+    url: { type: String },
+  },
+  { _id: false }
+);
+
 const SocialLinksSchema = new Schema<ISocialLinks>(
   {
     linkedin: { type: String, default: "" },
@@ -100,6 +136,8 @@ const RecruitSeekerProfileSchema = new Schema<IRecruitSeekerProfile>(
     skills: { type: [String], default: [] },
     experience: { type: [ExperienceSchema], default: [] },
     education: { type: [EducationSchema], default: [] },
+    projects: { type: [ProjectSchema], default: [] },
+    certifications: { type: [CertificationSchema], default: [] },
     preferredJobType: { type: String, default: "" },
     preferredWorkMode: { type: String, default: "" },
     preferredLocation: { type: String, default: "" },

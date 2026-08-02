@@ -455,6 +455,11 @@ function RecruiterProfileContent() {
             <h1 className="text-sm font-bold text-slate-900">Recruiter Profile</h1>
           </div>
           <div className="flex items-center gap-2">
+            {authUser?.username && (
+              <Link href={`/creator/${encodeURIComponent(authUser.username)}`} target="_blank" className="hidden rounded-full border border-indigo-200 px-4 py-2 text-xs font-bold text-indigo-700 transition hover:bg-indigo-50 sm:inline-flex">
+                View public profile <span className="ml-1.5">↗</span>
+              </Link>
+            )}
             {hasErrors && (
               <span className="text-xs text-red-600 font-semibold hidden sm:block">
                 {requiredCount} required field{requiredCount > 1 ? "s" : ""} missing
