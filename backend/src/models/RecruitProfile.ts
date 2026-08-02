@@ -3,6 +3,7 @@ import mongoose, { Schema, Document } from "mongoose";
 export interface IRecruitProfile extends Document {
   uid: string;
   role: "creator" | "seeker";
+  username?: string;
   name?: string;
   email?: string;
   createdAt: Date;
@@ -13,6 +14,7 @@ const RecruitProfileSchema = new Schema<IRecruitProfile>(
   {
     uid: { type: String, required: true, unique: true, index: true },
     role: { type: String, enum: ["creator", "seeker"], required: true },
+    username: { type: String },
     name: { type: String },
     email: { type: String },
   },

@@ -16,6 +16,7 @@ export type RecruitRole = "creator" | "seeker";
 export interface RecruitProfile {
   uid: string;
   role: RecruitRole;
+  username?: string;
   name?: string;
   email?: string;
 }
@@ -23,8 +24,15 @@ export interface RecruitProfile {
 export interface AuthUser {
   id: string;
   email?: string;
+  username?: string;
   name?: string;
 }
+
+export type SignInCredentials = {
+  password: string;
+  email?: string;
+  username?: string;
+};
 
 interface RecruitAuthState {
   authUser: AuthUser | null;
@@ -32,7 +40,7 @@ interface RecruitAuthState {
   recruitProfile: RecruitProfile | null;
   loading: boolean;
   profileError: string | null;
-  signIn: (email: string, password: string) => Promise<{ error?: string; code?: string }>;
+  signIn: (credentials: SignInCredentials) => Promise<{ error?: string; code?: string; email?: string }>;
   signInWithToken: (token: string) => Promise<{ error?: string }>;
   signOut: () => void;
   signOutFromRecruit: () => void;
@@ -58,10 +66,6 @@ export function useRecruitAuth() {
   return useContext(RecruitAuthContext);
 }
 
-// ─── Token persistence helpers ────────────────────────────────────────────────
-// We keep the token in BOTH localStorage (fast read) and a cookie (survives
-// localStorage eviction, private mode, and mobile OS storage pressure).
-
 function persistToken(token: string) {
   try { localStorage.setItem(TOKEN_KEY, token); } catch { /* storage full */ }
   setTokenCookie(token);
@@ -72,7 +76,6 @@ function retrieveToken(): string | null {
     const ls = typeof window !== "undefined" ? localStorage.getItem(TOKEN_KEY) : null;
     if (ls) return ls;
   } catch { /* quota error */ }
-  // Fall back to cookie if localStorage is unavailable or was cleared
   return getTokenCookie();
 }
 
@@ -81,11 +84,20 @@ function wipeToken() {
   clearTokenCookie();
 }
 
-// ─── Profile helper ───────────────────────────────────────────────────────────
+type MeResponse = { id: string; email: string; username?: string; name: string };
+
+function toAuthUser(data: MeResponse): AuthUser {
+  return {
+    id: data.id,
+    email: data.email,
+    username: data.username,
+    name: data.name,
+  };
+}
 
 async function fetchOrCreateProfile(
   token: string,
-  authEmail?: string,
+  authUser?: AuthUser | null,
 ): Promise<RecruitProfile | null> {
   try {
     const headers = { Authorization: `Bearer ${token}` };
@@ -93,11 +105,14 @@ async function fetchOrCreateProfile(
     const getRes = await fetch(apiUrl("/recruit/auth/profile"), { headers });
     if (getRes.ok) return await getRes.json();
 
-    // Profile not yet created — create it now (default role: creator)
     const postRes = await fetch(apiUrl("/recruit/auth/profile"), {
       method: "POST",
       headers: { ...headers, "Content-Type": "application/json" },
-      body: JSON.stringify({ role: "creator", email: authEmail ?? "" }),
+      body: JSON.stringify({
+        role: "creator",
+        email: authUser?.email ?? "",
+        username: authUser?.username ?? "",
+      }),
     });
     if (postRes.ok) return await postRes.json();
     return null;
@@ -106,8 +121,6 @@ async function fetchOrCreateProfile(
   }
 }
 
-// ─── Provider ─────────────────────────────────────────────────────────────────
-
 export function RecruitAuthProvider({ children }: { children: ReactNode }) {
   const [authUser, setAuthUser]             = useState<AuthUser | null>(null);
   const [sessionToken, setSessionToken]     = useState<string | null>(null);
@@ -115,7 +128,6 @@ export function RecruitAuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading]               = useState(true);
   const [profileError, setProfileError]     = useState<string | null>(null);
 
-  // ── Initialise from stored token ───────────────────────────────────────────
   useEffect(() => {
     const stored = retrieveToken();
 
@@ -124,42 +136,30 @@ export function RecruitAuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Verify the stored token is still valid against the backend.
-    // IMPORTANT: only wipe the token on an explicit auth rejection (401/403).
-    // Network errors (backend sleeping, timeout) must NOT clear the token —
-    // that was the root cause of session loss on Render cold starts.
     fetch(apiUrl("/auth/me"), {
       headers: { Authorization: `Bearer ${stored}` },
     })
       .then(async (res) => {
         if (res.status === 401 || res.status === 403) {
-          // Token is genuinely invalid or expired — clear it
           wipeToken();
           setLoading(false);
           return;
         }
 
         if (!res.ok) {
-          // Server error (5xx) or network issue — keep token, let user stay logged in
-          // Optimistically restore state from the stored token without profile
-          // (profile will reload on next navigation / retry)
           setSessionToken(stored);
-          // We can't validate the user object without a successful /auth/me,
-          // so set a minimal sentinel so guards don't redirect to login
-          // Re-sync the cookie to keep it alive
           persistToken(stored);
           setLoading(false);
           return;
         }
 
-        const data: { id: string; email: string; name: string } = await res.json();
-        const user: AuthUser = { id: data.id, email: data.email, name: data.name };
+        const data: MeResponse = await res.json();
+        const user = toAuthUser(data);
         setAuthUser(user);
         setSessionToken(stored);
-        // Re-sync both stores to keep expiry fresh
         persistToken(stored);
 
-        const profile = await fetchOrCreateProfile(stored, user.email);
+        const profile = await fetchOrCreateProfile(stored, user);
         if (profile) {
           setRecruitProfile(profile);
           setProfileError(null);
@@ -169,16 +169,12 @@ export function RecruitAuthProvider({ children }: { children: ReactNode }) {
         setLoading(false);
       })
       .catch(() => {
-        // Pure network failure (offline, DNS, CORS on cold start) —
-        // do NOT wipe the token. Keep the user "logged in" so they aren't
-        // kicked to the login page just because the backend is waking up.
-        persistToken(stored); // refresh cookie TTL
+        persistToken(stored);
         setSessionToken(stored);
         setLoading(false);
       });
   }, []);
 
-  // ── signInWithToken (used after OAuth redirect) ───────────────────────────
   const signInWithToken = useCallback(
     async (token: string): Promise<{ error?: string }> => {
       try {
@@ -186,14 +182,15 @@ export function RecruitAuthProvider({ children }: { children: ReactNode }) {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) return { error: "Invalid or expired token." };
-        const data: { id: string; email: string; name: string } = await res.json();
+        const data: MeResponse = await res.json();
+        const user = toAuthUser(data);
 
         persistToken(token);
         setSessionToken(token);
-        setAuthUser({ id: data.id, email: data.email, name: data.name });
+        setAuthUser(user);
 
         setProfileError(null);
-        const profile = await fetchOrCreateProfile(token, data.email);
+        const profile = await fetchOrCreateProfile(token, user);
         if (profile) {
           setRecruitProfile(profile);
         } else {
@@ -207,32 +204,41 @@ export function RecruitAuthProvider({ children }: { children: ReactNode }) {
     []
   );
 
-  // ── signIn ────────────────────────────────────────────────────────────────
   const signIn = useCallback(
-    async (email: string, password: string): Promise<{ error?: string; code?: string }> => {
+    async (credentials: SignInCredentials): Promise<{ error?: string; code?: string; email?: string }> => {
       try {
+        const body: Record<string, string> = { password: credentials.password };
+        if (credentials.email?.trim()) body.email = credentials.email.trim();
+        else if (credentials.username?.trim()) body.username = credentials.username.trim();
+        else return { error: "Provide email or username to sign in." };
+
         const res = await fetch(apiUrl("/auth/login"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password }),
+          body: JSON.stringify(body),
         });
 
         const data = await res.json();
-        if (!res.ok) return { error: data.error ?? "Login failed.", code: data.code };
+        if (!res.ok) return { error: data.error ?? "Login failed.", code: data.code, email: data.email };
 
         const { token, user } = data as {
           token: string;
-          user: { id: string; email: string; name: string };
+          user: { id: string; email: string; username?: string; name: string };
         };
 
         persistToken(token);
         setSessionToken(token);
 
-        const authUser: AuthUser = { id: user.id, email: user.email, name: user.name };
-        setAuthUser(authUser);
+        const nextUser: AuthUser = {
+          id: user.id,
+          email: user.email,
+          username: user.username,
+          name: user.name,
+        };
+        setAuthUser(nextUser);
 
         setProfileError(null);
-        const profile = await fetchOrCreateProfile(token, user.email);
+        const profile = await fetchOrCreateProfile(token, nextUser);
         if (profile) {
           setRecruitProfile(profile);
         } else {
@@ -247,7 +253,6 @@ export function RecruitAuthProvider({ children }: { children: ReactNode }) {
     []
   );
 
-  // ── signOut ───────────────────────────────────────────────────────────────
   const signOut = useCallback(() => {
     wipeToken();
     setAuthUser(null);
@@ -256,17 +261,16 @@ export function RecruitAuthProvider({ children }: { children: ReactNode }) {
     setProfileError(null);
   }, []);
 
-  // ── refreshProfile ────────────────────────────────────────────────────────
   const refreshProfile = useCallback(async () => {
     if (!sessionToken) return;
     setProfileError(null);
-    const profile = await fetchOrCreateProfile(sessionToken, authUser?.email);
+    const profile = await fetchOrCreateProfile(sessionToken, authUser);
     if (profile) {
       setRecruitProfile(profile);
     } else {
       setProfileError("Could not reach the server. Please try again.");
     }
-  }, [sessionToken, authUser?.email]);
+  }, [sessionToken, authUser]);
 
   return (
     <RecruitAuthContext.Provider

@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { RoleboltLogo } from "@/components/RoleboltLogo";
+import { LoginMethodSwitch } from "@/components/LoginMethodSwitch";
+import { normalizeUsernameInput } from "@/lib/username";
 import { apiUrl } from "@/lib/api";
 import { firebaseAuth, googleProvider } from "@/lib/firebaseClient";
 import { signInWithPopup, RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from "firebase/auth";
@@ -42,7 +44,7 @@ export default function SeekerLoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirect") || "/seeker/dashboard";
-  const { authUser, recruitProfile, loading, signInWithToken } = useRecruitAuth();
+  const { authUser, recruitProfile, loading, signInWithToken, signIn } = useRecruitAuth();
 
   function goAfterLogin() {
     router.replace(redirectTo.startsWith("/") ? redirectTo : "/seeker/dashboard");
@@ -54,7 +56,9 @@ export default function SeekerLoginPage() {
     }
   }, [loading, authUser, recruitProfile, router, redirectTo]);
 
+  const [loginMode, setLoginMode] = useState<"email" | "username">("email");
   const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -74,17 +78,16 @@ export default function SeekerLoginPage() {
   const confirmationRef = useRef<ConfirmationResult | null>(null);
   const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
 
-  async function syncSeekerSession(token: string, profile?: { name?: string; email?: string }) {
+  async function ensureSeekerProfile(token: string, profile?: { username?: string; email?: string }) {
     const existingRes = await fetch(apiUrl("/recruit/auth/profile"), {
       headers: { Authorization: `Bearer ${token}` },
     });
     const existingData = existingRes.ok ? await existingRes.json().catch(() => ({})) : {};
     const patchBody: Record<string, string | undefined> = {
-      name: profile?.name,
       email: profile?.email,
+      username: profile?.username,
     };
-    // Don't overwrite recruiter accounts when signing in via seeker login
-    if (existingData.profile?.role !== "creator") {
+    if (existingData.role !== "creator") {
       patchBody.role = "seeker";
     }
 
@@ -97,9 +100,12 @@ export default function SeekerLoginPage() {
     await fetch(apiUrl("/recruit/seeker/profile"), {
       method: "PUT",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ name: profile?.name, email: profile?.email }),
+      body: JSON.stringify({ username: profile?.username, email: profile?.email }),
     });
+  }
 
+  async function syncSeekerSession(token: string, profile?: { username?: string; email?: string }) {
+    await ensureSeekerProfile(token, profile);
     const result = await signInWithToken(token);
     if (result.error) {
       throw new Error(result.error);
@@ -128,7 +134,7 @@ export default function SeekerLoginPage() {
       }
 
       await syncSeekerSession(data.token, {
-        name: data.user?.name ?? result.user.displayName ?? "",
+        username: data.user?.username,
         email: data.user?.email ?? result.user.email ?? "",
       });
       goAfterLogin();
@@ -204,7 +210,7 @@ export default function SeekerLoginPage() {
         return;
       }
 
-      await syncSeekerSession(data.token, { name: data.user?.name ?? "", email: data.user?.email ?? "" });
+      await syncSeekerSession(data.token, { username: data.user?.username, email: data.user?.email ?? "" });
       goAfterLogin();
     } catch (err: any) {
       setPhoneError(err?.code === "auth/invalid-verification-code" ? "Incorrect OTP. Please try again." : (err?.message ?? "Verification failed."));
@@ -221,22 +227,31 @@ export default function SeekerLoginPage() {
     setSubmitting(true);
     setError("");
     try {
-      const res = await fetch(apiUrl("/auth/login"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), password }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        if (data.code === "EMAIL_NOT_VERIFIED") {
+      const result = await signIn(
+        loginMode === "email"
+          ? { email: email.trim(), password }
+          : { username: normalizeUsernameInput(username), password },
+      );
+      if (result.error) {
+        if (result.code === "EMAIL_NOT_VERIFIED") {
+          if (result.email) {
+            setEmail(result.email);
+            emailRef.current = result.email;
+          }
           setUnverified(true);
         } else {
-          setError(data.error ?? "Login failed.");
+          setError(result.error);
         }
         return;
       }
 
-      await syncSeekerSession(data.token, { name: data.user?.name, email: data.user?.email });
+      const token = typeof window !== "undefined" ? localStorage.getItem("rb_auth_token") : null;
+      if (token) {
+        const meRes = await fetch(apiUrl("/auth/me"), { headers: { Authorization: `Bearer ${token}` } });
+        const me = meRes.ok ? await meRes.json() : {};
+        await ensureSeekerProfile(token, { username: me.username, email: me.email });
+      }
+
       goAfterLogin();
     } catch {
       setError("Network error. Please try again.");
@@ -466,30 +481,63 @@ export default function SeekerLoginPage() {
                 </div>
               )}
 
-              <div className="space-y-1.5">
-                <label htmlFor="email" className="block text-xs font-semibold uppercase tracking-wide text-slate-700">
-                  Email address
-                </label>
-                <input
-                  id="email"
-                  type="email"
-                  required
-                  autoComplete="email"
-                  value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value);
-                    setError("");
-                    setUnverified(false);
-                  }}
-                  placeholder="you@example.com"
-                  className="h-11 w-full rounded-xl border border-slate-200 px-3.5 text-sm text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15"
-                />
-              </div>
+              <LoginMethodSwitch mode={loginMode} onChange={setLoginMode} accent="seeker" />
+
+              {loginMode === "email" ? (
+                <div className="space-y-1.5">
+                  <label htmlFor="email" className="block text-xs font-semibold uppercase tracking-wide text-slate-700">
+                    Email address
+                  </label>
+                  <input
+                    id="email"
+                    type="email"
+                    required
+                    autoComplete="email"
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setError("");
+                      setUnverified(false);
+                    }}
+                    placeholder="you@example.com"
+                    className="h-11 w-full rounded-xl border border-slate-200 px-3.5 text-sm text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15"
+                  />
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <label htmlFor="username" className="block text-xs font-semibold uppercase tracking-wide text-slate-700">
+                    Username
+                  </label>
+                  <div className="relative">
+                    <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-slate-400">@</span>
+                    <input
+                      id="username"
+                      type="text"
+                      required
+                      autoComplete="username"
+                      spellCheck={false}
+                      value={username}
+                      onChange={(e) => {
+                        setUsername(normalizeUsernameInput(e.target.value));
+                        setError("");
+                        setUnverified(false);
+                      }}
+                      placeholder="rupesh"
+                      className="h-11 w-full rounded-xl border border-slate-200 pl-8 pr-3.5 text-sm text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15"
+                    />
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-1.5">
-                <label htmlFor="password" className="block text-xs font-semibold uppercase tracking-wide text-slate-700">
-                  Password
-                </label>
+                <div className="flex items-center justify-between">
+                  <label htmlFor="password" className="block text-xs font-semibold uppercase tracking-wide text-slate-700">
+                    Password
+                  </label>
+                  <Link href="/recruit/forgot-password" className="text-xs font-medium text-indigo-600 hover:underline">
+                    Forgot password?
+                  </Link>
+                </div>
                 <div className="relative">
                   <input
                     id="password"

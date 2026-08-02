@@ -27,6 +27,7 @@ export interface ISocialLinks {
 
 export interface IRecruitSeekerProfile extends Document {
   uid: string;
+  username?: string;
   name: string;
   email: string;
   phone?: string;
@@ -90,6 +91,7 @@ const SocialLinksSchema = new Schema<ISocialLinks>(
 const RecruitSeekerProfileSchema = new Schema<IRecruitSeekerProfile>(
   {
     uid: { type: String, required: true, unique: true, index: true },
+    username: { type: String, default: "" },
     name: { type: String, default: "" },
     email: { type: String, default: "" },
     phone: { type: String },
