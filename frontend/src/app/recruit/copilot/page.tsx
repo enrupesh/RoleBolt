@@ -470,10 +470,14 @@ function MessageBubble({ msg, onQuickAction, onSourceNavigate, onCopied }: {
 
   if (msg.role === "user") {
     return (
-      <div className="flex justify-end mb-6 rb-animate-fade-in">
+      <div className="flex justify-end mb-7 rb-animate-fade-in">
         <div
-          className="max-w-[75%] rounded-2xl rounded-tr-md px-4 py-3 text-[0.9rem] leading-relaxed"
-          style={{ background: "var(--rb-accent-soft-bg)", border: `1px solid var(--rb-accent-soft-border)`, color: T.text }}
+          className="max-w-[78%] rounded-[22px] rounded-tr-md px-4 py-3 text-[0.9rem] leading-relaxed"
+          style={{
+            background: "var(--rb-accent)",
+            color: "#fff",
+            boxShadow: "0 8px 18px -12px var(--rb-accent)",
+          }}
         >
           {msg.content}
         </div>
@@ -485,97 +489,98 @@ function MessageBubble({ msg, onQuickAction, onSourceNavigate, onCopied }: {
   const showEmptyLoading = !!msg.isStreaming && !msg.content;
 
   return (
-    <div className="mb-6 rb-animate-fade-in">
-      <div
-        className="rounded-[20px] px-5 py-4 transition-shadow hover:shadow-md"
-        style={{ background: T.card, border: `1px solid ${T.border}`, boxShadow: "0 1px 2px var(--rb-shadow-color)" }}
-      >
-        <div className="flex items-center justify-between gap-2 mb-3">
-          <div className="flex items-center gap-2">
-            <div
-              className="w-6 h-6 rounded-full flex items-center justify-center shrink-0"
-              style={{ background: `linear-gradient(135deg, ${T.accent}, var(--rb-accent-dark))` }}
-            >
-              <Sparkles size={12} strokeWidth={2.4} color="#fff" />
-            </div>
-            <span className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: T.textSecondary }}>Rolebolt AI</span>
-          </div>
-          {!showEmptyLoading && msg.content && (
-            <button
-              type="button"
-              onClick={handleCopy}
-              title="Copy response"
-              className="shrink-0 inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-lg border transition-all hover:shadow-sm"
-              style={copied
-                ? { color: "var(--rb-success)", borderColor: "var(--rb-success)", background: "var(--rb-accent-softer-bg)" }
-                : { color: T.textSecondary, borderColor: T.border, background: "transparent" }}
-            >
-              {copied ? <Check size={11} strokeWidth={2.4} /> : <Copy size={11} strokeWidth={2.2} />}
-              {copied ? "Copied" : "Copy"}
-            </button>
-          )}
+    <div className="mb-8 rb-animate-fade-in">
+      <div className="flex items-start gap-3">
+        <div
+          className="mt-0.5 w-7 h-7 rounded-[10px] flex items-center justify-center shrink-0"
+          style={{ background: `linear-gradient(135deg, ${T.accent}, var(--rb-accent-dark))`, boxShadow: "0 5px 14px -8px var(--rb-accent)" }}
+        >
+          <Sparkles size={13} strokeWidth={2.4} color="#fff" />
         </div>
-
-        {showEmptyLoading ? (
-          <StreamingPlaceholder />
-        ) : (
-          <div className="text-[0.9rem] leading-relaxed copilot-markdown">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
-            {msg.isStreaming && (
-              <span className="inline-block w-[2px] h-4 align-middle ml-0.5 rb-cursor-blink" style={{ background: T.accent }} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <span className="text-[11px] font-semibold tracking-wide" style={{ color: T.textSecondary }}>Rolebolt AI</span>
+            {!showEmptyLoading && msg.content && (
+              <button
+                type="button"
+                onClick={handleCopy}
+                title="Copy response"
+                className="shrink-0 inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-lg transition-all hover:bg-[var(--rb-subtle)]"
+                style={copied
+                  ? { color: "var(--rb-success)" }
+                  : { color: "var(--rb-muted)" }}
+              >
+                {copied ? <Check size={11} strokeWidth={2.4} /> : <Copy size={11} strokeWidth={2.2} />}
+                {copied ? "Copied" : "Copy"}
+              </button>
             )}
           </div>
-        )}
+          <div
+            className="rounded-2xl border px-4 py-3.5"
+            style={{ background: T.card, borderColor: T.border, boxShadow: "0 1px 2px var(--rb-shadow-color)" }}
+          >
+            {showEmptyLoading ? (
+              <StreamingPlaceholder />
+            ) : (
+              <div className="text-[0.9rem] leading-relaxed copilot-markdown">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                {msg.isStreaming && (
+                  <span className="inline-block w-[2px] h-4 align-middle ml-0.5 rb-cursor-blink" style={{ background: T.accent }} />
+                )}
+              </div>
+            )}
 
-        {!msg.isStreaming && mentioned.length > 0 && (
-          <div className="mt-4 pt-4 border-t flex flex-wrap gap-2" style={{ borderColor: T.border }}>
-            {mentioned.map((src) => (
-              <CandidateIdentity
-                key={src.candidateId}
-                name={src.candidateName!}
-                email={src.candidateEmail}
-                fitScorePct={src.candidateFitScorePct}
-                onNavigate={onSourceNavigate ? () => onSourceNavigate(src) : undefined}
+            {!msg.isStreaming && mentioned.length > 0 && (
+              <div className="mt-4 pt-4 border-t flex flex-wrap gap-2" style={{ borderColor: T.border }}>
+                {mentioned.map((src) => (
+                  <CandidateIdentity
+                    key={src.candidateId}
+                    name={src.candidateName!}
+                    email={src.candidateEmail}
+                    fitScorePct={src.candidateFitScorePct}
+                    onNavigate={onSourceNavigate ? () => onSourceNavigate(src) : undefined}
+                  />
+                ))}
+              </div>
+            )}
+
+            {!msg.isStreaming && msg.recommendation && (
+              <RecommendationCard
+                recommendation={msg.recommendation}
+                confidence={msg.confidence ?? 0}
+                reasoning={msg.reasoning ?? ""}
               />
-            ))}
-          </div>
-        )}
+            )}
 
-        {!msg.isStreaming && msg.recommendation && (
-          <RecommendationCard
-            recommendation={msg.recommendation}
-            confidence={msg.confidence ?? 0}
-            reasoning={msg.reasoning ?? ""}
-          />
-        )}
+            {!msg.isStreaming && msg.sources && msg.sources.length > 0 && (
+              <div className="mt-4 pt-4 border-t" style={{ borderColor: T.border }}>
+                <p className="text-[10px] font-semibold uppercase tracking-widest mb-2" style={{ color: T.textSecondary }}>
+                  Sources
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {msg.sources.map((src, i) => <SourceCard key={i} src={src} onNavigate={onSourceNavigate} />)}
+                </div>
+              </div>
+            )}
 
-        {!msg.isStreaming && msg.sources && msg.sources.length > 0 && (
-          <div className="mt-4 pt-4 border-t" style={{ borderColor: T.border }}>
-            <p className="text-[10px] font-semibold uppercase tracking-widest mb-2" style={{ color: T.textSecondary }}>
-              Sources
-            </p>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {msg.sources.map((src, i) => <SourceCard key={i} src={src} onNavigate={onSourceNavigate} />)}
-            </div>
+            {!msg.isStreaming && msg.quickActions && msg.quickActions.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {msg.quickActions.map((action, i) => (
+                  <button
+                    key={i}
+                    onClick={() => onQuickAction(action)}
+                    className="text-[12px] font-medium px-3 py-1.5 rounded-full border transition-all hover:shadow-sm"
+                    style={{ borderColor: T.border, color: T.textSecondary, background: "var(--rb-subtle)" }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = T.accent; e.currentTarget.style.borderColor = "var(--rb-accent-hover-border)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = T.textSecondary; e.currentTarget.style.borderColor = T.border; }}
+                  >
+                    {action}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-        )}
-
-        {!msg.isStreaming && msg.quickActions && msg.quickActions.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {msg.quickActions.map((action, i) => (
-              <button
-                key={i}
-                onClick={() => onQuickAction(action)}
-                className="text-[12px] font-medium px-3 py-1.5 rounded-full border transition-all hover:shadow-sm"
-                style={{ borderColor: T.border, color: T.textSecondary, background: "var(--rb-subtle)" }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = T.accent; e.currentTarget.style.borderColor = "var(--rb-accent-hover-border)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = T.textSecondary; e.currentTarget.style.borderColor = T.border; }}
-              >
-                {action}
-              </button>
-            ))}
-          </div>
-        )}
+        </div>
       </div>
     </div>
   );
@@ -682,14 +687,15 @@ function WelcomeScreen({ recruiterName, jobSelected, contextMode, candidateName,
   }
 
   return (
-    <div className="flex flex-col items-center justify-center h-full text-center px-6 pb-24">
+    <div className="flex flex-col items-center justify-center h-full text-center px-6 py-12">
       <div
-        className="w-12 h-12 rounded-2xl flex items-center justify-center mb-6"
+        className="w-14 h-14 rounded-[18px] flex items-center justify-center mb-6"
         style={{ background: `linear-gradient(135deg, ${T.accent}, var(--rb-accent-dark))`, boxShadow: "0 0 40px var(--rb-accent-soft-border)" }}
       >
         <Sparkles size={20} color="#fff" />
       </div>
-      <h1 className="text-2xl font-bold mb-2" style={{ color: T.text }}>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] mb-3" style={{ color: T.accent }}>AI hiring copilot</p>
+      <h1 className="text-[1.8rem] tracking-[-0.03em] font-semibold mb-2" style={{ color: T.text }}>
         {hourGreeting()}, {handle} 👋
       </h1>
 
@@ -760,8 +766,8 @@ function WelcomeScreen({ recruiterName, jobSelected, contextMode, candidateName,
             <button
               key={i}
               onClick={() => onPrompt(p.text)}
-              className="flex items-center gap-3 text-left px-4 py-3.5 rounded-2xl border transition-all group hover:shadow-md hover:-translate-y-0.5"
-              style={{ background: T.card, borderColor: T.border }}
+              className="flex items-center gap-3 text-left px-4 py-3 rounded-2xl border transition-all group hover:shadow-md hover:-translate-y-0.5"
+              style={{ background: T.card, borderColor: T.border, boxShadow: "0 1px 2px var(--rb-shadow-color)" }}
             >
               <span
                 className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
@@ -2545,7 +2551,7 @@ function CopilotPageContent() {
         {/* Top bar */}
         <div
           className="flex items-center justify-between px-4 py-3 border-b shrink-0"
-          style={{ borderColor: T.border, background: T.bg }}
+          style={{ borderColor: T.border, background: T.card }}
         >
           <div className="flex items-center gap-3">
             <button
@@ -2693,7 +2699,7 @@ function CopilotPageContent() {
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto scrollbar-none">
+        <div className="flex-1 overflow-y-auto scrollbar-none" style={{ background: T.bg }}>
           {messages.length === 0 ? (
             <WelcomeScreen
               recruiterName={recruitProfile?.username ?? recruitProfile?.name}
@@ -2707,7 +2713,7 @@ function CopilotPageContent() {
               loadingInsights={insightsLoading}
             />
           ) : (
-            <div className="max-w-2xl mx-auto px-4 py-8">
+            <div className="max-w-3xl mx-auto px-4 sm:px-8 py-10">
               {messages.map(msg => (
                 <MessageBubble
                   key={msg.id}
@@ -2724,10 +2730,10 @@ function CopilotPageContent() {
 
         {/* Input area */}
         <div
-          className="shrink-0 border-t px-4 py-4"
-          style={{ borderColor: T.border, background: T.bg }}
+          className="shrink-0 px-4 pb-5 pt-3"
+          style={{ background: `linear-gradient(to top, ${T.bg} 78%, transparent)` }}
         >
-          <div className="max-w-2xl mx-auto">
+          <div className="max-w-3xl mx-auto">
             {workspace === "standard" && !selectedJob && contextMode !== "global" && (
               <p className="text-center text-[12px] mb-2" style={{ color: "var(--rb-warning)" }}>Select a job from the sidebar to start chatting</p>
             )}
@@ -2741,7 +2747,7 @@ function CopilotPageContent() {
               <p className="text-center text-[12px] mb-2" style={{ color: T.accent }}>Loading applicant context…</p>
             )}
             <div
-              className="flex items-end gap-2.5 rounded-[26px] border px-5 py-3.5 transition-all duration-200 ease-out"
+              className="flex items-end gap-2.5 rounded-[24px] border px-4 py-3 transition-all duration-200 ease-out"
               style={{
                 background: T.card,
                 borderColor: isStreaming
@@ -2753,8 +2759,7 @@ function CopilotPageContent() {
                   ? "0 0 0 3px var(--rb-accent-soft-bg), 0 8px 24px -8px var(--rb-shadow-color)"
                   : inputFocused
                   ? "0 0 0 3px var(--rb-accent-soft-bg), 0 10px 28px -10px var(--rb-shadow-color)"
-                  : "0 1px 2px var(--rb-shadow-color)",
-                transform: inputFocused || input.trim() ? "translateY(-10px)" : "translateY(0)",
+                  : "0 8px 26px -18px var(--rb-shadow-color)",
               }}
             >
               <textarea
