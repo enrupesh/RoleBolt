@@ -7,6 +7,7 @@ import ReportJobButton from "./ReportJobButton";
 import CompanySection from "./CompanySection";
 import QualityBreakdown from "./QualityBreakdown";
 import StickyActions from "./StickyActions";
+import SeekerJobActions from "@/components/SeekerJobActions";
 import { computeJobQuality } from "@/lib/jobQuality";
 import PageTracker from "@/components/PageTracker";
 import MatchScoreSection from "./MatchScoreSection";
@@ -268,19 +269,16 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
           </div>
 
           {/* Inline CTAs — visible on desktop, supplementary to sticky bar */}
-          <div className="mt-5 flex flex-col gap-2 sm:flex-row">
-            <Link
-              href={`/recruit/opportunities/${id}/apply`}
-              className="flex-1 rounded-full bg-[#0a66c2] py-3 text-center text-sm font-bold text-white shadow-md shadow-blue-500/20 transition hover:bg-[#004182] active:scale-95"
-            >
-              Apply Now →
-            </Link>
+          <div className="mt-5 space-y-3">
+            <SeekerJobActions jobId={id} jobTitle={job.title} />
+            <div className="flex flex-col gap-2 sm:flex-row">
             <Link
               href={`/recruit/recruiter/${id}`}
               className="flex-1 rounded-full border-2 border-[#0a66c2] py-3 text-center text-sm font-bold text-[#0a66c2] transition hover:bg-blue-50"
             >
               View Recruiter Profile
             </Link>
+            </div>
           </div>
         </div>
 

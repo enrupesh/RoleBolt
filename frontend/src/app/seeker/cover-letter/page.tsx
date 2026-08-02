@@ -23,8 +23,18 @@ function CoverLetterContent() {
   const [copied, setCopied]                 = useState(false);
 
   useEffect(() => {
+    if (!sessionToken) return;
+    fetch(apiUrl("/recruit/seeker/profile"), {
+      headers: { Authorization: `Bearer ${sessionToken}` },
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d?.profile?.resumeText && !resumeText) setResumeText(d.profile.resumeText);
+      })
+      .catch(() => undefined);
+
     const workspaceId = new URLSearchParams(window.location.search).get("workspaceId");
-    if (!workspaceId || !sessionToken) return;
+    if (!workspaceId) return;
     fetch(apiUrl(`/recruit/seeker/workspace/${encodeURIComponent(workspaceId)}`), {
       headers: { Authorization: `Bearer ${sessionToken}` },
     })

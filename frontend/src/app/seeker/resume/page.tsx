@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { RecruitGuard } from "@/components/RecruitGuard";
 import { SeekerHeader } from "@/components/SeekerHeader";
+import { ResumeExportPanel } from "@/components/ResumeExportPanel";
 import { apiUrl } from "@/lib/api";
 
 const BUILD_QUESTIONS = [
@@ -50,10 +51,24 @@ function ResumeContent() {
 
   // Copy state
   const [copied, setCopied] = useState(false);
+  const [profileHasResume, setProfileHasResume] = useState(false);
 
   useEffect(() => {
+    if (!sessionToken) return;
+    fetch(apiUrl("/recruit/seeker/profile"), {
+      headers: { Authorization: `Bearer ${sessionToken}` },
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d?.profile?.resumeText) {
+          setExistingResume(prev => prev || d.profile.resumeText);
+          setProfileHasResume(true);
+        }
+      })
+      .catch(() => undefined);
+
     const workspaceId = new URLSearchParams(window.location.search).get("workspaceId");
-    if (!workspaceId || !sessionToken) return;
+    if (!workspaceId) return;
     fetch(apiUrl(`/recruit/seeker/workspace/${encodeURIComponent(workspaceId)}`), {
       headers: { Authorization: `Bearer ${sessionToken}` },
     })
@@ -105,7 +120,21 @@ function ResumeContent() {
     navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
   }
 
-  function handlePrint() { window.print(); }
+  async function saveToProfile(text: string) {
+    if (!sessionToken || !text.trim()) return;
+    const res = await fetch(apiUrl("/recruit/seeker/profile"), {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${sessionToken}` },
+      body: JSON.stringify({ resumeText: text.trim() }),
+    });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      throw new Error(d.error || "Could not save to profile");
+    }
+    setProfileHasResume(true);
+  }
+
+  const [profileSaved, setProfileSaved] = useState(false);
 
   const inputCls = "w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/20 transition";
 
@@ -120,18 +149,24 @@ function ResumeContent() {
 
         {/* Mode Picker */}
         {mode === "pick" && (
-          <div className="grid sm:grid-cols-2 gap-4">
-            {[
-              { key: "build", icon: "✨", title: "Build from scratch", desc: "Answer 8 questions and AI builds your complete resume" },
-              { key: "improve", icon: "🔧", title: "Improve existing", desc: "Upload your resume + a job description to get an AI-improved version" },
-            ].map(opt => (
-              <button key={opt.key} onClick={() => setMode(opt.key as "build" | "improve")}
-                className="rounded-3xl border-2 border-slate-200 bg-white p-6 text-left transition hover:border-indigo-400 hover:shadow-md active:scale-[0.98]">
-                <span className="text-3xl">{opt.icon}</span>
-                <h3 className="mt-3 font-bold text-slate-900">{opt.title}</h3>
-                <p className="mt-1 text-sm text-slate-500">{opt.desc}</p>
-              </button>
-            ))}
+          <div className="space-y-4">
+            <div className="grid sm:grid-cols-2 gap-4">
+              {[
+                { key: "build", icon: "✨", title: "Build from scratch", desc: "Answer 8 questions and AI builds your complete resume" },
+                { key: "improve", icon: "🔧", title: "Improve existing", desc: "Upload your resume + a job description to get an AI-improved version" },
+              ].map(opt => (
+                <button key={opt.key} onClick={() => setMode(opt.key as "build" | "improve")}
+                  className="rounded-3xl border-2 border-slate-200 bg-white p-6 text-left transition hover:border-indigo-400 hover:shadow-md active:scale-[0.98]">
+                  <span className="text-3xl">{opt.icon}</span>
+                  <h3 className="mt-3 font-bold text-slate-900">{opt.title}</h3>
+                  <p className="mt-1 text-sm text-slate-500">{opt.desc}</p>
+                </button>
+              ))}
+            </div>
+
+            {profileHasResume && sessionToken && (
+              <ResumeExportPanel sessionToken={sessionToken} useProfile compact />
+            )}
           </div>
         )}
 
@@ -186,14 +221,15 @@ function ResumeContent() {
                 <span className="rounded-2xl bg-green-100 px-3 py-1.5 text-sm font-bold text-green-700">✓ Resume built!</span>
                 <span className="rounded-2xl bg-indigo-100 px-3 py-1.5 text-sm font-bold text-indigo-700">ATS Score: {builtResume.atsScore}%</span>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <button onClick={() => copyToClipboard(builtResume.fullText ?? "")}
                   className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition">
                   {copied ? "Copied!" : "Copy"}
                 </button>
-                <button onClick={handlePrint}
-                  className="rounded-xl bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 transition">
-                  Print / Save PDF
+                <button
+                  onClick={() => saveToProfile(builtResume.fullText ?? "").then(() => { setProfileSaved(true); setTimeout(() => setProfileSaved(false), 2500); }).catch(() => undefined)}
+                  className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition">
+                  {profileSaved ? "Saved to profile!" : "Save to profile"}
                 </button>
                 <button onClick={() => { setBuiltResume(null); setAnswers(Array(BUILD_QUESTIONS.length).fill("")); }}
                   className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-500 hover:bg-slate-50 transition">
@@ -201,6 +237,10 @@ function ResumeContent() {
                 </button>
               </div>
             </div>
+
+            {sessionToken && (
+              <ResumeExportPanel sessionToken={sessionToken} resume={builtResume} />
+            )}
 
             <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm print:shadow-none print:border-0">
               {/* Name & Contact */}
@@ -317,14 +357,15 @@ function ResumeContent() {
                 <span className="rounded-2xl bg-green-100 px-3 py-1.5 text-sm font-bold text-green-700">✓ Resume improved!</span>
                 <span className="rounded-2xl bg-indigo-100 px-3 py-1.5 text-sm font-bold text-indigo-700">ATS Score: {improvedResult.atsScore}%</span>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <button onClick={() => copyToClipboard(improvedResult.improvedResume)}
                   className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition">
                   {copied ? "Copied!" : "Copy"}
                 </button>
-                <button onClick={handlePrint}
-                  className="rounded-xl bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 transition">
-                  Print / Save PDF
+                <button
+                  onClick={() => saveToProfile(improvedResult.improvedResume).then(() => { setProfileSaved(true); setTimeout(() => setProfileSaved(false), 2500); }).catch(() => undefined)}
+                  className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition">
+                  {profileSaved ? "Saved to profile!" : "Save to profile"}
                 </button>
                 <button onClick={() => setImprovedResult(null)}
                   className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-500 hover:bg-slate-50 transition">
@@ -332,6 +373,10 @@ function ResumeContent() {
                 </button>
               </div>
             </div>
+
+            {sessionToken && (
+              <ResumeExportPanel sessionToken={sessionToken} resumeText={improvedResult.improvedResume} />
+            )}
 
             {improvedResult.changes.length > 0 && (
               <div className="rounded-3xl border border-green-200 bg-green-50 p-5">
