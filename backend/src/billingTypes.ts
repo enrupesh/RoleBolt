@@ -33,6 +33,8 @@ export interface PlanDefinition {
   catalogVersion: number;
 }
 
+export type BillingWarning = "past_due" | "halted" | "cancel_scheduled";
+
 export interface ResolvedEntitlement {
   userId: string;
   category: BillingCategory;
@@ -43,6 +45,10 @@ export interface ResolvedEntitlement {
   currentPeriodStart: Date;
   currentPeriodEnd: Date;
   cancelAtPeriodEnd: boolean;
+  /** When true, metered/AI operations may proceed (subject to plan limits). */
+  meteredAccessAllowed: boolean;
+  /** Non-blocking billing state surfaced to clients when payment needs attention. */
+  billingWarning?: BillingWarning;
   definition: PlanDefinition;
 }
 

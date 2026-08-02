@@ -32,6 +32,21 @@ export interface CounterSnapshot {
   reserved: number;
 }
 
+export class BillingAccessRestrictedError extends Error {
+  readonly code = "BILLING_ACCESS_RESTRICTED";
+
+  constructor(readonly category: BillingCategory) {
+    super("Metered billing access is restricted for this account.");
+    this.name = "BillingAccessRestrictedError";
+  }
+}
+
+export function assertMeteredAccessAllowed(entitlement: ResolvedEntitlement): void {
+  if (!entitlement.meteredAccessAllowed) {
+    throw new BillingAccessRestrictedError(entitlement.category);
+  }
+}
+
 export function requireFeature(
   entitlement: ResolvedEntitlement,
   featureKey: string,
@@ -166,6 +181,18 @@ export function serializeBillingError(
         feature: error.feature,
         plan: entitlement?.plan ?? "free",
         upgradeRequired: true,
+      },
+    };
+  }
+  if (error instanceof BillingAccessRestrictedError) {
+    return {
+      status: 403,
+      body: {
+        error: "BILLING_ACCESS_RESTRICTED",
+        code: error.code,
+        category: error.category,
+        plan: entitlement?.plan ?? "free",
+        upgradeRequired: false,
       },
     };
   }

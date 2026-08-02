@@ -1,6 +1,6 @@
 import mongoose, { type ClientSession } from "mongoose";
-import { Subscription, type ISubscription } from "../models/Subscription";
 import { UsagePeriod } from "../models/UsagePeriod";
+import { Subscription, type ISubscription } from "../models/Subscription";
 import {
   getPlanDefinition,
 } from "./planCatalog";
@@ -12,11 +12,16 @@ import {
   type BillingCategory,
   type BillingInterval,
   type BillingPlan,
+  type BillingWarning,
   type PlanDefinition,
   type ResolvedEntitlement,
 } from "../billingTypes";
 
-const PAID_STATUSES = new Set(["active", "authenticated", "trialing"]);
+/** Active paid provider statuses. `trialing` is excluded — no trials at launch. */
+const ACTIVE_PAID_STATUSES = new Set(["active", "authenticated", "pending"]);
+
+/** Paid access may continue until period end when payment failed or cancellation is scheduled. */
+const RETAINED_PAID_STATUSES = new Set(["cancelled", "past_due", "halted"]);
 
 function toObjectId(userId: string): mongoose.Types.ObjectId {
   if (!mongoose.isValidObjectId(userId)) {
@@ -29,11 +34,11 @@ function isLegacySubscription(sub: ISubscription): boolean {
   return sub.plan === "agency" || sub.plan === "seeker_pro";
 }
 
-function normalizeStoredSubscription(
-  sub: ISubscription | null,
-  category: BillingCategory,
-  now: Date,
-): {
+function periodStillActive(end: Date | undefined, now: Date): boolean {
+  return Boolean(end && end.getTime() > now.getTime());
+}
+
+export interface NormalizedSubscription {
   plan: BillingPlan;
   interval: BillingInterval;
   status: string;
@@ -41,31 +46,20 @@ function normalizeStoredSubscription(
   start?: Date;
   end?: Date;
   cancelAtPeriodEnd: boolean;
-} {
-  if (
-    sub &&
-    !isLegacySubscription(sub) &&
-    isBillingCategory(sub.category) &&
-    sub.category === category &&
-    isBillingPlan(sub.plan) &&
-    isBillingInterval(sub.interval) &&
-    sub.provider === "razorpay" &&
-    PAID_STATUSES.has(sub.status) &&
-    sub.plan !== "free" &&
-    (!sub.currentPeriodEnd || sub.currentPeriodEnd.getTime() > now.getTime())
-  ) {
-    return {
-      plan: sub.plan,
-      interval: sub.interval,
-      status: sub.status,
-      definition: getPlanDefinition(category, sub.plan, sub.interval),
-      start: sub.currentPeriodStart,
-      end: sub.currentPeriodEnd,
-      cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
-    };
-  }
+  meteredAccessAllowed: boolean;
+  billingWarning?: BillingWarning;
+}
 
-  return {
+/**
+ * Pure entitlement normalization used by `getEntitlement` and unit tests.
+ * Implements cancel-at-period-end retention and failed-payment grace per `payment.md` §13.5–13.7.
+ */
+export function normalizeStoredSubscription(
+  sub: ISubscription | null,
+  category: BillingCategory,
+  now: Date,
+): NormalizedSubscription {
+  const freeDefaults = (): NormalizedSubscription => ({
     plan: "free",
     interval: "monthly",
     status: "free",
@@ -73,6 +67,55 @@ function normalizeStoredSubscription(
     start: undefined,
     end: undefined,
     cancelAtPeriodEnd: false,
+    meteredAccessAllowed: true,
+  });
+
+  if (
+    !sub ||
+    isLegacySubscription(sub) ||
+    !isBillingCategory(sub.category) ||
+    sub.category !== category ||
+    !isBillingPlan(sub.plan) ||
+    !isBillingInterval(sub.interval) ||
+    sub.provider !== "razorpay" ||
+    sub.plan === "free"
+  ) {
+    return freeDefaults();
+  }
+
+  const periodActive = periodStillActive(sub.currentPeriodEnd, now);
+  const activePaid =
+    ACTIVE_PAID_STATUSES.has(sub.status) && periodActive;
+
+  const cancelledButRetained =
+    sub.status === "cancelled" &&
+    periodActive &&
+    sub.cancelAtPeriodEnd;
+
+  const paymentIssueButRetained =
+    RETAINED_PAID_STATUSES.has(sub.status) &&
+    sub.status !== "cancelled" &&
+    periodActive;
+
+  if (!activePaid && !cancelledButRetained && !paymentIssueButRetained) {
+    return freeDefaults();
+  }
+
+  let billingWarning: BillingWarning | undefined;
+  if (sub.status === "past_due") billingWarning = "past_due";
+  else if (sub.status === "halted") billingWarning = "halted";
+  else if (sub.cancelAtPeriodEnd || sub.status === "cancelled") billingWarning = "cancel_scheduled";
+
+  return {
+    plan: sub.plan,
+    interval: sub.interval,
+    status: sub.status,
+    definition: getPlanDefinition(category, sub.plan, sub.interval),
+    start: sub.currentPeriodStart,
+    end: sub.currentPeriodEnd,
+    cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
+    meteredAccessAllowed: true,
+    billingWarning,
   };
 }
 
@@ -104,6 +147,8 @@ export async function getEntitlement(
     currentPeriodStart: period.periodStart,
     currentPeriodEnd: period.periodEnd,
     cancelAtPeriodEnd: normalized.cancelAtPeriodEnd,
+    meteredAccessAllowed: normalized.meteredAccessAllowed,
+    billingWarning: normalized.billingWarning,
     definition: normalized.definition,
   };
 }

@@ -22,6 +22,7 @@ import { AUTH_FROM } from "./emailConfig";
 import { verifyFirebaseToken } from "./firebaseAdmin";
 import { RecruitProfile } from "./models/RecruitProfile";
 import { RecruitSeekerProfile } from "./models/RecruitSeekerProfile";
+import { initializeFreeEntitlements } from "./billing/entitlements";
 
 export const authRouter = express.Router();
 
@@ -66,6 +67,14 @@ function validateUsername(raw: unknown): { username: string } | { error: string 
   }
   if (RESERVED_USERNAMES.has(username)) return { error: "This username is reserved. Please choose another." };
   return { username };
+}
+
+async function createUserWithBillingEntitlements(
+  data: Parameters<typeof User.create>[0],
+): Promise<InstanceType<typeof User>> {
+  const user = await User.create(data);
+  await initializeFreeEntitlements(user._id.toString());
+  return user;
 }
 
 function userPublicDto(user: { _id: { toString(): string }; email?: string; username?: string; name?: string }) {
@@ -230,7 +239,7 @@ authRouter.post("/social", async (req, res) => {
         if (!user.isVerified)   { user.isVerified = true; changed = true; }
         if (changed) await user.save();
       } else {
-        user = await User.create({
+        user = await createUserWithBillingEntitlements({
           passwordHash: "",
           name,
           isVerified:   true,
@@ -264,7 +273,7 @@ authRouter.post("/social", async (req, res) => {
       if (!user.name && name)      { user.name = name;                     changed = true; }
       if (changed) await user.save();
     } else {
-      user = await User.create({
+      user = await createUserWithBillingEntitlements({
         email,
         passwordHash: "",
         name,
@@ -394,7 +403,7 @@ authRouter.get("/github/callback", async (req, res) => {
       if (changed) await user.save();
     } else {
       // Create new account — no password, already verified via GitHub
-      user = await User.create({
+      user = await createUserWithBillingEntitlements({
         email,
         passwordHash:  "",
         name:          (githubUser.name || githubUser.login || "").trim(),
@@ -529,7 +538,7 @@ authRouter.post("/signup", async (req, res) => {
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
     const verificationToken = makeVerificationToken();
 
-    const user = await User.create({
+    const user = await createUserWithBillingEntitlements({
       email:                   normalizedEmail,
       username:                normalizedUsername,
       passwordHash,
