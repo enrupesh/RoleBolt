@@ -77,12 +77,19 @@ async function createUserWithBillingEntitlements(
   return user;
 }
 
-function userPublicDto(user: { _id: { toString(): string }; email?: string; username?: string; name?: string }) {
+function userPublicDto(user: {
+  _id: { toString(): string };
+  email?: string;
+  username?: string;
+  name?: string;
+  signupRole?: SignupRole;
+}) {
   return {
     id: user._id.toString(),
     email: user.email ?? "",
     username: user.username ?? "",
     name: user.name ?? "",
+    signupRole: user.signupRole,
   };
 }
 
@@ -252,6 +259,7 @@ authRouter.post("/social", async (req, res) => {
       let user = await User.findOne({
         $or: [{ phoneId: firebaseUid }, { phoneNumber }],
       });
+      let isNewAccount = false;
 
       if (user) {
         let changed = false;
@@ -260,6 +268,7 @@ authRouter.post("/social", async (req, res) => {
         if (!user.isVerified)   { user.isVerified = true; changed = true; }
         if (changed) await user.save();
       } else {
+        isNewAccount = true;
         user = await createUserWithBillingEntitlements({
           passwordHash: "",
           name,
@@ -272,6 +281,7 @@ authRouter.post("/social", async (req, res) => {
       const token = signToken({ sub: user._id.toString(), email: user.email || user.phoneNumber || firebaseUid });
       return res.json({
         token,
+        isNewAccount,
         user: { ...userPublicDto(user), phoneNumber: user.phoneNumber },
       });
     }
@@ -286,6 +296,7 @@ authRouter.post("/social", async (req, res) => {
     let user = await User.findOne({
       $or: [{ [idField]: firebaseUid }, { email }],
     });
+    let isNewAccount = false;
 
     if (user) {
       let changed = false;
@@ -294,6 +305,7 @@ authRouter.post("/social", async (req, res) => {
       if (!user.name && name)      { user.name = name;                     changed = true; }
       if (changed) await user.save();
     } else {
+      isNewAccount = true;
       user = await createUserWithBillingEntitlements({
         email,
         passwordHash: "",
@@ -306,6 +318,7 @@ authRouter.post("/social", async (req, res) => {
     const token = signToken({ sub: user._id.toString(), email: user.email! });
     return res.json({
       token,
+      isNewAccount,
       user: userPublicDto(user),
     });
   } catch (err: any) {
@@ -415,6 +428,7 @@ authRouter.get("/github/callback", async (req, res) => {
     let user = await User.findOne({
       $or: [{ githubId: String(githubUser.id) }, { email }],
     });
+    let isNewAccount = false;
 
     if (user) {
       // Link githubId to existing account if not already set
@@ -424,6 +438,7 @@ authRouter.get("/github/callback", async (req, res) => {
       if (changed) await user.save();
     } else {
       // Create new account — no password, already verified via GitHub
+      isNewAccount = true;
       user = await createUserWithBillingEntitlements({
         email,
         passwordHash:  "",
@@ -435,7 +450,10 @@ authRouter.get("/github/callback", async (req, res) => {
 
     const jwt = signToken({ sub: user._id.toString(), email: user.email });
 
-    return res.redirect(buildGitHubFrontendCallback(target, intent, { token: jwt }));
+    return res.redirect(buildGitHubFrontendCallback(target, intent, {
+      token: jwt,
+      created: isNewAccount ? "1" : "0",
+    }));
   } catch (err: any) {
     console.error("[auth/github] callback error:", err?.message);
     return res.redirect(buildGitHubFrontendCallback(target, intent, { error: "github_failed" }));
@@ -899,6 +917,7 @@ authRouter.get("/me", requireAuth, async (req, res) => {
       username:   user.username ?? "",
       name:       user.name,
       isVerified: user.isVerified,
+      signupRole: user.signupRole,
     });
   } catch (err: any) {
     console.error("[auth] /me error:", err?.message);

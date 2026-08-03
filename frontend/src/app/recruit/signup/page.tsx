@@ -108,7 +108,7 @@ export default function RecruitSignUpPage() {
       if (!res.ok) { setError(data.error ?? "Google sign-up failed. Please try again."); return; }
       const session = await signInWithToken(data.token);
       if (session.error) { setError(session.error); return; }
-      markSignupWelcome("creator");
+      if (data.isNewAccount !== false) markSignupWelcome("creator");
       if (!session.username?.trim()) {
         router.replace(`/recruit/choose-username?next=${encodeURIComponent(nextPath)}`);
       } else {
@@ -169,7 +169,7 @@ export default function RecruitSignUpPage() {
       if (!res.ok) { setPhoneError(data.error ?? "Phone sign-up failed."); return; }
       const session = await signInWithToken(data.token);
       if (session.error) { setPhoneError(session.error); return; }
-      markSignupWelcome("creator");
+      if (data.isNewAccount !== false) markSignupWelcome("creator");
       router.replace(session.username?.trim()
         ? nextPath
         : `/recruit/choose-username?next=${encodeURIComponent(nextPath)}`);

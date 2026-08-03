@@ -26,6 +26,7 @@ export interface AuthUser {
   email?: string;
   username?: string;
   name?: string;
+  signupRole?: RecruitRole;
 }
 
 export type SignInCredentials = {
@@ -84,7 +85,13 @@ function wipeToken() {
   clearTokenCookie();
 }
 
-type MeResponse = { id: string; email: string; username?: string; name: string };
+type MeResponse = {
+  id: string;
+  email: string;
+  username?: string;
+  name: string;
+  signupRole?: RecruitRole;
+};
 
 function toAuthUser(data: MeResponse): AuthUser {
   return {
@@ -92,6 +99,7 @@ function toAuthUser(data: MeResponse): AuthUser {
     email: data.email,
     username: data.username,
     name: data.name,
+    signupRole: data.signupRole,
   };
 }
 
@@ -103,13 +111,24 @@ async function fetchOrCreateProfile(
     const headers = { Authorization: `Bearer ${token}` };
 
     const getRes = await fetch(apiUrl("/recruit/auth/profile"), { headers });
-    if (getRes.ok) return await getRes.json();
+    if (getRes.ok) {
+      const profile = await getRes.json() as RecruitProfile;
+      if (authUser?.signupRole === "seeker" && profile.role !== "seeker") {
+        const patchRes = await fetch(apiUrl("/recruit/auth/profile"), {
+          method: "PATCH",
+          headers: { ...headers, "Content-Type": "application/json" },
+          body: JSON.stringify({ role: "seeker" }),
+        });
+        if (patchRes.ok) return await patchRes.json();
+      }
+      return profile;
+    }
 
     const postRes = await fetch(apiUrl("/recruit/auth/profile"), {
       method: "POST",
       headers: { ...headers, "Content-Type": "application/json" },
       body: JSON.stringify({
-        role: "creator",
+        role: authUser?.signupRole === "seeker" ? "seeker" : "creator",
         email: authUser?.email ?? "",
         username: authUser?.username ?? "",
       }),
@@ -223,7 +242,13 @@ export function RecruitAuthProvider({ children }: { children: ReactNode }) {
 
         const { token, user } = data as {
           token: string;
-          user: { id: string; email: string; username?: string; name: string };
+          user: {
+            id: string;
+            email: string;
+            username?: string;
+            name: string;
+            signupRole?: RecruitRole;
+          };
         };
 
         persistToken(token);
@@ -234,6 +259,7 @@ export function RecruitAuthProvider({ children }: { children: ReactNode }) {
           email: user.email,
           username: user.username,
           name: user.name,
+          signupRole: user.signupRole,
         };
         setAuthUser(nextUser);
 
