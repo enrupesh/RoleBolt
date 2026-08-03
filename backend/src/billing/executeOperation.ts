@@ -10,6 +10,7 @@ import {
   reserveUsage,
   type UsageReservation,
 } from "./usage";
+import { safeBillingLog } from "./security";
 
 export class BillingOperationAbortedError extends Error {
   readonly code = "BILLING_OPERATION_ABORTED";
@@ -100,14 +101,18 @@ export async function executeBillingOperation<T>(
       try {
         await releaseUsage(reservation.reservationId);
       } catch (releaseError) {
-        console.error("[billing] releaseUsage failed:", releaseError);
+        safeBillingLog("error", "release_usage_failed", {
+          reservationId: reservation.reservationId,
+          operation: input.operation,
+          error: releaseError instanceof Error ? releaseError.message : String(releaseError),
+        });
       }
     } else {
-      console.warn(
-        "[billing] retaining reservation after ambiguous failure:",
-        reservation.reservationId,
-        (error as Error)?.message,
-      );
+      safeBillingLog("warn", "reservation_retained_ambiguous_failure", {
+        reservationId: reservation.reservationId,
+        operation: input.operation,
+        error: (error as Error)?.message,
+      });
     }
     throw error;
   }

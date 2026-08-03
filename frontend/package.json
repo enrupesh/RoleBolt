@@ -10,8 +10,9 @@
     "build": "next build --webpack",
     "start": "next start -p 5000 -H 0.0.0.0",
     "lint": "eslint src",
-    "test": "node ../backend/node_modules/tsx/dist/cli.mjs --test src/lib/whatIfSimulation.test.ts",
-    "test:whatif": "node ../backend/node_modules/tsx/dist/cli.mjs --test src/lib/whatIfSimulation.test.ts"
+    "test": "node ../backend/node_modules/tsx/dist/cli.mjs --test src/lib/whatIfSimulation.test.ts src/lib/billing.test.ts",
+    "test:whatif": "node ../backend/node_modules/tsx/dist/cli.mjs --test src/lib/whatIfSimulation.test.ts",
+    "test:billing": "node ../backend/node_modules/tsx/dist/cli.mjs --test src/lib/billing.test.ts"
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4",

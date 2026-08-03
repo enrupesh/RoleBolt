@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import type { BillingErrorPayload } from "@/lib/api";
 import {
@@ -129,6 +130,35 @@ export function PlanLimitModal({
         </button>
       </div>
     </div>
+  );
+}
+
+/** Inline notice plus upgrade modal — default billing limit UX for product surfaces. */
+export function BillingLimitNotice({
+  error,
+  className = "",
+  manualAlternative,
+}: {
+  error: unknown;
+  className?: string;
+  manualAlternative?: string;
+}) {
+  const [modalOpen, setModalOpen] = useState(false);
+  if (!error || !isUpgradeRequiredError(error)) return null;
+  return (
+    <>
+      <PlanLimitInlineNotice
+        error={error}
+        className={className}
+        onOpenUpgrade={() => setModalOpen(true)}
+      />
+      <PlanLimitModal
+        error={error}
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        manualAlternative={manualAlternative}
+      />
+    </>
   );
 }
 
