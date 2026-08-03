@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
 import { LegalPageShell, LegalSection } from "@/components/LegalPageShell";
+import { buildMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildMetadata({
   title: "Refund & Cancellation Policy | Rolebolt",
-  description: "The detailed Rolebolt policy for subscriptions, cancellation, refunds, failed payments and billing support.",
-};
+  description: "Read Rolebolt's policy for subscriptions, cancellation, refunds, failed payments and billing support.",
+  path: "/refund-policy",
+  keywords: ["Rolebolt refund policy", "subscription cancellation", "AI software refunds"],
+});
 
 function BillingLink({ href, children }: { href: string; children: React.ReactNode }) {
   return <a href={href} className="font-semibold text-[#0a66c2] hover:underline">{children}</a>;

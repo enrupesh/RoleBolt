@@ -1,5 +1,21 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { RoleboltLogo } from "@/components/RoleboltLogo";
+import { buildMetadata } from "@/lib/seo";
+
+export const metadata: Metadata = buildMetadata({
+  title: "AI Job Search Platform & Career Workspace | Rolebolt",
+  description:
+    "Track every application, build tailored resumes, prepare for interviews and get AI job-match guidance in Rolebolt's free career workspace.",
+  path: "/seeker",
+  keywords: [
+    "AI job search platform",
+    "job application tracker",
+    "AI resume builder",
+    "AI interview preparation",
+    "career workspace",
+  ],
+});
 
 const FEATURES = [
   {

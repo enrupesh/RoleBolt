@@ -7,99 +7,35 @@ export const siteConfig = {
   shortName: "Rolebolt",
   url: SITE_URL,
   locale: "en_US",
-  defaultTitle: "Rolebolt — Every AI Tool You Need. Free for Everyone.",
+  defaultTitle: "Rolebolt — AI Recruiting Software & Job Search Workspace",
   titleTemplate: "%s | Rolebolt",
   defaultDescription:
-    "Rolebolt is the free all-in-one AI platform: personal AI companion, WhatsApp AI, Inbox AI, invoice automation, AI hiring, Smart Ledger, Link Pulse, Sales Analytics, and more — built for individuals and businesses worldwide.",
-  slogan: "Every AI tool you need. Free for everyone.",
+    "Rolebolt is an AI recruiting workspace and applicant tracking system for hiring teams, with job discovery and career tools for people searching for their next opportunity.",
+  slogan: "Clearer hiring. More confident job searches.",
   defaultKeywords: [
     "Rolebolt",
-    "Rolebolt",
     "Rolebolt app",
-    "Rolebolt.app",
-    "rolebolt ai platform",
-    "free AI platform",
-    "free AI tools",
-    "free AI suite",
-    "all in one AI",
-    "all-in-one AI platform",
-    "AI tools",
-    "AI tools for business",
-    "AI tools for free",
-    "best free AI tools 2025",
-    "best free AI tools 2026",
-    "AI productivity tools",
-    "AI suite",
-    "unified AI platform",
-    "AI workspace",
-    "AI workspaces",
-    "AI for everyone",
+    "rolebolt ai recruiting",
+    "rolebolt hiring platform",
+    "best AI recruiting software",
+    "free applicant tracking system",
+    "applicant tracking system",
+    "AI recruiting software",
+    "AI hiring software",
+    "candidate screening software",
+    "resume screening software",
+    "candidate matching",
+    "hiring pipeline",
+    "recruiting automation",
+    "talent pool software",
+    "job search platform",
+    "career workspace",
+    "job application tracker",
+    "AI resume builder",
+    "AI interview preparation",
+    "public job board",
     "AI for small business",
     "AI for startups",
-    "AI for SMBs",
-    "AI for SMEs",
-    "AI for enterprise",
-    "multilingual AI",
-    "WhatsApp AI",
-    "WhatsApp business AI",
-    "WhatsApp chatbot",
-    "WhatsApp automation",
-    "AI email assistant",
-    "AI inbox",
-    "Gmail AI",
-    "Outlook AI",
-    "AI invoice automation",
-    "AI accounts payable",
-    "AP automation",
-    "invoice OCR AI",
-    "AI for recruiters",
-    "AI hiring",
-    "AI ATS",
-    "applicant tracking system AI",
-    "AI smart ledger",
-    "AI bookkeeping",
-    "AI accounting",
-    "personal AI assistant",
-    "personal AI companion",
-    "AI chat",
-    "AI chatbot",
-    "free AI chatbot",
-    "Ibara",
-    "Ibara widget",
-    "AI chat widget",
-    "embeddable AI",
-    "business automation",
-    "workflow automation AI",
-    "AI translator",
-    "AI translation",
-    "free translator",
-    "ChatGPT alternative",
-    "ChatGPT alternative free",
-    "Gemini alternative",
-    "Claude alternative",
-    "Copilot alternative",
-    "Perplexity alternative",
-    "AI for entrepreneurs",
-    "AI for freelancers",
-    "AI for agencies",
-    "no credit card AI",
-    "no signup AI",
-    "AI without signup",
-    "Budget Tracker AI",
-    "AI budget tracker",
-    "free budget tracker app",
-    "student budget app free",
-    "personal finance AI",
-    "AI expense tracker",
-    "monthly budget planner AI",
-    "Sales AI",
-    "AI cold email tool",
-    "cold email AI",
-    "AI sales outreach",
-    "AI SDR free",
-    "free AI sales tool",
-    "AI outreach automation",
-    "personalized cold email AI",
   ],
   twitterHandle: "@roleboltai",
   organization: {
@@ -263,14 +199,16 @@ export function buildMetadata({
   const url = path.startsWith("http") ? path : `${SITE_URL}${path}`;
   const seen = new Set<string>();
   const dedupedKeywords: string[] = [];
-  for (const kw of [...siteConfig.defaultKeywords, ...(keywords ?? [])]) {
+  for (const kw of [...(keywords ?? []), ...siteConfig.defaultKeywords]) {
     const key = kw.toLowerCase().trim();
     if (key && !seen.has(key)) {
       seen.add(key);
       dedupedKeywords.push(kw);
     }
   }
-  const finalKeywords = dedupedKeywords.join(", ");
+  // Meta keywords are not a direct ranking signal. Keep this list short and
+  // page-relevant instead of emitting the entire product catalog on every URL.
+  const finalKeywords = dedupedKeywords.slice(0, 24).join(", ");
 
   return {
     title: fullTitle,
@@ -340,7 +278,7 @@ export function organizationJsonLd() {
     url: SITE_URL,
     logo: {
       "@type": "ImageObject",
-      url: `${SITE_URL}/icons/rolebolt-512.png`,
+      url: `${SITE_URL}/rolebolt-icon.png`,
       width: 512,
       height: 512,
     },
@@ -400,7 +338,7 @@ export function websiteJsonLd() {
         "@type": "SearchAction",
         target: {
           "@type": "EntryPoint",
-          urlTemplate: `${SITE_URL}/blog?q={search_term_string}`,
+          urlTemplate: `${SITE_URL}/recruit/opportunities?q={search_term_string}`,
         },
         "query-input": "required name=search_term_string",
       },
@@ -419,23 +357,19 @@ export function softwareApplicationJsonLd() {
     applicationSubCategory: "Artificial Intelligence Platform",
     description: siteConfig.defaultDescription,
     url: SITE_URL,
-    image: `${SITE_URL}/icons/rolebolt-512.png`,
+    image: `${SITE_URL}/rolebolt-icon.png`,
     softwareVersion: "1.0",
     inLanguage: ["en", "hi"],
     featureList: [
-      "Personal AI companion (Simi & Loa) with persistent memory",
-      "WhatsApp AI — 24/7 customer automation for WhatsApp Business",
-      "Inbox AI — email triage and smart replies for Gmail & Outlook",
-      "Payable AI — invoice OCR and accounts payable automation",
-      "Recruit AI — AI applicant tracking system and hiring pipeline",
-      
-      "Smart Ledger — AI-powered bookkeeping for traders and small businesses",
-      "Ibara — embeddable AI chat widget for any website",
-      "Translate AI — 100+ language translation with privacy-first design",
-      "Budget Tracker AI — free personal monthly budget planner",
-      "Sales AI — personalized AI cold email and outreach automation",
-      "Link Pulse — free URL shortener with click analytics, A/B testing, and bio link pages",
-      "Sales Analytics Dashboard — revenue tracking by region, category, and time period for retail businesses",
+      "AI job analysis and hiring rubrics",
+      "Applicant tracking and candidate pipeline management",
+      "Resume review and candidate matching",
+      "Standard jobs and structured form jobs",
+      "Public opportunities and applications",
+      "Async candidate assessments",
+      "Pipeline automation and review actions",
+      "Talent pool, collaboration and hiring analytics",
+      "Job-search workspace with resumes and interview preparation",
     ],
     offers: {
       "@type": "Offer",
@@ -443,14 +377,6 @@ export function softwareApplicationJsonLd() {
       priceCurrency: "USD",
       availability: "https://schema.org/InStock",
       priceValidUntil: "2030-12-31",
-    },
-    aggregateRating: {
-      "@type": "AggregateRating",
-      ratingValue: "4.9",
-      ratingCount: "2847",
-      reviewCount: "2847",
-      bestRating: "5",
-      worstRating: "1",
     },
     publisher: { "@id": `${SITE_URL}#organization` },
   };
@@ -752,7 +678,7 @@ export function siteLinksSearchBoxJsonLd() {
         "@type": "SearchAction",
         target: {
           "@type": "EntryPoint",
-          urlTemplate: `${SITE_URL}/blog?q={search_term_string}`,
+          urlTemplate: `${SITE_URL}/recruit/opportunities?q={search_term_string}`,
         },
         "query-input": "required name=search_term_string",
       },
@@ -811,5 +737,89 @@ export function courseJsonLd(opts: {
       priceCurrency: "USD",
       availability: "https://schema.org/InStock",
     },
+  };
+}
+
+export function jobPostingJsonLd(opts: {
+  id: string;
+  title: string;
+  description: string;
+  url: string;
+  companyName?: string;
+  companyUrl?: string;
+  location?: string;
+  workMode?: string;
+  jobType?: string;
+  salaryMin?: number;
+  salaryMax?: number;
+  salaryCurrency?: string;
+  applicationDeadline?: string;
+  datePosted?: string;
+}) {
+  const url = opts.url.startsWith("http") ? opts.url : `${SITE_URL}${opts.url}`;
+  const remote = opts.workMode?.toLowerCase() === "remote";
+  const employmentTypeMap: Record<string, string> = {
+    full_time: "FULL_TIME",
+    "full-time": "FULL_TIME",
+    fulltime: "FULL_TIME",
+    part_time: "PART_TIME",
+    "part-time": "PART_TIME",
+    parttime: "PART_TIME",
+    contract: "CONTRACTOR",
+    freelance: "CONTRACTOR",
+    internship: "INTERN",
+    temporary: "TEMPORARY",
+  };
+  const employmentType = employmentTypeMap[(opts.jobType ?? "").toLowerCase()];
+  const salary =
+    opts.salaryMin != null || opts.salaryMax != null
+      ? {
+          "@type": "MonetaryAmount",
+          currency: opts.salaryCurrency ?? "INR",
+          value: {
+            "@type": "QuantitativeValue",
+            ...(opts.salaryMin != null ? { minValue: opts.salaryMin } : {}),
+            ...(opts.salaryMax != null ? { maxValue: opts.salaryMax } : {}),
+            unitText: "YEAR",
+          },
+        }
+      : undefined;
+
+  return {
+    "@context": "https://schema.org",
+    "@type": "JobPosting",
+    "@id": `${url}#jobposting`,
+    identifier: { "@type": "PropertyValue", name: "Rolebolt", value: opts.id },
+    title: opts.title,
+    description: opts.description,
+    url,
+    directApply: true,
+    ...(employmentType ? { employmentType } : {}),
+    ...(opts.datePosted ? { datePosted: opts.datePosted } : {}),
+    ...(opts.applicationDeadline ? { validThrough: opts.applicationDeadline } : {}),
+    hiringOrganization: {
+      "@type": "Organization",
+      name: opts.companyName || "Rolebolt recruiter",
+      ...(opts.companyUrl ? { sameAs: opts.companyUrl } : {}),
+    },
+    ...(remote
+      ? {
+          jobLocationType: "TELECOMMUTE",
+          applicantLocationRequirements: {
+            "@type": "Country",
+            name: "Worldwide",
+          },
+        }
+      : {
+          jobLocation: {
+            "@type": "Place",
+            address: {
+              "@type": "PostalAddress",
+              addressLocality: opts.location || "Remote",
+              addressCountry: "IN",
+            },
+          },
+        }),
+    ...(salary ? { baseSalary: salary } : {}),
   };
 }

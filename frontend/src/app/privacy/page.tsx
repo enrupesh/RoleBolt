@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
 import { LegalPageShell, LegalSection } from "@/components/LegalPageShell";
+import { buildMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildMetadata({
   title: "Privacy Policy | Rolebolt",
-  description: "The dedicated Rolebolt Privacy Policy explains how we handle recruiter, job-seeker, candidate, account, AI and billing information.",
-};
+  description: "Read Rolebolt's privacy policy covering recruiter, job-seeker, candidate, account, AI and billing information.",
+  path: "/privacy",
+  keywords: ["Rolebolt privacy policy", "recruiting data privacy", "candidate data protection"],
+});
 
 const privacyEmail = "privacy@rolebolt.tech";
 

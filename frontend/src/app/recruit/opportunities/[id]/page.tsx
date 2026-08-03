@@ -12,7 +12,8 @@ import { computeJobQuality } from "@/lib/jobQuality";
 import PageTracker from "@/components/PageTracker";
 import MatchScoreSection from "./MatchScoreSection";
 import { apiUrl, readApiJson } from "@/lib/api";
-import { buildMetadata } from "@/lib/seo";
+import { buildMetadata, jobPostingJsonLd, SITE_URL } from "@/lib/seo";
+import { JsonLd } from "@/components/JsonLd";
 import { formatJobDescription } from "@/lib/jobDescription";
 import JDRenderer from "./JDRenderer";
 
@@ -41,6 +42,7 @@ type Job = {
   niceToHaveSkills?: string;
   openings?: number;
   applicationDeadline?: string;
+  createdAt?: string;
   perks?: string;
   languageRequirement?: string;
   timezoneOverlap?: string;
@@ -137,6 +139,26 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
   const quality = computeJobQuality(job);
   const roleOverview = formatJobDescription(job.generatedJD);
   const deadlineLabel = formatDeadline(job.applicationDeadline);
+  const jobDescription = [
+    roleOverview,
+    mustHave.length ? `Must-have skills: ${mustHave.join(", ")}.` : "",
+    niceToHave.length ? `Good-to-have skills: ${niceToHave.join(", ")}.` : "",
+  ].filter(Boolean).join("\n\n") || `${job.title} opportunity on Rolebolt.`;
+  const jobPosting = jobPostingJsonLd({
+    id,
+    title: job.title,
+    description: jobDescription,
+    url: `${SITE_URL}/recruit/opportunities/${id}`,
+    companyName: job.companyName,
+    location: job.location,
+    workMode: job.workMode,
+    jobType: job.jobType,
+    salaryMin: job.salaryMin,
+    salaryMax: job.salaryMax,
+    salaryCurrency: job.salaryCurrency,
+    applicationDeadline: job.applicationDeadline,
+    datePosted: job.createdAt,
+  });
 
   const copyText = [
     `${job.title}${job.companyName ? ` — ${job.companyName}` : ""}`,
@@ -179,6 +201,7 @@ export default async function OpportunityDetailPage({ params }: { params: Promis
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-900">
       <PageTracker event="opportunity_viewed" data={{ jobId: id }} />
+      <JsonLd id="ld-job-posting" data={jobPosting} />
       <RecruitHeader />
 
       {/* Sticky bottom CTA bar */}

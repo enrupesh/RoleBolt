@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
 import { LegalPageShell, LegalSection } from "@/components/LegalPageShell";
+import { buildMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildMetadata({
   title: "Terms & Conditions | Rolebolt",
-  description: "The detailed Rolebolt Terms & Conditions for recruiting, job-search, AI, collaboration and billing features.",
-};
+  description: "Read the Rolebolt terms covering recruiting, job search, AI assistance, collaboration, public opportunities and billing.",
+  path: "/terms",
+  keywords: ["Rolebolt terms and conditions", "AI recruiting terms", "job platform terms"],
+});
 
 function TermsLink({ href, children }: { href: string; children: React.ReactNode }) {
   return <a href={href} className="font-semibold text-[#0a66c2] hover:underline">{children}</a>;
