@@ -61,7 +61,8 @@ const operations: BillingOperation[] = [
   { key: "assessment_score_standard", category: "creator_standard", units: 1, counter: "ai_units", description: "Score a Standard Job assessment response." },
   { key: "assessment_send_standard", category: "creator_standard", units: 0, counter: "assessment_invitations", description: "Send a Standard Job assessment invitation." },
   { key: "automated_email_standard", category: "creator_standard", units: 0, counter: "automated_emails", description: "Send a Standard Job automated email." },
-  { key: "pipeline_rule_execution", category: "creator_standard", units: 0, counter: "automated_emails", description: "Execute a Standard Job pipeline rule action." },
+  // Stage-only rule firings — metered for access/audit, not against automated_emails.
+  { key: "pipeline_rule_execution", category: "creator_standard", units: 0, description: "Execute a Standard Job pipeline rule action." },
   { key: "export_standard", category: "creator_standard", units: 0, counter: "exports", description: "Export Standard Job data." },
 
   // Aliases for audit inventory names (`payment.md` §5.1 / Phase -1)
