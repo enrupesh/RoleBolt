@@ -38,3 +38,4 @@
 - [Verified Razorpay integration](razorpay-integration.md) — Phase 3 adds server-owned checkout, raw HMAC webhooks, idempotency, and lifecycle reconciliation; checkout callbacks never activate access.
 - [Seeker billing enforcement](seeker-billing-enforcement.md) — request retries use explicit idempotency keys; active-application caps count tracker, workspace, and Rolebolt candidate representations.
 - [Imported project dependencies](imported-project-dependencies.md) — this split frontend/backend import needs root-hoisted packages for workflows; verify both package surfaces before debugging app code.
+- [Production build type checks](production-build-type-checks.md) — deployment builds can expose stale renamed context fields and strict shared-template shape errors missed by local route-only checks.
