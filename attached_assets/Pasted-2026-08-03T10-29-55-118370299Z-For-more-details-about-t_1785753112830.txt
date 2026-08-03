@@ -1,0 +1,50 @@
+2026-08-03T10:29:55.118370299Z ! For more details about this field, consult the documentation at https://nodejs.org/api/packages.html#packagemanager
+2026-08-03T10:29:55.118371772Z 
+2026-08-03T10:30:03.0370386Z 
+2026-08-03T10:30:03.037053229Z dependencies:
+2026-08-03T10:30:03.037054645Z + @tailwindcss/postcss 4.3.3
+2026-08-03T10:30:03.037055716Z + @types/node 20.19.43 (26.1.2 is available)
+2026-08-03T10:30:03.037056546Z + @types/react 19.2.18
+2026-08-03T10:30:03.037057408Z + @types/react-dom 19.2.4
+2026-08-03T10:30:03.037058263Z + firebase 12.17.0
+2026-08-03T10:30:03.037059643Z + jspdf 4.2.1
+2026-08-03T10:30:03.037060423Z + jspdf-autotable 5.0.8
+2026-08-03T10:30:03.037061157Z + lucide-react 1.28.0
+2026-08-03T10:30:03.037061957Z + next 16.2.3 (16.2.10 is available)
+2026-08-03T10:30:03.037062706Z + react 19.2.4 (19.2.7 is available)
+2026-08-03T10:30:03.03706341Z + react-dom 19.2.4 (19.2.7 is available)
+2026-08-03T10:30:03.037064269Z + react-markdown 10.1.0
+2026-08-03T10:30:03.037065043Z + recharts 3.10.1
+2026-08-03T10:30:03.037065814Z + remark-gfm 4.0.1
+2026-08-03T10:30:03.03706671Z + tailwindcss 4.3.3
+2026-08-03T10:30:03.03706762Z + typescript 6.0.3 (7.0.2 is available)
+2026-08-03T10:30:03.037068337Z 
+2026-08-03T10:30:03.037069567Z devDependencies: skipped because NODE_ENV is set to production
+2026-08-03T10:30:03.037070258Z 
+2026-08-03T10:30:03.037994501Z Done in 7.9s
+2026-08-03T10:30:03.4327323Z 
+2026-08-03T10:30:03.43273941Z > recruit-frontend@0.1.0 build /opt/render/project/src/frontend
+2026-08-03T10:30:03.432740903Z > next build --webpack
+2026-08-03T10:30:03.432741689Z 
+2026-08-03T10:30:03.694518699Z ⚠ No build cache found. Please configure build caching for faster rebuilds. Read more: https://nextjs.org/docs/messages/no-cache
+2026-08-03T10:30:03.703884507Z ▲ Next.js 16.2.3 (webpack)
+2026-08-03T10:30:03.704010516Z 
+2026-08-03T10:30:03.724735798Z   Creating an optimized production build ...
+2026-08-03T10:30:25.470906703Z ✓ Compiled successfully in 19.9s
+2026-08-03T10:30:25.472415632Z   Running TypeScript ...
+2026-08-03T10:30:37.949136289Z Failed to type check.
+2026-08-03T10:30:37.949164808Z 
+2026-08-03T10:30:37.949284612Z ./src/app/recruit/forms/[id]/page.tsx:1264:11
+2026-08-03T10:30:37.949297434Z Type error: Property 'user' does not exist on type 'RecruitAuthState'.
+2026-08-03T10:30:37.949298486Z 
+2026-08-03T10:30:37.949299746Z   1262 |   const [assessmentUrl, setAssessmentUrl] = useState("");
+2026-08-03T10:30:37.94930264Z   1263 |   const [pendingStageEmail, setPendingStageEmail] = useState<FormStageEmailNotifyStage |...
+2026-08-03T10:30:37.949303782Z > 1264 |   const { user } = useRecruitAuth();
+2026-08-03T10:30:37.949304578Z        |           ^
+2026-08-03T10:30:37.949305829Z   1265 |
+2026-08-03T10:30:37.949306631Z   1266 |   async function updateStage(stage: Stage) {
+2026-08-03T10:30:37.9493078Z   1267 |     const prevStage = r.stage;
+2026-08-03T10:30:38.009500553Z Next.js build worker exited with code: 1 and signal: null
+2026-08-03T10:30:38.017314813Z  ELIFECYCLE  Command failed with exit code 1.
+2026-08-03T10:30:38.054230646Z ==> Build failed 😞
+2026-08-03T10:30:38.054246575Z ==> Common ways to troubleshoot your deploy: https://render.com/docs/troubleshooting-deploys
