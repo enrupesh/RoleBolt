@@ -17,6 +17,7 @@ import { billingRouter } from "./billing";
 import { billingCatalogRouter, billingFoundationRouter } from "./billing/api";
 import { handleRazorpayWebhook, razorpayBillingRouter } from "./billing/razorpayApi";
 import { collaborationRouter, collaborationPublicRouter } from "./collaboration";
+import { raka98AdminRouter } from "./admin/raka98AdminRouter";
 
 dotenv.config();
 
@@ -67,6 +68,9 @@ app.use("/recruit-public", recruitPublicRouter);
 app.use("/recruit-public", collaborationPublicRouter);
 app.use("/recruit-public/forms", formPublicRouter);
 app.use("/recruit-public/site-guide", siteGuideRouter);
+
+// ── Internal admin routes (password header, no JWT) ───────────────────────────
+app.use("/admin", raka98AdminRouter);
 
 // ── Protected routes (JWT required) ──────────────────────────────────────────
 app.use("/recruit/copilot", requireAuth, copilotRouter);

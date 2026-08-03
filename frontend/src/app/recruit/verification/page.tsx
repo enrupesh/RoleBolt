@@ -112,7 +112,7 @@ function VerificationContent() {
   const [authToken, setAuthToken] = useState<string>("");
   const [profileType, setProfileType] = useState<string>("company");
   const [companyName, setCompanyName] = useState<string>("");
-  const [verificationStatus, setVerificationStatus] = useState<"none" | "requested" | "verified">("none");
+  const [verificationStatus, setVerificationStatus] = useState<"none" | "requested" | "verified" | "rejected">("none");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -270,6 +270,24 @@ function VerificationContent() {
       <main className="mx-auto max-w-2xl px-4 py-10 sm:px-6 sm:py-14">
 
         {submitted ? (
+          verificationStatus === "verified" ? (
+            <div className="text-center">
+              <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-green-50 border-2 border-green-200">
+                <svg width="36" height="36" fill="none" stroke="#22c55e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+              </div>
+              <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Your profile is verified</h1>
+              <p className="mt-3 text-sm text-slate-500 max-w-md mx-auto leading-relaxed">
+                A verified badge now appears on your public profile and all job listings.
+              </p>
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+                <Link href="/recruit/dashboard" className="inline-flex items-center justify-center rounded-full bg-[#0a66c2] px-7 py-3 text-sm font-bold text-white hover:bg-[#004182] transition">
+                  Go to Dashboard
+                </Link>
+              </div>
+            </div>
+          ) : (
           // ── SUCCESS STATE ──────────────────────────────────────────────────
           <div className="text-center">
             <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-green-50 border-2 border-green-200">
@@ -339,9 +357,19 @@ function VerificationContent() {
               </Link>
             </div>
           </div>
+          )
         ) : (
           // ── VERIFICATION INFO PAGE ─────────────────────────────────────────
           <>
+            {verificationStatus === "rejected" && (
+              <div className="mb-5 rounded-2xl border border-red-200 bg-red-50 p-5">
+                <p className="text-xs font-bold text-red-800 uppercase tracking-wide mb-1">Previous request not approved</p>
+                <p className="text-sm text-red-900 leading-relaxed">
+                  Your last verification request was not approved. Update your profile details if needed, then submit a new request below.
+                </p>
+              </div>
+            )}
+
             {/* Title */}
             <div className="mb-8">
               <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-1.5 text-xs font-semibold text-slate-600 mb-4">

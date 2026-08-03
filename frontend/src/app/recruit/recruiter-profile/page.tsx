@@ -830,6 +830,17 @@ function RecruiterProfileContent() {
                 <p className="text-xs text-amber-700 mt-0.5">Your verification request has been submitted. Our team will review within 2–3 business days.</p>
               </div>
             </div>
+          ) : verificationStatus === "rejected" ? (
+            <div className="p-5 flex items-center gap-4">
+              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-700">!</div>
+              <div className="flex-1">
+                <p className="text-sm font-bold text-red-800">Verification not approved</p>
+                <p className="text-xs text-red-700 mt-0.5">Update your profile and submit a new verification request when you are ready.</p>
+              </div>
+              <button type="button" onClick={requestVerification} className="shrink-0 rounded-full bg-[#0a66c2] px-4 py-2 text-xs font-bold text-white hover:bg-[#004182] transition">
+                Request again
+              </button>
+            </div>
           ) : (
             <div className="p-5 sm:p-6">
               <div className="flex items-start gap-3 mb-4">

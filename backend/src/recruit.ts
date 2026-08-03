@@ -6522,8 +6522,14 @@ recruitRouter.post("/company/request-verification", async (req, res) => {
 
     const profile = await RecruitCompanyProfile.findOne({ uid }).lean();
     if (!profile) return res.status(404).json({ error: "Company profile not found. Please save your company profile first." });
-    if (!profile.companyName || !profile.description || !profile.website) {
-      return res.status(400).json({ error: "Please complete your company profile (name, description, and website) before requesting verification." });
+    const hasPresence = Boolean(
+      String(profile.website ?? "").trim()
+      || String(profile.linkedinUrl ?? "").trim()
+      || String(profile.personalLinkedinUrl ?? "").trim()
+      || String(profile.socialLinks?.portfolio ?? "").trim(),
+    );
+    if (!profile.companyName || !profile.description || !hasPresence) {
+      return res.status(400).json({ error: "Please complete your company profile (name, description, and website or LinkedIn/portfolio link) before requesting verification." });
     }
     if ((profile as any).verificationStatus === "verified") {
       return res.json({ status: "verified", message: "Your company is already verified." });
