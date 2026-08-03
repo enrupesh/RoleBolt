@@ -50,3 +50,39 @@ to your deployed frontend's URL.
   new Firebase project for fully independent auth.
 - **Custom domain**: once deployed, point your new domain at the frontend
   deployment (e.g. Vercel domain settings).
+
+## Billing (Phase 0 foundation)
+
+Backend billing lives under `backend/src/billing/`. Product contracts:
+
+- [`payment.md`](./payment.md) — prices, limits, customer rules
+- [`paymentgateway.md`](./paymentgateway.md) — phased implementation roadmap
+
+### One-time Free entitlement migration
+
+New signups automatically receive three Free category subscriptions
+(`seeker`, `creator_form`, `creator_standard`). Existing users need a one-time backfill:
+
+```bash
+cd backend
+npm run billing:migrate-free
+```
+
+Requires `MONGODB_URI`. The command is idempotent (`$setOnInsert` only).
+
+### Billing tests
+
+```bash
+cd backend
+npm test
+# MongoDB integration reservation tests (concurrent limits, signup records):
+MONGODB_URI=mongodb://127.0.0.1:27017/rolebolt_billing_test npm test
+# or MONGODB_TEST_URI=...
+```
+
+### Razorpay plan sync (later phases)
+
+```bash
+cd backend
+npm run billing:sync-razorpay-plans
+```

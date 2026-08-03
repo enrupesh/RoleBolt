@@ -106,6 +106,11 @@ export function normalizeStoredSubscription(
   else if (sub.status === "halted") billingWarning = "halted";
   else if (sub.cancelAtPeriodEnd || sub.status === "cancelled") billingWarning = "cancel_scheduled";
 
+  // Cancel-at-period-end keeps full paid capacity until period end.
+  // past_due / halted retain paid plan metadata for read access and warnings,
+  // but block new metered/AI work per payment.md failed-payment rules.
+  const meteredAccessAllowed = !paymentIssueButRetained;
+
   return {
     plan: sub.plan,
     interval: sub.interval,
@@ -114,7 +119,7 @@ export function normalizeStoredSubscription(
     start: sub.currentPeriodStart,
     end: sub.currentPeriodEnd,
     cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
-    meteredAccessAllowed: true,
+    meteredAccessAllowed,
     billingWarning,
   };
 }
