@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { RoleboltLogo } from "@/components/RoleboltLogo";
 import { JudgesTestingKit } from "@/components/JudgesTestingKit";
+import { MarketingFooter } from "@/components/MarketingFooter";
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 
@@ -763,6 +764,7 @@ export default function ProductPreviewPage() {
           </div>
         </div>
       </main>
+      <MarketingFooter />
 
       {/* ── Lightbox ────────────────────────────────────────────────────────── */}
       {lightbox && (

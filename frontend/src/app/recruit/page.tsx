@@ -6,6 +6,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { RoleboltLogo } from "@/components/RoleboltLogo";
 import { SiteGuideChatbot } from "@/components/SiteGuideChatbot";
+import { MarketingFooter } from "@/components/MarketingFooter";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 
 type PlatformStats = {
@@ -375,9 +376,7 @@ export default function RecruitLandingPage() {
         </section>
       </main>
 
-      <footer className="border-t border-[#dfe8ef] bg-[#f8fbfd]">
-        <div className="mx-auto flex max-w-7xl flex-col gap-5 px-5 py-8 sm:flex-row sm:items-center sm:justify-between lg:px-8"><div className="flex items-center gap-2"><RoleboltLogo size="sm" /><span className="text-sm font-semibold">Rolebolt</span></div><p className="text-xs text-[#7a8c9b]">A shared workspace for better hiring and better job searches.</p><div className="flex flex-wrap gap-x-4 gap-y-2 text-xs font-medium text-[#60778a]"><Link href="/recruit/opportunities" className="hover:text-[#0a66c2]">Find jobs</Link><Link href="/recruit/preview" className="hover:text-[#0a66c2]">Product preview</Link><Link href="/recruit/status" className="hover:text-[#0a66c2]">Status</Link><Link href="/recruit/analytics" className="hover:text-[#0a66c2]">Analytics</Link><Link href="/recruit/talent-pool" className="hover:text-[#0a66c2]">Talent pool</Link><Link href="/recruit/recruiter-profile" className="hover:text-[#0a66c2]">Recruiter profile</Link><Link href="/seeker/workspace" className="hover:text-[#0a66c2]">Seeker workspace</Link><Link href="/recruit/pricing" className="hover:text-[#0a66c2]">Plans</Link><Link href="/recruit/login" className="hover:text-[#0a66c2]">Sign in</Link></div></div>
-      </footer>
+      <MarketingFooter />
       <SiteGuideChatbot />
     </div>
   );
