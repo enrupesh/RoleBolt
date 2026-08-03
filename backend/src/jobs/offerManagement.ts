@@ -6,6 +6,10 @@ import { User } from "../models/User";
 import { sendEmail } from "../mailer";
 import { NOTIFICATION_FROM } from "../emailConfig";
 import * as emailTemplates from "../emailTemplates";
+import {
+  tryBackgroundBillingOperation,
+  backgroundIdempotencyKey,
+} from "../billing/backgroundEnforcement";
 
 const FRONTEND_URL = (() => {
   const raw = process.env.FRONTEND_URL ?? "";
@@ -41,9 +45,21 @@ export async function processOfferExpiry(): Promise<void> {
     await candidate.save();
     console.log(`[offer-cron] Marked offer expired for candidate ${candidate._id}`);
 
-    // Notify recruiter
-    setImmediate(async () => {
-      try {
+    // Phase 4: the mark-expired status transition above is a pure DB update and
+    // proceeds without metering. The recruiter notification email is a metered
+    // creator email, gated + metered at execution time via
+    // tryBackgroundBillingOperation (skipped if the owner's billing is blocked).
+    // Awaited (not fire-and-forget) so the reserve→commit completes.
+    const candidateId = String(candidate._id);
+    const ownerUid = String(candidate.uid ?? "");
+    const outcome = await tryBackgroundBillingOperation({
+      ownerUid,
+      category: "creator_standard",
+      operation: "automated_email_standard",
+      idempotencyKey: backgroundIdempotencyKey(ownerUid, ["offer-expired-email", candidateId]),
+      resourceType: "candidate",
+      resourceId: candidateId,
+      work: async () => {
         const user = await User.findOne({ uid: candidate.uid }).lean() as any;
         if (!user?.email) return;
         const job = await RecruitJob.findById(candidate.jobId).lean() as any;
@@ -60,10 +76,11 @@ export async function processOfferExpiry(): Promise<void> {
           text: `The offer for ${candidate.name} (${job?.title || ""}) has expired.`,
           from: NOTIFICATION_FROM,
         });
-      } catch (err) {
-        console.error("[offer-cron] Failed to send expiry notification:", err);
-      }
+      },
     });
+    if (!outcome.ok) {
+      console.log(`[offer-cron] Skipped expiry notification for candidate ${candidateId} — billing blocked: ${outcome.reason}`);
+    }
   }
 }
 
@@ -94,8 +111,19 @@ export async function processExpiryWarnings(): Promise<void> {
     );
     if (alreadySent) continue;
 
-    setImmediate(async () => {
-      try {
+    // Phase 4: metered creator email — gate + meter at execution time with a
+    // stable per-candidate per-daysLeft idempotency key so re-runs don't double
+    // charge. Awaited so reserve→commit completes; skipped if billing blocked.
+    const candidateId = String(candidate._id);
+    const ownerUid = String(candidate.uid ?? "");
+    const outcome = await tryBackgroundBillingOperation({
+      ownerUid,
+      category: "creator_standard",
+      operation: "automated_email_standard",
+      idempotencyKey: backgroundIdempotencyKey(ownerUid, ["offer-expiry-warning", candidateId, String(daysLeft)]),
+      resourceType: "candidate",
+      resourceId: candidateId,
+      work: async () => {
         const user = await User.findOne({ uid: candidate.uid }).lean() as any;
         if (!user?.email) return;
         const job = await RecruitJob.findById(candidate.jobId).lean() as any;
@@ -118,10 +146,11 @@ export async function processExpiryWarnings(): Promise<void> {
           timestamp: new Date(),
         });
         await candidate.save();
-      } catch (err) {
-        console.error("[offer-cron] Failed to send expiry warning:", err);
-      }
+      },
     });
+    if (!outcome.ok) {
+      console.log(`[offer-cron] Skipped expiry warning for candidate ${candidateId} — billing blocked: ${outcome.reason}`);
+    }
   }
 }
 
@@ -175,25 +204,43 @@ export async function processOfferReminders(): Promise<void> {
       ? Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
       : undefined;
 
-    setImmediate(async () => {
-      try {
-        const job = await RecruitJob.findById(candidate.jobId).lean() as any;
-        const jobTitle    = job?.title || "";
-        const companyName = (candidate.offerDetails as any)?.companyName || job?.companyName || "";
-        const offerUrl    = `${FRONTEND_URL}/recruit/offer/${(candidate as any).offerToken}`;
+    // Phase 4: candidate-facing offer reminder is an automated creator email —
+    // gate + meter at execution time. Idempotency key is stable per reminder
+    // number (remindersSent + 1) so a re-run for the same attempt does not double
+    // charge. Awaited so reserve→commit completes; skipped if billing blocked.
+    // If the provider send fails we throw so the reservation is not committed and
+    // a later run can retry under the same key without charging twice.
+    const candidateId = String(candidate._id);
+    const ownerUid = String(candidate.uid ?? "");
+    try {
+      const outcome = await tryBackgroundBillingOperation({
+        ownerUid,
+        category: "creator_standard",
+        operation: "automated_email_standard",
+        idempotencyKey: backgroundIdempotencyKey(ownerUid, ["offer-reminder", candidateId, String(remindersSent + 1)]),
+        resourceType: "candidate",
+        resourceId: candidateId,
+        work: async () => {
+          const job = await RecruitJob.findById(candidate.jobId).lean() as any;
+          const jobTitle    = job?.title || "";
+          const companyName = (candidate.offerDetails as any)?.companyName || job?.companyName || "";
+          const offerUrl    = `${FRONTEND_URL}/recruit/offer/${(candidate as any).offerToken}`;
 
-        const payload = emailTemplates.offerReminderEmail(
-          candidate.name, jobTitle, companyName, offerUrl, daysLeft
-        );
-        const result = await sendEmail({
-          to: candidate.email,
-          subject: payload.subject,
-          html: payload.html,
-          text: payload.text,
-          from: NOTIFICATION_FROM,
-        });
+          const payload = emailTemplates.offerReminderEmail(
+            candidate.name, jobTitle, companyName, offerUrl, daysLeft
+          );
+          const result = await sendEmail({
+            to: candidate.email,
+            subject: payload.subject,
+            html: payload.html,
+            text: payload.text,
+            from: NOTIFICATION_FROM,
+          });
 
-        if (result.ok) {
+          if (!result.ok) {
+            throw new Error(`offer reminder send failed for candidate ${candidateId}`);
+          }
+
           (candidate.offerReminderConfig as any).remindersSent = remindersSent + 1;
           (candidate.offerReminderConfig as any).lastReminderSentAt = new Date();
           (candidate.offerLog as any[]).push({
@@ -211,11 +258,14 @@ export async function processOfferReminders(): Promise<void> {
           } as any);
           await candidate.save();
           console.log(`[offer-cron] Reminder ${remindersSent + 1}/${maxReminders} sent to ${candidate.email}`);
-        }
-      } catch (err) {
-        console.error("[offer-cron] Failed to send reminder:", err);
+        },
+      });
+      if (!outcome.ok) {
+        console.log(`[offer-cron] Skipped reminder for candidate ${candidateId} — billing blocked: ${outcome.reason}`);
       }
-    });
+    } catch (err) {
+      console.error("[offer-cron] Failed to send reminder:", err);
+    }
   }
 }
 
