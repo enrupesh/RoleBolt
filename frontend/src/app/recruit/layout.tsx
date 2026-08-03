@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
-import { RecruitAuthProvider } from "@/contexts/RecruitAuthContext";
 import { buildMetadata, breadcrumbJsonLd, productAppJsonLd, faqJsonLd, howToJsonLd, productKeywords } from "@/lib/seo";
 import { JsonLd } from "@/components/JsonLd";
-import { SignupWelcomeModal } from "@/components/SignupWelcomeModal";
 
 export const metadata: Metadata = buildMetadata({
   title: "AI Recruiting Software & Job Search Workspace | Rolebolt",
@@ -104,10 +102,5 @@ const howTo = howToJsonLd({
 });
 
 export default function RecruitLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <RecruitAuthProvider>
-      {children}
-      <SignupWelcomeModal onlyRole="creator" />
-    </RecruitAuthProvider>
-  );
+  return children;
 }

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { apiUrl } from "@/lib/api";
 import { RoleboltLogo } from "@/components/RoleboltLogo";
+import { markSignupWelcome } from "@/lib/signupWelcome";
 
 type Status = "loading" | "success" | "error" | "expired" | "no-token";
 
@@ -26,7 +27,10 @@ function SeekerVerifyEmailContent() {
     })
       .then(async (res) => {
         const data = await res.json();
-        if (res.ok) setStatus("success");
+        if (res.ok) {
+          markSignupWelcome("seeker");
+          setStatus("success");
+        }
         else if (data.code === "TOKEN_EXPIRED") setStatus("expired");
         else {
           setStatus("error");

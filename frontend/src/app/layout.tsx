@@ -89,7 +89,7 @@ export default function RootLayout({
                 <JsonLd id="ld-rolebolt-website" data={websiteJsonLd()} />
                 <JsonLd id="ld-rolebolt-application" data={softwareApplicationJsonLd()} />
                 {children}
-                <SignupWelcomeModal onlyRole="seeker" />
+                <SignupWelcomeModal />
               </div>
             </ThemeProvider>
           </BillingEntitlementProvider>

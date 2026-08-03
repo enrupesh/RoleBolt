@@ -82,7 +82,7 @@ function OAuthCallbackInner() {
           return;
         }
 
-        if (intent === "signup") {
+        if (intent === "signup" && params.get("created") !== "0") {
           markSignupWelcome(target === "seeker" ? "seeker" : "creator");
         }
         if (!result.username?.trim()) {

@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { apiUrl } from "@/lib/api";
 import { RoleboltLogo } from "@/components/RoleboltLogo";
+import { markSignupWelcome } from "@/lib/signupWelcome";
 
 type Status = "loading" | "success" | "error" | "expired" | "no-token";
 
@@ -31,6 +32,7 @@ function VerifyEmailContent() {
         const data = await res.json();
         if (res.ok) {
           if (data.role === "seeker" || data.role === "creator") setVerifiedRole(data.role);
+          markSignupWelcome(data.role === "seeker" ? "seeker" : "creator");
           setStatus("success");
         } else if (data.code === "TOKEN_EXPIRED") {
           setStatus("expired");
