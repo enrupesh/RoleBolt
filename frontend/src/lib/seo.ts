@@ -546,6 +546,8 @@ export function productAppJsonLd(opts: {
   rating?: { value: string; count: string };
   image?: string;
   inLanguage?: string[];
+  priceCurrency?: string;
+  lowPrice?: string;
 }) {
   const url = opts.url.startsWith("http") ? opts.url : `${SITE_URL}${opts.url}`;
   const image = opts.image
@@ -568,8 +570,8 @@ export function productAppJsonLd(opts: {
     featureList: opts.features ?? [],
     offers: {
       "@type": "Offer",
-      price: "0",
-      priceCurrency: "USD",
+      price: opts.lowPrice ?? "0",
+      priceCurrency: opts.priceCurrency ?? "USD",
       availability: "https://schema.org/InStock",
     },
     ...(opts.rating

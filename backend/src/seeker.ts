@@ -38,8 +38,17 @@ import {
   isSeekerBillingError,
   isActiveSeekerTrackerStage,
 } from "./billing/seekerEnforcement";
+import {
+  isSeekerMeteredAiPath,
+  seekerAiRateLimit,
+} from "./billing/security";
 
 export const seekerRouter = express.Router();
+
+seekerRouter.use((req, res, next) => {
+  if (!isSeekerMeteredAiPath(req.method, req.path)) return next();
+  return seekerAiRateLimit(req, res, next);
+});
 
 // Helper: get uid from request (set by requireAuth middleware)
 function getUid(req: express.Request): string {

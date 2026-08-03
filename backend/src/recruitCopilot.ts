@@ -41,6 +41,7 @@ import {
   respondStandardBillingError,
   runStandardBillingOperation,
 } from "./billing/standardEnforcement";
+import { copilotTurnRateLimit } from "./billing/security";
 
 export const copilotRouter = express.Router();
 
@@ -696,7 +697,7 @@ function validateContext(context: ApiContext, data: ContextData): string | null 
 
 // ─── POST /recruit/copilot/chat ───────────────────────────────────────────────
 
-copilotRouter.post("/chat", async (req, res) => {
+copilotRouter.post("/chat", copilotTurnRateLimit, async (req, res) => {
   const uid = getUid(req);
   if (!uid) return res.status(401).json({ error: "Unauthorized" });
 
@@ -826,7 +827,7 @@ copilotRouter.post("/chat", async (req, res) => {
 
 const STREAM_SENTINEL = "---ROLEBOLT_META---";
 
-copilotRouter.post("/chat/stream", async (req, res) => {
+copilotRouter.post("/chat/stream", copilotTurnRateLimit, async (req, res) => {
   const uid = getUid(req);
   if (!uid) return res.status(401).json({ error: "Unauthorized" });
 

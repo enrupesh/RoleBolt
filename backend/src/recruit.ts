@@ -45,6 +45,7 @@ import {
 } from "./billing/standardEnforcement";
 import { getPlanDefinition } from "./billing/planCatalog";
 import { UsageLimitError } from "./billing/usage";
+import { bulkImportRateLimit, publicParseResumeRateLimit } from "./billing/security";
 import { verifyToken } from "./authMiddleware";
 import {
   type AgentAction,
@@ -76,24 +77,7 @@ const resumeUpload = multer({
   },
 });
 
-// Simple in-memory rate limiter for the expensive parse-resume route
-const parseResumeIpCounts = new Map<string, { count: number; resetAt: number }>();
-function resumeRateLimit(req: express.Request, res: express.Response, next: express.NextFunction) {
-  const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
-  const now = Date.now();
-  const window = 60_000; // 1 minute
-  const limit = 10;
-  const entry = parseResumeIpCounts.get(ip);
-  if (!entry || now > entry.resetAt) {
-    parseResumeIpCounts.set(ip, { count: 1, resetAt: now + window });
-    return next();
-  }
-  if (entry.count >= limit) {
-    return res.status(429).json({ error: "Too many resume uploads. Please wait a minute and try again." });
-  }
-  entry.count++;
-  return next();
-}
+// Expensive parse-resume route — per-user fair-use throttle (Phase 7).
 
 function trackEvent(event: string, uid?: string, data?: Record<string, unknown>) {
   UsageEvent.create({ event, uid, data: data ?? {} }).catch(() => {});
@@ -2429,7 +2413,7 @@ recruitPublicRouter.get("/profiles/creator/:username", async (req, res) => {
 // ─── Parse resume file → extract text ────────────────────────────────────────
 recruitPublicRouter.post(
   "/parse-resume",
-  resumeRateLimit,
+  publicParseResumeRateLimit,
   (req: express.Request, res: express.Response, next: express.NextFunction) => {
     resumeUpload.single("resume")(req, res, (err) => {
       if (err) {
@@ -3496,6 +3480,7 @@ async function extractResumeText(file: Express.Multer.File): Promise<string> {
 // ── Bulk resume import (SSE streaming progress) ───────────────────────────────
 recruitRouter.post(
   "/jobs/:jobId/candidates/bulk",
+  bulkImportRateLimit,
   (req: express.Request, res: express.Response, next: express.NextFunction) => {
     resumeUpload.array("resumes", 50)(req, res, (err: any) => {
       if (err) {

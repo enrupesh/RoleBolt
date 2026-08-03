@@ -15,8 +15,12 @@ import {
   formatLimit,
   PLAN_LABELS,
   pricingHref,
+  fetchBillingCatalog,
+  highlightLimits,
+  formatInrPaise,
   type BillingCategory,
   type CategoryEntitlement,
+  type PublicPlanDefinition,
   VISIBLE_COUNTERS,
 } from "@/lib/billing";
 
@@ -78,6 +82,12 @@ function UsageBar({
   );
 }
 
+function nextUpgradePlan(entitlement: CategoryEntitlement): "pro" | "ultra" | null {
+  if (entitlement.plan === "free") return "pro";
+  if (entitlement.plan === "pro") return "ultra";
+  return null;
+}
+
 function BillingContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -90,6 +100,7 @@ function BillingContent() {
   const [actionError, setActionError] = useState("");
   const [actionNotice, setActionNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [upgradePlan, setUpgradePlan] = useState<PublicPlanDefinition | null>(null);
 
   const checkoutPending = searchParams.get("checkout") === "pending";
   // Intentionally ignore legacy ?success=1 activation — never claim paid unlock client-side.
@@ -118,6 +129,42 @@ function BillingContent() {
     () => entitlements.find((item) => item.category === category) ?? null,
     [entitlements, category],
   );
+
+  useEffect(() => {
+    if (!entitlement) {
+      setUpgradePlan(null);
+      return;
+    }
+    const target = nextUpgradePlan(entitlement);
+    if (!target) {
+      setUpgradePlan(null);
+      return;
+    }
+    let cancelled = false;
+    fetchBillingCatalog()
+      .then((catalog) => {
+        if (cancelled) return;
+        const match =
+          catalog.plansByCategory.find(
+            (item) =>
+              item.category === category &&
+              item.plan === target &&
+              item.interval === entitlement.interval,
+          ) ??
+          catalog.plansByCategory.find(
+            (item) =>
+              item.category === category && item.plan === target && item.interval === "monthly",
+          ) ??
+          null;
+        setUpgradePlan(match);
+      })
+      .catch(() => {
+        if (!cancelled) setUpgradePlan(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [category, entitlement]);
 
   const warning = entitlement ? warningCopy(entitlement) : null;
   const counters = VISIBLE_COUNTERS[category];
@@ -346,6 +393,40 @@ function BillingContent() {
             </div>
           )}
         </section>
+
+        {upgradePlan && entitlement && (
+          <section className="mt-6 rounded-3xl border border-teal-100 bg-gradient-to-br from-teal-50 to-white p-6 shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-teal-700">What upgrading unlocks</p>
+                <h3 className="mt-2 font-[family-name:var(--font-display)] text-xl font-bold text-slate-900">
+                  {PLAN_LABELS[upgradePlan.plan]} for {CATEGORY_LABELS[category]}
+                </h3>
+                <p className="mt-1 text-sm text-slate-600">
+                  {formatInrPaise(upgradePlan.pricePaise, upgradePlan.interval)} ·{" "}
+                  {upgradePlan.processingPriority} queue priority
+                </p>
+              </div>
+              <Link
+                href={pricingHref(category)}
+                className="rounded-2xl bg-teal-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-teal-800"
+              >
+                Compare plans
+              </Link>
+            </div>
+            <ul className="mt-4 grid gap-2 sm:grid-cols-2">
+              {highlightLimits(category, upgradePlan.limits).map((line) => (
+                <li key={line} className="flex gap-2 text-sm text-slate-700">
+                  <span className="text-teal-600">✓</span>
+                  <span>{line}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-4 text-xs text-slate-500">
+              Manual workflows that still work on your current plan remain available when AI limits are hit.
+            </p>
+          </section>
+        )}
 
         <p className="mt-8 text-center text-xs text-slate-400">
           Payments processed by Razorpay. Checkout success never unlocks paid plans — only a verified
