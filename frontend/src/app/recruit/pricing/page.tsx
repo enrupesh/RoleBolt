@@ -125,7 +125,6 @@ function PricingContent() {
         await openRazorpaySubscriptionCheckout({
           keyId,
           subscriptionId,
-          checkoutConfigId: catalog?.razorpayCheckoutConfigId,
           description: `${CATEGORY_LABELS[category]} ${PLAN_LABELS[plan]}`,
           onSuccess: async (result) => {
             await verifyCheckout(sessionToken, result);
