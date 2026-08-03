@@ -104,9 +104,14 @@ export function normalizeStoredSubscription(
   let billingWarning: BillingWarning | undefined;
   if (sub.status === "past_due") billingWarning = "past_due";
   else if (sub.status === "halted") billingWarning = "halted";
+  else if (sub.status === "pending") billingWarning = "payment_pending";
   else if (sub.cancelAtPeriodEnd || sub.status === "cancelled") billingWarning = "cancel_scheduled";
+  else if (sub.pendingPlan && sub.pendingPlan !== sub.plan) {
+    billingWarning = "plan_change_pending";
+  }
 
   // Cancel-at-period-end keeps full paid capacity until period end.
+  // pending (Razorpay retry window) keeps full capacity with a non-blocking warning.
   // past_due / halted retain paid plan metadata for read access and warnings,
   // but block new metered/AI work per payment.md failed-payment rules.
   const meteredAccessAllowed = !paymentIssueButRetained;
@@ -154,6 +159,16 @@ export async function getEntitlement(
     cancelAtPeriodEnd: normalized.cancelAtPeriodEnd,
     meteredAccessAllowed: normalized.meteredAccessAllowed,
     billingWarning: normalized.billingWarning,
+    pendingPlan:
+      sub?.pendingPlan && isBillingPlan(sub.pendingPlan) ? sub.pendingPlan : undefined,
+    pendingInterval:
+      sub?.pendingInterval && isBillingInterval(sub.pendingInterval)
+        ? sub.pendingInterval
+        : undefined,
+    pendingChangeAt:
+      sub?.pendingChangeAt === "now" || sub?.pendingChangeAt === "cycle_end"
+        ? sub.pendingChangeAt
+        : undefined,
     definition: normalized.definition,
   };
 }

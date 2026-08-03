@@ -33,7 +33,12 @@ export interface PlanDefinition {
   catalogVersion: number;
 }
 
-export type BillingWarning = "past_due" | "halted" | "cancel_scheduled";
+export type BillingWarning =
+  | "past_due"
+  | "halted"
+  | "cancel_scheduled"
+  | "payment_pending"
+  | "plan_change_pending";
 
 /** Thrown when past_due/halted (or similar) blocks new metered work. */
 export class BillingAccessRestrictedError extends Error {
@@ -68,6 +73,10 @@ export interface ResolvedEntitlement {
   meteredAccessAllowed: boolean;
   /** Non-blocking billing state surfaced to clients when payment needs attention. */
   billingWarning?: BillingWarning;
+  /** Scheduled plan change awaiting provider confirmation (never grants access alone). */
+  pendingPlan?: BillingPlan;
+  pendingInterval?: BillingInterval;
+  pendingChangeAt?: "now" | "cycle_end";
   definition: PlanDefinition;
 }
 

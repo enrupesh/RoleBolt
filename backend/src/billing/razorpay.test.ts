@@ -79,6 +79,7 @@ describe("Razorpay provider boundary", () => {
     assert.equal(lifecycleStatus("subscription.activated", "pending"), "active");
     assert.equal(lifecycleStatus("subscription.pending", "active"), "pending");
     assert.equal(lifecycleStatus("subscription.cancelled", "cancelled"), "cancelled");
+    assert.equal(lifecycleStatus("payment.failed", "failed"), "past_due");
     assert.equal(lifecycleStatus("subscription.unknown", "unknown"), null);
     assert.equal(getRazorpayEventId({ "x-razorpay-event-id": "evt_123" }), "evt_123");
     assert.throws(() => getRazorpayEventId({}), /Missing x-razorpay-event-id/);
