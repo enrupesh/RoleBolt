@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, use } from "react";
+import { useState, useEffect, useCallback, use, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { RecruitGuard } from "@/components/RecruitGuard";
@@ -16,6 +16,7 @@ import FormTopPicks from "./FormTopPicks";
 import FormPostCreateChecklist, { markFormChecklistStep } from "@/components/FormPostCreateChecklist";
 import FormCopilotDrawer from "./FormCopilotDrawer";
 import { FormErrorNotice } from "@/components/FormErrorNotice";
+import { CreatorEmailComposer, type CreatorEmailRecipient } from "@/components/CreatorEmailComposer";
 
 type Stage =
   | "new"
@@ -1232,10 +1233,11 @@ function FormResponseInfoModal({ r, onClose }: { r: FormResponse; onClose: () =>
 
 // ─── Response card ─────────────────────────────────────────────────────────────
 
-function ResponseCard({ r, token, formId, formTitle, companyName, onUpdate, onDelete }: {
+function ResponseCard({ r, token, formId, formTitle, companyName, onUpdate, onDelete, recipientPool }: {
   r: FormResponse; token: string; formId: string; formTitle: string; companyName: string;
   onUpdate: (id: string, patch: Partial<FormResponse>) => void;
   onDelete: (id: string) => void;
+  recipientPool: CreatorEmailRecipient[];
 }) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState<"email" | "phone" | null>(null);
@@ -1259,6 +1261,7 @@ function ResponseCard({ r, token, formId, formTitle, companyName, onUpdate, onDe
   const [assessmentError, setAssessmentError] = useState("");
   const [assessmentUrl, setAssessmentUrl] = useState("");
   const [pendingStageEmail, setPendingStageEmail] = useState<FormStageEmailNotifyStage | null>(null);
+  const { user } = useRecruitAuth();
 
   async function updateStage(stage: Stage) {
     const prevStage = r.stage;
@@ -1532,10 +1535,10 @@ function ResponseCard({ r, token, formId, formTitle, companyName, onUpdate, onDe
           {displayEmail && (
             <button
               onClick={() => setShowComposeModal(true)}
-              className="flex items-center gap-1 rounded-xl border border-sky-200 bg-sky-50 px-2.5 py-1.5 text-[11px] font-semibold text-sky-600 hover:bg-sky-100 transition"
+              className="flex items-center gap-1 rounded-xl border border-[#0a66c2]/20 bg-[#0a66c2]/10 px-2.5 py-1.5 text-[11px] font-semibold text-[#0a66c2] hover:bg-[#0a66c2]/15 transition"
             >
               <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,12 2,6"/></svg>
-              Email
+              Send Email
             </button>
           )}
 
@@ -1702,14 +1705,33 @@ function ResponseCard({ r, token, formId, formTitle, companyName, onUpdate, onDe
       {/* Modals */}
       {showInfo && <FormResponseInfoModal r={r} onClose={() => setShowInfo(false)} />}
       {showComposeModal && displayEmail && (
-        <FormComposeEmailModal
-          candidateName={displayName}
-          candidateEmail={displayEmail}
-          formId={formId}
-          responseId={r._id}
-          token={token}
+        <CreatorEmailComposer
+          open={showComposeModal}
           onClose={() => setShowComposeModal(false)}
-          onSent={(entry) => setLocalEmailLog(prev => [...prev, entry])}
+          channel="form"
+          contextId={formId}
+          token={token}
+          billingCategory="creator_form"
+          initialRecipientIds={[r._id]}
+          recipientPool={recipientPool}
+          senderPreview={{
+            username: user?.username,
+            email: user?.email,
+            companyName,
+          }}
+          onSent={() => {
+            setLocalEmailLog((prev) => [
+              ...prev,
+              {
+                type: "creator_premium",
+                to: displayEmail,
+                subject: "Creator email",
+                body: "",
+                sentAt: new Date().toISOString(),
+                status: "sent",
+              },
+            ]);
+          }}
         />
       )}
       {showRejectModal && rejectionDraft && displayEmail && (
@@ -2776,6 +2798,18 @@ function FormResponsesContent({ id }: { id: string }) {
   const [exportError, setExportError] = useState<unknown>("");
   const [showCopilot, setShowCopilot] = useState(false);
 
+  const emailRecipients = useMemo<CreatorEmailRecipient[]>(
+    () =>
+      responses
+        .filter((response) => response.submittedEmail?.trim())
+        .map((response) => ({
+          id: response._id,
+          name: response.submittedName || "Applicant",
+          email: response.submittedEmail!.trim(),
+        })),
+    [responses],
+  );
+
   const { sessionToken } = useRecruitAuth();
   useEffect(() => {
     if (sessionToken) setToken(sessionToken);
@@ -3079,6 +3113,7 @@ function FormResponsesContent({ id }: { id: string }) {
                         onUpdate(responseId, patch);
                       }}
                       onDelete={onDelete}
+                      recipientPool={emailRecipients}
                     />
                   </div>
                 ))}

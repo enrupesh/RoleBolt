@@ -16,8 +16,13 @@ const NOTIFICATION_EMAIL =
   process.env.NOTIFICATION_FROM_EMAIL ||
   "notifications@rolebolt.tech";
 
+const CREATOR_OUTBOUND_EMAIL =
+  process.env.CREATOR_OUTBOUND_FROM_EMAIL ||
+  "no-reply@jobcreators.rolebolt.tech";
+
 export const AUTH_FROM = `${NAME} <${AUTH_EMAIL}>`;
 export const NOTIFICATION_FROM = `${NAME} <${NOTIFICATION_EMAIL}>`;
+export const CREATOR_OUTBOUND_FROM = `Rolebolt Job Creators <${CREATOR_OUTBOUND_EMAIL}>`;
 
 /**
  * The default is intentionally operational, not security-oriented. Every
