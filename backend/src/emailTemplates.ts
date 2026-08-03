@@ -781,3 +781,84 @@ export function formApplicationReceived(
   const text = `Hi ${applicantName},\n\nThank you for applying for ${formTitle}. We received your application and will review it soon.${ctx?.statusUrl ? `\n\nCheck status: ${ctx.statusUrl}` : ""}${officialContactPlain(ctx?.officialContactEmail)}\n\nThank you!`;
   return { subject, html, text };
 }
+
+// ── 18. Creator premium candidate email (Pro / Ultra Pro) ─────────────────────
+
+export type CreatorEmailSender = {
+  username: string;
+  email: string;
+  companyName: string;
+};
+
+function creatorEmailFooterHtml(sender: CreatorEmailSender): string {
+  const username = sender.username?.trim() || "creator";
+  const email = sender.email?.trim() || "unknown";
+  return `
+    <div data-rolebolt-immutable-footer="true" style="margin-top:28px;padding:18px 20px;border-radius:12px;background:linear-gradient(180deg,#f8fafc 0%,#f1f5f9 100%);border:1px solid #e2e8f0;">
+      <p style="margin:0 0 8px;font-size:12px;color:#64748b;line-height:1.6;text-align:center;">
+        This email was sent through <strong style="color:#0f172a;">Rolebolt</strong>.
+      </p>
+      <p style="margin:0;font-size:12px;color:#64748b;line-height:1.6;text-align:center;">
+        Sent by <strong style="color:#0f172a;">@${esc(username)}</strong>
+        <span style="color:#cbd5e1;"> · </span>
+        <a href="mailto:${esc(email)}" style="color:#0a66c2;text-decoration:none;">${esc(email)}</a>
+      </p>
+    </div>`;
+}
+
+function creatorEmailFooterPlain(sender: CreatorEmailSender): string {
+  const username = sender.username?.trim() || "creator";
+  const email = sender.email?.trim() || "unknown";
+  return `\n\n---\nThis email was sent through Rolebolt.\nSent by @${username} · ${email}`;
+}
+
+export function creatorPremiumCandidateEmail(args: {
+  candidateName: string;
+  subject: string;
+  body: string;
+  sender: CreatorEmailSender;
+}): EmailPayload {
+  const firstName = esc(args.candidateName.split(" ")[0] || args.candidateName || "there");
+  const company = esc(args.sender.companyName?.trim() || "Your hiring team");
+  const subject = args.subject.trim();
+  const bodyHtml = nl2br(args.body.trim());
+  const footerHtml = creatorEmailFooterHtml(args.sender);
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>${esc(subject)}</title>
+</head>
+<body style="margin:0;padding:0;background:#eef2f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#eef2f7;padding:36px 16px;">
+    <tr><td align="center">
+      <table width="100%" style="max-width:560px;background:#ffffff;border-radius:20px;border:1px solid #e2e8f0;overflow:hidden;box-shadow:0 18px 50px rgba(15,23,42,0.08);">
+        <tr>
+          <td style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 55%,#0a66c2 100%);padding:28px 32px;">
+            <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:rgba(255,255,255,0.55);">Verified creator message</p>
+            <p style="margin:0;font-size:22px;font-weight:800;color:#ffffff;letter-spacing:-0.03em;line-height:1.2;">${company}</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:32px 32px 28px;">
+            <p style="margin:0 0 18px;font-size:15px;color:#0f172a;line-height:1.65;">Hi <strong>${firstName}</strong>,</p>
+            <div style="font-size:15px;color:#334155;line-height:1.75;">${bodyHtml}</div>
+            ${footerHtml}
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:16px 32px 24px;background:#fafbfc;border-top:1px solid #f1f5f9;text-align:center;">
+            <p style="margin:0;font-size:11px;color:#94a3b8;line-height:1.5;">
+              © ${new Date().getFullYear()} Rolebolt · <a href="https://www.rolebolt.tech" style="color:#94a3b8;text-decoration:none;">rolebolt.tech</a>
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+  const text = `Hi ${args.candidateName.split(" ")[0] || args.candidateName},\n\n${args.body.trim()}${creatorEmailFooterPlain(args.sender)}`;
+  return { subject, html, text };
+}

@@ -5,6 +5,12 @@ import { RecruitJob } from "../models/RecruitJob";
 import { RecruitProfile } from "../models/RecruitProfile";
 import { User } from "../models/User";
 import { setCompanyVerificationStatus } from "./companyVerificationSync";
+import {
+  grantAdminPlans,
+  lookupAdminUser,
+  revokeAdminPlans,
+} from "./adminPlanGrant";
+import { BILLING_CATEGORIES, type BillingCategory } from "../billingTypes";
 
 export const raka98AdminRouter = Router();
 
@@ -192,6 +198,95 @@ raka98AdminRouter.post("/verification-requests/:uid/unverify", async (req, res) 
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to unverify company.";
     console.error("[admin] POST unverify", err);
+    return res.status(500).json({ error: message });
+  }
+});
+
+raka98AdminRouter.get("/users/lookup", async (req, res) => {
+  try {
+    await connectMongo();
+    const query = String(req.query.q ?? "").trim();
+    if (!query) return res.status(400).json({ error: "Enter an email or username." });
+
+    const user = await lookupAdminUser(query);
+    if (!user) return res.status(404).json({ error: "User not found." });
+    return res.json({ user });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to look up user.";
+    console.error("[admin] GET /users/lookup", err);
+    return res.status(500).json({ error: message });
+  }
+});
+
+function parseCategories(input: unknown): BillingCategory[] {
+  const raw = Array.isArray(input) ? input : [];
+  const categories = raw
+    .map((value) => String(value).trim())
+    .filter((value): value is BillingCategory =>
+      (BILLING_CATEGORIES as readonly string[]).includes(value),
+    );
+  return Array.from(new Set(categories));
+}
+
+raka98AdminRouter.post("/users/:uid/plans/grant", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = String(req.params.uid || "").trim();
+    if (!uid) return res.status(400).json({ error: "Missing uid." });
+
+    const plan = String(req.body?.plan ?? "").trim();
+    const interval = String(req.body?.interval ?? "monthly").trim();
+    const categories = parseCategories(req.body?.categories);
+    const note = String(req.body?.note ?? "").trim();
+
+    if (plan !== "pro" && plan !== "ultra") {
+      return res.status(400).json({ error: "Plan must be pro or ultra." });
+    }
+    if (categories.length === 0) {
+      return res.status(400).json({ error: "Select at least one category." });
+    }
+
+    const result = await grantAdminPlans({
+      userId: uid,
+      categories,
+      plan,
+      interval: interval === "yearly" ? "yearly" : "monthly",
+      note,
+    });
+
+    return res.json({
+      ok: true,
+      message: `Granted ${plan} on ${categories.length} categor${categories.length === 1 ? "y" : "ies"}.`,
+      ...result,
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to grant plan.";
+    console.error("[admin] POST /users/plans/grant", err);
+    return res.status(500).json({ error: message });
+  }
+});
+
+raka98AdminRouter.post("/users/:uid/plans/revoke", async (req, res) => {
+  try {
+    await connectMongo();
+    const uid = String(req.params.uid || "").trim();
+    if (!uid) return res.status(400).json({ error: "Missing uid." });
+
+    const categories = parseCategories(req.body?.categories);
+    const note = String(req.body?.note ?? "").trim();
+    if (categories.length === 0) {
+      return res.status(400).json({ error: "Select at least one category." });
+    }
+
+    const result = await revokeAdminPlans({ userId: uid, categories, note });
+    return res.json({
+      ok: true,
+      message: `Reset ${categories.length} categor${categories.length === 1 ? "y" : "ies"} to Free.`,
+      ...result,
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to revoke plan.";
+    console.error("[admin] POST /users/plans/revoke", err);
     return res.status(500).json({ error: message });
   }
 });

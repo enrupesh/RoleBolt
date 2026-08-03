@@ -3,6 +3,21 @@ import { apiUrl, readApiJson } from "./api";
 export const RAKA98_ADMIN_PASSWORD = "raka@9800";
 export const RAKA98_ADMIN_SESSION_KEY = "raka98_admin_authed";
 
+export type AdminUserLookup = {
+  uid: string;
+  email: string;
+  username: string;
+  name: string;
+  entitlements: Array<{
+    category: "seeker" | "creator_form" | "creator_standard";
+    plan: "free" | "pro" | "ultra";
+    interval: "monthly" | "yearly";
+    status: string;
+    periodEnd: string | null;
+    billingWarning: string | null;
+  }>;
+};
+
 export type VerificationRequestStatus = "pending" | "verified" | "rejected" | "all";
 
 export type AdminVerificationRequest = {

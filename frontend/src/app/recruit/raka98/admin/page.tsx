@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { VerificationAdminPanel } from "@/components/VerificationAdminPanel";
+import { PlanGrantAdminPanel } from "@/components/PlanGrantAdminPanel";
 import { RAKA98_ADMIN_PASSWORD, RAKA98_ADMIN_SESSION_KEY } from "@/lib/raka98Admin";
+
+type AdminTab = "verification" | "plans";
 
 function AdminLogin({ onSuccess }: { onSuccess: () => void }) {
   const [input, setInput] = useState("");
@@ -68,6 +71,8 @@ function AdminLogin({ onSuccess }: { onSuccess: () => void }) {
 }
 
 function AdminShell({ onLock }: { onLock: () => void }) {
+  const [tab, setTab] = useState<AdminTab>("verification");
+
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white">
       <header className="border-b border-white/8 px-6 py-4 flex items-center justify-between sticky top-0 bg-[#0a0a0f]/95 backdrop-blur z-10">
@@ -104,8 +109,33 @@ function AdminShell({ onLock }: { onLock: () => void }) {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-6 py-10">
-        <VerificationAdminPanel />
+      <main className="max-w-6xl mx-auto px-6 py-10 space-y-8">
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setTab("verification")}
+            className={`rounded-full px-4 py-2 text-xs font-semibold border transition ${
+              tab === "verification"
+                ? "bg-white text-black border-white"
+                : "border-white/10 text-white/45 hover:border-white/20"
+            }`}
+          >
+            Verification
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab("plans")}
+            className={`rounded-full px-4 py-2 text-xs font-semibold border transition ${
+              tab === "plans"
+                ? "bg-white text-black border-white"
+                : "border-white/10 text-white/45 hover:border-white/20"
+            }`}
+          >
+            Plan grants
+          </button>
+        </div>
+
+        {tab === "verification" ? <VerificationAdminPanel /> : <PlanGrantAdminPanel />}
       </main>
     </div>
   );

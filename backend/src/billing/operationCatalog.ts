@@ -37,6 +37,7 @@ const operations: BillingOperation[] = [
   { key: "assessment_score_form", category: "creator_form", units: 1, counter: "ai_units", description: "Score a Form Job assessment response." },
   { key: "assessment_send_form", category: "creator_form", units: 0, counter: "assessment_sends", description: "Send a Form Job assessment invitation." },
   { key: "automated_email_form", category: "creator_form", units: 0, counter: "automated_emails", description: "Send a Form Job automated email." },
+  { key: "creator_premium_email_form", category: "creator_form", units: 0, counter: "automated_emails", description: "Send a premium creator email to Form Job applicants (Pro/Ultra)." },
   // Stage-only rule firings — metered for access/audit, not against automated_emails.
   { key: "pipeline_rule_execution_form", category: "creator_form", units: 0, description: "Execute a Form Job pipeline rule action." },
   { key: "export_form", category: "creator_form", units: 0, counter: "exports", description: "Export Form Job responses." },
@@ -61,6 +62,7 @@ const operations: BillingOperation[] = [
   { key: "assessment_score_standard", category: "creator_standard", units: 1, counter: "ai_units", description: "Score a Standard Job assessment response." },
   { key: "assessment_send_standard", category: "creator_standard", units: 0, counter: "assessment_invitations", description: "Send a Standard Job assessment invitation." },
   { key: "automated_email_standard", category: "creator_standard", units: 0, counter: "automated_emails", description: "Send a Standard Job automated email." },
+  { key: "creator_premium_email_standard", category: "creator_standard", units: 0, counter: "automated_emails", description: "Send a premium creator email to Standard Job candidates (Pro/Ultra)." },
   // Stage-only rule firings — metered for access/audit, not against automated_emails.
   { key: "pipeline_rule_execution", category: "creator_standard", units: 0, description: "Execute a Standard Job pipeline rule action." },
   { key: "export_standard", category: "creator_standard", units: 0, counter: "exports", description: "Export Standard Job data." },
