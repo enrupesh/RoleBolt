@@ -4,9 +4,10 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { VerificationAdminPanel } from "@/components/VerificationAdminPanel";
 import { PlanGrantAdminPanel } from "@/components/PlanGrantAdminPanel";
+import { FeedbackAdminPanel } from "@/components/FeedbackAdminPanel";
 import { RAKA98_ADMIN_PASSWORD, RAKA98_ADMIN_SESSION_KEY } from "@/lib/raka98Admin";
 
-type AdminTab = "verification" | "plans";
+type AdminTab = "verification" | "plans" | "feedback";
 
 function AdminLogin({ onSuccess }: { onSuccess: () => void }) {
   const [input, setInput] = useState("");
@@ -133,9 +134,20 @@ function AdminShell({ onLock }: { onLock: () => void }) {
           >
             Plan grants
           </button>
+          <button
+            type="button"
+            onClick={() => setTab("feedback")}
+            className={`rounded-full px-4 py-2 text-xs font-semibold border transition ${
+              tab === "feedback"
+                ? "bg-white text-black border-white"
+                : "border-white/10 text-white/45 hover:border-white/20"
+            }`}
+          >
+            Feedback
+          </button>
         </div>
 
-        {tab === "verification" ? <VerificationAdminPanel /> : <PlanGrantAdminPanel />}
+        {tab === "verification" ? <VerificationAdminPanel /> : tab === "plans" ? <PlanGrantAdminPanel /> : <FeedbackAdminPanel />}
       </main>
     </div>
   );
