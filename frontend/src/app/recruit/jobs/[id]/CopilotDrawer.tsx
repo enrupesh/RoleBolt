@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { apiUrl } from "@/lib/api";
+import { apiUrl, readApiJson } from "@/lib/api";
 import { ArrowUp, Briefcase, CircleStop, Sparkles, X } from "lucide-react";
 
 type Msg = {
@@ -82,7 +82,20 @@ export default function CopilotDrawer({
         signal: controller.signal,
       });
 
-      if (!res.ok || !res.body) throw new Error("Stream failed");
+      if (!res.ok || !res.body) {
+        const contentType = res.headers.get("content-type") || "";
+        if (contentType.includes("application/json")) {
+          const data = await readApiJson(res).catch(() => ({} as any));
+          throw new Error(
+            data.message
+              || (data.error === "PLAN_LIMIT_REACHED"
+                ? "Standard Copilot limit reached for this billing period."
+                : data.error)
+              || "Stream failed",
+          );
+        }
+        throw new Error("Stream failed");
+      }
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -128,7 +141,9 @@ export default function CopilotDrawer({
           prev.map(m => m.id === aiId ? {
             ...m,
             isStreaming: false,
-            content: m.content || "Something went wrong. Please try again.",
+            content: m.content
+              || (err instanceof Error ? err.message : "")
+              || "Something went wrong. Please try again.",
           } : m),
         );
       }

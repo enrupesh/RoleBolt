@@ -3,6 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import {
   assertResourceLimit,
   assertWithinLimit,
+  assertUsageLimit,
   requireFeature,
   serializeBillingError,
   FeatureNotAvailableError,
@@ -91,6 +92,21 @@ export async function assertStandardBulkActionSize(
     });
   }
   assertWithinLimit(entitlement, "bulk_action_size", 1, { used: 0, reserved: 0 });
+}
+
+/**
+ * Ensure a bulk resume import batch fits remaining `bulk_import_files` quota
+ * (Free: 3 files/period) before SSE starts.
+ */
+export async function assertStandardBulkImportFileCount(
+  ownerUid: string,
+  fileCount: number,
+): Promise<void> {
+  if (!Number.isSafeInteger(fileCount) || fileCount <= 0) {
+    throw new BillingConfigurationError("Bulk import file count must be a positive integer.");
+  }
+  const entitlement = await getEntitlement(ownerUid, STANDARD_BILLING_CATEGORY);
+  await assertUsageLimit(entitlement, "bulk_import_files", fileCount);
 }
 
 export interface RunStandardOperationInput<T> {
