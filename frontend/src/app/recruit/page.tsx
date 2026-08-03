@@ -9,12 +9,6 @@ import { SiteGuideChatbot } from "@/components/SiteGuideChatbot";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 
-type PlatformStats = {
-  activeJobs: number;
-  candidatesScreened: number;
-  recruiters: number;
-};
-
 const capabilities = [
   {
     number: "01",
@@ -103,43 +97,11 @@ function Check() {
   );
 }
 
-function Stats({ stats }: { stats: PlatformStats | null }) {
-  const items = stats
-    ? [
-        [stats.recruiters.toLocaleString(), "recruiting teams"],
-        [stats.activeJobs.toLocaleString(), "active opportunities"],
-        [stats.candidatesScreened.toLocaleString(), "candidate profiles assessed"],
-      ]
-    : [
-        ["One", "workspace for every hiring stage"],
-        ["Two", "ways to build an opportunity"],
-        ["One", "shared source of truth"],
-      ];
-  return (
-    <div className="mx-auto grid max-w-5xl grid-cols-1 divide-y divide-[#dbe5ee] border-y border-[#dbe5ee] sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-      {items.map(([value, label]) => (
-        <div key={label} className="px-6 py-6 text-center sm:py-7">
-          <p className="font-display text-2xl font-semibold tracking-[-0.04em] text-[#10263d]">{value}</p>
-          <p className="mt-1 text-xs font-medium uppercase tracking-[0.12em] text-[#6e8193]">{label}</p>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export default function RecruitLandingPage() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [stats, setStats] = useState<PlatformStats | null>(null);
   const router = useRouter();
   const { authUser, recruitProfile, loading, signOutFromRecruit } = useRecruitAuth();
   const isLoggedIn = Boolean(authUser && recruitProfile);
-
-  useEffect(() => {
-    fetch("/backend/stats/public")
-      .then((response) => (response.ok ? response.json() : null))
-      .then((data) => data && setStats(data))
-      .catch(() => undefined);
-  }, []);
 
   useEffect(() => {
     if (!loading && isLoggedIn) router.replace("/recruit/dashboard");
@@ -247,8 +209,6 @@ export default function RecruitLandingPage() {
           </div>
         </section>
 
-        <section aria-label="Platform snapshot" className="bg-white px-5 py-2 lg:px-8"><Stats stats={stats} /></section>
-
         <section id="how-it-works" className="border-b border-[#dfe8ef] bg-[#f8fbfd] scroll-mt-20">
           <div className="mx-auto max-w-7xl px-5 py-24 lg:px-8">
             <div className="max-w-2xl">
@@ -328,7 +288,7 @@ export default function RecruitLandingPage() {
         <section id="ai-copilot" className="border-b border-[#dfe8ef] bg-[#10263d] scroll-mt-20">
           <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 py-24 lg:grid-cols-[.8fr_1.2fr] lg:px-8">
             <div><p className="text-xs font-semibold uppercase tracking-[.17em] text-[#8ec7f7]">A useful copilot</p><h2 className="mt-4 font-display text-4xl font-semibold leading-tight tracking-[-.055em] text-white">Ask the work. Keep the judgement.</h2><p className="mt-5 text-base leading-7 text-[#b7c9d8]">Rolebolt Copilot works across your jobs, candidates, resumes and assessments. Ask for a comparison, an interview brief or a missing skill — then verify the answer in context.</p></div>
-            <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/95 shadow-[0_18px_50px_rgba(0,0,0,.18)]"><Image src="/screenshots/ai-copilot.png" alt="Rolebolt AI Copilot showing candidate context and prompts" width={1024} height={576} loading="lazy" className="h-auto w-full" /></div>
+            <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/95 shadow-[0_18px_50px_rgba(0,0,0,.18)]"><Image src="/screenshots/ai-copilot-rolebolt.png" alt="Rolebolt AI Copilot showing candidate context and prompts" width={1024} height={576} loading="lazy" className="h-auto w-full" /></div>
           </div>
         </section>
 

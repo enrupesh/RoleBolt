@@ -106,7 +106,7 @@ const SCREENSHOTS: Screenshot[] = [
     badge: "Candidate",
   },
   {
-    src: "/screenshots/ai-copilot.png",
+    src: "/screenshots/ai-copilot-rolebolt.png",
     title: "AI Copilot",
     desc: "Ask natural-language questions about a candidate, a job's pipeline, or your entire hiring organisation, and get sourced, data-grounded answers instantly.",
     category: "AI Evaluation",
