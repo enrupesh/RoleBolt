@@ -225,7 +225,6 @@ export default function RecruitLandingPage() {
                 <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                   <Link href="/recruit/signup" className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0a66c2] px-5 py-3.5 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(10,102,194,.18)] transition hover:-translate-y-0.5 hover:bg-[#07559f]">Build your hiring workspace <Arrow /></Link>
                   <Link href="/recruit/opportunities" className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#cbd9e4] bg-white px-5 py-3.5 text-sm font-semibold text-[#31536e] transition hover:border-[#0a66c2] hover:text-[#0a66c2]">Explore open roles <Arrow /></Link>
-                  <Link href="/recruit/preview" className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#cbd9e4] bg-white/70 px-5 py-3.5 text-sm font-semibold text-[#31536e] transition hover:border-[#0a66c2] hover:text-[#0a66c2]">See product preview <Arrow /></Link>
                 </div>
                 <p className="mt-4 text-xs text-[#7a8c9b]">Start with the entry plan. Upgrade when your workflow needs more.</p>
               </div>
@@ -285,7 +284,7 @@ export default function RecruitLandingPage() {
 
         <section id="product" className="border-y border-[#dfe8ef] bg-white scroll-mt-20">
           <div className="mx-auto max-w-7xl px-5 py-24 lg:px-8">
-             <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between"><div className="max-w-2xl"><p className="text-xs font-semibold uppercase tracking-[.17em] text-[#0a66c2]">The product, in practice</p><h2 className="mt-4 font-display text-4xl font-semibold tracking-[-.055em] text-[#10263d]">A more considered path from “we’re hiring” to “welcome aboard”.</h2></div><Link href="/recruit/preview" className="inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-[#0a66c2] transition hover:gap-3">Open product preview <Arrow /></Link></div>
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between"><div className="max-w-2xl"><p className="text-xs font-semibold uppercase tracking-[.17em] text-[#0a66c2]">The product, in practice</p><h2 className="mt-4 font-display text-4xl font-semibold tracking-[-.055em] text-[#10263d]">A more considered path from “we’re hiring” to “welcome aboard”.</h2></div></div>
             <div className="mt-14 space-y-20 lg:mt-20">
               {capabilities.map((item, index) => (
                 <article key={item.number} className={`grid items-center gap-10 lg:grid-cols-2 lg:gap-20 ${index % 2 ? "lg:[&>div:first-child]:order-2" : ""}`}>
