@@ -1,929 +1,382 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { useRouter } from "next/navigation";
 import { RoleboltLogo } from "@/components/RoleboltLogo";
 import { SiteGuideChatbot } from "@/components/SiteGuideChatbot";
+import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 
-// ─── Data ────────────────────────────────────────────────────────────────────
+type PlatformStats = {
+  activeJobs: number;
+  candidatesScreened: number;
+  recruiters: number;
+};
 
-const NICHES = [
+const capabilities = [
   {
-    label: "AI, Data & Software", desc: "Engineers, PMs, data scientists, ML researchers", full: "AI, Data, Software & Product Tech", accent: "from-blue-500/10 to-indigo-500/10 border-blue-500/20 hover:border-blue-400/40", iconColor: "text-blue-500",
-    icon: <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="m9 8 2 2-2 2M13 12h2"/></svg>,
+    number: "01",
+    eyebrow: "Run the room",
+    title: "A hiring command center that keeps the signal visible.",
+    copy: "Job Health shows what is moving, what needs attention, and where a role is losing momentum. See the hiring timeline, live assessment progress, and next best action without opening six tabs.",
+    image: "/screenshots/dashboard.png",
+    alt: "Rolebolt hiring dashboard showing active roles and candidate pipeline",
+    accent: "bg-[#e7f0ff]",
   },
   {
-    label: "Sales & Business Dev", desc: "AEs, SDRs, BDMs, revenue leaders", full: "Sales, Business Development & Revenue Roles", accent: "from-emerald-500/10 to-teal-500/10 border-emerald-500/20 hover:border-emerald-400/40", iconColor: "text-emerald-500",
-    icon: <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>,
+    number: "02",
+    eyebrow: "Make better calls",
+    title: "A pipeline built for judgement, not just storage.",
+    copy: "Bring in resumes in bulk, calibrate an AI rubric, compare candidates against the actual job, and use what-if simulation before you move someone forward. Review-zone actions and Autopilot rules take care of the repeatable work.",
+    image: "/screenshots/pipeline.png",
+    alt: "Rolebolt applicant tracking pipeline with candidate fit scores",
+    accent: "bg-[#f3edff]",
   },
   {
-    label: "Finance & Fintech", desc: "Analysts, CFOs, bankers, fintech specialists", full: "Finance, Accounting, Banking & Fintech", accent: "from-amber-500/10 to-yellow-500/10 border-amber-500/20 hover:border-amber-400/40", iconColor: "text-amber-500",
-    icon: <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>,
-  },
-  {
-    label: "Healthcare & Pharma", desc: "Doctors, nurses, pharma, allied health", full: "Healthcare, Pharma & Allied Medical Workforce", accent: "from-rose-500/10 to-pink-500/10 border-rose-500/20 hover:border-rose-400/40", iconColor: "text-rose-500",
-    icon: <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>,
-  },
-  {
-    label: "Blue-Collar & Logistics", desc: "Drivers, technicians, warehouse, field ops", full: "Skilled Blue-Collar, Logistics & Industrial Workforce", accent: "from-orange-500/10 to-amber-500/10 border-orange-500/20 hover:border-orange-400/40", iconColor: "text-orange-500",
-    icon: <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>,
-  },
-  {
-    label: "Creative & Marketing", desc: "Designers, copywriters, brand, growth", full: "Creative, Marketing, Media & Design", accent: "from-violet-500/10 to-purple-500/10 border-violet-500/20 hover:border-violet-400/40", iconColor: "text-violet-500",
-    icon: <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>,
+    number: "03",
+    eyebrow: "Go structured",
+    title: "Form jobs for the roles that need a little more context.",
+    copy: "Build structured applications, score async assessments, and see an applicant timeline from first answer to final review. Form Copilot helps you shape questions that reveal how someone thinks.",
+    image: "/screenshots/form-jobs.png",
+    alt: "Rolebolt form jobs workspace for structured applications",
+    accent: "bg-[#e8f7f3]",
   },
 ];
 
-const FEATURES = [
-  {
-    icon: (
-      <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-    ),
-    title: "AI Job Description Writer",
-    desc: "Generate a complete, role-specific JD in seconds. Just enter the title and skills — Rolebolt writes the rest, tailored to your industry niche.",
-    tag: "Create",
-  },
-  {
-    icon: (
-      <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-    ),
-    title: "Resume Parsing & AI Scoring",
-    desc: "Every applicant gets a 0–100 AI fit score the moment they apply. Skills, experience, seniority — all calibrated to your rubric, not generic keywords.",
-    tag: "Evaluate",
-  },
-  {
-    icon: (
-      <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
-    ),
-    title: "Async Candidate Assessments",
-    desc: "Send AI-generated written assessments to candidates. Responses are automatically scored and summarised — no scheduling required.",
-    tag: "Evaluate",
-  },
-  {
-    icon: (
-      <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-    ),
-    title: "Interview Brief Generator",
-    desc: "One click produces a tailored interview brief with key focus areas, red-flag questions, and a scorecard — ready before your first call.",
-    tag: "Evaluate",
-  },
-  {
-    icon: (
-      <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-    ),
-    title: "Analytics & Funnel Insights",
-    desc: "Track every stage of your hiring funnel — applications, scores, conversions, time-to-hire. Make data-driven decisions, not gut calls.",
-    tag: "Decide",
-  },
-  {
-    icon: (
-      <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M20 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
-    ),
-    title: "Talent Pool Management",
-    desc: "Every candidate who ever applied is searchable. When a new role opens, surface the right people in seconds — never start from scratch.",
-    tag: "Decide",
-  },
-  {
-    icon: (
-      <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-    ),
-    title: "AI Copilot — ask about anyone, anytime",
-    desc: "Chat with an AI that already knows your jobs, candidates, resumes, and scores. Ask \"who should I interview first?\" or \"summarise this candidate\" and get grounded, sourced answers instantly.",
-    tag: "Decide",
-  },
+const recruiterFeatures = [
+  ["Job analysis & rubric", "Turn a job brief into clear, reviewable criteria."],
+  ["Offers, without the scramble", "Draft, version, send and share a candidate signing link."],
+  ["Collaboration in context", "Keep notes, decisions and feedback alongside the candidate."],
+  ["Talent pool reuse", "Find strong people from past applications when a new role opens."],
+  ["Analytics you can use", "Understand funnel movement, source quality and hiring pace."],
+  ["AI Copilot", "Ask about a candidate, a role or your organisation and get grounded answers."],
 ];
 
-const STEPS = [
-  {
-    n: "01",
-    title: "Post a job in 90 seconds",
-    desc: "Enter a job title. Rolebolt's AI generates a complete, industry-calibrated job description and scoring rubric. Publish instantly to your public job board.",
-  },
-  {
-    n: "02",
-    title: "AI screens every applicant",
-    desc: "Candidates upload their resume. Our AI parses it, matches it against your rubric, and assigns a 0–100 fit score — instantly, for every applicant.",
-  },
-  {
-    n: "03",
-    title: "Decide fast, hire confident",
-    desc: "Sort by AI score, run async assessments on shortlisted candidates, generate interview briefs, and make your hire. All in one place, completely free.",
-  },
+const seekerFeatures = [
+  ["Public opportunities", "Discover roles from teams that are actively hiring."],
+  ["Candidate match", "See how your experience maps to a role before you apply."],
+  ["A calmer application flow", "Save progress, submit structured answers and track every update."],
+  ["Your job-search workspace", "Keep applications, resumes, cover letters and interview prep together."],
 ];
 
-const PAINS = [
-  {
-    icon: <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
-    title: "Reading 200 resumes wastes weeks",
-    desc: "Recruiters spend 80% of their time on manual screening — before a single qualified candidate is even contacted.",
-  },
-  {
-    icon: <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>,
-    title: "Keyword filters miss great candidates",
-    desc: "Legacy ATS systems reject strong candidates who use different terminology. You're filtering by vocabulary, not capability.",
-  },
-  {
-    icon: <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>,
-    title: "Hiring tools charge per seat, per job",
-    desc: "Greenhouse, Lever, and LinkedIn Recruiter are built for enterprises. SMBs and startups pay for features they barely use.",
-  },
+const workflowSteps = [
+  ["01", "Shape the role", "Start with a standard job or a structured form job. Use job analysis, a review rubric and clear criteria before you publish."],
+  ["02", "Bring in the signal", "Share a public opportunity, invite applications or import resumes in bulk. Rolebolt keeps every profile and answer connected to the role."],
+  ["03", "Review with context", "Use fit signals, assessments, applicant timelines, collaboration and What-If simulation to decide where human attention matters most."],
+  ["04", "Move the work forward", "Let Autopilot and pipeline rules handle repeatable actions, then collaborate, send an offer, and keep the hiring timeline clear."],
 ];
 
-const WHY = [
-  { label: "AI fit score on every resume", rolebolt: true, others: false },
-  { label: "JD generated in seconds", rolebolt: true, others: false },
-  { label: "Async assessments built-in", rolebolt: true, others: false },
-  { label: "Multi-model AI (1000+ LLMs)", rolebolt: true, others: false },
-  { label: "6 niche industry categories", rolebolt: true, others: false },
-  { label: "Interview brief generator", rolebolt: true, others: false },
-  { label: "Completely free", rolebolt: true, others: false },
-  { label: "Talent pool with search", rolebolt: true, others: true },
-  { label: "AI Copilot chat across your pipeline", rolebolt: true, others: false },
+const nicheCards = [
+  ["Technology & product", "Engineering, data, AI, product and design teams.", "bg-[#e9f2ff]"],
+  ["Sales & growth", "Revenue, business development, marketing and customer teams.", "bg-[#eaf8f2]"],
+  ["Finance & fintech", "Accounting, finance, banking and operations roles.", "bg-[#fff5df]"],
+  ["Healthcare & pharma", "Clinical, allied health and life-science hiring.", "bg-[#fff0f3]"],
+  ["Operations & logistics", "Field, skilled, blue-collar and industrial workforces.", "bg-[#fff1e8]"],
+  ["Professional services", "Consulting, legal, research and specialist teams.", "bg-[#f2edff]"],
 ];
 
-const AI_CAPABILITIES = [
-  {
-    title: "Multi-model routing", desc: "Powered by Google M API — routes each task to the optimal model across GPT, Claude, Gemini, and 1000+ LLMs. Best output, every time.",
-    icon: <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>,
-  },
-  {
-    title: "Automatic fallbacks", desc: "If a provider goes down, requests reroute in under 100ms. Your hiring pipeline never stops because of an LLM outage.",
-    icon: <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>,
-  },
-  {
-    title: "Structured AI output", desc: "All scoring, summaries, and JDs return validated JSON — not raw prose. Data you can trust, not just text you have to parse.",
-    icon: <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>,
-  },
-  {
-    title: "Model-agnostic prompts", desc: "Prompt logic is centralised and reused across features. Consistent, version-controlled AI behaviour across the entire platform.",
-    icon: <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>,
-  },
+const comparisonRows = [
+  ["Standard job pipeline", true, true],
+  ["Structured form jobs", true, false],
+  ["Rubric-based candidate review", true, false],
+  ["Async assessments and live progress", true, false],
+  ["Pipeline rules and Autopilot actions", true, false],
+  ["Offer versions and candidate signing link", true, false],
+  ["Candidate workspace with job-search tools", true, false],
 ];
 
-// ─── Animated counter hook ───────────────────────────────────────────────────
-
-function useCountUp(target: number, duration = 1400) {
-  const [val, setVal] = useState(0);
-  useEffect(() => {
-    if (target === 0) return;
-    const steps = 40;
-    const increment = target / steps;
-    let current = 0;
-    const timer = setInterval(() => {
-      current += increment;
-      if (current >= target) { setVal(target); clearInterval(timer); }
-      else { setVal(Math.floor(current)); }
-    }, duration / steps);
-    return () => clearInterval(timer);
-  }, [target, duration]);
-  return val;
+function Arrow() {
+  return (
+    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
+    </svg>
+  );
 }
 
-// ─── LiveStatsBar component ───────────────────────────────────────────────────
-
-function StatCell({ value, label, prefix = "", suffix = "", isLive }: {
-  value: number; label: string; prefix?: string; suffix?: string; isLive?: boolean;
-}) {
-  const count = useCountUp(value);
-  const display = value >= 1000
-    ? (count >= 1000 ? `${(count / 1000).toFixed(count >= 10000 ? 0 : 1)}k` : count.toString())
-    : count.toString();
-
+function Check() {
   return (
-    <div className="py-7 px-4 sm:px-6 text-center">
-      <div className="flex items-center justify-center gap-1.5">
-        <p className="text-2xl font-black text-slate-950 tracking-tight tabular-nums">
-          {prefix}{display}{suffix}
-        </p>
-        {isLive && (
-          <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-        )}
-      </div>
-      <p className="text-xs text-slate-500 mt-1 font-medium">{label}</p>
+    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#e8f3ff] text-[#0a66c2]">
+      <svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 4 4L19 6" /></svg>
+    </span>
+  );
+}
+
+function Stats({ stats }: { stats: PlatformStats | null }) {
+  const items = stats
+    ? [
+        [stats.recruiters.toLocaleString(), "recruiting teams"],
+        [stats.activeJobs.toLocaleString(), "active opportunities"],
+        [stats.candidatesScreened.toLocaleString(), "candidate profiles assessed"],
+      ]
+    : [
+        ["One", "workspace for every hiring stage"],
+        ["Two", "ways to build an opportunity"],
+        ["One", "shared source of truth"],
+      ];
+  return (
+    <div className="mx-auto grid max-w-5xl grid-cols-1 divide-y divide-[#dbe5ee] border-y border-[#dbe5ee] sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+      {items.map(([value, label]) => (
+        <div key={label} className="px-6 py-6 text-center sm:py-7">
+          <p className="font-display text-2xl font-semibold tracking-[-0.04em] text-[#10263d]">{value}</p>
+          <p className="mt-1 text-xs font-medium uppercase tracking-[0.12em] text-[#6e8193]">{label}</p>
+        </div>
+      ))}
     </div>
   );
 }
 
-function LiveStatsBar({ stats }: { stats: { activeJobs: number; candidatesScreened: number; recruiters: number } | null }) {
-  // Static fallback stats shown while loading or if fetch fails
-  if (!stats) {
-    return (
-      <section className="border-b border-slate-100 bg-white">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-slate-100">
-            {[
-              { val: "1,000+", label: "AI Models via Google M API" },
-              { val: "6",      label: "Niche industry verticals" },
-              { val: "< 2s",   label: "Resume scored in" },
-              { val: "₹0",     label: "Cost to recruiters" },
-            ].map(s => (
-              <div key={s.label} className="py-7 px-4 sm:px-6 text-center">
-                <p className="text-2xl font-black text-slate-950 tracking-tight">{s.val}</p>
-                <p className="text-xs text-slate-500 mt-1 font-medium">{s.label}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-    );
-  }
-
-  return (
-    <section className="border-b border-slate-100 bg-white">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        {/* LIVE badge */}
-        <div className="flex justify-center pt-4 pb-1">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-600">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            Live platform stats
-          </span>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-slate-100">
-          <StatCell value={stats.recruiters}         label="Recruiters on platform"    isLive />
-          <StatCell value={stats.activeJobs}         label="Active job listings"        isLive />
-          <StatCell value={stats.candidatesScreened} label="Candidates screened by AI"  isLive />
-          <div className="py-7 px-4 sm:px-6 text-center">
-            <p className="text-2xl font-black text-slate-950 tracking-tight">₹0</p>
-            <p className="text-xs text-slate-500 mt-1 font-medium">Cost to recruiters</p>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// ─── Component ────────────────────────────────────────────────────────────────
-
-type LiveStats = { activeJobs: number; candidatesScreened: number; recruiters: number };
-
 export default function RecruitLandingPage() {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [stats, setStats] = useState<PlatformStats | null>(null);
   const router = useRouter();
-  const { recruitProfile, authUser, loading, signOutFromRecruit } = useRecruitAuth();
-  const role = recruitProfile?.role ?? null;
-  const isLoggedIn = !!authUser && !!recruitProfile;
+  const { authUser, recruitProfile, loading, signOutFromRecruit } = useRecruitAuth();
+  const isLoggedIn = Boolean(authUser && recruitProfile);
 
-  // Live stats state
-  const [liveStats, setLiveStats] = useState<LiveStats | null>(null);
-
-  // Fetch live platform stats (no auth needed)
   useEffect(() => {
     fetch("/backend/stats/public")
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d) setLiveStats(d); })
-      .catch(() => {});
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => data && setStats(data))
+      .catch(() => undefined);
   }, []);
 
-  // Auto-redirect authenticated users straight to the dashboard
   useEffect(() => {
-    if (!loading && isLoggedIn) {
-      router.replace("/recruit/dashboard");
-    }
+    if (!loading && isLoggedIn) router.replace("/recruit/dashboard");
   }, [loading, isLoggedIn, router]);
 
-  // While auth is resolving, show nothing to avoid a flash of the landing page
-  if (loading) return null;
+  if (loading) return <div className="min-h-[100dvh] bg-[#f8fbfd]" />;
 
-  async function handleSignOut() {
+  async function signOut() {
     try {
       await signOutFromRecruit();
-    } catch {}
-    router.replace("/recruit/login");
+    } finally {
+      router.replace("/recruit/login");
+    }
   }
 
   return (
-    <div className="min-h-screen bg-white text-slate-900 overflow-x-hidden">
-
-      {/* ── Nav ─────────────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-xl border-b border-slate-200/70 shadow-[0_1px_0_rgba(0,0,0,0.04),0_2px_16px_rgba(0,0,0,0.04)]">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-          <Link href="/" className="flex items-center gap-2.5 shrink-0 group">
-            <RoleboltLogo size="md" className="transition-all group-hover:shadow-[0_4px_14px_rgba(10,102,194,0.4)] group-hover:scale-105" />
-            <div>
-              <p className="text-sm font-bold text-slate-900 leading-none tracking-tight">Rolebolt</p>
-              <p className="text-[10px] text-slate-400 leading-none mt-0.5 font-medium tracking-wide">AI Hiring Platform</p>
-            </div>
+    <div className="min-h-[100dvh] overflow-x-hidden bg-[#f8fbfd] text-[#10263d]">
+      <header className="sticky top-0 z-50 border-b border-[#dfe8ef]/80 bg-[#f8fbfd]/90 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 lg:px-8">
+          <Link href="/" className="flex items-center gap-2.5" aria-label="Rolebolt home">
+            <RoleboltLogo size="md" />
+            <span className="font-display text-[15px] font-semibold tracking-[-0.03em]">Rolebolt</span>
           </Link>
-
-          <nav className="hidden md:flex items-center gap-0.5">
-            <Link href="/recruit/opportunities" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">Find Jobs</Link>
-            <a href="#how-it-works" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">How it Works</a>
-            <a href="#features" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">Features</a>
-            <a href="#ai-copilot" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">AI Copilot</a>
-            <a href="#why-rolebolt" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">Why Rolebolt</a>
-            <a href="#team" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">Team</a>
-            {!isLoggedIn && <Link href="/recruit/signup" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">For Recruiters</Link>}
-            {isLoggedIn && role === "creator" && <>
-              <Link href="/recruit/dashboard" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">Dashboard</Link>
-              <Link href="/recruit/analytics" className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">Analytics</Link>
-            </>}
+          <nav className="hidden items-center gap-1 md:flex" aria-label="Primary navigation">
+            <Link href="/recruit/opportunities" className="rounded-lg px-3 py-2 text-sm text-[#5d7285] transition hover:bg-white hover:text-[#10263d]">Find jobs</Link>
+            <a href="#how-it-works" className="rounded-lg px-3 py-2 text-sm text-[#5d7285] transition hover:bg-white hover:text-[#10263d]">How it works</a>
+            <a href="#recruiters" className="rounded-lg px-3 py-2 text-sm text-[#5d7285] transition hover:bg-white hover:text-[#10263d]">For recruiters</a>
+            <a href="#seekers" className="rounded-lg px-3 py-2 text-sm text-[#5d7285] transition hover:bg-white hover:text-[#10263d]">For job seekers</a>
+            <a href="#product" className="rounded-lg px-3 py-2 text-sm text-[#5d7285] transition hover:bg-white hover:text-[#10263d]">Product</a>
+            <Link href="/recruit/pricing" className="rounded-lg px-3 py-2 text-sm text-[#5d7285] transition hover:bg-white hover:text-[#10263d]">Plans</Link>
           </nav>
-
-          <div className="flex items-center gap-2 shrink-0">
-            {isLoggedIn ? <>
-              <Link href="/recruit/dashboard" className="hidden sm:inline-flex rounded-lg border border-slate-200 px-3.5 py-2 text-[13px] font-medium text-slate-700 hover:bg-slate-50 transition-all">Dashboard</Link>
-              <button onClick={handleSignOut} className="hidden sm:inline-flex rounded-lg border border-slate-200 px-3.5 py-2 text-[13px] font-medium text-slate-500 hover:bg-slate-50 transition-all">Sign out</button>
-            </> : <>
-              <Link href="/recruit/login" className="hidden sm:inline-flex rounded-lg border border-slate-200 px-3.5 py-2 text-[13px] font-medium text-slate-700 hover:bg-slate-50 transition-all">Sign in</Link>
-              <Link href="/recruit/signup" className="inline-flex rounded-lg bg-[#0a66c2] px-3.5 py-2 text-[13px] font-bold text-white shadow-[0_2px_8px_rgba(10,102,194,0.3)] hover:bg-[#004182] hover:shadow-[0_4px_14px_rgba(10,102,194,0.4)] hover:-translate-y-px transition-all">Get started free</Link>
-            </>}
-            <button onClick={() => setMobileMenuOpen(o => !o)} aria-label="Menu" className="md:hidden h-8 w-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition">
-              {mobileMenuOpen
-                ? <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
-                : <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>}
+          <div className="flex items-center gap-2">
+            {isLoggedIn ? (
+              <>
+                <Link href="/recruit/dashboard" className="hidden rounded-lg border border-[#d7e2eb] bg-white px-3.5 py-2 text-sm font-medium text-[#38546d] transition hover:border-[#0a66c2] sm:inline-flex">Dashboard</Link>
+                <button onClick={signOut} className="hidden rounded-lg px-3.5 py-2 text-sm text-[#6e8193] transition hover:bg-white sm:inline-flex">Sign out</button>
+              </>
+            ) : (
+              <>
+                <Link href="/recruit/login" className="hidden px-3.5 py-2 text-sm font-medium text-[#38546d] sm:inline-flex">Sign in</Link>
+                <Link href="/recruit/signup" className="inline-flex items-center gap-2 rounded-lg bg-[#0a66c2] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_5px_16px_rgba(10,102,194,.18)] transition hover:-translate-y-0.5 hover:bg-[#07559f]">Get started <Arrow /></Link>
+              </>
+            )}
+            <button aria-label="Toggle navigation" onClick={() => setMenuOpen((open) => !open)} className="flex h-10 w-10 items-center justify-center rounded-lg border border-[#d7e2eb] bg-white md:hidden">
+              {menuOpen ? (
+                <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
+              ) : (
+                <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+              )}
             </button>
           </div>
         </div>
-        {mobileMenuOpen && (
-          <div className="md:hidden border-t border-slate-100 bg-white px-4 pb-5 pt-3">
-            <nav className="flex flex-col gap-1">
-              <Link href="/recruit/opportunities" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Find Jobs</Link>
-              <a href="#how-it-works" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">How it Works</a>
-              <a href="#features" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Features</a>
-              <a href="#ai-copilot" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">AI Copilot</a>
-              <a href="#why-rolebolt" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Why Rolebolt</a>
-              <a href="#team" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Team</a>
-              {isLoggedIn ? <>
-                <Link href="/recruit/dashboard" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Dashboard</Link>
-                <button onClick={() => { setMobileMenuOpen(false); handleSignOut(); }} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-500 hover:bg-slate-50 text-left">Sign out</button>
-              </> : <>
-                <Link href="/recruit/login" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Sign in</Link>
-                <Link href="/recruit/signup" onClick={() => setMobileMenuOpen(false)} className="mt-1 rounded-xl bg-[#0a66c2] px-4 py-3 text-center text-sm font-bold text-white">Get started free →</Link>
-              </>}
-            </nav>
-          </div>
+        {menuOpen && (
+          <nav className="border-t border-[#dfe8ef] bg-[#f8fbfd] px-5 py-3 md:hidden">
+            <div className="mx-auto flex max-w-7xl flex-col gap-1">
+              <Link onClick={() => setMenuOpen(false)} href="/recruit/opportunities" className="rounded-lg px-3 py-3 text-sm">Find jobs</Link>
+              <a onClick={() => setMenuOpen(false)} href="#how-it-works" className="rounded-lg px-3 py-3 text-sm">How it works</a>
+              <a onClick={() => setMenuOpen(false)} href="#recruiters" className="rounded-lg px-3 py-3 text-sm">For recruiters</a>
+              <a onClick={() => setMenuOpen(false)} href="#seekers" className="rounded-lg px-3 py-3 text-sm">For job seekers</a>
+              <a onClick={() => setMenuOpen(false)} href="#product" className="rounded-lg px-3 py-3 text-sm">Product</a>
+              <Link onClick={() => setMenuOpen(false)} href="/recruit/pricing" className="rounded-lg px-3 py-3 text-sm">Plans</Link>
+            </div>
+          </nav>
         )}
       </header>
 
-      {/* ── Hero ────────────────────────────────────────────────────────────── */}
-      <section className="relative bg-slate-950 overflow-hidden">
-        {/* Grid background */}
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:64px_64px] pointer-events-none" />
-        {/* Glow orbs */}
-        <div className="absolute -top-40 -left-40 h-[600px] w-[600px] rounded-full bg-[#0a66c2]/20 blur-[100px] pointer-events-none" />
-        <div className="absolute -bottom-20 -right-20 h-[500px] w-[500px] rounded-full bg-indigo-600/15 blur-[100px] pointer-events-none" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[800px] w-[800px] rounded-full bg-[#0a66c2]/5 blur-[120px] pointer-events-none" />
-
-        <div className="relative mx-auto max-w-7xl px-4 pt-20 pb-16 sm:px-6 sm:pt-28 sm:pb-20 lg:px-8 lg:pt-32 lg:pb-28">
-          <div className="mx-auto max-w-4xl text-center">
-
-
-            {/* Badge */}
-            <div className="inline-flex items-stretch rounded-lg border border-[#0a66c2]/35 bg-slate-950/70 text-[11px] font-bold mb-8 overflow-hidden">
-              {/* Left: Google M API brand tab */}
-              <div className="flex items-center gap-1.5 bg-[#0a66c2]/18 px-3.5 py-2 border-r border-[#0a66c2]/25">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-                <span className="text-[#60a5fa] tracking-wide">Powered by Google M API</span>
+      <main>
+        <section className="relative overflow-hidden border-b border-[#dfe8ef]">
+          <div className="pointer-events-none absolute -left-24 top-16 h-80 w-80 rounded-full bg-[#d9ecff] blur-3xl" />
+          <div className="pointer-events-none absolute -right-24 top-0 h-96 w-96 rounded-full bg-[#e7e1ff] blur-3xl" />
+          <div className="relative mx-auto max-w-7xl px-5 pb-20 pt-20 lg:px-8 lg:pb-24 lg:pt-28">
+            <div className="grid items-center gap-14 lg:grid-cols-[1fr_0.92fr] lg:gap-20">
+              <div>
+                <p className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#cbddea] bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-[#3873a5]">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#2bb58a]" /> AI hiring workspace
+                </p>
+                <h1 className="max-w-3xl font-display text-5xl font-semibold leading-[1.03] tracking-[-0.065em] text-[#10263d] sm:text-6xl lg:text-[4.75rem]">
+                  Better hiring starts with a clearer view.
+                </h1>
+                <p className="mt-7 max-w-xl text-lg leading-8 text-[#5d7285]">
+                  Rolebolt brings jobs, applications, candidate assessment, hiring automation and job search into one thoughtful workspace — for teams and the people they hope to meet.
+                </p>
+                <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+                  <Link href="/recruit/signup" className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0a66c2] px-5 py-3.5 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(10,102,194,.18)] transition hover:-translate-y-0.5 hover:bg-[#07559f]">Build your hiring workspace <Arrow /></Link>
+                  <Link href="/recruit/opportunities" className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#cbd9e4] bg-white px-5 py-3.5 text-sm font-semibold text-[#31536e] transition hover:border-[#0a66c2] hover:text-[#0a66c2]">Explore open roles <Arrow /></Link>
+                </div>
+                <p className="mt-4 text-xs text-[#7a8c9b]">Start with the entry plan. Upgrade when your workflow needs more.</p>
               </div>
-              {/* Right: stats + hackathon link */}
-              <div className="flex items-center gap-2.5 px-3.5 py-2 text-slate-400">
-                <span>1,000+ AI Models</span>
-                <span className="text-slate-600 font-normal">·</span>
-                <a
-                  href="https://hack.meshapi.ai/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-[#93c5fd] hover:text-white transition-colors"
-                >
-                  Mesh Hackathon 2026
-                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                </a>
+              <div className="relative">
+                <div className="absolute -inset-3 rounded-3xl bg-white/70 shadow-[0_22px_60px_rgba(34,72,104,.12)] ring-1 ring-[#d9e5ee]" />
+                <div className="relative overflow-hidden rounded-2xl border border-[#d9e5ee] bg-white">
+                  <div className="flex items-center justify-between border-b border-[#edf1f5] px-5 py-4">
+                    <div><p className="text-[11px] font-semibold uppercase tracking-[.14em] text-[#8093a4]">Hiring command center</p><p className="mt-1 text-sm font-semibold">AI Backend Engineer</p></div>
+                    <span className="rounded-full bg-[#e7f8f0] px-2.5 py-1 text-[10px] font-semibold text-[#188866]">Healthy</span>
+                  </div>
+                  <Image src="/screenshots/dashboard.png" alt="Rolebolt dashboard preview" width={1024} height={576} priority loading="eager" className="h-auto w-full object-cover" />
+                  <div className="grid grid-cols-3 divide-x border-t border-[#edf1f5] bg-[#fbfcfd]">
+                    <div className="px-4 py-4"><p className="text-xl font-semibold text-[#10263d]">11</p><p className="text-[10px] text-[#8093a4]">candidates</p></div>
+                    <div className="px-4 py-4"><p className="text-xl font-semibold text-[#10263d]">4</p><p className="text-[10px] text-[#8093a4]">shortlisted</p></div>
+                    <div className="px-4 py-4"><p className="text-xl font-semibold text-[#10263d]">2d</p><p className="text-[10px] text-[#8093a4]">next action</p></div>
+                  </div>
+                </div>
               </div>
             </div>
+          </div>
+        </section>
 
-            {/* Headline */}
-            <h1 className="text-5xl font-black tracking-tight text-white sm:text-6xl lg:text-7xl leading-[1.04]">
-              Hire the best.<br />
-              <span className="bg-gradient-to-r from-[#60a5fa] via-[#3b82f6] to-[#818cf8] bg-clip-text text-transparent">
-                In half the time.
-              </span>
-            </h1>
+        <section aria-label="Platform snapshot" className="bg-white px-5 py-2 lg:px-8"><Stats stats={stats} /></section>
 
-            {/* Sub */}
-            <p className="mt-6 text-lg text-slate-400 leading-relaxed max-w-2xl mx-auto">
-              Rolebolt is an AI-powered hiring platform that writes job descriptions, scores every resume, and runs candidate assessments automatically — so you can focus on the humans, not the paperwork.
-            </p>
-
-            {/* CTAs */}
-            {isLoggedIn ? (
-              <div className="mt-10 flex flex-col sm:flex-row gap-3 justify-center">
-                <Link href="/recruit/dashboard" className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0a66c2] px-8 py-4 text-sm font-bold text-white shadow-[0_4px_24px_rgba(10,102,194,0.5)] hover:bg-[#1d77d2] hover:-translate-y-0.5 transition-all">
-                  Go to Dashboard
-                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-                </Link>
-                <Link href="/recruit/jobs/new" className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/8 px-8 py-4 text-sm font-bold text-white hover:bg-white/14 hover:-translate-y-0.5 transition-all backdrop-blur-sm">
-                  Post a New Job
-                </Link>
-                <Link href="/recruit/preview" className="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-400/30 bg-amber-400/8 px-8 py-4 text-sm font-bold text-amber-200 hover:bg-amber-400/15 hover:border-amber-400/50 hover:-translate-y-0.5 transition-all backdrop-blur-sm">
-                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-                  Explore Product Preview
-                </Link>
-              </div>
-            ) : (
-              <div className="mt-10 flex flex-col sm:flex-row gap-3 justify-center">
-                <Link href="/recruit/signup" className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0a66c2] px-8 py-4 text-sm font-bold text-white shadow-[0_4px_24px_rgba(10,102,194,0.5)] hover:bg-[#1d77d2] hover:-translate-y-0.5 transition-all">
-                  Start hiring free
-                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-                </Link>
-                <Link href="/recruit/preview" className="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-400/30 bg-amber-400/8 px-8 py-4 text-sm font-bold text-amber-200 hover:bg-amber-400/15 hover:border-amber-400/50 hover:-translate-y-0.5 transition-all backdrop-blur-sm">
-                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-                  Explore Product Preview
-                </Link>
-              </div>
-            )}
-
-            {/* Trust row */}
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
-              {["No credit card required", "Completely free forever", "AI-powered scoring", "Global reach"].map(t => (
-                <span key={t} className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
-                  <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" className="text-emerald-500"><polyline points="20 6 9 17 4 12"/></svg>
-                  {t}
-                </span>
+        <section id="how-it-works" className="border-b border-[#dfe8ef] bg-[#f8fbfd] scroll-mt-20">
+          <div className="mx-auto max-w-7xl px-5 py-24 lg:px-8">
+            <div className="max-w-2xl">
+              <p className="text-xs font-semibold uppercase tracking-[.17em] text-[#0a66c2]">How it works</p>
+              <h2 className="mt-4 font-display text-4xl font-semibold tracking-[-.055em] text-[#10263d]">A clear path from first brief to next step.</h2>
+              <p className="mt-5 text-base leading-7 text-[#647a8d]">Rolebolt keeps the workflow connected, so your team can spend less time moving information between tools and more time making thoughtful decisions.</p>
+            </div>
+            <div className="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              {workflowSteps.map(([number, title, copy]) => (
+                <article key={number} className="rounded-2xl border border-[#d9e5ee] bg-white p-6 shadow-[0_8px_24px_rgba(32,79,112,.05)]">
+                  <p className="font-display text-3xl font-semibold tracking-[-.06em] text-[#b4d2ea]">{number}</p>
+                  <h3 className="mt-7 text-sm font-semibold text-[#203d56]">{title}</h3>
+                  <p className="mt-2 text-sm leading-6 text-[#718496]">{copy}</p>
+                </article>
               ))}
             </div>
-
           </div>
+        </section>
 
-          {/* Hero UI mockup */}
-          <div className="mt-16 relative mx-auto max-w-4xl">
-            <div className="absolute -inset-1 bg-gradient-to-r from-[#0a66c2]/40 via-indigo-500/30 to-[#0a66c2]/40 rounded-2xl blur-lg opacity-60" />
-            <div className="relative rounded-2xl border border-white/10 bg-slate-900/80 backdrop-blur-sm overflow-hidden shadow-[0_32px_80px_rgba(0,0,0,0.5)]">
-              {/* Window bar */}
-              <div className="flex items-center gap-2 px-4 py-3 border-b border-white/6">
-                <div className="flex gap-1.5">
-                  <div className="h-3 w-3 rounded-full bg-slate-700" />
-                  <div className="h-3 w-3 rounded-full bg-slate-700" />
-                  <div className="h-3 w-3 rounded-full bg-slate-700" />
-                </div>
-                <div className="flex-1 flex items-center justify-center">
-                  <div className="rounded-md bg-slate-800 px-3 py-1 text-[11px] text-slate-500 font-mono">rolebolt.tech/recruit/dashboard</div>
-                </div>
-              </div>
-              {/* Mock dashboard content */}
-              <div className="p-5 sm:p-7">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-1">AI Hiring Dashboard</p>
-                    <p className="text-base font-bold text-white">Senior AI Engineer — 47 Applicants</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-semibold text-slate-400">Filters</div>
-                    <div className="rounded-lg bg-[#0a66c2] px-3 py-1.5 text-[11px] font-bold text-white">+ Assess</div>
-                  </div>
-                </div>
-                {/* Stat pills */}
-                <div className="grid grid-cols-4 gap-3 mb-6">
-                  {[
-                    { label: "Total Applied", val: "47" },
-                    { label: "AI Scored", val: "47" },
-                    { label: "Score 80+", val: "12" },
-                    { label: "Shortlisted", val: "5" },
-                  ].map(s => (
-                    <div key={s.label} className="rounded-xl border border-white/8 bg-white/4 px-3 py-3 text-center">
-                      <p className="text-xl font-black text-white">{s.val}</p>
-                      <p className="text-[10px] text-slate-500 mt-0.5 font-medium">{s.label}</p>
-                    </div>
-                  ))}
-                </div>
-                {/* Candidate rows */}
-                <div className="space-y-2">
-                  {[
-                    { name: "Aryan Sharma", role: "ML Engineer · 4 yrs", score: 94, flag: "Strong Match", flagColor: "bg-emerald-500/15 text-emerald-400 border-emerald-500/25" },
-                    { name: "Priya Nair", role: "AI Researcher · 6 yrs", score: 91, flag: "Strong Match", flagColor: "bg-emerald-500/15 text-emerald-400 border-emerald-500/25" },
-                    { name: "Rohan Mehta", role: "Backend Engineer · 3 yrs", score: 78, flag: "Good Fit", flagColor: "bg-blue-500/15 text-blue-400 border-blue-500/25" },
-                    { name: "Sneha Iyer", role: "Data Scientist · 2 yrs", score: 61, flag: "Partial Fit", flagColor: "bg-amber-500/15 text-amber-400 border-amber-500/25" },
-                  ].map((c, i) => (
-                    <div key={i} className="flex items-center justify-between gap-4 rounded-xl border border-white/6 bg-white/3 px-4 py-3 hover:border-[#0a66c2]/40 hover:bg-white/6 transition-all group cursor-pointer">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="h-8 w-8 rounded-full bg-gradient-to-br from-[#0a66c2]/60 to-indigo-600/60 flex items-center justify-center text-[11px] font-bold text-white shrink-0">
-                          {c.name.split(" ").map(w => w[0]).join("")}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-white truncate group-hover:text-[#60a5fa] transition-colors">{c.name}</p>
-                          <p className="text-[11px] text-slate-500">{c.role}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3 shrink-0">
-                        <span className={`hidden sm:inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${c.flagColor}`}>{c.flag}</span>
-                        <div className={`flex h-9 w-9 items-center justify-center rounded-xl text-sm font-black ${c.score >= 85 ? "bg-emerald-500/20 text-emerald-400" : c.score >= 70 ? "bg-blue-500/20 text-blue-400" : "bg-amber-500/20 text-amber-400"}`}>{c.score}</div>
-                      </div>
-                    </div>
-                  ))}
-                  <div className="flex items-center justify-center py-2 text-[11px] text-slate-600 font-medium">+ 43 more applicants ranked by AI</div>
-                </div>
-              </div>
+        <section id="recruiters" className="mx-auto max-w-7xl scroll-mt-20 px-5 py-24 lg:px-8">
+          <div className="grid gap-12 lg:grid-cols-[.72fr_1fr] lg:gap-24">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[.17em] text-[#0a66c2]">For recruiting teams</p>
+              <h2 className="mt-4 font-display text-4xl font-semibold leading-tight tracking-[-.055em] text-[#10263d]">The applicant tracking system that shows the work behind the work.</h2>
+              <p className="mt-5 text-base leading-7 text-[#5d7285]">Use standard jobs for a familiar pipeline, or form jobs when structured applications are the better signal. Rolebolt gives your team the context to move with care and confidence.</p>
+              <Link href="/recruit/signup" className="mt-7 inline-flex items-center gap-2 text-sm font-semibold text-[#0a66c2] hover:gap-3 transition-all">Start building for your team <Arrow /></Link>
+            </div>
+            <div className="grid gap-x-10 gap-y-8 sm:grid-cols-2">
+              {recruiterFeatures.map(([title, copy]) => <div key={title} className="flex gap-3"><Check /><div><h3 className="text-sm font-semibold text-[#203d56]">{title}</h3><p className="mt-1.5 text-sm leading-6 text-[#718496]">{copy}</p></div></div>)}
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* ── Live Stats bar ──────────────────────────────────────────────────── */}
-      <LiveStatsBar stats={liveStats} />
-
-      {/* ── How it works ────────────────────────────────────────────────────── */}
-      <section id="how-it-works" className="py-20 bg-white">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="max-w-2xl mx-auto text-center mb-14">
-            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#0a66c2] mb-3">How it works</p>
-            <h2 className="text-3xl font-black text-slate-950 tracking-tight sm:text-4xl leading-tight">
-              From job post to<br />hire in 3 steps.
-            </h2>
-            <p className="mt-4 text-slate-500 leading-relaxed">No training required. No complex setup. Just post, let AI do the screening, and hire.</p>
+        <section id="product" className="border-y border-[#dfe8ef] bg-white scroll-mt-20">
+          <div className="mx-auto max-w-7xl px-5 py-24 lg:px-8">
+            <div className="max-w-2xl"><p className="text-xs font-semibold uppercase tracking-[.17em] text-[#0a66c2]">The product, in practice</p><h2 className="mt-4 font-display text-4xl font-semibold tracking-[-.055em] text-[#10263d]">A more considered path from “we’re hiring” to “welcome aboard”.</h2></div>
+            <div className="mt-14 space-y-20 lg:mt-20">
+              {capabilities.map((item, index) => (
+                <article key={item.number} className={`grid items-center gap-10 lg:grid-cols-2 lg:gap-20 ${index % 2 ? "lg:[&>div:first-child]:order-2" : ""}`}>
+                  <div><div className="flex items-center gap-3 text-xs font-semibold uppercase tracking-[.16em] text-[#0a66c2]"><span>{item.number}</span><span className="h-px w-8 bg-[#a9c9e3]" />{item.eyebrow}</div><h3 className="mt-5 max-w-lg font-display text-3xl font-semibold leading-tight tracking-[-.05em] text-[#10263d]">{item.title}</h3><p className="mt-5 max-w-lg text-base leading-7 text-[#647a8d]">{item.copy}</p></div>
+                  <div className={`rounded-2xl p-3 ${item.accent}`}><div className="overflow-hidden rounded-xl border border-white bg-white shadow-[0_14px_35px_rgba(33,71,103,.12)]"><Image src={item.image} alt={item.alt} width={1024} height={576} loading="lazy" className="h-auto w-full" /></div></div>
+                </article>
+              ))}
+            </div>
           </div>
-          <div className="relative max-w-4xl mx-auto">
-            {/* Connector line */}
-            <div className="hidden sm:block absolute top-[2.25rem] left-[calc(16.67%+1.5rem)] right-[calc(16.67%+1.5rem)] h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
-            <div className="grid gap-8 sm:grid-cols-3">
-              {STEPS.map((step) => (
-                <div key={step.n} className="relative flex flex-col items-start sm:items-center sm:text-center">
-                  <div className="flex h-[4.5rem] w-[4.5rem] shrink-0 items-center justify-center rounded-2xl bg-blue-50 border-2 border-[#0a66c2]/20 shadow-[0_2px_12px_rgba(10,102,194,0.12)] mb-5">
-                    <span className="text-2xl font-black text-[#0a66c2]">{step.n}</span>
-                  </div>
-                  <h3 className="text-base font-bold text-slate-950 mb-2">{step.title}</h3>
-                  <p className="text-sm text-slate-500 leading-relaxed">{step.desc}</p>
+        </section>
+
+        <section id="industries" className="border-b border-[#dfe8ef] bg-white scroll-mt-20">
+          <div className="mx-auto max-w-7xl px-5 py-24 lg:px-8">
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+              <div className="max-w-2xl">
+                <p className="text-xs font-semibold uppercase tracking-[.17em] text-[#0a66c2]">Built for the work you do</p>
+                <h2 className="mt-4 font-display text-4xl font-semibold tracking-[-.055em] text-[#10263d]">Useful across teams, not just one kind of role.</h2>
+                <p className="mt-5 text-base leading-7 text-[#647a8d]">Use focused role context and review criteria across the markets where hiring quality matters.</p>
+              </div>
+              <Link href="/recruit/opportunities" className="inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-[#0a66c2] hover:gap-3 transition-all">Browse open roles <Arrow /></Link>
+            </div>
+            <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {nicheCards.map(([title, copy, accent]) => (
+                <Link key={title} href="/recruit/opportunities" className={`rounded-2xl border border-[#d9e5ee] ${accent} p-6 transition hover:-translate-y-1 hover:shadow-[0_12px_28px_rgba(32,79,112,.1)]`}>
+                  <h3 className="text-sm font-semibold text-[#203d56]">{title}</h3>
+                  <p className="mt-2 text-sm leading-6 text-[#718496]">{copy}</p>
+                  <span className="mt-5 inline-flex items-center gap-1 text-xs font-semibold text-[#0a66c2]">Explore opportunities <Arrow /></span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section id="seekers" className="scroll-mt-20 bg-[#eef6fb]">
+          <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 py-24 lg:grid-cols-[1fr_1.08fr] lg:px-8">
+            <div><p className="text-xs font-semibold uppercase tracking-[.17em] text-[#0a66c2]">For job seekers</p><h2 className="mt-4 font-display text-4xl font-semibold leading-tight tracking-[-.055em] text-[#10263d]">Your next role deserves more than a browser tab.</h2><p className="mt-5 max-w-xl text-base leading-7 text-[#5d7285]">Discover public opportunities, understand your match, and keep the whole search moving in one place — from resume and cover letter to interview preparation.</p><div className="mt-7 flex flex-col gap-3 sm:flex-row"><Link href="/recruit/opportunities" className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#10263d] px-5 py-3.5 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#1d405c]">Find your next opportunity <Arrow /></Link><Link href="/seeker/workspace" className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#cbd9e4] bg-white px-5 py-3.5 text-sm font-semibold text-[#31536e] transition hover:border-[#0a66c2]">Open your workspace <Arrow /></Link></div></div>
+            <div className="grid gap-4 sm:grid-cols-2">{seekerFeatures.map(([title, copy], index) => <div key={title} className={`rounded-2xl border border-[#d4e4ee] bg-white p-6 shadow-[0_8px_26px_rgba(32,79,112,.06)] ${index === 1 ? "sm:translate-y-8" : ""}`}><div className="mb-8 flex h-9 w-9 items-center justify-center rounded-lg bg-[#e7f0ff] text-sm font-semibold text-[#0a66c2]">0{index + 1}</div><h3 className="text-sm font-semibold text-[#203d56]">{title}</h3><p className="mt-2 text-sm leading-6 text-[#718496]">{copy}</p></div>)}</div>
+          </div>
+        </section>
+
+        <section id="ai-copilot" className="border-b border-[#dfe8ef] bg-[#10263d] scroll-mt-20">
+          <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 py-24 lg:grid-cols-[.8fr_1.2fr] lg:px-8">
+            <div><p className="text-xs font-semibold uppercase tracking-[.17em] text-[#8ec7f7]">A useful copilot</p><h2 className="mt-4 font-display text-4xl font-semibold leading-tight tracking-[-.055em] text-white">Ask the work. Keep the judgement.</h2><p className="mt-5 text-base leading-7 text-[#b7c9d8]">Rolebolt Copilot works across your jobs, candidates, resumes and assessments. Ask for a comparison, an interview brief or a missing skill — then verify the answer in context.</p></div>
+            <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/95 shadow-[0_18px_50px_rgba(0,0,0,.18)]"><Image src="/screenshots/ai-copilot.png" alt="Rolebolt AI Copilot showing candidate context and prompts" width={1024} height={576} loading="lazy" className="h-auto w-full" /></div>
+          </div>
+        </section>
+
+        <section id="why-rolebolt" className="border-b border-[#dfe8ef] bg-white scroll-mt-20">
+          <div className="mx-auto max-w-4xl px-5 py-24 lg:px-8">
+            <div className="mx-auto max-w-2xl text-center">
+              <p className="text-xs font-semibold uppercase tracking-[.17em] text-[#0a66c2]">Why Rolebolt</p>
+              <h2 className="mt-4 font-display text-4xl font-semibold tracking-[-.055em] text-[#10263d]">One workspace for the decisions that matter.</h2>
+              <p className="mt-5 text-base leading-7 text-[#647a8d]">Instead of stitching together a job board, form builder, spreadsheet, assessment tool and offer workflow, keep the context with the candidate and the role.</p>
+            </div>
+            <div className="mt-12 overflow-hidden rounded-2xl border border-[#d9e5ee] shadow-[0_14px_35px_rgba(33,71,103,.08)]">
+              <div className="grid grid-cols-[1fr_72px_72px] border-b border-[#dfe8ef] bg-[#f8fbfd] px-5 py-4 text-[11px] font-semibold uppercase tracking-[.12em] text-[#718496] sm:grid-cols-[1fr_100px_100px]">
+                <span>Capability</span><span className="text-center text-[#0a66c2]">Rolebolt</span><span className="text-center">Separate tools</span>
+              </div>
+              {comparisonRows.map(([label, rolebolt, separate], index) => (
+                <div key={label as string} className={`grid grid-cols-[1fr_72px_72px] items-center px-5 py-4 text-sm sm:grid-cols-[1fr_100px_100px] ${index < comparisonRows.length - 1 ? "border-b border-[#edf1f5]" : ""}`}>
+                  <span className="font-medium text-[#38546d]">{label}</span>
+                  <span className="flex justify-center text-[#188866]">{rolebolt ? "✓" : "—"}</span>
+                  <span className="flex justify-center text-[#9badba]">{separate ? "✓" : "—"}</span>
                 </div>
               ))}
             </div>
           </div>
-          <div className="mt-12 text-center">
-            <Link href="/recruit/signup" className="inline-flex items-center gap-2 rounded-xl bg-[#0a66c2] px-7 py-3.5 text-sm font-bold text-white shadow-[0_4px_14px_rgba(10,102,194,0.32)] hover:bg-[#004182] hover:shadow-[0_6px_20px_rgba(10,102,194,0.4)] hover:-translate-y-0.5 transition-all">
-              Start for free — no card needed
-              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-            </Link>
-          </div>
-        </div>
-      </section>
+        </section>
 
-      {/* ── Features ────────────────────────────────────────────────────────── */}
-      <section id="features" className="py-20 bg-[#f8fafc] border-t border-slate-100">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="max-w-2xl mx-auto text-center mb-14">
-            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#0a66c2] mb-3">Features</p>
-            <h2 className="text-3xl font-black text-slate-950 tracking-tight sm:text-4xl leading-tight">
-              Everything a modern<br />recruiter actually needs.
-            </h2>
-            <p className="mt-4 text-slate-500 leading-relaxed">End-to-end hiring from first post to final hire — all AI-assisted, all free.</p>
-          </div>
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 max-w-6xl mx-auto">
-            {FEATURES.map(f => (
-              <div key={f.title} className="group rounded-2xl border border-slate-100 bg-white p-7 shadow-[0_2px_12px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_28px_rgba(0,0,0,0.08)] hover:border-[#0a66c2]/20 hover:-translate-y-1 transition-all duration-200">
-                <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-[#0a66c2] group-hover:bg-[#0a66c2] group-hover:text-white transition-all duration-200">
-                  {f.icon}
-                </div>
-                <span className="inline-block mb-2 rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-500">{f.tag}</span>
-                <h3 className="text-base font-bold text-slate-950 mb-2">{f.title}</h3>
-                <p className="text-sm text-slate-500 leading-relaxed">{f.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── AI Copilot spotlight ────────────────────────────────────────────── */}
-      <section id="ai-copilot" className="py-20 bg-white border-t border-slate-100 overflow-hidden">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid gap-12 lg:grid-cols-2 items-center">
-            {/* Copy */}
+        <section id="team" className="bg-[#f8fbfd] scroll-mt-20">
+          <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 py-24 lg:grid-cols-[.75fr_1fr] lg:px-8">
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-4 py-1.5 text-[11px] font-bold text-violet-600 mb-5 uppercase tracking-widest">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                AI Copilot
-              </div>
-              <h2 className="text-3xl font-black text-slate-950 tracking-tight sm:text-4xl leading-tight">
-                Your entire hiring pipeline,<br />one conversation away.
-              </h2>
-              <p className="mt-4 text-slate-500 leading-relaxed max-w-lg">
-                Ask Rolebolt anything — about a single candidate, a whole job's pipeline, or your entire
-                hiring organisation — and get a straight answer, grounded in your real data. No dashboards
-                to dig through, no exports to read.
-              </p>
-              <div className="mt-6 space-y-3 max-w-lg">
-                {[
-                  { title: "Organisation-wide intelligence", desc: "\"Which jobs need attention?\" or \"search my talent pool for React devs\" — across every role at once." },
-                  { title: "Job-level pipeline analysis", desc: "\"Who should I interview first?\" or \"compare my top candidates\" for the role you're viewing." },
-                  { title: "Candidate deep-dives", desc: "\"Should I hire this candidate?\" or \"generate interview questions\" — tailored to one person's resume and scores." },
-                ].map(item => (
-                  <div key={item.title} className="flex items-start gap-3">
-                    <div className="mt-0.5 shrink-0 flex h-6 w-6 items-center justify-center rounded-full bg-violet-50 text-violet-600">
-                      <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-                    </div>
-                    <div>
-                      <p className="text-[13.5px] font-bold text-slate-900">{item.title}</p>
-                      <p className="text-[13px] text-slate-500 leading-relaxed">{item.desc}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <p className="mt-6 text-[12px] text-slate-400 leading-relaxed max-w-lg">
-                Every answer cites its sources — the exact candidate, job, or score it's referring to — so you
-                can verify it in one click. Nothing is invented; it's your data, explained.
-              </p>
-              <div className="mt-7">
-                <Link href="/recruit/preview" className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-6 py-3.5 text-sm font-bold text-white shadow-[0_4px_14px_rgba(124,58,237,0.32)] hover:bg-violet-700 hover:-translate-y-0.5 transition-all">
-                  See it in the product preview
-                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-                </Link>
-              </div>
+              <p className="text-xs font-semibold uppercase tracking-[.17em] text-[#0a66c2]">Built with care</p>
+              <h2 className="mt-4 font-display text-4xl font-semibold tracking-[-.055em] text-[#10263d]">Hiring is human work. The software should respect that.</h2>
             </div>
-
-            {/* Screenshot */}
-            <div className="relative">
-              <div className="absolute -inset-3 bg-gradient-to-br from-violet-200/50 via-blue-100/40 to-transparent rounded-3xl blur-2xl" />
-              <div className="relative rounded-2xl border border-slate-200 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.12)] overflow-hidden">
-                <div className="relative aspect-[1024/500] w-full bg-slate-50">
-                  <Image
-                    src="/screenshots/ai-copilot.png"
-                    alt="Ask Rolebolt AI Copilot chat, focused on a candidate with a 90% fit score"
-                    fill
-                    className="object-cover object-top"
-                    sizes="(max-width: 1024px) 100vw, 50vw"
-                  />
-                </div>
+            <div className="rounded-2xl border border-[#d9e5ee] bg-white p-7 shadow-[0_8px_26px_rgba(32,79,112,.06)]">
+              <p className="text-base leading-7 text-[#5d7285]">Rolebolt is being built by a small product team focused on making hiring more legible for both sides of the market: teams need better signals, and candidates deserve a clearer path through the process.</p>
+              <div className="mt-7 flex items-center gap-3 border-t border-[#edf1f5] pt-5">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#e7f0ff] text-sm font-semibold text-[#0a66c2]">RG</div>
+                <div><p className="text-sm font-semibold text-[#203d56]">Rupesh Gupta</p><p className="text-xs text-[#8093a4]">Founder</p></div>
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* ── Why Rolebolt ────────────────────────────────────────────────────── */}
-      <section id="why-rolebolt" className="py-20 bg-white border-t border-slate-100">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="max-w-2xl mx-auto text-center mb-14">
-            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#0a66c2] mb-3">Why Rolebolt</p>
-            <h2 className="text-3xl font-black text-slate-950 tracking-tight sm:text-4xl leading-tight">
-              Not another ATS.<br />A smarter one.
-            </h2>
-            <p className="mt-4 text-slate-500 leading-relaxed">Traditional ATS tools were built before AI existed. Rolebolt was built for it.</p>
-          </div>
-          <div className="mx-auto max-w-2xl rounded-2xl border border-slate-200 bg-white shadow-[0_4px_24px_rgba(0,0,0,0.06)] overflow-hidden">
-            <div className="grid grid-cols-3 border-b border-slate-100 bg-slate-50">
-              <div className="col-span-1 py-3 px-5 text-xs font-bold text-slate-500 uppercase tracking-wider">Capability</div>
-              <div className="py-3 px-4 text-center text-xs font-bold text-[#0a66c2] uppercase tracking-wider">Rolebolt</div>
-              <div className="py-3 px-4 text-center text-xs font-bold text-slate-400 uppercase tracking-wider">Others</div>
-            </div>
-            {WHY.map((row, i) => (
-              <div key={row.label} className={`grid grid-cols-3 ${i < WHY.length - 1 ? "border-b border-slate-100" : ""}`}>
-                <div className="col-span-1 py-3.5 px-5 text-sm text-slate-700 font-medium">{row.label}</div>
-                <div className="py-3.5 px-4 flex items-center justify-center">
-                  <svg width="16" height="16" fill="none" stroke="#22c55e" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-                </div>
-                <div className="py-3.5 px-4 flex items-center justify-center">
-                  {row.others
-                    ? <svg width="16" height="16" fill="none" stroke="#94a3b8" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-                    : <svg width="16" height="16" fill="none" stroke="#ef4444" strokeWidth="2.5" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                  }
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+        <section className="bg-white">
+          <div className="mx-auto max-w-4xl px-5 py-24 text-center lg:px-8"><p className="text-xs font-semibold uppercase tracking-[.17em] text-[#0a66c2]">Ready when your team is</p><h2 className="mt-4 font-display text-4xl font-semibold tracking-[-.055em] text-[#10263d] sm:text-5xl">Make the next hiring decision with the whole picture.</h2><p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-[#667d8f]">Start with the tools that fit today. Rolebolt plans are designed to grow with your hiring volume, with payment-ready upgrades when you need them.</p><div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row"><Link href="/recruit/signup" className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0a66c2] px-6 py-3.5 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#07559f]">Start free <Arrow /></Link><Link href="/recruit/opportunities" className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#cbd9e4] px-6 py-3.5 text-sm font-semibold text-[#31536e] transition hover:border-[#0a66c2]">Browse opportunities <Arrow /></Link></div></div>
+        </section>
+      </main>
 
-      {/* ── Problem ─────────────────────────────────────────────────────────── */}
-      <section className="py-20 bg-[#f8fafc] border-t border-slate-100">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="max-w-2xl mx-auto text-center mb-14">
-            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#0a66c2] mb-3">The problem</p>
-            <h2 className="text-3xl font-black text-slate-950 tracking-tight sm:text-4xl leading-tight">
-              Traditional hiring is<br />broken by design.
-            </h2>
-            <p className="mt-4 text-slate-500 leading-relaxed">Every recruiter knows the pain. It didn't have to be this way.</p>
-          </div>
-          <div className="grid gap-6 sm:grid-cols-3 max-w-5xl mx-auto">
-            {PAINS.map(p => (
-              <div key={p.title} className="rounded-2xl border border-slate-100 bg-white p-7 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-600">{p.icon}</div>
-                <h3 className="text-base font-bold text-slate-900 mb-2">{p.title}</h3>
-                <p className="text-sm text-slate-500 leading-relaxed">{p.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── AI Capabilities (Google M API) ───────────────────────────────────────── */}
-      <section className="py-20 bg-slate-950 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:48px_48px] pointer-events-none" />
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 h-[400px] w-[800px] rounded-full bg-[#0a66c2]/10 blur-[100px] pointer-events-none" />
-        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="max-w-2xl mx-auto text-center mb-14">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#0a66c2]/30 bg-[#0a66c2]/10 px-4 py-1.5 text-[11px] font-bold text-[#60a5fa] mb-4">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-              Powered by Google M API
-            </div>
-            <h2 className="text-3xl font-black text-white tracking-tight sm:text-4xl leading-tight">
-              AI infrastructure<br />built for reliability.
-            </h2>
-            <p className="mt-4 text-slate-400 leading-relaxed">
-              Every AI feature in Rolebolt runs through Google M API — a unified gateway to 1,000+ LLMs including GPT, Claude, and Gemini. Your hiring pipeline never fails because an LLM does.
-            </p>
-          </div>
-
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4 max-w-6xl mx-auto mb-10">
-            {AI_CAPABILITIES.map(c => (
-              <div key={c.title} className="rounded-2xl border border-white/8 bg-white/4 p-6 hover:border-[#0a66c2]/40 hover:bg-white/7 transition-all">
-                <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-white/8 text-[#60a5fa]">{c.icon}</div>
-                <h3 className="text-sm font-bold text-white mb-2">{c.title}</h3>
-                <p className="text-xs text-slate-400 leading-relaxed">{c.desc}</p>
-              </div>
-            ))}
-          </div>
-
-        </div>
-      </section>
-
-      {/* ── Niches ──────────────────────────────────────────────────────────── */}
-      <section className="py-20 bg-white border-t border-slate-100">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-12">
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#0a66c2] mb-3">Industry niches</p>
-              <h2 className="text-3xl font-black text-slate-950 tracking-tight sm:text-4xl leading-tight">
-                Built for your<br />specific market.
-              </h2>
-              <p className="mt-3 text-slate-500 max-w-md leading-relaxed">Generic job boards miss the nuance of each industry. Rolebolt AI is calibrated for 6 focused niches — not one-size-fits-all.</p>
-            </div>
-            <Link href="/recruit/opportunities" className="shrink-0 inline-flex items-center gap-1.5 text-sm font-bold text-[#0a66c2] hover:text-[#004182] transition-colors">
-              Browse all opportunities
-              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-            </Link>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {NICHES.map(({ label, icon, iconColor, desc, full, accent }) => (
-              <Link
-                key={label}
-                href={`/recruit/opportunities?niche=${encodeURIComponent(full)}`}
-                className={`group rounded-2xl border bg-gradient-to-br ${accent} p-6 transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_12px_28px_rgba(0,0,0,0.08)]`}
-              >
-                <span className={iconColor}>{icon}</span>
-                <p className="mt-3 text-base font-bold text-slate-900 leading-snug">{label}</p>
-                <p className="mt-1 text-xs text-slate-500 leading-relaxed">{desc}</p>
-                <p className="mt-3 text-xs font-bold text-[#0a66c2] group-hover:underline">Browse jobs →</p>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Team ────────────────────────────────────────────────────────────── */}
-      <section id="team" className="py-20 bg-[#f8fafc] border-t border-slate-100">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="max-w-2xl mx-auto text-center mb-14">
-            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#0a66c2] mb-3">The team</p>
-            <h2 className="text-3xl font-black text-slate-950 tracking-tight sm:text-4xl leading-tight">
-              Built by people who<br />care about hiring.
-            </h2>
-            <p className="mt-4 text-slate-500 leading-relaxed">We're builders who believe hiring should be faster, fairer, and smarter for everyone.</p>
-          </div>
-
-          <div className="flex flex-col sm:flex-row justify-center gap-6 max-w-xl mx-auto">
-            {[
-              { name: "Rupesh Gupta", role: "Founder", initials: "RG" },
-            ].map((member) => (
-              <div
-                key={member.name}
-                className="group flex-1 flex flex-col items-center rounded-2xl border border-slate-200 bg-white px-10 py-8 shadow-sm hover:shadow-md hover:border-slate-300 hover:-translate-y-1 transition-all duration-200"
-              >
-                {/* Avatar */}
-                <div className="h-20 w-20 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center mb-5 group-hover:bg-slate-50 transition-colors duration-200">
-                  <span className="text-xl font-bold text-slate-500 tracking-wide">{member.initials}</span>
-                </div>
-
-                {/* Name + role */}
-                <h3 className="text-base font-bold text-slate-900 tracking-tight">{member.name}</h3>
-                <p className="mt-1 text-[12px] font-medium text-slate-400 uppercase tracking-widest">{member.role}</p>
-              </div>
-            ))}
-          </div>
-
-
-        </div>
-      </section>
-
-      {/* ── Final CTA ───────────────────────────────────────────────────────── */}
-      <section className="py-24 bg-slate-950 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:48px_48px] pointer-events-none" />
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 h-[500px] w-[900px] rounded-full bg-[#0a66c2]/12 blur-[100px] pointer-events-none" />
-        <div className="relative mx-auto max-w-3xl px-4 text-center sm:px-6">
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-[11px] font-bold text-slate-400 mb-6">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            Free forever · No limits · No card required
-          </div>
-          <h2 className="text-4xl font-black text-white tracking-tight sm:text-5xl leading-tight">
-            Ready to hire<br />
-            <span className="bg-gradient-to-r from-[#60a5fa] to-[#818cf8] bg-clip-text text-transparent">smarter?</span>
-          </h2>
-          <p className="mt-5 text-slate-400 text-base leading-relaxed max-w-xl mx-auto">
-            Join recruiters who've switched from spreadsheets and keyword filters to AI-powered hiring. Your first job post takes 90 seconds.
-          </p>
-          <div className="mt-10 flex flex-col sm:flex-row gap-3 justify-center">
-            {isLoggedIn ? (
-              <Link href="/recruit/dashboard" className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-9 py-4 text-sm font-bold text-slate-900 shadow-[0_4px_24px_rgba(255,255,255,0.15)] hover:bg-blue-50 hover:-translate-y-0.5 transition-all">
-                Go to Dashboard
-                <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-              </Link>
-            ) : (
-              <>
-                <Link href="/recruit/signup" className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0a66c2] px-9 py-4 text-sm font-bold text-white shadow-[0_4px_24px_rgba(10,102,194,0.5)] hover:bg-[#1d77d2] hover:-translate-y-0.5 transition-all">
-                  Start hiring free
-                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-                </Link>
-                <Link href="/recruit/opportunities" className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/8 px-9 py-4 text-sm font-bold text-white hover:bg-white/14 hover:-translate-y-0.5 transition-all">
-                  Browse open roles
-                </Link>
-              </>
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Footer ──────────────────────────────────────────────────────────── */}
-      <footer className="bg-slate-950 border-t border-white/6">
-        <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-10">
-            {/* Brand */}
-            <div className="max-w-xs">
-              <div className="flex items-center gap-2.5 mb-4">
-                <RoleboltLogo size="md" />
-                <div>
-                  <p className="text-sm font-bold text-white leading-none">Rolebolt</p>
-                  <p className="text-[10px] text-slate-500 mt-0.5 font-medium">AI Hiring Platform</p>
-                </div>
-              </div>
-              <p className="text-xs text-slate-500 leading-relaxed">AI-powered hiring for recruiters and job seekers worldwide. Completely free, forever.</p>
-              <div className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-white/8 bg-white/4 px-3 py-1.5 text-[10px] font-bold text-slate-500">
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-                Powered by Google M API
-              </div>
-            </div>
-
-            {/* Links */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-8">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-4">Platform</p>
-                <ul className="space-y-2.5">
-                  {[
-                    { label: "Find Jobs", href: "/recruit/opportunities" },
-                    { label: "For Recruiters", href: "/recruit/signup" },
-                    { label: "Dashboard", href: "/recruit/dashboard" },
-                    { label: "Analytics", href: "/recruit/analytics" },
-                  ].map(l => <li key={l.label}><Link href={l.href} className="text-xs text-slate-500 hover:text-slate-300 transition-colors">{l.label}</Link></li>)}
-                </ul>
-              </div>
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-4">Niches</p>
-                <ul className="space-y-2.5">
-                  {NICHES.slice(0, 4).map(n => (
-                    <li key={n.label}>
-                      <Link href={`/recruit/opportunities?niche=${encodeURIComponent(n.full)}`} className="text-xs text-slate-500 hover:text-slate-300 transition-colors">{n.label}</Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-4">Account</p>
-                <ul className="space-y-2.5">
-                  {[
-                    { label: "Sign up free", href: "/recruit/signup" },
-                    { label: "Sign in", href: "/recruit/login" },
-                    { label: "Talent Pool", href: "/recruit/talent-pool" },
-                    { label: "Recruiter Profile", href: "/recruit/recruiter-profile" },
-                  ].map(l => <li key={l.label}><Link href={l.href} className="text-xs text-slate-500 hover:text-slate-300 transition-colors">{l.label}</Link></li>)}
-                </ul>
-              </div>
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-4">Status</p>
-                <ul className="space-y-2.5">
-                  <li>
-                    <Link href="/recruit/status" className="text-xs text-slate-500 hover:text-slate-300 transition-colors inline-flex items-center gap-1.5">
-                      <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-                      Status
-                    </Link>
-                  </li>
-                  <li>
-                    <Link href="/recruit/preview" className="text-xs text-slate-500 hover:text-slate-300 transition-colors">Product Preview</Link>
-                  </li>
-                </ul>
-              </div>
-            </div>
-          </div>
-
-          {/* Bottom bar */}
-          <div className="mt-10 pt-6 border-t border-white/6 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <p className="text-[11px] text-slate-600">© 2026 Rolebolt. All rights reserved.</p>
-            <div className="flex items-center gap-1.5 text-[11px] text-slate-600">
-              Built with
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="#ef4444" className="inline"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-              for the{" "}
-              <a href="https://hack.meshapi.ai/" target="_blank" rel="noopener noreferrer" className="hover:text-slate-400 underline underline-offset-2 transition-colors">Google M API Hackathon 2026</a>
-            </div>
-          </div>
-        </div>
+      <footer className="border-t border-[#dfe8ef] bg-[#f8fbfd]">
+        <div className="mx-auto flex max-w-7xl flex-col gap-5 px-5 py-8 sm:flex-row sm:items-center sm:justify-between lg:px-8"><div className="flex items-center gap-2"><RoleboltLogo size="sm" /><span className="text-sm font-semibold">Rolebolt</span></div><p className="text-xs text-[#7a8c9b]">A shared workspace for better hiring and better job searches.</p><div className="flex flex-wrap gap-4 text-xs font-medium text-[#60778a]"><Link href="/recruit/opportunities" className="hover:text-[#0a66c2]">Find jobs</Link><Link href="/seeker/workspace" className="hover:text-[#0a66c2]">Seeker workspace</Link><Link href="/recruit/pricing" className="hover:text-[#0a66c2]">Plans</Link><Link href="/recruit/login" className="hover:text-[#0a66c2]">Sign in</Link></div></div>
       </footer>
-
       <SiteGuideChatbot />
     </div>
   );

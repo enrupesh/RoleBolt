@@ -37,3 +37,4 @@
 - [Central entitlement enforcement](entitlement-enforcement.md) — Phase 2 provides server-side feature, quota, owner-resource, stable-error, and middleware primitives; route adoption remains explicit work.
 - [Verified Razorpay integration](razorpay-integration.md) — Phase 3 adds server-owned checkout, raw HMAC webhooks, idempotency, and lifecycle reconciliation; checkout callbacks never activate access.
 - [Seeker billing enforcement](seeker-billing-enforcement.md) — request retries use explicit idempotency keys; active-application caps count tracker, workspace, and Rolebolt candidate representations.
+- [Imported project dependencies](imported-project-dependencies.md) — this split frontend/backend import needs root-hoisted packages for workflows; verify both package surfaces before debugging app code.
