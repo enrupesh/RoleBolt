@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import { Sora, Plus_Jakarta_Sans } from "next/font/google";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { RecruitAuthProvider } from "@/contexts/RecruitAuthContext";
+import { BillingEntitlementProvider } from "@/contexts/BillingEntitlementContext";
 import "./globals.css";
 
 const sora = Sora({
@@ -75,9 +76,11 @@ export default function RootLayout({
     >
       <body className="app-theme min-h-screen antialiased" suppressHydrationWarning>
         <RecruitAuthProvider>
-          <ThemeProvider>
-            <div className="min-h-screen">{children}</div>
-          </ThemeProvider>
+          <BillingEntitlementProvider>
+            <ThemeProvider>
+              <div className="min-h-screen">{children}</div>
+            </ThemeProvider>
+          </BillingEntitlementProvider>
         </RecruitAuthProvider>
       </body>
     </html>
