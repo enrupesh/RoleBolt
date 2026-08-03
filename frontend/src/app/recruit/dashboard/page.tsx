@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
+import { useBillingEntitlements } from "@/contexts/BillingEntitlementContext";
 import { apiUrl, readApiJson } from "@/lib/api";
 import { displayHandle } from "@/lib/username";
 import { RecruitGuard } from "@/components/RecruitGuard";
@@ -918,33 +919,26 @@ function RecruitDashboardContent() {
 
 // ── Upgrade Nudge (free plan banner) ─────────────────────────────────────────
 function UpgradeNudge() {
-  const { sessionToken } = useRecruitAuth();
-  const [plan, setPlan] = useState<string | null>(null);
+  const { getEntitlement, loading } = useBillingEntitlements();
+  const entitlement = getEntitlement("creator_standard");
 
-  useEffect(() => {
-    if (!sessionToken) return;
-    fetch(apiUrl("/billing/subscription"), {
-      headers: { Authorization: `Bearer ${sessionToken}` },
-    })
-      .then(r => r.json())
-      .then(d => setPlan(d.plan ?? "free"))
-      .catch(() => setPlan("free"));
-  }, [sessionToken]);
-
-  if (!plan || plan === "pro" || plan === "agency") return null;
+  if (loading) return null;
+  if (!entitlement || entitlement.plan !== "free") return null;
 
   return (
-    <div className="mb-6 rounded-2xl border border-indigo-200 bg-gradient-to-r from-indigo-50 to-violet-50 px-5 py-4 flex items-center justify-between gap-4 shadow-[0_1px_3px_rgba(99,102,241,0.08)]">
+    <div className="mb-6 rounded-2xl border border-teal-200 bg-gradient-to-r from-teal-50 to-emerald-50 px-5 py-4 flex items-center justify-between gap-4 shadow-[0_1px_3px_rgba(15,118,110,0.08)]">
       <div className="flex items-center gap-3 min-w-0">
         <span className="text-xl shrink-0">⚡</span>
         <div className="min-w-0">
-          <p className="text-sm font-bold text-indigo-900">You&rsquo;re on the Free plan</p>
-          <p className="text-xs text-indigo-600 mt-0.5 leading-snug">Upgrade to Pro for AI Agent Mode, unlimited jobs, Pipeline Rules &amp; Daily Briefings.</p>
+          <p className="text-sm font-bold text-teal-950">You&rsquo;re on Standard Jobs Free</p>
+          <p className="text-xs text-teal-800 mt-0.5 leading-snug">
+            Upgrade to Pro for higher AI capacity, more active jobs, Pipeline Rules, and priority processing.
+          </p>
         </div>
       </div>
       <a
-        href="/recruit/pricing"
-        className="shrink-0 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700 transition shadow-[0_2px_8px_rgba(99,102,241,0.35)]"
+        href="/recruit/pricing?category=creator_standard"
+        className="shrink-0 rounded-xl bg-teal-700 px-4 py-2 text-xs font-bold text-white hover:bg-teal-800 transition shadow-[0_2px_8px_rgba(15,118,110,0.35)]"
       >
         Upgrade →
       </a>
