@@ -1,5 +1,61 @@
 @import "tailwindcss";
 
+@keyframes rb-welcome-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes rb-welcome-orb-in {
+  0% {
+    opacity: 0;
+    transform: scale(.7) rotate(-12deg);
+  }
+  70% {
+    transform: scale(1.08) rotate(4deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0);
+  }
+}
+
+@keyframes rb-welcome-note-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.rb-welcome-card {
+  animation: rb-welcome-card-in 420ms cubic-bezier(.22, 1, .36, 1) both;
+}
+
+.rb-welcome-orb {
+  animation: rb-welcome-orb-in 560ms cubic-bezier(.22, 1, .36, 1) 100ms both;
+}
+
+.rb-welcome-free-note {
+  animation: rb-welcome-note-in 240ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rb-welcome-card,
+  .rb-welcome-orb,
+  .rb-welcome-free-note {
+    animation: none;
+  }
+}
+
 :root {
   --background: #f1f3f8;
   --foreground: #0f1420;

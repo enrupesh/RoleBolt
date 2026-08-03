@@ -10,6 +10,7 @@ import { UsernameField } from "@/components/UsernameField";
 import { validateUsername } from "@/lib/username";
 import { firebaseAuth, googleProvider } from "@/lib/firebaseClient";
 import { signInWithPopup, RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from "firebase/auth";
+import { markSignupWelcome } from "@/lib/signupWelcome";
 
 function safeNextPath(raw: string | null): string {
   if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/recruit/dashboard";
@@ -107,6 +108,7 @@ export default function RecruitSignUpPage() {
       if (!res.ok) { setError(data.error ?? "Google sign-up failed. Please try again."); return; }
       const session = await signInWithToken(data.token);
       if (session.error) { setError(session.error); return; }
+      markSignupWelcome("creator");
       if (!session.username?.trim()) {
         router.replace(`/recruit/choose-username?next=${encodeURIComponent(nextPath)}`);
       } else {
@@ -167,6 +169,7 @@ export default function RecruitSignUpPage() {
       if (!res.ok) { setPhoneError(data.error ?? "Phone sign-up failed."); return; }
       const session = await signInWithToken(data.token);
       if (session.error) { setPhoneError(session.error); return; }
+      markSignupWelcome("creator");
       router.replace(session.username?.trim()
         ? nextPath
         : `/recruit/choose-username?next=${encodeURIComponent(nextPath)}`);
@@ -207,6 +210,7 @@ export default function RecruitSignUpPage() {
         return;
       }
 
+      markSignupWelcome("creator");
       setStep("check-email");
     } catch {
       setError("Network error. Please check your connection and try again.");
