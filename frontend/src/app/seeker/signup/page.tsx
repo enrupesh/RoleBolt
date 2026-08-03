@@ -10,6 +10,7 @@ import { validateUsername } from "@/lib/username";
 import { apiUrl } from "@/lib/api";
 import { firebaseAuth, googleProvider } from "@/lib/firebaseClient";
 import { signInWithPopup, RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from "firebase/auth";
+import { markSignupWelcome } from "@/lib/signupWelcome";
 
 type Step = "form" | "check-email";
 type PhoneStep = "idle" | "entering" | "otp";
@@ -122,6 +123,7 @@ export default function SeekerSignupPage() {
       });
       const session = await signInWithToken(data.token);
       if (session.error) throw new Error(session.error);
+      markSignupWelcome("seeker");
       routeAfterSocialLogin(session.username);
     } catch (err: any) {
       if (err?.code !== "auth/popup-closed-by-user") {
@@ -194,6 +196,7 @@ export default function SeekerSignupPage() {
       await ensureSeekerProfile(data.token, { username: data.user?.username, email: data.user?.email ?? "" });
       const session = await signInWithToken(data.token);
       if (session.error) throw new Error(session.error);
+      markSignupWelcome("seeker");
       routeAfterSocialLogin(session.username);
     } catch (err: any) {
       setPhoneError(err?.code === "auth/invalid-verification-code"
@@ -230,6 +233,7 @@ export default function SeekerSignupPage() {
         setError(data.error ?? "Signup failed.");
         return;
       }
+      markSignupWelcome("seeker");
       setStep("check-email");
     } catch {
       setError("Network error. Please try again.");

@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { apiUrl } from "@/lib/api";
+import { markSignupWelcome } from "@/lib/signupWelcome";
 
 function Spinner() {
   return (
@@ -81,6 +82,9 @@ function OAuthCallbackInner() {
           return;
         }
 
+        if (intent === "signup") {
+          markSignupWelcome(target === "seeker" ? "seeker" : "creator");
+        }
         if (!result.username?.trim()) {
           router.replace(`/recruit/choose-username?role=${target}&next=${encodeURIComponent(destination)}`);
         } else {

@@ -4,6 +4,7 @@ import { Sora, Plus_Jakarta_Sans } from "next/font/google";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { RecruitAuthProvider } from "@/contexts/RecruitAuthContext";
 import { BillingEntitlementProvider } from "@/contexts/BillingEntitlementContext";
+import { SignupWelcomeModal } from "@/components/SignupWelcomeModal";
 import "./globals.css";
 
 const sora = Sora({
@@ -78,7 +79,10 @@ export default function RootLayout({
         <RecruitAuthProvider>
           <BillingEntitlementProvider>
             <ThemeProvider>
-              <div className="min-h-screen">{children}</div>
+              <div className="min-h-screen">
+                {children}
+                <SignupWelcomeModal onlyRole="seeker" />
+              </div>
             </ThemeProvider>
           </BillingEntitlementProvider>
         </RecruitAuthProvider>
