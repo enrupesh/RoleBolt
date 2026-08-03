@@ -29,6 +29,9 @@ import {
   runSeekerBillingOperation,
   seekerRequestIdempotencyKey,
 } from "./billing/seekerEnforcement";
+import { getPlanDefinition } from "./billing/planCatalog";
+import { UsageLimitError } from "./billing/usage";
+import { verifyToken } from "./authMiddleware";
 import {
   type AgentAction,
   validatePipelineRuleInput,
@@ -227,6 +230,16 @@ const FRONTEND_URL = (
 ).replace(/\/$/, "");
 function getUid(req: express.Request): string {
   return (req as any).user?.uid ?? "";
+}
+
+/** Optional JWT uid for public routes that may bill an authenticated seeker. */
+function optionalUidFromAuth(req: express.Request): string {
+  const attached = getUid(req);
+  if (attached) return attached;
+  const header = req.headers.authorization;
+  if (!header?.startsWith("Bearer ")) return "";
+  const payload = verifyToken(header.slice(7));
+  return payload?.sub ?? "";
 }
 
 // Form Jobs use a shorter stage list than Standard Jobs; this projects a form
@@ -6161,6 +6174,16 @@ Rules:
 recruitPublicRouter.post("/jobs/:jobId/match", async (req, res) => {
   try {
     await connectMongo();
+    const uid = optionalUidFromAuth(req);
+    if (!uid) {
+      return res.status(401).json({
+        error: "AUTH_REQUIRED_FOR_MATCH",
+        code: "AUTH_REQUIRED_FOR_MATCH",
+        message: "Sign in to check your match score. This uses your Job Seeker AI quota.",
+        upgradeRequired: false,
+      });
+    }
+
     const job = await RecruitJob.findOne({
       _id: req.params.jobId,
       status: "active",
@@ -6174,20 +6197,34 @@ recruitPublicRouter.post("/jobs/:jobId/match", async (req, res) => {
       return res.status(400).json({ error: "Provide at least your skills or resume text for match analysis." });
     }
 
-    const result = await generateJobMatch({
-      job,
-      skills: Array.isArray(skills) ? skills : [],
-      preferredNiche,
-      preferredWorkMode,
-      preferredLocation,
-      preferredSalaryMin: preferredSalaryMin ? Number(preferredSalaryMin) : undefined,
-      preferredSalaryMax: preferredSalaryMax ? Number(preferredSalaryMax) : undefined,
-      experienceLevel,
-      resumeText,
+    const result = await runSeekerBillingOperation({
+      uid,
+      operation: "job_fit_analysis",
+      idempotencyKey: seekerRequestIdempotencyKey(
+        uid,
+        "public-job-match",
+        typeof req.headers["idempotency-key"] === "string"
+          ? req.headers["idempotency-key"]
+          : undefined,
+      ),
+      resourceType: "job",
+      resourceId: String(job._id),
+      work: async () => generateJobMatch({
+        job,
+        skills: Array.isArray(skills) ? skills : [],
+        preferredNiche,
+        preferredWorkMode,
+        preferredLocation,
+        preferredSalaryMin: preferredSalaryMin ? Number(preferredSalaryMin) : undefined,
+        preferredSalaryMax: preferredSalaryMax ? Number(preferredSalaryMax) : undefined,
+        experienceLevel,
+        resumeText,
+      }),
     });
 
     return res.json(result);
   } catch (err: any) {
+    if (await respondSeekerBillingError(res, err, optionalUidFromAuth(req))) return;
     console.error("[recruit] POST /jobs/match", err);
     return res.status(500).json({ error: err.message });
   }
@@ -6264,6 +6301,27 @@ recruitPublicRouter.post("/job-alerts", async (req, res) => {
       await existing.save();
       return res.json({ alert: existing, updated: true });
     }
+
+    const ownerProfile = await RecruitSeekerProfile.findOne({ email: normalizedEmail })
+      .select({ uid: 1 })
+      .lean()
+      .exec();
+    if (ownerProfile?.uid) {
+      await assertSeekerResourceLimit(ownerProfile.uid, "job_alerts");
+    } else {
+      const freeLimit = getPlanDefinition("seeker", "free").limits.job_alerts;
+      const current = await RecruitJobAlert.countDocuments({ email: normalizedEmail }).exec();
+      if (typeof freeLimit === "number" && current + 1 > freeLimit) {
+        throw new UsageLimitError({
+          reasonCode: "JOB_ALERTS_QUOTA_EXHAUSTED",
+          category: "seeker",
+          feature: "job_alerts",
+          used: current,
+          limit: freeLimit,
+        });
+      }
+    }
+
     const alert = await RecruitJobAlert.create({
       email: normalizedEmail,
       niche: niche || "",
@@ -6275,6 +6333,26 @@ recruitPublicRouter.post("/job-alerts", async (req, res) => {
     });
     return res.status(201).json({ alert });
   } catch (err: any) {
+    const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+    let billingUid = optionalUidFromAuth(req);
+    if (!billingUid && email) {
+      const profile = await RecruitSeekerProfile.findOne({ email }).select({ uid: 1 }).lean().exec();
+      billingUid = profile?.uid ?? "";
+    }
+    if (billingUid && await respondSeekerBillingError(res, err, billingUid)) return;
+    if (err instanceof UsageLimitError) {
+      return res.status(409).json({
+        error: "PLAN_LIMIT_REACHED",
+        code: err.reasonCode,
+        category: "seeker",
+        feature: err.feature,
+        plan: "free",
+        used: err.used,
+        limit: err.limit,
+        upgradeRequired: true,
+        message: "Job alert limit reached for the Free plan. Sign in and upgrade for more alerts.",
+      });
+    }
     console.error("[recruit] POST /job-alerts", err);
     return res.status(500).json({ error: err.message });
   }

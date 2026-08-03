@@ -1,10 +1,19 @@
 import type express from "express";
 import { createHash, randomUUID } from "node:crypto";
-import { assertResourceLimit, serializeBillingError } from "./enforcement";
+import {
+  assertResourceLimit,
+  assertWithinLimit,
+  serializeBillingError,
+  FeatureNotAvailableError,
+  BillingAccessRestrictedError,
+  BillingConfigurationError,
+} from "./enforcement";
 import { executeBillingOperation } from "./executeOperation";
-import type { ResourceCounterKey } from "./resourceCounters";
+import {
+  syncSeekerResumeVersionFromProfile,
+  type ResourceCounterKey,
+} from "./resourceCounters";
 import { UsageIdempotencyConflictError, UsageLimitError } from "./usage";
-import { FeatureNotAvailableError, BillingAccessRestrictedError, BillingConfigurationError } from "./enforcement";
 import { getEntitlement } from "./entitlements";
 
 export const SEEKER_BILLING_CATEGORY = "seeker" as const;
@@ -18,7 +27,8 @@ export function isSeekerBillingError(error: unknown): boolean {
     error instanceof BillingConfigurationError ||
     (error as { code?: string })?.code === "PLAN_LIMIT_REACHED" ||
     (error as { code?: string })?.code === "IDEMPOTENCY_KEY_REUSED" ||
-    (error as { code?: string })?.code === "IDEMPOTENT_OPERATION_ALREADY_COMPLETED"
+    (error as { code?: string })?.code === "IDEMPOTENT_OPERATION_ALREADY_COMPLETED" ||
+    (error as { code?: string })?.code === "BILLING_ACCESS_RESTRICTED"
   );
 }
 
@@ -48,6 +58,69 @@ export async function assertSeekerResourceLimit(
   quantity = 1,
 ) {
   return assertResourceLimit(uid, SEEKER_BILLING_CATEGORY, counter, quantity);
+}
+
+/**
+ * Enforce an absolute resource count (e.g. projects/certifications array length)
+ * against the seeker's plan limit. Decreasing or empty updates are always allowed.
+ */
+export async function assertSeekerProposedResourceCount(
+  uid: string,
+  counter: ResourceCounterKey,
+  proposedCount: number,
+): Promise<void> {
+  if (!Number.isSafeInteger(proposedCount) || proposedCount < 0) {
+    throw new BillingConfigurationError(`Invalid proposed count for ${counter}.`);
+  }
+  if (proposedCount === 0) return;
+  const entitlement = await getEntitlement(uid, SEEKER_BILLING_CATEGORY);
+  assertWithinLimit(entitlement, counter, proposedCount, { used: 0, reserved: 0 });
+}
+
+const ACTIVE_TRACKER_STAGES = new Set([
+  "applied",
+  "screening",
+  "assessment",
+  "interview",
+  "offer",
+]);
+
+export function isActiveSeekerTrackerStage(stage: string | undefined | null): boolean {
+  return Boolean(stage && ACTIVE_TRACKER_STAGES.has(stage));
+}
+
+/**
+ * When resume text/file changes, enforce stored version capacity and sync the
+ * durable version history used by billing counters.
+ */
+export async function enforceAndSyncSeekerResumeVersion(input: {
+  uid: string;
+  previousResumeText?: string;
+  previousResumeFileName?: string;
+  nextResumeText?: string;
+  nextResumeFileName?: string;
+  source?: "profile_sync" | "upload" | "build" | "import";
+}): Promise<boolean> {
+  const nextText = (input.nextResumeText ?? "").trim();
+  const nextFile = (input.nextResumeFileName ?? "").trim();
+  const prevText = (input.previousResumeText ?? "").trim();
+  const prevFile = (input.previousResumeFileName ?? "").trim();
+  const hasResume = Boolean(nextText || nextFile);
+  const changed = nextText !== prevText || nextFile !== prevFile;
+  if (!hasResume || !changed) return false;
+
+  // A new distinct version will be appended by sync — require capacity first.
+  await assertSeekerResourceLimit(input.uid, "stored_resume_versions");
+  // Active versions become exactly one after sync; ensure the plan allows ≥1 active.
+  await assertSeekerProposedResourceCount(input.uid, "active_resume_versions", 1);
+
+  await syncSeekerResumeVersionFromProfile({
+    uid: input.uid,
+    resumeText: nextText,
+    resumeFileName: nextFile,
+    source: input.source ?? "profile_sync",
+  });
+  return true;
 }
 
 export interface RunSeekerOperationInput<T> {
@@ -99,4 +172,11 @@ export function seekerRequestIdempotencyKey(
     operation,
     normalized || randomUUID(),
   ]);
+}
+
+export function seekerIdempotencyHeader(req: express.Request): string | undefined {
+  const value = req.headers["idempotency-key"];
+  if (typeof value === "string") return value;
+  if (Array.isArray(value) && typeof value[0] === "string") return value[0];
+  return undefined;
 }
