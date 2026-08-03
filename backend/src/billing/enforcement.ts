@@ -1,10 +1,16 @@
-import { connectMongo } from "../db";
 import { UsagePeriod } from "../models/UsagePeriod";
 import { getEntitlement } from "./entitlements";
 import { getPeriodWindow } from "./periods";
 import { UsageIdempotencyConflictError, UsageLimitError } from "./usage";
 import { countOwnedResources, type ResourceCounterKey } from "./resourceCounters";
-import type { BillingCategory, ResolvedEntitlement } from "../billingTypes";
+import {
+  assertMeteredAccessAllowed,
+  BillingAccessRestrictedError,
+  type BillingCategory,
+  type ResolvedEntitlement,
+} from "../billingTypes";
+
+export { assertMeteredAccessAllowed, BillingAccessRestrictedError };
 
 export class FeatureNotAvailableError extends Error {
   readonly code = "FEATURE_NOT_AVAILABLE";
@@ -30,21 +36,6 @@ export class BillingConfigurationError extends Error {
 export interface CounterSnapshot {
   used: number;
   reserved: number;
-}
-
-export class BillingAccessRestrictedError extends Error {
-  readonly code = "BILLING_ACCESS_RESTRICTED";
-
-  constructor(readonly category: BillingCategory) {
-    super("Metered billing access is restricted for this account.");
-    this.name = "BillingAccessRestrictedError";
-  }
-}
-
-export function assertMeteredAccessAllowed(entitlement: ResolvedEntitlement): void {
-  if (!entitlement.meteredAccessAllowed) {
-    throw new BillingAccessRestrictedError(entitlement.category);
-  }
 }
 
 export function requireFeature(

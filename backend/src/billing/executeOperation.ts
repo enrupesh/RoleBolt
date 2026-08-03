@@ -2,7 +2,7 @@ import type express from "express";
 import type { BillingCategory } from "../billingTypes";
 import { getEntitlement } from "./entitlements";
 import { serializeBillingError } from "./enforcement";
-import { assertMeteredAccessAllowed } from "./enforcement";
+import { assertMeteredAccessAllowed } from "../billingTypes";
 import { requireBillingOwnerUid, type BillingOwnerResource } from "./billingOwner";
 import {
   commitUsage,

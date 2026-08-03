@@ -4,6 +4,7 @@ import { UsageLedger, type IUsageLedger } from "../models/UsageLedger";
 import { UsagePeriod } from "../models/UsagePeriod";
 import { getBillingOperation } from "./operationCatalog";
 import { getEntitlement, ensureUsagePeriod } from "./entitlements";
+import { assertMeteredAccessAllowed } from "../billingTypes";
 import { isLimited } from "./planCatalog";
 import type { BillingCategory } from "../billingTypes";
 
@@ -121,6 +122,8 @@ export async function reserveUsage(input: ReserveUsageInput): Promise<UsageReser
     let reservation: UsageReservation | null = null;
     await session.withTransaction(async () => {
       const entitlement = await getEntitlement(input.userId, input.category, new Date(), session);
+      // Fail closed for past_due / halted: keep read access, block new metered work.
+      assertMeteredAccessAllowed(entitlement);
       const { period, periodKey } = await ensureUsagePeriod(entitlement, session);
       if (!period) throw new Error("Could not create billing usage period.");
 
