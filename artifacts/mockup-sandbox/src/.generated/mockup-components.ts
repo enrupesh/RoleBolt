@@ -4,5 +4,7 @@ export const modules: ModuleMap = {
   "./components/mockups/standard-job-workspace/CommandCenter.tsx": () => import("../components/mockups/standard-job-workspace/CommandCenter.tsx"),
   "./components/mockups/standard-job-workspace/Current.tsx": () => import("../components/mockups/standard-job-workspace/Current.tsx"),
   "./components/mockups/standard-job-workspace/JobTabNav.tsx": () => import("../components/mockups/standard-job-workspace/JobTabNav.tsx"),
-  "./components/mockups/standard-job-workspace/NeedsAttentionQueue.tsx": () => import("../components/mockups/standard-job-workspace/NeedsAttentionQueue.tsx")
+  "./components/mockups/standard-job-workspace/NeedsAttentionQueue.tsx": () => import("../components/mockups/standard-job-workspace/NeedsAttentionQueue.tsx"),
+  "./components/mockups/landing/Current.tsx": () => import("../components/mockups/landing/Current.tsx"),
+  "./components/mockups/landing/Premium.tsx": () => import("../components/mockups/landing/Premium.tsx")
 };
