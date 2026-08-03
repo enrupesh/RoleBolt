@@ -32,6 +32,7 @@ const operations: BillingOperation[] = [
   { key: "copilot_turn_form", category: "creator_form", units: 1, counter: "copilot_turns", description: "Use Form Job Copilot." },
   { key: "offer_letter_form", category: "creator_form", units: 3, counter: "offer_letters", description: "Draft a Form Job offer letter." },
   { key: "short_improvement", category: "creator_form", units: 1, counter: "ai_content_actions", description: "Generate a short Form Job improvement." },
+  { key: "short_rewrite", category: "creator_form", units: 1, counter: "ai_content_actions", description: "Short rewrite / field suggestion (Form Jobs)." },
   { key: "assessment_generate_form", category: "creator_form", units: 2, counter: "ai_units", description: "Generate a Form Job assessment." },
   { key: "assessment_score_form", category: "creator_form", units: 1, counter: "ai_units", description: "Score a Form Job assessment response." },
   { key: "assessment_send_form", category: "creator_form", units: 0, counter: "assessment_sends", description: "Send a Form Job assessment invitation." },
@@ -41,9 +42,11 @@ const operations: BillingOperation[] = [
 
   // ── Standard Jobs ──────────────────────────────────────────────────────────
   { key: "candidate_score", category: "creator_standard", units: 1, counter: "ai_scored_candidates", description: "Score a Standard Job candidate." },
+  { key: "deep_candidate_analysis", category: "creator_standard", units: 2, counter: "ai_scored_candidates", description: "Deep candidate analysis." },
   { key: "new_candidate_intake", category: "creator_standard", units: 0, counter: "new_candidates", description: "Add a new Standard Job candidate." },
   { key: "job_analysis", category: "creator_standard", units: 3, counter: "job_analysis_reports", description: "Generate a job analysis report." },
   { key: "job_generation", category: "creator_standard", units: 3, description: "Generate a job description with AI." },
+  { key: "short_rewrite_standard", category: "creator_standard", units: 1, description: "Short rewrite / field suggestion (Standard Jobs)." },
   { key: "copilot_turn_standard", category: "creator_standard", units: 1, counter: "copilot_turns", description: "Use Standard Job Copilot." },
   { key: "offer_letter_standard", category: "creator_standard", units: 3, counter: "offer_letters", description: "Draft a Standard Job offer letter." },
   { key: "agent_action", category: "creator_standard", units: 1, description: "Execute a hiring agent action." },
@@ -58,9 +61,13 @@ const operations: BillingOperation[] = [
   { key: "pipeline_rule_execution", category: "creator_standard", units: 0, counter: "automated_emails", description: "Execute a Standard Job pipeline rule action." },
   { key: "export_standard", category: "creator_standard", units: 0, counter: "exports", description: "Export Standard Job data." },
 
-  // Aliases for audit inventory names
+  // Aliases for audit inventory names (`payment.md` §5.1 / Phase -1)
   { key: "copilot_turn", category: "creator_standard", units: 1, counter: "copilot_turns", description: "Copilot turn (Standard Jobs default)." },
   { key: "offer_letter_draft", category: "creator_standard", units: 3, counter: "offer_letters", description: "Offer letter draft (Standard Jobs default)." },
+  { key: "assessment_generate", category: "creator_standard", units: 2, description: "Generate an assessment (Standard Jobs default)." },
+  { key: "assessment_score", category: "creator_standard", units: 1, counter: "ai_units", description: "Score an assessment (Standard Jobs default)." },
+  { key: "automated_email", category: "creator_standard", units: 0, counter: "automated_emails", description: "Send an automated email (Standard Jobs default)." },
+  { key: "export", category: "creator_standard", units: 0, counter: "exports", description: "Export data (Standard Jobs default)." },
 ];
 
 export const BILLING_OPERATIONS: ReadonlyMap<string, BillingOperation> = new Map(
@@ -79,6 +86,7 @@ export const REQUIRED_BILLING_OPERATION_KEYS = [
   "profile_optimization",
   "email_intelligence",
   "candidate_score",
+  "deep_candidate_analysis",
   "form_response_score",
   "job_analysis",
   "form_hiring_summary",
@@ -97,6 +105,12 @@ export const REQUIRED_BILLING_OPERATION_KEYS = [
   "export_seeker",
   "export_form",
   "export_standard",
+  "short_rewrite",
+  "short_rewrite_standard",
+  "assessment_generate",
+  "assessment_score",
+  "automated_email",
+  "export",
 ] as const;
 
 export function assertOperationCatalogComplete(): void {

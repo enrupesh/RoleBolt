@@ -35,6 +35,25 @@ export interface PlanDefinition {
 
 export type BillingWarning = "past_due" | "halted" | "cancel_scheduled";
 
+/** Thrown when past_due/halted (or similar) blocks new metered work. */
+export class BillingAccessRestrictedError extends Error {
+  readonly code = "BILLING_ACCESS_RESTRICTED";
+
+  constructor(readonly category: BillingCategory) {
+    super("Metered billing access is restricted for this account.");
+    this.name = "BillingAccessRestrictedError";
+  }
+}
+
+export function assertMeteredAccessAllowed(entitlement: {
+  category: BillingCategory;
+  meteredAccessAllowed: boolean;
+}): void {
+  if (!entitlement.meteredAccessAllowed) {
+    throw new BillingAccessRestrictedError(entitlement.category);
+  }
+}
+
 export interface ResolvedEntitlement {
   userId: string;
   category: BillingCategory;
