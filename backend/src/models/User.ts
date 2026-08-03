@@ -5,6 +5,7 @@ export interface IUser extends Document {
   username?: string;
   passwordHash: string;
   name: string;
+  signupRole?: "creator" | "seeker";
   isVerified: boolean;
   githubId?: string;
   googleId?: string;
@@ -40,6 +41,7 @@ const UserSchema = new Schema<IUser>(
     },
     passwordHash: { type: String, default: "" },
     name:         { type: String, default: "" },
+    signupRole:   { type: String, enum: ["creator", "seeker"] },
     isVerified:   { type: Boolean, default: false },
     githubId:     { type: String, index: true, sparse: true },
     googleId:     { type: String, index: true, sparse: true },

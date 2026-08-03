@@ -18,7 +18,7 @@ description: Full custom JWT auth (signup, login, email verification) — replac
 ## Email verification
 - Token: `crypto.randomBytes(32).toString('hex')`, 24h TTL
 - Sent via Resend (`RESEND_API_KEY`), from `SMTP_FROM_EMAIL` (default `noreply@rolebolt.tech`)
-- Link points to `{FRONTEND_URL}/recruit/verify-email?token=<token>`
+- Link is role-aware: seeker accounts use `{FRONTEND_URL}/seeker/verify-email?token=<token>`, creator accounts use `/recruit/verify-email`; the backend returns the stored role after verification.
 - Frontend page calls POST /auth/verify-email with token in body
 
 ## Required env vars (backend)
