@@ -4,9 +4,9 @@ import { buildMetadata, breadcrumbJsonLd, productAppJsonLd, faqJsonLd, howToJson
 import { JsonLd } from "@/components/JsonLd";
 
 export const metadata: Metadata = buildMetadata({
-  title: "Recruit AI — Free AI Hiring & ATS for Modern Teams | Rolebolt",
+  title: "AI Recruiting Software & Job Search Workspace | Rolebolt",
   description:
-    "Rolebolt is a free AI-powered ATS that sources candidates, screens resumes, scores fit, and runs your full hiring pipeline end-to-end — for startups, agencies, and enterprise teams.",
+    "Rolebolt is an AI recruiting workspace and applicant tracking system for hiring teams, plus a focused job-search workspace for candidates.",
   path: "/recruit",
   keywords: [...productKeywords.recruit],
 });
@@ -15,42 +15,42 @@ const recruitFaqs = [
   {
     question: "What is Rolebolt?",
     answer:
-      "Recruit AI is a free AI-powered applicant tracking system (ATS) that sources candidates, parses and scores resumes, schedules interviews, runs async assessments, and manages the full hiring pipeline for startups, SMBs, and enterprise teams.",
+      "Rolebolt is an AI-powered applicant tracking system and hiring workspace that helps teams create jobs, assess candidates, automate pipeline actions, collaborate, and make informed hiring decisions.",
   },
   {
-    question: "Is Recruit AI really free?",
+    question: "Can I start using Rolebolt without choosing a paid plan?",
     answer:
-      "Yes — every account includes a Free plan with real product access and strict limits. Paid Pro and Ultra Pro plans (INR via Razorpay) unlock higher AI capacity, more active jobs, pipeline automation, and priority processing. Checkout never activates paid access client-side; only verified webhooks do.",
+      "Rolebolt offers a free entry plan so teams can explore the workspace. Paid plans and Razorpay-ready upgrades are available for organisations that need more capacity and advanced workflow support.",
   },
   {
     question: "How does AI candidate scoring work?",
     answer:
-      "Recruit AI parses each candidate's resume, compares their skills, experience level, and role intent against your job description, and assigns a fit score (0–100). This lets your team focus on the strongest matches first instead of reading every CV.",
+      "Rolebolt analyses a candidate's resume against the job description and review rubric, then presents fit signals and supporting context so teams can focus their attention without treating automation as the final decision.",
   },
   {
     question: "Can I post jobs publicly on a job board?",
     answer:
-      "Yes. Recruit AI generates a public-facing job board for your company, individual job listing pages, niche landing pages (by industry), and an embeddable apply widget you can add to your own website.",
+      "Yes. Teams can publish public opportunities and share individual job pages so candidates can discover roles and apply through a focused experience.",
   },
   {
     question: "What is the AI job description writer?",
     answer:
-      "When creating a new job, Recruit AI can auto-generate a complete, professional job description from just a job title and key skills. It produces role summary, responsibilities, requirements, and preferred qualifications — editable before publishing.",
+      "When creating a job, Rolebolt can analyse the brief and help shape the description, assessment criteria and rubric before you publish. The resulting content remains editable by your team.",
   },
   {
     question: "Does Recruit AI support async candidate assessments?",
     answer:
-      "Yes. You can send candidates AI-generated async assessments (written or video) directly from the pipeline. Responses are scored and summarized by AI so you can evaluate candidates efficiently without scheduling calls.",
+      "Yes. Form jobs support structured applications and async assessments, with progress and scoring surfaced alongside the applicant timeline.",
   },
   {
     question: "Can job seekers also use Recruit AI to find jobs?",
     answer:
-      "Yes. Job seekers can browse niche job listings, filter by role, location, work mode, salary, and skill match, save jobs, apply directly, and track their application status — all for free.",
+      "Yes. Job seekers can browse public opportunities, review candidate-match signals, apply, and keep resumes, cover letters, applications and interview preparation in one workspace.",
   },
   {
     question: "How is Recruit AI different from Naukri or LinkedIn Recruiter?",
     answer:
-      "Unlike Naukri and LinkedIn Recruiter (both paid), Rolebolt is completely free, built for niche hiring categories (tech, finance, healthcare, sales, creative, blue-collar), and uses AI to score and match candidates — not just keyword search.",
+      "Rolebolt combines applicant tracking, structured form jobs, assessment workflows, hiring automation and candidate workspace tools in one product, with a free entry plan and paid capacity options.",
   },
   {
     question: "Does Recruit AI work for non-technical hiring?",
@@ -67,12 +67,12 @@ const recruitFaqs = [
 const howTo = howToJsonLd({
   name: "How to Post a Job and Hire with Rolebolt",
   description:
-    "Step-by-step guide to posting your first job listing, setting up your hiring pipeline, and screening candidates using Rolebolt — completely free.",
+    "Step-by-step guide to posting a job listing, setting up a hiring pipeline, and reviewing candidates using Rolebolt.",
   totalTime: "PT10M",
   steps: [
     {
-      name: "Sign up for a free Rolebolt account",
-      text: "Go to rolebolt.tech and create your account. Navigate to the Recruit AI section and select the Recruiter role.",
+      name: "Sign up for a Rolebolt account",
+      text: "Go to rolebolt.tech and create your account. Navigate to the recruiting workspace and select the role that fits your workflow.",
       url: "/signup",
     },
     {
@@ -86,13 +86,13 @@ const howTo = howToJsonLd({
       url: "/recruit",
     },
     {
-      name: "Review incoming applications and AI scores",
-      text: "As candidates apply, Recruit AI scores each applicant's resume for fit (0–100). Sort by AI score to identify your strongest candidates immediately.",
+      name: "Review incoming applications and candidate signals",
+      text: "As candidates apply, Rolebolt organises resumes, assessment progress and review signals so your team can identify where to focus next.",
       url: "/recruit",
     },
     {
       name: "Send assessments and make hiring decisions",
-      text: "Send AI-generated assessments to shortlisted candidates, review their responses, and use the AI hiring decision engine to select your final hire.",
+      text: "Send assessments to shortlisted candidates, review responses and context, collaborate with your team, and make the final hiring decision.",
       url: "/recruit",
     },
   ],
@@ -116,22 +116,20 @@ export default function RecruitLayout({ children }: { children: React.ReactNode 
           id: "recruit",
           name: "Rolebolt",
           url: "/recruit",
-          description:
-            "Free AI applicant tracking system: AI sourcing, resume parsing and scoring, niche job board, async assessments, talent pool, and full hiring pipeline management.",
+      description:
+        "AI recruiting software and applicant tracking system with standard and form jobs, candidate assessment, hiring automation, talent pools, analytics, and job-seeker tools.",
           subCategory: "Applicant Tracking System",
           features: [
-            "AI candidate sourcing and outreach",
-            "Resume parsing and fit scoring (0–100)",
-            "AI job description writer",
-            "Public niche job board with embeddable apply widget",
-            "Async AI assessments for candidates",
-            "Talent pool and saved searches",
-            "Recruiter and job-seeker dashboards",
-            "Application analytics and hiring funnel",
+            "AI job analysis and hiring rubrics",
+            "Resume review and candidate matching",
+            "Standard jobs and structured form jobs",
+            "Public opportunities and applications",
+            "Async candidate assessments",
+            "Pipeline automation and review actions",
+            "Talent pool, collaboration and analytics",
+            "Recruiter and job-seeker workspaces",
           ],
-          rating: { value: "4.8", count: "263" },
           priceCurrency: "INR",
-          lowPrice: "0",
         })}
       />
       {children}

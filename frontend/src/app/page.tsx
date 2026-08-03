@@ -3,9 +3,9 @@ import RecruitLandingPage from "@/app/recruit/page";
 import { buildMetadata, productKeywords } from "@/lib/seo";
 
 export const metadata: Metadata = buildMetadata({
-  title: "Recruit AI — Free AI Hiring & ATS for Modern Teams | Rolebolt",
+  title: "AI Recruiting Software & Job Search Workspace | Rolebolt",
   description:
-    "Rolebolt is a free AI-powered ATS that sources candidates, screens resumes, scores fit, and runs your full hiring pipeline end-to-end — for startups, agencies, and enterprise teams.",
+    "Rolebolt is an AI recruiting workspace and applicant tracking system for hiring teams, plus a focused job-search workspace for candidates.",
   path: "/",
   keywords: [...productKeywords.recruit],
 });
