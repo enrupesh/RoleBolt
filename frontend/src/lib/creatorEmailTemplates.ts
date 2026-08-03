@@ -39,6 +39,7 @@ Looking forward to hearing from you.`,
   {
     key: "update",
     label: "Status update",
+    description: "Keep candidates informed while the hiring process continues",
     body: `We are writing with a brief update on your application status.
 
 Our hiring team is actively reviewing candidates, and we wanted to keep you informed while the process continues. We appreciate your patience and will follow up with more details soon.
