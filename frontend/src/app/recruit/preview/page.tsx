@@ -18,6 +18,7 @@ interface Screenshot {
   desc: string;
   category: Exclude<Category, "All">;
   badge?: string;
+  contain?: boolean;
 }
 
 const SCREENSHOTS: Screenshot[] = [
@@ -114,11 +115,177 @@ const SCREENSHOTS: Screenshot[] = [
   },
 ];
 
+const NEW_VERSION_SCREENSHOTS: Screenshot[] = [
+  {
+    src: "/screenshots/new-version/Screenshot_2026-08-03_174200_1785760331750.png",
+    title: "Recruitment Pipeline",
+    desc: "A recruiter command centre for active roles, candidate volume, shortlist progress, interviews, hires, and daily briefing updates.",
+    category: "Dashboard",
+    badge: "Recruiter",
+    contain: true,
+  },
+  {
+    src: "/screenshots/new-version/Screenshot_2026-08-03_174224_1785760328349.png",
+    title: "Form Jobs Workspace",
+    desc: "A focused view for collecting and reviewing applicants through lightweight custom forms without a full hiring pipeline.",
+    category: "Dashboard",
+    badge: "Recruiter",
+    contain: true,
+  },
+  {
+    src: "/screenshots/new-version/Screenshot_2026-08-03_174242_1785760325931.png",
+    title: "Talent Pool",
+    desc: "Keep strong candidates warm, review match scores, and reuse promising people across future roles.",
+    category: "Dashboard",
+    badge: "Recruiter",
+    contain: true,
+  },
+  {
+    src: "/screenshots/new-version/Screenshot_2026-08-03_174554_1785760271871.png",
+    title: "Candidate Email Outreach",
+    desc: "Select candidates, choose a professional template, edit the message, and see the live email preview before sending.",
+    category: "Candidate Experience",
+    badge: "Recruiter",
+    contain: true,
+  },
+  {
+    src: "/screenshots/new-version/Screenshot_2026-08-03_174613_1785760271871.png",
+    title: "Choose Your Hiring Flow",
+    desc: "Start with a Standard Job Post for a complete AI pipeline or a Form Builder for flexible candidate intake.",
+    category: "Dashboard",
+    badge: "Recruiter",
+    contain: true,
+  },
+  {
+    src: "/screenshots/new-version/Screenshot_2026-08-03_174618_1785760271872.png",
+    title: "AI Job Posting Generator",
+    desc: "A guided role setup turns a few inputs into a complete job description and scoring rubric.",
+    category: "AI Evaluation",
+    badge: "AI",
+    contain: true,
+  },
+  {
+    src: "/screenshots/new-version/Screenshot_2026-08-03_174625_1785760271872.png",
+    title: "Application Form Builder",
+    desc: "Choose a starting template and build a custom application form that can be shared anywhere.",
+    category: "Dashboard",
+    badge: "Recruiter",
+    contain: true,
+  },
+  {
+    src: "/screenshots/new-version/Screenshot_2026-08-03_174643_1785760271873.png",
+    title: "Plans & Billing",
+    desc: "Separate plans for job seekers, Form Jobs, and Standard Jobs with clear payment and access verification.",
+    category: "Dashboard",
+    badge: "Billing",
+    contain: true,
+  },
+  {
+    src: "/screenshots/new-version/Screenshot_2026-08-03_174740_1785760257250.png",
+    title: "Job Seeker Dashboard",
+    desc: "A personal job search overview with Career GPS momentum, applications, interviews, saved jobs, and AI tools.",
+    category: "Candidate Experience",
+    badge: "Job seeker",
+    contain: true,
+  },
+  {
+    src: "/screenshots/new-version/Screenshot_2026-08-03_174747_1785760257251.png",
+    title: "Career GPS",
+    desc: "Turn job search activity into clear next actions with momentum scoring, weekly goals, and pipeline visibility.",
+    category: "Candidate Experience",
+    badge: "Job seeker",
+    contain: true,
+  },
+  {
+    src: "/screenshots/new-version/Screenshot_2026-08-03_174756_1785760257252.png",
+    title: "Universal Application Tracker",
+    desc: "Track Rolebolt, LinkedIn, Indeed, company-site, and manually added applications in one place.",
+    category: "Candidate Experience",
+    badge: "Job seeker",
+    contain: true,
+  },
+  {
+    src: "/screenshots/new-version/Screenshot_2026-08-03_174812_1785760257252.png",
+    title: "Universal Job Workspace",
+    desc: "Bring any job from a URL or pasted description into a workspace for analysis and smarter next steps.",
+    category: "Candidate Experience",
+    badge: "Job seeker",
+    contain: true,
+  },
+  {
+    src: "/screenshots/new-version/Screenshot_2026-08-03_174833_1785760257253.png",
+    title: "Job Seeker AI Tools",
+    desc: "Jump from the dashboard into Resume, Cover Letter, Interview Prep, Email Intelligence, Extension, and Profile tools.",
+    category: "Candidate Experience",
+    badge: "Job seeker",
+    contain: true,
+  },
+  {
+    src: "/screenshots/new-version/Screenshot_2026-08-03_174840_1785760257254.png",
+    title: "AI Tools at a Glance",
+    desc: "A quick dashboard view of the complete job seeker toolkit, from application tracking to interview preparation.",
+    category: "Candidate Experience",
+    badge: "Job seeker",
+    contain: true,
+  },
+  {
+    src: "/screenshots/new-version/Screenshot_2026-08-03_174849_1785760257254.png",
+    title: "Browser Extension",
+    desc: "Save roles from LinkedIn, Indeed, and career pages, then get instant AI match analysis and workspace actions.",
+    category: "Candidate Experience",
+    badge: "Job seeker",
+    contain: true,
+  },
+  {
+    src: "/screenshots/new-version/Screenshot_2026-08-03_174900_1785760257255.png",
+    title: "AI Interview Prep",
+    desc: "Practice with AI-generated questions at entry, mid, or senior difficulty and get ready for the real conversation.",
+    category: "AI Evaluation",
+    badge: "AI",
+    contain: true,
+  },
+  {
+    src: "/screenshots/new-version/Screenshot_2026-08-03_174911_1785760257255.png",
+    title: "AI Cover Letter Generator",
+    desc: "Combine a job description and your resume, choose a tone, and generate a tailored cover letter in seconds.",
+    category: "AI Evaluation",
+    badge: "AI",
+    contain: true,
+  },
+  {
+    src: "/screenshots/new-version/Screenshot_2026-08-03_174921_1785760257256.png",
+    title: "Email Intelligence",
+    desc: "Paste recruiter emails and extract stage updates, interview dates, and recommended next steps.",
+    category: "AI Evaluation",
+    badge: "AI",
+    contain: true,
+  },
+  {
+    src: "/screenshots/new-version/Screenshot_2026-08-03_174932_1785760207911.png",
+    title: "AI Resume Builder",
+    desc: "Build from scratch or improve an existing resume, then export an ATS-friendly version in your preferred format.",
+    category: "AI Evaluation",
+    badge: "AI",
+    contain: true,
+  },
+  {
+    src: "/screenshots/new-version/Screenshot_2026-08-03_174951_1785760184810.png",
+    title: "Job Seeker Profile",
+    desc: "Keep your headline, experience, location, bio, and skills current so every job match starts with better context.",
+    category: "Candidate Experience",
+    badge: "Job seeker",
+    contain: true,
+  },
+];
+
 const BADGE_STYLES: Record<string, string> = {
   Dashboard: "bg-[#0a66c2]/10 text-[#0a66c2] border-[#0a66c2]/20",
   AI: "bg-violet-500/10 text-violet-600 border-violet-500/20",
   Analytics: "bg-emerald-500/10 text-emerald-700 border-emerald-500/20",
   Candidate: "bg-amber-500/10 text-amber-700 border-amber-500/20",
+  Recruiter: "bg-[#0a66c2]/10 text-[#0a66c2] border-[#0a66c2]/20",
+  Billing: "bg-emerald-500/10 text-emerald-700 border-emerald-500/20",
+  "Job seeker": "bg-violet-500/10 text-violet-600 border-violet-500/20",
 };
 
 // ─── Architecture diagram helpers ────────────────────────────────────────────
@@ -293,7 +460,7 @@ export default function ProductPreviewPage() {
                   alt={shot.title}
                   fill
                   loading={idx === 0 ? "eager" : "lazy"}
-                  className="object-cover object-top transition-transform duration-500 group-hover:scale-[1.03]"
+                   className={`${shot.contain ? "object-contain" : "object-cover object-top"} transition-transform duration-500 group-hover:scale-[1.03]`}
                   sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                 />
                 {/* Hover overlay */}
@@ -317,6 +484,107 @@ export default function ProductPreviewPage() {
             </article>
           ))}
         </div>
+
+         {/* ── The New Version of Preview ──────────────────────────────────── */}
+         <section id="new-version-preview" className="mt-24 scroll-mt-28">
+           <div className="relative overflow-hidden rounded-[2rem] bg-slate-950 px-6 py-10 sm:px-10 sm:py-12">
+             <div className="pointer-events-none absolute -right-32 -top-40 h-[28rem] w-[28rem] rounded-full bg-violet-600/20 blur-[90px]" />
+             <div className="pointer-events-none absolute -bottom-48 left-1/4 h-[24rem] w-[24rem] rounded-full bg-[#0a66c2]/20 blur-[90px]" />
+             <div className="relative mx-auto max-w-3xl text-center">
+               <span className="inline-flex items-center gap-2 rounded-full border border-violet-300/25 bg-violet-300/10 px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-violet-200">
+                 <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                   <path d="M12 3v18M3 12h18M5.64 5.64l12.72 12.72M18.36 5.64 5.64 18.36" />
+                 </svg>
+                 The New Version of Preview
+               </span>
+               <h2 className="mt-5 text-3xl font-black tracking-tight text-white sm:text-4xl">
+                 One workspace. Every better next step.
+               </h2>
+               <p className="mx-auto mt-4 max-w-2xl text-sm leading-6 text-slate-400 sm:text-base">
+                 Explore the latest Rolebolt experience for recruiting teams and job seekers — from the first job post to the final interview.
+               </p>
+               <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-[11px] font-semibold text-slate-400">
+                 <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">20 new screens</span>
+                 <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">Recruiter + job seeker</span>
+                 <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">Click to enlarge</span>
+               </div>
+             </div>
+           </div>
+
+           <div className="mt-12 space-y-14">
+             {[
+               {
+                 label: "For recruiting teams",
+                 title: "A clearer operating system for hiring",
+                 desc: "Move from job creation to candidate outreach with better context at every step.",
+                 items: NEW_VERSION_SCREENSHOTS.filter((shot) => ["Recruiter", "Billing"].includes(shot.badge ?? "")),
+                 accent: "text-[#0a66c2]",
+                 pill: "bg-blue-50 text-[#0a66c2] border-blue-100",
+               },
+               {
+                 label: "For job seekers",
+                 title: "A smarter workspace for the whole search",
+                 desc: "Keep your profile, applications, preparation, and job research connected in one place.",
+                 items: NEW_VERSION_SCREENSHOTS.filter((shot) => shot.badge === "Job seeker"),
+                 accent: "text-violet-600",
+                 pill: "bg-violet-50 text-violet-600 border-violet-100",
+               },
+               {
+                 label: "AI-powered tools",
+                 title: "Useful assistance, right when you need it",
+                 desc: "Build, tailor, prepare, and understand with focused AI tools for real job-search moments.",
+                 items: NEW_VERSION_SCREENSHOTS.filter((shot) => shot.badge === "AI"),
+                 accent: "text-amber-600",
+                 pill: "bg-amber-50 text-amber-700 border-amber-100",
+               },
+             ].map((group) => (
+               <div key={group.label}>
+                 <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                   <div>
+                     <p className={`text-[11px] font-bold uppercase tracking-[0.16em] ${group.accent}`}>{group.label}</p>
+                     <h3 className="mt-2 text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">{group.title}</h3>
+                   </div>
+                   <p className="max-w-md text-sm leading-5 text-slate-500 sm:text-right">{group.desc}</p>
+                 </div>
+                 <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                   {group.items.map((shot, idx) => (
+                     <article
+                       key={shot.src}
+                       onClick={() => setLightbox(shot)}
+                       className="group cursor-zoom-in overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-[#0a66c2]/30 hover:shadow-lg"
+                     >
+                       <div className="relative aspect-[16/10] overflow-hidden bg-slate-100">
+                         <Image
+                           src={shot.src}
+                           alt={shot.title}
+                           fill
+                           loading={idx === 0 ? "eager" : "lazy"}
+                           className={`${shot.contain ? "object-contain" : "object-cover object-top"} transition-transform duration-500 group-hover:scale-[1.03]`}
+                           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                         />
+                         <div className="absolute inset-0 flex items-center justify-center bg-slate-950/0 transition-all duration-200 group-hover:bg-slate-950/20">
+                           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-slate-700 opacity-0 shadow-lg transition-opacity duration-200 group-hover:opacity-100">
+                             <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                               <circle cx="11" cy="11" r="8" />
+                               <path d="m21 21-4.35-4.35M11 8v6M8 11h6" />
+                             </svg>
+                           </div>
+                         </div>
+                       </div>
+                       <div className="p-4 sm:p-5">
+                         <span className={`mb-3 inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${group.pill}`}>
+                           {shot.badge}
+                         </span>
+                         <h4 className="text-[15px] font-bold leading-snug text-slate-900">{shot.title}</h4>
+                         <p className="mt-1.5 text-[13px] leading-relaxed text-slate-500">{shot.desc}</p>
+                       </div>
+                     </article>
+                   ))}
+                 </div>
+               </div>
+             ))}
+           </div>
+         </section>
 
         {/* ── Judges Testing Kit ───────────────────────────────────────────── */}
         <div className="mt-20">
