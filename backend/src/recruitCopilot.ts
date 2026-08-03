@@ -971,6 +971,10 @@ copilotRouter.post("/chat/stream", async (req, res) => {
       return parsed;
     };
 
+    // Phase 4 verified: entitlement + reservation happen here at execution time,
+    // before any SSE bytes are written. Queued/streamed copilot turns for an owner
+    // who downgraded / cancelled / went past_due are blocked at the reserve step
+    // (fail closed), so no new AI streams start without a committed reservation.
     if (meterFormTurn) {
       // Critical: reserve BEFORE SSE headers so capacity errors remain JSON.
       await runFormBillingOperation({
