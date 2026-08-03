@@ -64,12 +64,12 @@ export interface RazorpayPlanResponse {
 
 /**
  * Razorpay requires a bounded subscription when perpetual subscriptions are
- * not enabled on the account. Keep the duration below the provider's absolute
- * 100-year subscription boundary so the UPI mandate end_time remains valid
- * even when the subscription is created near the end of a calendar year.
+ * not enabled on the account. UPI mandates have a stricter 30-year expiry
+ * boundary than the general subscription API, so keep a full year of headroom
+ * for subscriptions created near the end of a calendar year.
  */
 export function getRazorpaySubscriptionTotalCount(interval: BillingInterval): number {
-  return interval === "monthly" ? 1080 : 90;
+  return interval === "monthly" ? 348 : 29;
 }
 
 /** Razorpay Checkout prefill expects E.164, e.g. +919876543210 for Indian numbers. */

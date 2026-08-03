@@ -15,8 +15,8 @@ Razorpay subscription Checkout shows a dynamic UPI QR as the documented desktop 
 
 **How to apply:** Use Razorpay's default subscription Checkout options so its QR rendering remains intact. Always pass server-built checkout prefill (name/email/phone) from `/billing/create-checkout` into Checkout.js, and create subscriptions with matching `notify_info`. Never use a frontend-only Razorpay key fallback that can mismatch the server key used to create the subscription.
 
-UPI mandate checkouts also require the subscription's computed `end_time` to stay within Razorpay's provider boundary; a nominal 100-year billing horizon can push new subscriptions past the 2120 maximum and make UPI authorization fail before payment.
+UPI mandate checkouts also require the subscription's computed `expire_at` to stay within Razorpay's 30-year boundary; a nominal 100-year billing horizon can push new subscriptions past the allowed expiry and make UPI authorization fail before payment.
 
-**Why:** Razorpay accepts the subscription record but rejects the UPI mandate when its end time is outside the allowed timestamp range, producing the misleading `end_time must be between ...` checkout error.
+**Why:** Razorpay accepts the subscription record but rejects the UPI mandate when its expiry is outside the allowed 30-year range, producing the `expire_at cannot be more than 30 years for upi` checkout error.
 
-**How to apply:** Keep monthly/yearly `total_count` values below the 100-year ceiling with headroom for the creation date, and test a fresh subscription after changing them; existing `created` subscriptions retain their original invalid end time.
+**How to apply:** Keep monthly/yearly `total_count` values below 30 years with headroom for the creation date, and test a fresh subscription after changing them; existing `created` subscriptions retain their original expiry.
