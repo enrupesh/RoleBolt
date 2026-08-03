@@ -38,7 +38,7 @@ const BillingCheckoutSchema = new Schema<IBillingCheckout>(
       default: "creating",
     },
     provider: { type: String, enum: ["razorpay"], required: true, default: "razorpay" },
-    providerSubscriptionId: { type: String, index: true },
+    providerSubscriptionId: { type: String },
     providerPaymentId: { type: String },
     providerPlanId: { type: String, required: true },
     payloadHash: { type: String },

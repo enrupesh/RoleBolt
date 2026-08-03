@@ -11,6 +11,6 @@ Razorpay integration uses server-owned plan IDs, checkout idempotency records, r
 
 Razorpay subscription Checkout shows a dynamic UPI QR as the documented desktop fallback. Mobile UPI Intent requires Razorpay-side enablement; it cannot be created by adding a browser camera scanner.
 
-**Why:** The QR on a subscription mandate is a payment approval QR, not a scanner control. Forcing unsupported Checkout options can break the payment flow.
+**Why:** The QR on a subscription mandate is a payment approval QR, not a scanner control. Forcing unsupported Checkout options can break the payment flow. Razorpay also requires customer contact context (`prefill.contact` + subscription `notify_info`) for reliable UPI Autopay QR generation.
 
-**How to apply:** Use Razorpay's default subscription Checkout options so its QR rendering remains intact, and explain desktop QR versus mobile UPI-app behavior in the pricing UI.
+**How to apply:** Use Razorpay's default subscription Checkout options so its QR rendering remains intact. Always pass server-built checkout prefill (name/email/phone) from `/billing/create-checkout` into Checkout.js, and create subscriptions with matching `notify_info`. Never use a frontend-only Razorpay key fallback that can mismatch the server key used to create the subscription.
