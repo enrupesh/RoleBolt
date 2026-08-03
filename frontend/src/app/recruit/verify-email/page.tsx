@@ -15,6 +15,7 @@ function VerifyEmailContent() {
 
   const [status, setStatus]   = useState<Status>(token ? "loading" : "no-token");
   const [message, setMessage] = useState("");
+  const [verifiedRole, setVerifiedRole] = useState<"creator" | "seeker">("creator");
   const calledRef = useRef(false);
 
   useEffect(() => {
@@ -29,6 +30,7 @@ function VerifyEmailContent() {
       .then(async (res) => {
         const data = await res.json();
         if (res.ok) {
+          if (data.role === "seeker" || data.role === "creator") setVerifiedRole(data.role);
           setStatus("success");
         } else if (data.code === "TOKEN_EXPIRED") {
           setStatus("expired");
@@ -86,10 +88,10 @@ function VerifyEmailContent() {
                 Your email address has been confirmed. You can now sign in to your Rolebolt account.
               </p>
               <Link
-                href="/recruit/login"
+                href={verifiedRole === "seeker" ? "/seeker/login" : "/recruit/login"}
                 className="inline-flex w-full items-center justify-center rounded-xl bg-[#0a66c2] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#004182] transition-all shadow-[0_2px_10px_rgba(10,102,194,0.28)]"
               >
-                Sign in to your account
+                {verifiedRole === "seeker" ? "Sign in as a job seeker" : "Sign in to your account"}
               </Link>
             </>
           )}

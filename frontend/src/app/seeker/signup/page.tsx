@@ -222,7 +222,7 @@ export default function SeekerSignupPage() {
       const res = await fetch(apiUrl("/auth/signup"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: username.trim(), email: email.trim(), password }),
+        body: JSON.stringify({ username: username.trim(), email: email.trim(), password, role: "seeker" }),
       });
       const data = await res.json();
       if (!res.ok) {

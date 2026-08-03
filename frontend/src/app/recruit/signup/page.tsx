@@ -197,7 +197,7 @@ export default function RecruitSignUpPage() {
       const res = await fetch(apiUrl("/auth/signup"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), password, username: username.trim() }),
+        body: JSON.stringify({ email: email.trim(), password, username: username.trim(), role: "creator" }),
       });
       const data = await res.json();
 

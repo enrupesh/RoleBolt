@@ -95,8 +95,29 @@ function makeToken(): string {
 /** @deprecated use makeToken() */
 function makeVerificationToken(): string { return makeToken(); }
 
-async function sendVerificationEmail(email: string, name: string, token: string): Promise<void> {
-  const link = `${FRONTEND_URL}/recruit/verify-email?token=${token}`;
+type SignupRole = "creator" | "seeker";
+
+function parseSignupRole(raw: unknown): SignupRole | null {
+  if (raw === undefined || raw === null || raw === "") return "creator";
+  return raw === "creator" || raw === "seeker" ? raw : null;
+}
+
+async function getStoredSignupRole(
+  user: { _id: { toString(): string }; signupRole?: SignupRole },
+): Promise<SignupRole | null> {
+  if (user.signupRole) return user.signupRole;
+  const profile = await RecruitProfile.findOne({ uid: user._id.toString() }).select("role").lean();
+  return profile?.role === "seeker" || profile?.role === "creator" ? profile.role : null;
+}
+
+async function sendVerificationEmail(
+  email: string,
+  name: string,
+  token: string,
+  role: SignupRole = "creator",
+): Promise<void> {
+  const verificationPath = role === "seeker" ? "/seeker/verify-email" : "/recruit/verify-email";
+  const link = `${FRONTEND_URL}${verificationPath}?token=${token}`;
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -495,11 +516,14 @@ authRouter.post("/signup", async (req, res) => {
   try {
     await connectMongo();
 
-    const { email, password, username } = req.body as {
+    const { email, password, username, role } = req.body as {
       email?: string;
       password?: string;
       username?: string;
+      role?: string;
     };
+    const signupRole = parseSignupRole(role);
+    if (!signupRole) return res.status(400).json({ error: "Invalid signup role." });
 
     const usernameResult = validateUsername(username);
     if ("error" in usernameResult) return res.status(400).json({ error: usernameResult.error });
@@ -523,10 +547,12 @@ authRouter.post("/signup", async (req, res) => {
       if (!existing.isVerified) {
         // Resend verification instead of erroring out
         const token = makeVerificationToken();
+        const existingRole = await getStoredSignupRole(existing) ?? signupRole;
+        if (!existing.signupRole) existing.signupRole = existingRole;
         existing.verificationToken       = token;
         existing.verificationTokenExpiry = new Date(Date.now() + TOKEN_TTL_MS);
         await existing.save();
-        await sendVerificationEmail(normalizedEmail, existing.username || existing.name, token);
+        await sendVerificationEmail(normalizedEmail, existing.username || existing.name, token, existingRole);
         return res.status(400).json({
           code:  "EMAIL_NOT_VERIFIED",
           error: "An account with this email exists but hasn't been verified. We've sent a new verification link.",
@@ -543,13 +569,14 @@ authRouter.post("/signup", async (req, res) => {
       username:                normalizedUsername,
       passwordHash,
       name:                    "",
+      signupRole,
       isVerified:              false,
       verificationToken,
       verificationTokenExpiry: new Date(Date.now() + TOKEN_TTL_MS),
     });
 
     // Fire-and-forget — don't block the response on email delivery
-    sendVerificationEmail(normalizedEmail, user.username || user.name, verificationToken).catch((err) => {
+    sendVerificationEmail(normalizedEmail, user.username || user.name, verificationToken, signupRole).catch((err) => {
       console.error("[auth] Failed to send verification email:", err?.message);
     });
 
@@ -657,7 +684,8 @@ authRouter.post("/verify-email", async (req, res) => {
     user.verificationTokenExpiry = undefined;
     await user.save();
 
-    return res.json({ message: "Email verified successfully. You can now sign in." });
+    const role = await getStoredSignupRole(user) ?? "creator";
+    return res.json({ message: "Email verified successfully. You can now sign in.", role });
   } catch (err: any) {
     console.error("[auth] verify-email error:", err?.message);
     return res.status(500).json({ error: "Internal server error." });
@@ -670,7 +698,7 @@ authRouter.post("/resend-verification", async (req, res) => {
   try {
     await connectMongo();
 
-    const { email } = req.body as { email?: string };
+    const { email, role: requestedRole } = req.body as { email?: string; role?: string };
     if (!email?.trim()) return res.status(400).json({ error: "Email is required." });
 
     const user = await User.findOne({ email: email.trim().toLowerCase() });
@@ -680,12 +708,16 @@ authRouter.post("/resend-verification", async (req, res) => {
       return res.json({ message: "If that email exists and is unverified, a new link has been sent." });
     }
 
+    const requestedSignupRole = parseSignupRole(requestedRole);
+    if (!requestedSignupRole) return res.status(400).json({ error: "Invalid signup role." });
+    const verificationRole = await getStoredSignupRole(user) ?? requestedSignupRole;
+    if (!user.signupRole) user.signupRole = verificationRole;
     const token = makeVerificationToken();
     user.verificationToken       = token;
     user.verificationTokenExpiry = new Date(Date.now() + TOKEN_TTL_MS);
     await user.save();
 
-    sendVerificationEmail(user.email, user.name, token).catch((err) => {
+    sendVerificationEmail(user.email, user.name, token, verificationRole).catch((err) => {
       console.error("[auth] Failed to resend verification email:", err?.message);
     });
 

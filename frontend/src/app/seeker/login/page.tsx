@@ -283,7 +283,7 @@ function SeekerLoginPageContent() {
       await fetch(apiUrl("/auth/resend-verification"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: emailRef.current.trim() }),
+        body: JSON.stringify({ email: emailRef.current.trim(), role: "seeker" }),
       });
       setResendSuccess(true);
     } catch {
