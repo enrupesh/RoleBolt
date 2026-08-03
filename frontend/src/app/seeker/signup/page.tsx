@@ -123,7 +123,7 @@ export default function SeekerSignupPage() {
       });
       const session = await signInWithToken(data.token);
       if (session.error) throw new Error(session.error);
-      markSignupWelcome("seeker");
+      if (data.isNewAccount !== false) markSignupWelcome("seeker");
       routeAfterSocialLogin(session.username);
     } catch (err: any) {
       if (err?.code !== "auth/popup-closed-by-user") {
@@ -196,7 +196,7 @@ export default function SeekerSignupPage() {
       await ensureSeekerProfile(data.token, { username: data.user?.username, email: data.user?.email ?? "" });
       const session = await signInWithToken(data.token);
       if (session.error) throw new Error(session.error);
-      markSignupWelcome("seeker");
+      if (data.isNewAccount !== false) markSignupWelcome("seeker");
       routeAfterSocialLogin(session.username);
     } catch (err: any) {
       setPhoneError(err?.code === "auth/invalid-verification-code"
