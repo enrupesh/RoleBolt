@@ -12,6 +12,10 @@ import { callGeminiChain } from "../ai/geminiClient";
 import { callMeshChatCompletions } from "../ai/meshClient";
 import { callNvidia } from "../ai/nvidiaClient";
 import * as emailTemplates from "../emailTemplates";
+import {
+  tryBackgroundBillingOperation,
+  backgroundIdempotencyKey,
+} from "../billing/backgroundEnforcement";
 
 const MESH_KEY = process.env.GEMINI_MESH_KEY ?? "";
 
@@ -131,24 +135,45 @@ Write a 3-paragraph briefing:
 
 Rules: Under 220 words total. Conversational tone, not robotic. No bullet points — flowing paragraphs only. Address recruiter by first name.`;
 
-  let briefingText = "";
-  try {
-    briefingText = await callAI(prompt);
-  } catch {
-    briefingText = `Good morning ${name}! Here's your hiring summary for today: you have ${newApps} new application${newApps !== 1 ? "s" : ""} in the last 24 hours and ${pendingReview} candidate${pendingReview !== 1 ? "s" : ""} awaiting your review across ${jobs.length} active job${jobs.length !== 1 ? "s" : ""}${forms.length > 0 ? ` and ${forms.length} active form${forms.length !== 1 ? "s" : ""}` : ""}. ${inInterview > 0 ? `${inInterview} candidate${inInterview !== 1 ? "s are" : " is"} currently in the interview stage — worth following up on today.` : ""} ${pendingFormAssessments > 0 ? `${pendingFormAssessments} form assessment${pendingFormAssessments !== 1 ? "s are" : " is"} still pending — follow up with those candidates.` : ""} ${staleJobs.length > 0 ? `Consider refreshing these listings: ${staleJobs.join(", ")}.` : "Your active jobs are receiving healthy interest."}`;
+  // Phase 4: entitlement is evaluated at execution time. The daily briefing runs
+  // AI generation + a metered creator email, so gate + meter with a stable
+  // per-user per-UTC-day idempotency key (no double charge if the cron re-runs
+  // the same day). Blocked owners (downgrade / cancel / past_due, or entitlement
+  // unresolved → fail closed) are skipped without sending an email.
+  const utcDay = new Date().toISOString().slice(0, 10);
+  const outcome = await tryBackgroundBillingOperation({
+    ownerUid: userId,
+    category: "creator_standard",
+    operation: "daily_briefing",
+    idempotencyKey: backgroundIdempotencyKey(userId, ["daily-briefing", utcDay]),
+    resourceType: "user",
+    resourceId: userId,
+    work: async () => {
+      let briefingText = "";
+      try {
+        briefingText = await callAI(prompt);
+      } catch {
+        briefingText = `Good morning ${name}! Here's your hiring summary for today: you have ${newApps} new application${newApps !== 1 ? "s" : ""} in the last 24 hours and ${pendingReview} candidate${pendingReview !== 1 ? "s" : ""} awaiting your review across ${jobs.length} active job${jobs.length !== 1 ? "s" : ""}${forms.length > 0 ? ` and ${forms.length} active form${forms.length !== 1 ? "s" : ""}` : ""}. ${inInterview > 0 ? `${inInterview} candidate${inInterview !== 1 ? "s are" : " is"} currently in the interview stage — worth following up on today.` : ""} ${pendingFormAssessments > 0 ? `${pendingFormAssessments} form assessment${pendingFormAssessments !== 1 ? "s are" : " is"} still pending — follow up with those candidates.` : ""} ${staleJobs.length > 0 ? `Consider refreshing these listings: ${staleJobs.join(", ")}.` : "Your active jobs are receiving healthy interest."}`;
+      }
+
+      const html = emailTemplates.dailyBriefing(name, briefingText, {
+        newApps, pendingReview, inInterview, activeJobs: jobs.length, staleJobs,
+      });
+
+      await sendEmail({
+        to: user.email,
+        subject: `☀️ Your Daily Hiring Briefing — ${new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}`,
+        html,
+        text: briefingText,
+        from: NOTIFICATION_FROM,
+      });
+    },
+  });
+
+  if (!outcome.ok) {
+    console.log(`[briefing] Skipped for ${user.email} — billing blocked: ${outcome.reason}`);
+    return;
   }
-
-  const html = emailTemplates.dailyBriefing(name, briefingText, {
-    newApps, pendingReview, inInterview, activeJobs: jobs.length, staleJobs,
-  });
-
-  await sendEmail({
-    to: user.email,
-    subject: `☀️ Your Daily Hiring Briefing — ${new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}`,
-    html,
-    text: briefingText,
-    from: NOTIFICATION_FROM,
-  });
 
   console.log(`[briefing] Sent to ${user.email}`);
 }
