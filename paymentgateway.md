@@ -390,43 +390,43 @@ Estimated relative effort:
 
 ### 0.1 Tasks
 
-- [ ] **Fix cancellation-at-period-end** in `entitlements.ts`:
+- [x] **Fix cancellation-at-period-end** in `entitlements.ts`:
   - Retain paid plan if `cancelAtPeriodEnd && currentPeriodEnd > now`
-  - Map `past_due` / `halted` per `payment.md` §11.5 (restrict new metered work; keep read access)
+  - Map `past_due` / `halted` per `payment.md` (restrict new metered work; keep read access)
 
-- [ ] **Remove `trialing` from paid statuses** unless explicitly re-approved in `payment.md`
+- [x] **Remove `trialing` from paid statuses** unless explicitly re-approved in `payment.md`
 
-- [ ] **Wire `initializeFreeEntitlements(userId)` on signup** in `auth.ts` (after User.create)
+- [x] **Wire `initializeFreeEntitlements(userId)` on signup** in `auth.ts` (after User.create)
 
-- [ ] **Run and document** `migrateFreeEntitlements` for all existing users
+- [x] **Run and document** `migrateFreeEntitlements` for all existing users
 
-- [ ] **Expand `operationCatalog.ts`** to cover every AI/metered operation in `payment.md` §5.1 and the Phase -1 audit inventory
+- [x] **Expand `operationCatalog.ts`** to cover every AI/metered operation in `payment.md` §5.1 and the Phase -1 audit inventory
 
-- [ ] **Fix `resourceCounters.ts`:**
+- [x] **Fix `resourceCounters.ts`:**
   - Implement accurate resume version counting (or add `RecruitSeekerResumeVersion` model if versions are stored separately)
   - Add `recruiter_seats` counter via `RecruitTeamMember`
   - Verify `uid` field usage on `RecruitCandidate`, `RecruitFormResponse`, `RecruitJob`, `RecruitForm`
 
-- [ ] **Add `backend/src/billing/executeOperation.ts`** — standard wrapper:
+- [x] **Add `backend/src/billing/executeOperation.ts`** — standard wrapper:
   - `executeBillingOperation(req, { category, operation, ownerUid, idempotencyKey, work })`
   - Handles reserve/commit/release + error serialization
 
-- [ ] **Add `resolveBillingOwner(req, resource)`** helper for collaboration routes
+- [x] **Add `resolveBillingOwner(req, resource)`** helper for collaboration routes
 
-- [ ] **Extend middleware** or add composable guards:
+- [x] **Extend middleware** or add composable guards:
   - `requireUsageReservation(operation)` for AI routes
   - Attach `req.billingReservation` for handler use
 
-- [ ] **Delete `middleware/planCheck.ts`** (or mark deprecated and grep-verify zero imports)
+- [x] **Delete `middleware/planCheck.ts`** (or mark deprecated and grep-verify zero imports)
 
-- [ ] **Add MongoDB integration tests** (`billing/usage.integration.test.ts`):
+- [x] **Add MongoDB integration tests** (`billing/usage.integration.test.ts`):
   - Exact limit boundary
   - One request beyond limit fails
   - Concurrent requests cannot exceed limit
   - Duplicate idempotency key returns same reservation
   - Commit/release transitions are idempotent
 
-- [ ] **Add `GET /billing/subscription` multi-category response** or document that frontend must use `/billing/entitlements`
+- [x] **Add `GET /billing/subscription` multi-category response** or document that frontend must use `/billing/entitlements`
 
 ### 0.2 Review gate
 
@@ -439,6 +439,8 @@ Estimated relative effort:
 | Signup test | New user has 3 Free Subscription records |
 | Operation catalog | Every AI route in audit has a catalog entry |
 | Grep for `planCheck` | Zero production imports |
+
+**Phase 0 status:** Complete — see [`phase-zero-foundation-review.md`](./phase-zero-foundation-review.md).
 
 **Do not proceed to Phase 1 until Phase 0 passes.**
 

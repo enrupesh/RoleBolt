@@ -75,6 +75,8 @@ billingFoundationRouter.get("/entitlements", async (req, res) => {
           status: entitlement.status,
           processingPriority: entitlement.definition.processingPriority,
           featureFlags: entitlement.definition.featureFlags,
+          cancelAtPeriodEnd: entitlement.cancelAtPeriodEnd,
+          meteredAccessAllowed: entitlement.meteredAccessAllowed,
           billingWarning: entitlement.billingWarning ?? null,
           periodStart: period.periodStart,
           periodEnd: period.periodEnd,
