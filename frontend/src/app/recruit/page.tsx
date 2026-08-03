@@ -163,13 +163,13 @@ export default function RecruitLandingPage() {
             <RoleboltLogo size="md" />
             <span className="font-display text-[15px] font-semibold tracking-[-0.03em]">Rolebolt</span>
           </Link>
-          <nav className="hidden items-center gap-1 min-[1180px]:flex" aria-label="Primary navigation">
-            <Link href="/recruit/opportunities" className="rounded-lg px-3 py-2 text-sm text-[#5d7285] transition hover:bg-white hover:text-[#10263d]">Find jobs</Link>
-            <a href="#how-it-works" className="rounded-lg px-3 py-2 text-sm text-[#5d7285] transition hover:bg-white hover:text-[#10263d]">How it works</a>
-            <a href="#recruiters" className="rounded-lg px-3 py-2 text-sm text-[#5d7285] transition hover:bg-white hover:text-[#10263d]">For recruiters</a>
-            <a href="#seekers" className="rounded-lg px-3 py-2 text-sm text-[#5d7285] transition hover:bg-white hover:text-[#10263d]">For job seekers</a>
-            <a href="#product" className="rounded-lg px-3 py-2 text-sm text-[#5d7285] transition hover:bg-white hover:text-[#10263d]">Product</a>
-            <Link href="/recruit/pricing" className="rounded-lg px-3 py-2 text-sm text-[#5d7285] transition hover:bg-white hover:text-[#10263d]">Plans</Link>
+          <nav className="hidden items-center gap-0 min-[1024px]:flex" aria-label="Primary navigation">
+            <Link href="/recruit/opportunities" className="rounded-lg px-2 py-2 text-[13px] text-[#5d7285] transition hover:bg-white hover:text-[#10263d] min-[1180px]:px-3 min-[1180px]:text-sm">Find jobs</Link>
+            <a href="#how-it-works" className="rounded-lg px-2 py-2 text-[13px] text-[#5d7285] transition hover:bg-white hover:text-[#10263d] min-[1180px]:px-3 min-[1180px]:text-sm">How it works</a>
+            <a href="#recruiters" className="rounded-lg px-2 py-2 text-[13px] text-[#5d7285] transition hover:bg-white hover:text-[#10263d] min-[1180px]:px-3 min-[1180px]:text-sm">For recruiters</a>
+            <a href="#seekers" className="rounded-lg px-2 py-2 text-[13px] text-[#5d7285] transition hover:bg-white hover:text-[#10263d] min-[1180px]:px-3 min-[1180px]:text-sm">For job seekers</a>
+            <a href="#product" className="rounded-lg px-2 py-2 text-[13px] text-[#5d7285] transition hover:bg-white hover:text-[#10263d] min-[1180px]:px-3 min-[1180px]:text-sm">Product</a>
+            <Link href="/recruit/pricing" className="rounded-lg px-2 py-2 text-[13px] text-[#5d7285] transition hover:bg-white hover:text-[#10263d] min-[1180px]:px-3 min-[1180px]:text-sm">Plans</Link>
           </nav>
           <div className="flex items-center gap-2">
             {isLoggedIn ? (
@@ -183,7 +183,7 @@ export default function RecruitLandingPage() {
                 <Link href="/recruit/signup" className="inline-flex items-center gap-2 rounded-lg bg-[#0a66c2] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_5px_16px_rgba(10,102,194,.18)] transition hover:-translate-y-0.5 hover:bg-[#07559f]">Get started <Arrow /></Link>
               </>
             )}
-            <button aria-label="Toggle navigation" onClick={() => setMenuOpen((open) => !open)} className="flex h-10 w-10 items-center justify-center rounded-lg border border-[#d7e2eb] bg-white min-[1180px]:hidden">
+            <button aria-label="Toggle navigation" onClick={() => setMenuOpen((open) => !open)} className="flex h-10 w-10 items-center justify-center rounded-lg border border-[#d7e2eb] bg-white min-[1024px]:hidden">
               {menuOpen ? (
                 <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
               ) : (
@@ -193,7 +193,7 @@ export default function RecruitLandingPage() {
           </div>
         </div>
         {menuOpen && (
-          <nav className="border-t border-[#dfe8ef] bg-[#f8fbfd] px-5 py-3 min-[1180px]:hidden">
+          <nav className="border-t border-[#dfe8ef] bg-[#f8fbfd] px-5 py-3 min-[1024px]:hidden">
             <div className="mx-auto flex max-w-7xl flex-col gap-1">
               <Link onClick={() => setMenuOpen(false)} href="/recruit/opportunities" className="rounded-lg px-3 py-3 text-sm">Find jobs</Link>
               <a onClick={() => setMenuOpen(false)} href="#how-it-works" className="rounded-lg px-3 py-3 text-sm">How it works</a>
