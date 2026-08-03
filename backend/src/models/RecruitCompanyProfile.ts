@@ -44,6 +44,7 @@ export interface IRecruitCompanyProfile extends Document {
   socialLinks: ICompanySocialLinks;
   verificationStatus: "none" | "requested" | "verified" | "rejected";
   verificationRequestedAt?: Date;
+  verifiedAt?: Date;
   verificationNote?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -91,6 +92,7 @@ const RecruitCompanyProfileSchema = new Schema<IRecruitCompanyProfile>(
     socialLinks: { type: CompanySocialLinksSchema, default: () => ({}) },
     verificationStatus: { type: String, enum: ["none", "requested", "verified", "rejected"], default: "none" },
     verificationRequestedAt: { type: Date },
+    verifiedAt: { type: Date },
     verificationNote: { type: String, default: "" },
   },
   { timestamps: true }
