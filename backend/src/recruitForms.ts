@@ -17,9 +17,25 @@ import {
   RECAPTCHA_REJECTION_MESSAGE,
   checkRateLimit,
 } from "./publicSubmissionGuard";
+import {
+  assertFormBulkActionSize,
+  assertFormFeature,
+  assertFormResourceLimit,
+  formBillingOwnerUid,
+  formContentHash,
+  formIdempotencyHeader,
+  formIdempotencyKey,
+  formRequestIdempotencyKey,
+  isFormBillingError,
+  respondFormBillingError,
+  runFormBillingOperation,
+} from "./billing/formEnforcement";
 
 export const formRouter = express.Router();       // protected — /recruit/forms
 export const formPublicRouter = express.Router(); // public    — /recruit-public/forms
+
+// Re-export for tests / future bulk form actions
+export { assertFormBulkActionSize };
 
 const GEMINI_MESH_KEY = process.env.GEMINI_MESH_KEY ?? "";
 const FORM_FRONTEND_URL = (
@@ -212,14 +228,51 @@ async function processFormAssessmentScore(responseId: any, runKey: string): Prom
     ]);
     if (!form || !response || response.assessmentScoringStatus !== "pending") return;
 
-    const scored = await scoreFormAssessment({
-      formTitle: form.title,
-      formDescription: form.description,
-      screeningScore: response.aiScore,
-      screeningSummary: response.aiSummary,
-      questions: response.assessmentQuestions,
-      answers: response.assessmentAnswers,
-    });
+    const ownerUid = formBillingOwnerUid(form);
+    if (!ownerUid) {
+      await RecruitFormResponse.updateOne(
+        { _id: responseId, assessmentRunKey: runKey, assessmentScoringStatus: "pending" },
+        { $set: { assessmentScoringStatus: "failed" } },
+      );
+      return;
+    }
+
+    let scored;
+    try {
+      scored = await runFormBillingOperation({
+        ownerUid,
+        operation: "assessment_score_form",
+        idempotencyKey: formIdempotencyKey(ownerUid, [
+          "assessment-score",
+          String(responseId),
+          runKey,
+        ]),
+        resourceType: "form_response",
+        resourceId: String(responseId),
+        work: async () => scoreFormAssessment({
+          formTitle: form.title,
+          formDescription: form.description,
+          screeningScore: response.aiScore,
+          screeningSummary: response.aiSummary,
+          questions: response.assessmentQuestions,
+          answers: response.assessmentAnswers,
+        }),
+      });
+    } catch (billingErr) {
+      if (isFormBillingError(billingErr)) {
+        console.warn(
+          "[forms] assessment scoring blocked by billing — response kept for manual review:",
+          (billingErr as Error).message,
+        );
+        await RecruitFormResponse.updateOne(
+          { _id: responseId, assessmentRunKey: runKey, assessmentScoringStatus: "pending" },
+          { $set: { assessmentScoringStatus: "failed" } },
+        );
+        return;
+      }
+      throw billingErr;
+    }
+
     const updated = await RecruitFormResponse.updateOne(
       { _id: responseId, assessmentRunKey: runKey, assessmentScoringStatus: "pending" },
       {
@@ -652,22 +705,41 @@ async function runFormAgent(args: {
     }
 
     try {
-      const result = await sendEmail({
-        to: email, subject: tpl.subject, html: tpl.html, text: tpl.text, from: NOTIFICATION_FROM,
-      });
-      emailSent = result.ok;
-      emailStatus = result.ok ? "sent" : "failed";
-      await RecruitFormResponse.updateOne({ _id: args.responseId }, {
-        $push: {
-          emailLog: {
-            type: `agent_${decision.action}`, to: email, subject: tpl.subject, body: tpl.text,
-            sentAt: new Date(), status: emailStatus, error: result.error,
-          },
+      await runFormBillingOperation({
+        ownerUid: args.ownerUid,
+        operation: "automated_email_form",
+        idempotencyKey: formIdempotencyKey(args.ownerUid, [
+          "agent-email",
+          String(args.responseId),
+          decision.action,
+        ]),
+        resourceType: "form_response",
+        resourceId: String(args.responseId),
+        work: async () => {
+          const result = await sendEmail({
+            to: email, subject: tpl.subject, html: tpl.html, text: tpl.text, from: NOTIFICATION_FROM,
+          });
+          emailSent = result.ok;
+          emailStatus = result.ok ? "sent" : "failed";
+          await RecruitFormResponse.updateOne({ _id: args.responseId }, {
+            $push: {
+              emailLog: {
+                type: `agent_${decision.action}`, to: email, subject: tpl.subject, body: tpl.text,
+                sentAt: new Date(), status: emailStatus, error: result.error,
+              },
+            },
+          });
+          return result;
         },
       });
     } catch (e) {
-      console.error("[forms][agent] email dispatch failed:", e);
-      emailStatus = "failed";
+      if (isFormBillingError(e)) {
+        console.warn("[forms][agent] automated email blocked by billing:", (e as Error).message);
+        emailStatus = "skipped";
+      } else {
+        console.error("[forms][agent] email dispatch failed:", e);
+        emailStatus = "failed";
+      }
     }
   }
 
@@ -748,6 +820,9 @@ async function evaluateFormPipelineRules(formId: string, responseId: string): Pr
     ]);
     if (!form || !response) return;
 
+    const ownerUid = formBillingOwnerUid(form);
+    if (!ownerUid) return;
+
     const rules: any[] = ((form as any).pipelineRules ?? []).filter((r: any) => r.enabled);
     if (!rules.length) return;
 
@@ -772,23 +847,52 @@ async function evaluateFormPipelineRules(formId: string, responseId: string): Pr
       const nextStage = FORM_RULE_STAGE_MAP[rule.action];
       if (!nextStage || nextStage === currentStage) continue;
 
-      await RecruitFormResponse.updateOne(
-        { _id: responseId },
-        { $set: { stage: nextStage, stageMovedAt: new Date() } }
-      );
-      await recordFormStageChange({
-        responseId,
-        fromStage: currentStage,
-        toStage: nextStage,
-        actor: "rule",
-        reason: `${rule.condition} → ${rule.action}`,
-      });
-      await RecruitForm.updateOne(
-        { _id: formId, "pipelineRules.id": rule.id },
-        { $inc: { "pipelineRules.$.triggerCount": 1 } }
-      );
-      currentStage = nextStage;
-      console.log(`[forms][pipeline-rule] "${rule.id}" fired: ${rule.condition} → ${rule.action} for response ${responseId}`);
+      const fromStage = currentStage;
+      try {
+        await runFormBillingOperation({
+          ownerUid,
+          operation: "pipeline_rule_execution_form",
+          idempotencyKey: formIdempotencyKey(ownerUid, [
+            "pipeline-rule",
+            String(responseId),
+            String(rule.id),
+            fromStage,
+            nextStage,
+          ]),
+          resourceType: "form_response",
+          resourceId: String(responseId),
+          metadata: { ruleId: rule.id, action: rule.action, condition: rule.condition },
+          work: async () => {
+            await RecruitFormResponse.updateOne(
+              { _id: responseId },
+              { $set: { stage: nextStage, stageMovedAt: new Date() } },
+            );
+            await recordFormStageChange({
+              responseId,
+              fromStage,
+              toStage: nextStage,
+              actor: "rule",
+              reason: `${rule.condition} → ${rule.action}`,
+            });
+            await RecruitForm.updateOne(
+              { _id: formId, "pipelineRules.id": rule.id },
+              { $inc: { "pipelineRules.$.triggerCount": 1 } },
+            );
+            return true;
+          },
+        });
+        currentStage = nextStage;
+        console.log(`[forms][pipeline-rule] "${rule.id}" fired: ${rule.condition} → ${rule.action} for response ${responseId}`);
+      } catch (e) {
+        if (isFormBillingError(e)) {
+          console.warn(
+            `[forms][pipeline-rule] "${rule.id}" blocked by billing:`,
+            (e as Error).message,
+          );
+          continue;
+        }
+        throw e;
+      }
     }
   } catch (e) {
     console.error("[forms][pipeline-rule] evaluation failed:", e);
@@ -812,6 +916,9 @@ formRouter.post("/", async (req, res) => {
     };
 
     if (!title?.trim()) return res.status(400).json({ error: "Form title is required." });
+
+    await assertFormResourceLimit(uid, "active_forms");
+    await assertFormResourceLimit(uid, "stored_forms");
 
     // Generate unique slug
     let slug = generateSlug();
@@ -842,6 +949,7 @@ formRouter.post("/", async (req, res) => {
 
     return res.status(201).json({ form });
   } catch (err: any) {
+    if (await respondFormBillingError(res, err, getUid(req))) return;
     console.error("[forms] POST /recruit/forms:", err);
     return res.status(500).json({ error: err.message });
   }
@@ -973,15 +1081,26 @@ If there are fewer than 3 scored responses, explicitly say the sample is small a
 DATA:
 ${JSON.stringify(evidence)}`;
 
-    const raw = await callMeshChatCompletions({
-      apiKey: GEMINI_MESH_KEY,
-      model: "openai/gpt-4o-mini",
-      retries: 2,
-      fallbackModels: ["google/gemini-2.5-flash-lite", "meta-llama/llama-3.1-8b-instruct"],
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.2,
-      max_tokens: 2200,
-      nvidiaFallback: true,
+    const raw = await runFormBillingOperation({
+      ownerUid: uid,
+      operation: "form_hiring_summary",
+      idempotencyKey: formRequestIdempotencyKey(
+        uid,
+        `hiring-summary:${form._id}`,
+        formIdempotencyHeader(req),
+      ),
+      resourceType: "form",
+      resourceId: String(form._id),
+      work: async () => callMeshChatCompletions({
+        apiKey: GEMINI_MESH_KEY,
+        model: "openai/gpt-4o-mini",
+        retries: 2,
+        fallbackModels: ["google/gemini-2.5-flash-lite", "meta-llama/llama-3.1-8b-instruct"],
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.2,
+        max_tokens: 2200,
+        nvidiaFallback: true,
+      }),
     });
     const parsed = safeJson(raw);
     if (!parsed || typeof parsed.summary !== "string" || !parsed.summary.trim()) {
@@ -1012,6 +1131,7 @@ ${JSON.stringify(evidence)}`;
     ).lean();
     return res.json({ summary: (updated as any)?.aiHiringSummary ?? summary });
   } catch (err: any) {
+    if (await respondFormBillingError(res, err, getUid(req))) return;
     console.error("[forms] POST /ai-summary/refresh:", err);
     const uid = getUid(req);
     const existing = uid ? await getOwnedForm(req.params.formId, uid).catch(() => null) : null;
@@ -1358,6 +1478,13 @@ formRouter.patch("/:formId", async (req, res) => {
       }));
     }
 
+    if (status === "active") {
+      const existing = await RecruitForm.findOne({ _id: req.params.formId, uid }).select("status").lean();
+      if (existing && existing.status !== "active") {
+        await assertFormResourceLimit(uid, "active_forms");
+      }
+    }
+
     const form = await RecruitForm.findOneAndUpdate(
       { _id: req.params.formId, uid },
       { $set: update },
@@ -1367,6 +1494,7 @@ formRouter.patch("/:formId", async (req, res) => {
 
     return res.json({ form });
   } catch (err: any) {
+    if (await respondFormBillingError(res, err, getUid(req))) return;
     console.error("[forms] PATCH /recruit/forms/:formId:", err);
     return res.status(500).json({ error: err.message });
   }
@@ -1536,13 +1664,35 @@ formRouter.post("/:formId/responses/:responseId/assessment/send", async (req, re
       });
     }
 
-    const questions = await generateFormAssessmentQuestions({
-      formTitle: form.title,
-      description: form.description,
-      questions: (form.questions || []).map((question: any) => ({
-        id: String(question.id),
-        label: String(question.label),
-      })),
+    await assertFormFeature(uid, "assessments");
+    await assertFormResourceLimit(uid, "active_assessments");
+
+    const questions = await runFormBillingOperation({
+      ownerUid: uid,
+      operation: "assessment_generate_form",
+      idempotencyKey: formRequestIdempotencyKey(
+        uid,
+        `assessment-generate:${response._id}`,
+        formIdempotencyHeader(req),
+      ),
+      resourceType: "form_response",
+      resourceId: String(response._id),
+      work: async () => generateFormAssessmentQuestions({
+        formTitle: form.title,
+        description: form.description,
+        questions: (form.questions || []).map((question: any) => ({
+          id: String(question.id),
+          label: String(question.label),
+        })),
+      }),
+    });
+    await runFormBillingOperation({
+      ownerUid: uid,
+      operation: "assessment_send_form",
+      idempotencyKey: formIdempotencyKey(uid, ["assessment-send", String(response._id), String(Date.now())]),
+      resourceType: "form_response",
+      resourceId: String(response._id),
+      work: async () => true,
     });
     const token = generateFormAssessmentToken();
     const previousStage = String(response.stage || "new");
@@ -1617,6 +1767,7 @@ formRouter.post("/:formId/responses/:responseId/assessment/send", async (req, re
       emailSent,
     });
   } catch (err: any) {
+    if (await respondFormBillingError(res, err, getUid(req))) return;
     console.error("[forms] POST assessment/send:", err);
     return res.status(500).json({ error: err.message || "Could not send assessment." });
   }
@@ -1640,14 +1791,26 @@ formRouter.post("/:formId/responses/:responseId/reject-email", async (req, res) 
 
     const candidateName = (response as any).submittedName || "Applicant";
     const candidateEmail = (response as any).submittedEmail || "";
-    const email = await generateRejectionEmailText({
-      candidateName,
-      formTitle: (form as any).title,
-      stage: (response as any).stage,
+    const email = await runFormBillingOperation({
+      ownerUid: uid,
+      operation: "reject_email_draft_form",
+      idempotencyKey: formRequestIdempotencyKey(
+        uid,
+        `reject-email:${response._id}`,
+        formIdempotencyHeader(req),
+      ),
+      resourceType: "form_response",
+      resourceId: String(response._id),
+      work: async () => generateRejectionEmailText({
+        candidateName,
+        formTitle: (form as any).title,
+        stage: (response as any).stage,
+      }),
     });
 
     return res.json({ email, candidateName, candidateEmail });
   } catch (err: any) {
+    if (await respondFormBillingError(res, err, getUid(req))) return;
     console.error("[forms] POST reject-email:", err);
     return res.status(500).json({ error: err.message });
   }
@@ -1697,7 +1860,18 @@ formRouter.post("/:formId/responses/:responseId/send-email", async (req, res) =>
       html = emailTemplates.genericEmail(candName, subject.trim(), body, ctx);
     }
 
-    const result = await sendEmail({ to: candEmail, subject: subject.trim(), html, text, from: NOTIFICATION_FROM });
+    const result = await runFormBillingOperation({
+      ownerUid: uid,
+      operation: type === "offer" ? "offer_letter_form" : "automated_email_form",
+      idempotencyKey: formRequestIdempotencyKey(
+        uid,
+        `send-email:${response._id}:${type || "custom"}`,
+        formIdempotencyHeader(req),
+      ),
+      resourceType: "form_response",
+      resourceId: String(response._id),
+      work: async () => sendEmail({ to: candEmail, subject: subject.trim(), html, text, from: NOTIFICATION_FROM }),
+    });
 
     const logEntry = {
       type: type || "custom",
@@ -1720,6 +1894,7 @@ formRouter.post("/:formId/responses/:responseId/send-email", async (req, res) =>
     }
     return res.json({ ok: true, sentAt: logEntry.sentAt, logEntry });
   } catch (err: any) {
+    if (await respondFormBillingError(res, err, getUid(req))) return;
     console.error("[forms] POST send-email:", err);
     return res.status(500).json({ error: err.message });
   }
@@ -1783,17 +1958,29 @@ Return ONLY this JSON (no markdown):
 
     let raw: string;
     try {
-      raw = await callMeshChatCompletions({
-        apiKey: GEMINI_MESH_KEY,
-        model: "openai/gpt-4o-mini",
-        retries: 2,
-        fallbackModels: ["google/gemini-2.5-flash-lite", "meta-llama/llama-3.1-8b-instruct"],
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.45,
-        max_tokens: 2000,
-        nvidiaFallback: true,
+      raw = await runFormBillingOperation({
+        ownerUid: uid,
+        operation: "interview_questions_form",
+        idempotencyKey: formRequestIdempotencyKey(
+          uid,
+          `interview-questions:${response._id}`,
+          formIdempotencyHeader(req),
+        ),
+        resourceType: "form_response",
+        resourceId: String(response._id),
+        work: async () => callMeshChatCompletions({
+          apiKey: GEMINI_MESH_KEY,
+          model: "openai/gpt-4o-mini",
+          retries: 2,
+          fallbackModels: ["google/gemini-2.5-flash-lite", "meta-llama/llama-3.1-8b-instruct"],
+          messages: [{ role: "user", content: prompt }],
+          temperature: 0.45,
+          max_tokens: 2000,
+          nvidiaFallback: true,
+        }),
       });
     } catch (err) {
+      if (await respondFormBillingError(res, err, uid)) return;
       console.error("[forms] interview-questions: AI call failed:", err);
       return res.status(500).json({ error: "AI is temporarily unavailable. Please try again shortly." });
     }
@@ -1821,6 +2008,7 @@ Return ONLY this JSON (no markdown):
 
     return res.json({ questions });
   } catch (err: any) {
+    if (await respondFormBillingError(res, err, getUid(req))) return;
     console.error("[forms] POST interview-questions:", err);
     return res.status(500).json({ error: err.message });
   }
@@ -1850,10 +2038,21 @@ formRouter.post("/:formId/responses/:responseId/retry-score", async (req, res) =
       .filter(a => a.value && a.value.trim() && a.value !== "__file_uploaded__")
       .map(a => ({ questionId: a.questionId, label: a.label, value: a.value }));
 
-    const scored = await scoreFormResponse({
-      formTitle: form.title,
-      answers: textAnswers,
-      resumeText: response.resumeText || undefined,
+    const scored = await runFormBillingOperation({
+      ownerUid: uid,
+      operation: "form_response_score",
+      idempotencyKey: formRequestIdempotencyKey(
+        uid,
+        `retry-score:${response._id}`,
+        formIdempotencyHeader(req),
+      ),
+      resourceType: "form_response",
+      resourceId: String(response._id),
+      work: async () => scoreFormResponse({
+        formTitle: form.title,
+        answers: textAnswers,
+        resumeText: response.resumeText || undefined,
+      }),
     });
 
     const updated = await RecruitFormResponse.findByIdAndUpdate(
@@ -1900,6 +2099,7 @@ formRouter.post("/:formId/responses/:responseId/retry-score", async (req, res) =
 
     return res.json({ response: updated });
   } catch (err: any) {
+    if (await respondFormBillingError(res, err, getUid(req))) return;
     console.error("[forms] POST retry-score:", err);
     return res.status(500).json({ error: err.message });
   }
@@ -2132,6 +2332,8 @@ formRouter.post("/:formId/pipeline-rules", async (req, res) => {
       return res.status(400).json({ error: "A numeric threshold is required." });
     }
 
+    await assertFormResourceLimit(uid, "pipeline_rules");
+
     const rule = {
       id: crypto.randomUUID(),
       condition,
@@ -2151,6 +2353,7 @@ formRouter.post("/:formId/pipeline-rules", async (req, res) => {
 
     return res.status(201).json({ rule, rules: (form as any).pipelineRules });
   } catch (err: any) {
+    if (await respondFormBillingError(res, err, getUid(req))) return;
     console.error("[forms] POST pipeline-rules:", err);
     return res.status(500).json({ error: err.message });
   }
@@ -2168,6 +2371,24 @@ formRouter.patch("/:formId/pipeline-rules/:ruleId", async (req, res) => {
     if (threshold !== undefined) update["pipelineRules.$.threshold"] = Math.max(0, Number(threshold) || 0);
     if (fromStage !== undefined) update["pipelineRules.$.fromStage"] = String(fromStage);
 
+    // Enabling a previously disabled rule consumes an additional pipeline_rules slot.
+    if (enabled === true) {
+      const existing = await RecruitForm.findOne({
+        _id: req.params.formId,
+        uid,
+        "pipelineRules.id": req.params.ruleId,
+      })
+        .select("pipelineRules")
+        .lean();
+      if (!existing) return res.status(404).json({ error: "Rule not found." });
+      const rule = ((existing as any).pipelineRules ?? []).find(
+        (r: any) => String(r.id) === String(req.params.ruleId),
+      );
+      if (rule && rule.enabled === false) {
+        await assertFormResourceLimit(uid, "pipeline_rules");
+      }
+    }
+
     const form = await RecruitForm.findOneAndUpdate(
       { _id: req.params.formId, uid, "pipelineRules.id": req.params.ruleId },
       { $set: update },
@@ -2177,6 +2398,7 @@ formRouter.patch("/:formId/pipeline-rules/:ruleId", async (req, res) => {
 
     return res.json({ rules: (form as any).pipelineRules });
   } catch (err: any) {
+    if (await respondFormBillingError(res, err, getUid(req))) return;
     console.error("[forms] PATCH pipeline-rule:", err);
     return res.status(500).json({ error: err.message });
   }
@@ -2214,70 +2436,95 @@ formRouter.get("/:formId/export", async (req, res) => {
     const form = await RecruitForm.findOne({ _id: req.params.formId, uid }).lean();
     if (!form) return res.status(404).json({ error: "Form not found." });
 
-    const responses = await RecruitFormResponse.find({ formId: req.params.formId, uid })
-      .sort({ aiScore: -1 })
-      .lean();
+    const format = req.query.format === "json" ? "json" : "csv";
+    const payload = await runFormBillingOperation({
+      ownerUid: uid,
+      operation: "export_form",
+      idempotencyKey: formRequestIdempotencyKey(
+        uid,
+        `export:${form._id}:${format}`,
+        formIdempotencyHeader(req),
+      ),
+      resourceType: "form",
+      resourceId: String(form._id),
+      metadata: { format },
+      work: async () => {
+        const responses = await RecruitFormResponse.find({ formId: req.params.formId, uid })
+          .sort({ aiScore: -1 })
+          .lean();
 
-    const filenameBase = (form as any).title.replace(/[^a-z0-9]/gi, "_");
-    const questions = (form as any).questions ?? [];
+        const filenameBase = (form as any).title.replace(/[^a-z0-9]/gi, "_");
+        const questions = (form as any).questions ?? [];
 
-    const rowFor = (r: any) => ({
-      name: r.submittedName || "",
-      email: r.submittedEmail || "",
-      phone: r.submittedPhone || "",
-      stage: r.stage,
-      score: r.scoringFailed ? "" : r.aiScore,
-      source: r.source || "",
-      agentAction: r.agentLog?.length ? r.agentLog[r.agentLog.length - 1].action : "",
-      redFlags: (r.redFlags ?? []).join("; "),
-      strengths: (r.strengths ?? []).join("; "),
-      aiSummary: r.aiSummary || "",
-      notes: r.notes || "",
-      submittedAt: new Date(r.createdAt).toISOString(),
-      answers: questions.map((q: any) => {
-        const a = (r.answers ?? []).find((x: any) => x.questionId === q.id);
-        return a?.value === "__file_uploaded__" ? "(file uploaded)" : (a?.value ?? "");
-      }),
-    });
+        const rowFor = (r: any) => ({
+          name: r.submittedName || "",
+          email: r.submittedEmail || "",
+          phone: r.submittedPhone || "",
+          stage: r.stage,
+          score: r.scoringFailed ? "" : r.aiScore,
+          source: r.source || "",
+          agentAction: r.agentLog?.length ? r.agentLog[r.agentLog.length - 1].action : "",
+          redFlags: (r.redFlags ?? []).join("; "),
+          strengths: (r.strengths ?? []).join("; "),
+          aiSummary: r.aiSummary || "",
+          notes: r.notes || "",
+          submittedAt: new Date(r.createdAt).toISOString(),
+          answers: questions.map((q: any) => {
+            const a = (r.answers ?? []).find((x: any) => x.questionId === q.id);
+            return a?.value === "__file_uploaded__" ? "(file uploaded)" : (a?.value ?? "");
+          }),
+        });
 
-    if (req.query.format === "json") {
-      res.setHeader("Content-Type", "application/json");
-      res.setHeader("Content-Disposition", `attachment; filename="${filenameBase}_responses.json"`);
-      return res.json(
-        (responses as any[]).map(r => {
-          const row = rowFor(r);
-          const { answers, ...rest } = row;
+        if (format === "json") {
           return {
-            ...rest,
-            answers: questions.map((q: any, i: number) => ({ question: q.label, answer: answers[i] })),
+            contentType: "application/json",
+            filename: `${filenameBase}_responses.json`,
+            body: (responses as any[]).map(r => {
+              const row = rowFor(r);
+              const { answers, ...rest } = row;
+              return {
+                ...rest,
+                answers: questions.map((q: any, i: number) => ({ question: q.label, answer: answers[i] })),
+              };
+            }),
+            asJson: true as const,
           };
-        })
-      );
-    }
+        }
 
-    const escape = (val: string | number | undefined) => {
-      const s = String(val ?? "");
-      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-    };
+        const escape = (val: string | number | undefined) => {
+          const s = String(val ?? "");
+          return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+        };
 
-    const headers = [
-      "Name", "Email", "Phone", "Stage", "AI Score", "Source", "Agent Action",
-      "Red Flags", "Strengths", "AI Summary", "Notes", "Submitted At",
-      ...questions.map((q: any) => q.label),
-    ];
-    const rows = (responses as any[]).map(r => {
-      const row = rowFor(r);
-      return [
-        row.name, row.email, row.phone, row.stage, row.score, row.source, row.agentAction,
-        row.redFlags, row.strengths, row.aiSummary, row.notes, row.submittedAt,
-        ...row.answers,
-      ].map(escape).join(",");
+        const headers = [
+          "Name", "Email", "Phone", "Stage", "AI Score", "Source", "Agent Action",
+          "Red Flags", "Strengths", "AI Summary", "Notes", "Submitted At",
+          ...questions.map((q: any) => q.label),
+        ];
+        const rows = (responses as any[]).map(r => {
+          const row = rowFor(r);
+          return [
+            row.name, row.email, row.phone, row.stage, row.score, row.source, row.agentAction,
+            row.redFlags, row.strengths, row.aiSummary, row.notes, row.submittedAt,
+            ...row.answers,
+          ].map(escape).join(",");
+        });
+
+        return {
+          contentType: "text/csv",
+          filename: `${filenameBase}_responses.csv`,
+          body: [headers.map(escape).join(","), ...rows].join("\n"),
+          asJson: false as const,
+        };
+      },
     });
 
-    res.setHeader("Content-Type", "text/csv");
-    res.setHeader("Content-Disposition", `attachment; filename="${filenameBase}_responses.csv"`);
-    return res.send([headers.map(escape).join(","), ...rows].join("\n"));
+    res.setHeader("Content-Type", payload.contentType);
+    res.setHeader("Content-Disposition", `attachment; filename="${payload.filename}"`);
+    if (payload.asJson) return res.json(payload.body);
+    return res.send(payload.body);
   } catch (err: any) {
+    if (await respondFormBillingError(res, err, getUid(req))) return;
     console.error("[forms] GET export:", err);
     return res.status(500).json({ error: err.message });
   }
@@ -2556,35 +2803,62 @@ formPublicRouter.post(
         }
       }
 
-      // ── 1. Save response immediately (scoring = pending) ─────────────────
-      const response = await RecruitFormResponse.create({
-        formId: form._id,
-        uid: form.uid,
-        answers: rawAnswers,
-        resumeText,
-        aiSummary: "",
-        aiScore: 0,
-        strengths: [],
-        redFlags: [],
-        answerSignals: [],
-        scoringFailed: true, // will be patched after async scoring
-        stage: "new",
-        submittedName,
-        submittedEmail,
-        submittedPhone,
-        source: typeof req.body.source === "string" && req.body.source.trim()
-          ? req.body.source.trim().slice(0, 80)
-          : "Form",
-        stageMovedAt: new Date(),
-        stageHistory: [{
-          fromStage: "",
-          toStage: "new",
-          actor: "system",
-          actorUid: "",
-          reason: "Application received",
-          timestamp: new Date(),
-        }],
-      });
+      const ownerUid = formBillingOwnerUid(form);
+      if (!ownerUid) {
+        return res.status(503).json({ error: "This form cannot accept responses right now." });
+      }
+
+      // Pattern C: reserve creator quota BEFORE creating the response record.
+      const intakeKey = formIdempotencyKey(ownerUid, [
+        "intake",
+        String(form._id),
+        normalizedEmail || formContentHash(JSON.stringify(rawAnswers).slice(0, 2000)),
+      ]);
+
+      let response;
+      try {
+        response = await runFormBillingOperation({
+          ownerUid,
+          operation: "form_response_intake",
+          idempotencyKey: intakeKey,
+          resourceType: "form",
+          resourceId: String(form._id),
+          work: async () => {
+            await assertFormResourceLimit(ownerUid, "stored_responses");
+            return RecruitFormResponse.create({
+              formId: form._id,
+              uid: form.uid,
+              answers: rawAnswers,
+              resumeText,
+              aiSummary: "",
+              aiScore: 0,
+              strengths: [],
+              redFlags: [],
+              answerSignals: [],
+              scoringFailed: true, // will be patched after async scoring
+              stage: "new",
+              submittedName,
+              submittedEmail,
+              submittedPhone,
+              source: typeof req.body.source === "string" && req.body.source.trim()
+                ? req.body.source.trim().slice(0, 80)
+                : "Form",
+              stageMovedAt: new Date(),
+              stageHistory: [{
+                fromStage: "",
+                toStage: "new",
+                actor: "system",
+                actorUid: "",
+                reason: "Application received",
+                timestamp: new Date(),
+              }],
+            });
+          },
+        });
+      } catch (billingErr: any) {
+        if (await respondFormBillingError(res, billingErr, ownerUid)) return;
+        throw billingErr;
+      }
 
       // ── 2. Increment counter (fire-and-forget; OK to drift by ±1 rarely) ─
       RecruitForm.findByIdAndUpdate(form._id, { $inc: { responseCount: 1 } }).catch(e =>
@@ -2594,12 +2868,11 @@ formPublicRouter.post(
       // ── 3. Return 201 immediately — candidate is done ─────────────────────
       res.status(201).json({ ok: true, responseId: response._id });
 
-      // Confirmation email to applicant
+      // Confirmation email to applicant (not creator-metered)
       if (submittedEmail?.trim()) {
         const confirmName = submittedName || "Applicant";
         const confirmEmail = submittedEmail.trim();
         const formTitle = form.title;
-        const formUid = String(form.uid);
         setImmediate(async () => {
           try {
             const ctx = await formEmailContext(form);
@@ -2625,17 +2898,24 @@ formPublicRouter.post(
         });
       }
 
-      // ── 4. Score in background and patch result ───────────────────────────
+      // ── 4. Score in background (Pattern D) — AI exhaust keeps the response ─
       const textAnswers: ScoredAnswer[] = rawAnswers
         .filter(a => a.value?.trim() && a.value !== "__file_uploaded__")
         .map(a => ({ questionId: a.questionId, label: a.label, value: a.value }));
 
       setImmediate(async () => {
         try {
-          const scored = await scoreFormResponse({
-            formTitle: form.title,
-            answers: textAnswers,
-            resumeText: resumeText || undefined,
+          const scored = await runFormBillingOperation({
+            ownerUid,
+            operation: "form_response_score",
+            idempotencyKey: formIdempotencyKey(ownerUid, ["score", String(response._id)]),
+            resourceType: "form_response",
+            resourceId: String(response._id),
+            work: async () => scoreFormResponse({
+              formTitle: form.title,
+              answers: textAnswers,
+              resumeText: resumeText || undefined,
+            }),
           });
           await RecruitFormResponse.findByIdAndUpdate(response._id, {
             $set: {
@@ -2667,12 +2947,20 @@ formPublicRouter.post(
           });
           await evaluateFormPipelineRules(String(form._id), String(response._id));
         } catch (e) {
+          if (isFormBillingError(e)) {
+            console.warn("[forms] background scoring blocked by billing — response kept for manual review:", (e as Error).message);
+            return;
+          }
           console.error("[forms] background scoring failed (non-fatal):", e);
         }
       });
 
     } catch (err: any) {
       console.error("[forms] POST submit:", err);
+      const ownerUid = formBillingOwnerUid(
+        await RecruitForm.findOne({ slug: req.params.slug }).select("uid").lean().catch(() => null),
+      );
+      if (!res.headersSent && ownerUid && await respondFormBillingError(res, err, ownerUid)) return;
       // Only send if headers not already sent (i.e. before res.status(201))
       if (!res.headersSent) {
         return res.status(500).json({ error: err.message });

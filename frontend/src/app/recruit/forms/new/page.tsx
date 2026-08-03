@@ -5,9 +5,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { RecruitGuard } from "@/components/RecruitGuard";
 import Link from "next/link";
-import { apiUrl, readApiJson } from "@/lib/api";
+import { apiErrorFromPayload, apiUrl, readApiJson } from "@/lib/api";
 import { FORM_ROLE_TEMPLATES } from "@/lib/formRoleTemplates";
 import { registerFormPostCreateChecklist } from "@/components/FormPostCreateChecklist";
+import { FormErrorNotice } from "@/components/FormErrorNotice";
 
 type QuestionType = "short" | "paragraph" | "number" | "email" | "phone" | "dropdown" | "multiple_choice" | "yes_no" | "file";
 
@@ -277,7 +278,7 @@ function FormBuilderContent() {
   });
   const [questions, setQuestions] = useState<Question[]>(DEFAULT_QUESTIONS);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<unknown>("");
   const [savedSlug, setSavedSlug] = useState<string | null>(null);
   const [showShare, setShowShare] = useState(false);
   const [loadingEdit, setLoadingEdit] = useState(!!editId);
@@ -368,7 +369,9 @@ function FormBuilderContent() {
         });
       }
       const data = await readApiJson(res);
-      if (!res.ok) throw new Error(data.error || "Failed to save form.");
+      if (!res.ok) {
+        throw apiErrorFromPayload(res.status, data, data.message || data.error || "Failed to save form.");
+      }
       const slug = data.form?.slug || savedSlug;
       setSavedSlug(slug);
       if (!editId && data.form?._id) {
@@ -377,7 +380,7 @@ function FormBuilderContent() {
       if (andShare) setShowShare(true);
       else router.push(`/recruit/forms/${data.form?._id}?saved=1`);
     } catch (e: any) {
-      setError(e.message || "Something went wrong.");
+      setError(e);
     } finally {
       setSaving(false);
     }
@@ -450,12 +453,7 @@ function FormBuilderContent() {
           <p className="mt-1.5 text-[13px] text-slate-500 leading-relaxed">Design a custom form, share the link, and let AI score every response automatically.</p>
         </div>
 
-        {error && (
-          <div className="flex items-center gap-2.5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3.5 text-[13px] font-medium text-rose-700 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-            <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" className="shrink-0"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>
-            {error}
-          </div>
-        )}
+        {error ? <FormErrorNotice error={error} /> : null}
 
         {!editId && (
           <div className="rounded-2xl bg-white border border-black/[0.06] p-5 shadow-sm">
