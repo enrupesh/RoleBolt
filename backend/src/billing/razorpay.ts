@@ -72,6 +72,49 @@ export function getRazorpaySubscriptionTotalCount(interval: BillingInterval): nu
   return interval === "monthly" ? 1200 : 100;
 }
 
+/** Razorpay Checkout prefill expects E.164, e.g. +919876543210 for Indian numbers. */
+export function formatRazorpayPrefillContact(phone?: string | null): string | undefined {
+  if (!phone?.trim()) return undefined;
+  const raw = phone.trim();
+  if (raw.startsWith("+")) {
+    const digits = raw.replace(/\D/g, "");
+    return digits.length >= 10 ? `+${digits}` : undefined;
+  }
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length === 10) return `+91${digits}`;
+  if (digits.length === 12 && digits.startsWith("91")) return `+${digits}`;
+  return undefined;
+}
+
+/** Razorpay subscription notify_info uses a plain national number without the country prefix. */
+export function formatRazorpayNotifyPhone(phone?: string | null): string | undefined {
+  const prefill = formatRazorpayPrefillContact(phone);
+  if (!prefill) return undefined;
+  const digits = prefill.replace(/\D/g, "");
+  if (digits.length === 12 && digits.startsWith("91")) return digits.slice(2);
+  if (digits.length > 10) return digits.slice(-10);
+  return digits.length === 10 ? digits : undefined;
+}
+
+export function buildRazorpayCheckoutPrefill(input: {
+  name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+}): { name?: string; email?: string; contact?: string } {
+  const prefill: { name?: string; email?: string; contact?: string } = {};
+  const name = input.name?.trim();
+  const email = input.email?.trim().toLowerCase();
+  const contact = formatRazorpayPrefillContact(input.phone);
+  if (name) prefill.name = name.slice(0, 120);
+  if (email) prefill.email = email.slice(0, 120);
+  if (contact) prefill.contact = contact;
+  return prefill;
+}
+
+export function subscriptionSupportsCheckoutAuth(status: string | undefined): boolean {
+  return status === "created";
+}
+
 function getApiConfig(): { keyId: string; keySecret: string } {
   const keyId = process.env.RAZORPAY_KEY_ID?.trim();
   const keySecret = process.env.RAZORPAY_KEY_SECRET?.trim();
@@ -283,8 +326,20 @@ export async function createRazorpaySubscription(input: {
   interval: BillingInterval;
   userId: string;
   idempotencyKey: string;
+  notifyEmail?: string | null;
+  notifyPhone?: string | null;
 }): Promise<RazorpaySubscriptionResponse> {
   const planId = getConfiguredRazorpayPlanId(input.category, input.plan, input.interval);
+  const notifyEmail = input.notifyEmail?.trim().toLowerCase();
+  const notifyPhone = formatRazorpayNotifyPhone(input.notifyPhone);
+  const notifyInfo =
+    notifyEmail || notifyPhone
+      ? {
+          ...(notifyEmail ? { notify_email: notifyEmail.slice(0, 120) } : {}),
+          ...(notifyPhone ? { notify_phone: notifyPhone } : {}),
+        }
+      : undefined;
+
   return razorpayRequest<RazorpaySubscriptionResponse>("/v1/subscriptions", {
     method: "POST",
     body: {
@@ -292,6 +347,7 @@ export async function createRazorpaySubscription(input: {
       total_count: getRazorpaySubscriptionTotalCount(input.interval),
       quantity: 1,
       customer_notify: true,
+      ...(notifyInfo ? { notify_info: notifyInfo } : {}),
       notes: {
         rolebolt_user_id: input.userId,
         rolebolt_category: input.category,

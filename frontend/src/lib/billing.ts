@@ -166,6 +166,12 @@ export async function fetchEntitlements(
   return res.json();
 }
 
+export type RazorpayCheckoutPrefill = {
+  name?: string;
+  email?: string;
+  contact?: string;
+};
+
 export async function createCheckout(
   token: string,
   input: { category: BillingCategory; plan: BillingPlan; interval: BillingInterval },
@@ -174,8 +180,10 @@ export async function createCheckout(
     status: string;
     provider: string;
     subscriptionId: string | null;
+    subscriptionStatus?: string | null;
     planId?: string;
     shortUrl?: string | null;
+    prefill?: RazorpayCheckoutPrefill;
     category: BillingCategory;
     plan: BillingPlan;
     interval: BillingInterval;
@@ -290,20 +298,31 @@ export function loadRazorpayCheckoutScript(): Promise<void> {
     const script = document.createElement("script");
     script.src = "https://checkout.razorpay.com/v1/checkout.js";
     script.async = true;
+    script.crossOrigin = "anonymous";
     script.onload = () => resolve();
     script.onerror = () => {
       razorpayScriptPromise = null;
       reject(new Error("Unable to load Razorpay Checkout."));
     };
-    document.body.appendChild(script);
+    document.head.appendChild(script);
   });
   return razorpayScriptPromise;
+}
+
+function buildCheckoutPrefill(input?: RazorpayCheckoutPrefill): Record<string, string> | undefined {
+  if (!input) return undefined;
+  const prefill: Record<string, string> = {};
+  if (input.name?.trim()) prefill.name = input.name.trim();
+  if (input.email?.trim()) prefill.email = input.email.trim().toLowerCase();
+  if (input.contact?.trim()) prefill.contact = input.contact.trim();
+  return Object.keys(prefill).length > 0 ? prefill : undefined;
 }
 
 export async function openRazorpaySubscriptionCheckout(input: {
   keyId: string;
   subscriptionId: string;
   description: string;
+  prefill?: RazorpayCheckoutPrefill;
   onSuccess: (result: {
     razorpay_payment_id: string;
     razorpay_subscription_id: string;
@@ -314,13 +333,22 @@ export async function openRazorpaySubscriptionCheckout(input: {
   await loadRazorpayCheckoutScript();
   if (!window.Razorpay) throw new Error("Razorpay Checkout is unavailable.");
 
+  const subscriptionId = input.subscriptionId.trim();
+  const keyId = input.keyId.trim();
+  if (!subscriptionId || !keyId) {
+    throw new Error("Razorpay checkout is missing a subscription id or public key.");
+  }
+
+  const prefill = buildCheckoutPrefill(input.prefill);
+
   await new Promise<void>((resolve, reject) => {
     const checkoutOptions: Record<string, unknown> = {
-      key: input.keyId,
-      subscription_id: input.subscriptionId,
+      key: keyId,
+      subscription_id: subscriptionId,
       name: "Rolebolt",
       description: input.description,
       theme: { color: "#0f766e" },
+      ...(prefill ? { prefill } : {}),
       handler: async (response: {
         razorpay_payment_id: string;
         razorpay_subscription_id: string;
