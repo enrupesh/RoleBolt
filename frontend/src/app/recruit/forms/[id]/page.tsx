@@ -1261,7 +1261,7 @@ function ResponseCard({ r, token, formId, formTitle, companyName, onUpdate, onDe
   const [assessmentError, setAssessmentError] = useState("");
   const [assessmentUrl, setAssessmentUrl] = useState("");
   const [pendingStageEmail, setPendingStageEmail] = useState<FormStageEmailNotifyStage | null>(null);
-  const { user } = useRecruitAuth();
+  const { authUser } = useRecruitAuth();
 
   async function updateStage(stage: Stage) {
     const prevStage = r.stage;
@@ -1715,8 +1715,8 @@ function ResponseCard({ r, token, formId, formTitle, companyName, onUpdate, onDe
           initialRecipientIds={[r._id]}
           recipientPool={recipientPool}
           senderPreview={{
-            username: user?.username,
-            email: user?.email,
+            username: authUser?.username,
+            email: authUser?.email,
             companyName,
           }}
           onSent={() => {

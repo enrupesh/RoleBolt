@@ -2055,7 +2055,7 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete, highlighted, 
   }> | null>(null);
   const [pendingStageEmail, setPendingStageEmail] = useState<CandidateStage | null>(null);
   const [showCreatorEmail, setShowCreatorEmail] = useState(false);
-  const { user } = useRecruitAuth();
+  const { authUser } = useRecruitAuth();
 
   useEffect(() => {
     if (!expanded || !token) return;
@@ -2318,8 +2318,8 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete, highlighted, 
         initialRecipientIds={[c._id]}
         recipientPool={recipientPool}
         senderPreview={{
-          username: user?.username,
-          email: user?.email,
+          username: authUser?.username,
+          email: authUser?.email,
           companyName: job.companyName,
         }}
         onSent={() => {
