@@ -8,7 +8,10 @@ export const metadata: Metadata = buildMetadata({
   title: "AI Recruiting Software & Job Search Workspace | Rolebolt",
   description:
     "Rolebolt is an AI recruiting workspace and applicant tracking system for hiring teams, plus a focused job-search workspace for candidates.",
-  path: "/recruit",
+  // The root route renders this same landing page. Keep /recruit as a
+  // compatible deep link, but make the root URL canonical to avoid duplicate
+  // landing-page indexing.
+  path: "/",
   keywords: [...productKeywords.recruit],
 });
 

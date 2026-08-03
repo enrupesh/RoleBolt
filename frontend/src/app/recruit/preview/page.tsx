@@ -276,6 +276,70 @@ const NEW_VERSION_SCREENSHOTS: Screenshot[] = [
     badge: "Job seeker",
     contain: true,
   },
+  {
+    src: "/screenshots/new-version/Screenshot_2026-08-03_174250_1785760819689.png",
+    title: "Recruiting Analytics",
+    desc: "See pipeline health, stage distribution, source quality, hiring outcomes, and key recruiting metrics at a glance.",
+    category: "Analytics",
+    badge: "Recruiter",
+    contain: true,
+  },
+  {
+    src: "/screenshots/new-version/Screenshot_2026-08-03_174305_1785760819690.png",
+    title: "Recruiter Profile",
+    desc: "Build a public-facing recruiter or company profile with the details candidates need to understand who is hiring.",
+    category: "Dashboard",
+    badge: "Recruiter",
+    contain: true,
+  },
+  {
+    src: "/screenshots/new-version/Screenshot_2026-08-03_174316_1785760819691.png",
+    title: "Recruiter Profile Details",
+    desc: "Capture company basics, industry, size, location, website, and description in a clear profile workflow.",
+    category: "Dashboard",
+    badge: "Recruiter",
+    contain: true,
+  },
+  {
+    src: "/screenshots/new-version/Screenshot_2026-08-03_174331_1785760819691.png",
+    title: "Assessment Responses",
+    desc: "Review applicant responses, AI scores, assessment summaries, stage decisions, notes, and next actions in one view.",
+    category: "AI Evaluation",
+    badge: "Recruiter",
+    contain: true,
+  },
+  {
+    src: "/screenshots/new-version/Screenshot_2026-08-03_174357_1785760819692.png",
+    title: "Standard Job Pipeline",
+    desc: "Run a structured hiring command centre with AI recommendations, candidate scores, needs-attention items, and pipeline health.",
+    category: "AI Evaluation",
+    badge: "Recruiter",
+    contain: true,
+  },
+  {
+    src: "/screenshots/new-version/Screenshot_2026-08-03_174404_1785760819692.png",
+    title: "Candidate Pipeline Review",
+    desc: "Take action on each candidate with stage changes, assessments, outreach, reminders, decisions, and supporting score context.",
+    category: "AI Evaluation",
+    badge: "Recruiter",
+    contain: true,
+  },
+  {
+    src: "/screenshots/new-version/Screenshot_2026-08-03_174422_1785760819693.png",
+    title: "AI Pipeline Rules",
+    desc: "Set automated rules that move candidates through stages or trigger actions when scores and assessment outcomes match.",
+    category: "AI Evaluation",
+    badge: "AI",
+    contain: true,
+  },
+  {
+    src: "/screenshots/new-version/Screenshot_2026-08-03_174430_1785760819693.png",
+    title: "AI Triage Agent",
+    desc: "Tune shortlist and reject thresholds, configure automatic actions, and keep human review in control of the pipeline.",
+    category: "AI Evaluation",
+    badge: "AI",
+    contain: true,
+  },
 ];
 
 const BADGE_STYLES: Record<string, string> = {
@@ -504,7 +568,7 @@ export default function ProductPreviewPage() {
                  Explore the latest Rolebolt experience for recruiting teams and job seekers — from the first job post to the final interview.
                </p>
                <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-[11px] font-semibold text-slate-400">
-                 <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">20 new screens</span>
+                 <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">28 new screens</span>
                  <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">Recruiter + job seeker</span>
                  <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">Click to enlarge</span>
                </div>
