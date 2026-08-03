@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { apiUrl } from "@/lib/api";
+import { apiErrorFromPayload, apiUrl } from "@/lib/api";
+import { SeekerErrorNotice } from "@/components/SeekerErrorNotice";
+import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 
 type MatchResult = {
   matchScore: number;
@@ -32,26 +34,34 @@ function ScoreCircle({ score }: { score: number }) {
 }
 
 export default function MatchScoreSection({ jobId }: { jobId: string }) {
+  const { sessionToken } = useRecruitAuth();
   const [resumeText, setResumeText] = useState("");
   const [result, setResult]         = useState<MatchResult | null>(null);
   const [loading, setLoading]       = useState(false);
-  const [error, setError]           = useState("");
+  const [error, setError]           = useState<unknown>("");
   const [expanded, setExpanded]     = useState(false);
 
   async function handleCheck() {
+    if (!sessionToken) {
+      setError("Sign in to check your match score. This uses your Job Seeker AI quota.");
+      return;
+    }
     if (!resumeText.trim()) { setError("Please paste your resume text first."); return; }
     setLoading(true); setError(""); setResult(null);
     try {
       const res = await fetch(apiUrl(`/recruit-public/jobs/${jobId}/match`), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${sessionToken}`,
+        },
         body: JSON.stringify({ resumeText }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Match check failed.");
+      if (!res.ok) throw apiErrorFromPayload(res.status, data, "Match check failed.");
       setResult(data);
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e);
     } finally {
       setLoading(false);
     }
@@ -59,7 +69,6 @@ export default function MatchScoreSection({ jobId }: { jobId: string }) {
 
   return (
     <div className="rounded-3xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-white p-6 shadow-sm">
-      {/* Header */}
       <button
         onClick={() => setExpanded(v => !v)}
         className="flex w-full items-center justify-between"
@@ -76,6 +85,16 @@ export default function MatchScoreSection({ jobId }: { jobId: string }) {
 
       {expanded && (
         <div className="mt-5 space-y-4">
+          {!sessionToken && (
+            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+              <p className="font-semibold">Sign in required</p>
+              <p className="mt-1 text-xs text-slate-500">Match analysis uses your Job Seeker AI quota.</p>
+              <Link href="/recruit/login" className="mt-2 inline-block text-xs font-bold text-indigo-700 hover:text-indigo-800">
+                Sign in to continue →
+              </Link>
+            </div>
+          )}
+
           <textarea
             rows={5}
             value={resumeText}
@@ -84,11 +103,11 @@ export default function MatchScoreSection({ jobId }: { jobId: string }) {
             className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/20 transition resize-none"
           />
 
-          {error && <p className="text-sm text-rose-600">{error}</p>}
+          {error ? <SeekerErrorNotice error={error} /> : null}
 
           <button
             onClick={handleCheck}
-            disabled={loading}
+            disabled={loading || !sessionToken}
             className="w-full rounded-2xl bg-indigo-600 py-3 text-sm font-bold text-white transition hover:bg-indigo-700 disabled:opacity-60"
           >
             {loading ? (
@@ -101,7 +120,6 @@ export default function MatchScoreSection({ jobId }: { jobId: string }) {
 
           {result && (
             <div className="mt-2 space-y-5 animate-[rb-fade-in_0.3s_ease_both]">
-              {/* Score */}
               <div className="flex items-center justify-center gap-8 rounded-2xl bg-white p-5 border border-slate-100">
                 <ScoreCircle score={result.matchScore} />
                 <div className="space-y-1 text-sm">
@@ -115,7 +133,6 @@ export default function MatchScoreSection({ jobId }: { jobId: string }) {
                 </div>
               </div>
 
-              {/* Missing skills */}
               {result.missingSkills.length > 0 && (
                 <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
                   <p className="text-xs font-bold text-amber-800 uppercase tracking-wide mb-2">Skills gap</p>
@@ -127,7 +144,6 @@ export default function MatchScoreSection({ jobId }: { jobId: string }) {
                 </div>
               )}
 
-              {/* Suggestions */}
               {result.profileSuggestions.length > 0 && (
                 <div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-4">
                   <p className="text-xs font-bold text-indigo-800 uppercase tracking-wide mb-2">How to improve your match</p>

@@ -67,7 +67,7 @@ function ProfileContent() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving]   = useState(false);
   const [saved, setSaved]     = useState(false);
-  const [error, setError]     = useState("");
+  const [error, setError]     = useState<unknown>(null);
 
   function updateList<K extends "projects" | "certifications">(key: K, index: number, patch: Partial<Profile[K][number]>) {
     setProfile(prev => ({
@@ -92,7 +92,7 @@ function ProfileContent() {
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     if (!token) return;
-    setSaving(true); setError(""); setSaved(false);
+    setSaving(true); setError(null); setSaved(false);
     try {
       const res = await fetch(apiUrl("/recruit/seeker/profile"), {
         method: "PUT",
@@ -100,10 +100,10 @@ function ProfileContent() {
         body: JSON.stringify(profile),
       });
       const d = await res.json();
-      if (!res.ok) throw new Error(d.error ?? "Save failed.");
+      if (!res.ok) throw apiErrorFromPayload(res.status, d, "Save failed.");
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
-    } catch (e: any) { setError(e.message); }
+    } catch (e: unknown) { setError(e); }
     finally { setSaving(false); }
   }
 
@@ -307,7 +307,7 @@ function ProfileContent() {
           {/* AI Profile Audit */}
           <ProfileOptimizer token={token} profile={profile} />
 
-          {error && <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>}
+          {error ? <SeekerErrorNotice error={error} /> : null}
 
           <div className="flex justify-end gap-3 pb-8">
             {saved && <span className="flex items-center text-sm font-semibold text-green-600">✓ Profile saved!</span>}
