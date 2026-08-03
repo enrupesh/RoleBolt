@@ -29,6 +29,20 @@ import {
   runSeekerBillingOperation,
   seekerRequestIdempotencyKey,
 } from "./billing/seekerEnforcement";
+import {
+  assertStandardBulkActionSize,
+  assertStandardBulkImportFileCount,
+  assertStandardFeature,
+  assertStandardResourceLimit,
+  isStandardBillingError,
+  respondStandardBillingError,
+  runStandardBillingOperation,
+  standardBillingOwnerUid,
+  standardContentHash,
+  standardIdempotencyHeader,
+  standardIdempotencyKey,
+  standardRequestIdempotencyKey,
+} from "./billing/standardEnforcement";
 import { getPlanDefinition } from "./billing/planCatalog";
 import { UsageLimitError } from "./billing/usage";
 import { verifyToken } from "./authMiddleware";
@@ -327,22 +341,39 @@ async function sendCandidateStageEmail(
     if (stage === "interview") payload = emailTemplates.interview(candName, jobTitle, companyName, ctx);
     if (stage === "hired") payload = emailTemplates.hired(candName, jobTitle, companyName, undefined, ctx);
     if (!payload) return;
-    const result = await sendEmail({
-      to: candEmail,
-      subject: payload.subject,
-      html: payload.html,
-      text: payload.text,
-      from: NOTIFICATION_FROM,
-    });
-    await pushCandidateEmailLog(candidateId, {
-      type: stage,
-      to: candEmail,
-      subject: payload.subject,
-      body: payload.text,
-      status: result.ok ? "sent" : "failed",
-      error: result.error,
+    const stagePayload = payload;
+    const ownerUid = standardBillingOwnerUid({ uid: jobUid ?? (job as any)?.uid });
+    // Automated stage emails are metered; skip (don't fail) when billing blocks.
+    await runStandardBillingOperation({
+      ownerUid,
+      operation: "automated_email_standard",
+      idempotencyKey: standardIdempotencyKey(ownerUid, ["stage-email", String(candidateId), stage]),
+      resourceType: "candidate",
+      resourceId: String(candidateId),
+      work: async () => {
+        const result = await sendEmail({
+          to: candEmail,
+          subject: stagePayload.subject,
+          html: stagePayload.html,
+          text: stagePayload.text,
+          from: NOTIFICATION_FROM,
+        });
+        await pushCandidateEmailLog(candidateId, {
+          type: stage,
+          to: candEmail,
+          subject: stagePayload.subject,
+          body: stagePayload.text,
+          status: result.ok ? "sent" : "failed",
+          error: result.error,
+        });
+        return result;
+      },
     });
   } catch (err) {
+    if (isStandardBillingError(err)) {
+      console.warn("[mailer] stage-change email skipped (billing):", (err as Error).message);
+      return;
+    }
     console.error("[mailer] stage-change email failed:", err);
   }
 }
@@ -382,17 +413,29 @@ async function activateAssessmentByToken(token: string): Promise<{ ok: boolean; 
   const job = await RecruitJob.findById(candidate.jobId).lean();
   if (!job) return { ok: false, error: "Job not found." };
 
+  const ownerUid = standardBillingOwnerUid(job);
   let questions: Awaited<ReturnType<typeof generateAssessmentQuestions>>;
   try {
-    questions = await generateAssessmentQuestions({
-      jobTitle: (job as any).title,
-      rubric: (job as any).rubric,
-      jd: (job as any).generatedJD,
-      niche: (job as any).niche,
-      nicheDetails: (job as any).nicheDetails,
-      languageRequirement: (job as any).languageRequirement,
+    questions = await runStandardBillingOperation({
+      ownerUid,
+      operation: "assessment_generate_standard",
+      idempotencyKey: standardIdempotencyKey(ownerUid, ["assessment-generate", String(candidate._id)]),
+      resourceType: "candidate",
+      resourceId: String(candidate._id),
+      work: async () => generateAssessmentQuestions({
+        jobTitle: (job as any).title,
+        rubric: (job as any).rubric,
+        jd: (job as any).generatedJD,
+        niche: (job as any).niche,
+        nicheDetails: (job as any).nicheDetails,
+        languageRequirement: (job as any).languageRequirement,
+      }),
     });
   } catch (err) {
+    if (isStandardBillingError(err)) {
+      console.warn("[assessment] activate generation blocked by billing:", (err as Error).message);
+      return { ok: false, error: "This assessment is temporarily unavailable. Please contact the employer." };
+    }
     console.error("[assessment] activate generation failed:", err);
     return { ok: false, error: "Could not prepare assessment. Please try again shortly." };
   }
@@ -488,13 +531,25 @@ async function sendAssessmentToCandidate(args: {
   const useUnified = args.unifiedWithScreened === true
     || (args.unifiedWithScreened !== false && EARLY_PIPELINE_STAGES.has(stageRow?.stage ?? "applied"));
 
-  return sendAssessmentInviteEmail({
-    job: args.job,
-    candidateId: args.candidateId,
-    candidateName: args.candidateName,
-    candidateEmail: args.candidateEmail,
-    mode: useUnified ? "unified_screened" : "assessment_only",
-    logTag: args.logTag,
+  // Assessments are a gated Standard feature and consume an active-assessment slot.
+  const ownerUid = standardBillingOwnerUid(args.job);
+  await assertStandardFeature(ownerUid, "assessments");
+  await assertStandardResourceLimit(ownerUid, "active_assessments");
+
+  return runStandardBillingOperation({
+    ownerUid,
+    operation: "assessment_send_standard",
+    idempotencyKey: standardIdempotencyKey(ownerUid, ["assessment-send", String(args.candidateId)]),
+    resourceType: "candidate",
+    resourceId: String(args.candidateId),
+    work: async () => sendAssessmentInviteEmail({
+      job: args.job,
+      candidateId: args.candidateId,
+      candidateName: args.candidateName,
+      candidateEmail: args.candidateEmail,
+      mode: useUnified ? "unified_screened" : "assessment_only",
+      logTag: args.logTag,
+    }),
   });
 }
 
@@ -527,8 +582,19 @@ async function dispatchAgentActions(args: {
 
   let emailSent = false;
   let emailStatus: "sent" | "failed" | "skipped" | "disabled" = "disabled";
+  const ownerUid = standardBillingOwnerUid(job);
 
   try {
+    // Meter the autonomous agent action against the job owner's Standard plan.
+    // On billing block we skip (log) without failing the surrounding intake.
+    await runStandardBillingOperation({
+      ownerUid,
+      operation: "agent_action",
+      idempotencyKey: standardIdempotencyKey(ownerUid, ["agent", String(candidateId), agentAction]),
+      resourceType: "candidate",
+      resourceId: String(candidateId),
+      metadata: { action: agentAction, logPrefix },
+      work: async () => {
     if (agentAction === "shortlisted") {
       await ensureScreenedStage(candidateId);
       const officialContactEmail = await getCreatorOfficialEmail(job.uid ?? "");
@@ -624,9 +690,16 @@ async function dispatchAgentActions(args: {
     } else if (agentAction === "review_zone") {
       emailStatus = "disabled";
     }
+      },
+    });
   } catch (e) {
-    console.error(`[${logPrefix}] Email dispatch failed:`, e);
-    emailStatus = "failed";
+    if (isStandardBillingError(e)) {
+      console.warn(`[${logPrefix}] agent action skipped (billing limit reached):`, (e as Error).message);
+      emailStatus = "skipped";
+    } else {
+      console.error(`[${logPrefix}] Email dispatch failed:`, e);
+      emailStatus = "failed";
+    }
   }
 
   try {
@@ -754,6 +827,61 @@ async function clearScorePipelineRuleState(jobId: string, candidateId: string) {
   await RecruitCandidate.updateOne({ _id: candidateId }, { $set: { pipelineRuleState: state } });
 }
 
+/**
+ * Build a fully-formed "unscored" scoring result. Used when AI scoring is
+ * blocked by billing so the candidate is still stored and can be re-scored
+ * later (mirrors Form Jobs `scoringFailed` degradation).
+ */
+function unscoredCandidateResult(
+  resumeText: string,
+  rubric: { name: string; weight: number; description: string }[] | undefined,
+): Awaited<ReturnType<typeof scoreCandidate>> {
+  const rubricMaxScore = (rubric ?? []).reduce((sum, r) => sum + (r?.weight ?? 0), 0) || 100;
+  return {
+    name: extractNameFromResume(resumeText),
+    email: "",
+    totalScore: 0,
+    maxScore: rubricMaxScore,
+    scoreBreakdown: [],
+    aiSummary: "",
+    redFlags: [],
+    strengths: [],
+    scoringFailed: true,
+  };
+}
+
+/**
+ * Meter a candidate resume-scoring AI call against the job owner's Standard plan.
+ * If scoring is blocked by billing, returns an unscored result so intake never
+ * hard-fails on the metered AI leg (the candidate stays re-scorable).
+ */
+async function meterCandidateScore(
+  ownerUid: string,
+  job: any,
+  resumeText: string,
+): Promise<Awaited<ReturnType<typeof scoreCandidate>>> {
+  try {
+    return await runStandardBillingOperation({
+      ownerUid,
+      operation: "candidate_score",
+      idempotencyKey: standardIdempotencyKey(ownerUid, [
+        "candidate-score",
+        String(job._id),
+        standardContentHash(resumeText),
+      ]),
+      resourceType: "job",
+      resourceId: String(job._id),
+      work: async () => scoreCandidate({ resumeText, jobTitle: job.title, rubric: job.rubric }),
+    });
+  } catch (scoreErr) {
+    if (isStandardBillingError(scoreErr)) {
+      console.warn("[recruit] candidate scoring blocked by billing — candidate kept unscored:", (scoreErr as Error).message);
+      return unscoredCandidateResult(resumeText, job.rubric);
+    }
+    throw scoreErr;
+  }
+}
+
 // ── AI Pipeline Rules: evaluate rules against a candidate (call non-blocking) ─
 export async function evaluatePipelineRules(jobId: string, candidateId: string) {
   try {
@@ -776,6 +904,23 @@ export async function evaluatePipelineRules(jobId: string, candidateId: string) 
       if (shouldSkipPipelineRule(rule, candidate as any, scorePct)) continue;
       if (!isPipelineConditionMet(rule, candidate as any, scorePct, dayInStage)) continue;
 
+      const ownerUid = standardBillingOwnerUid(job);
+      let fired = false;
+      try {
+        await runStandardBillingOperation({
+          ownerUid,
+          operation: "pipeline_rule_execution",
+          idempotencyKey: standardIdempotencyKey(ownerUid, [
+            "pipeline-rule",
+            String(candidateId),
+            String(rule.id),
+            String(candidate.stage),
+          ]),
+          resourceType: "candidate",
+          resourceId: String(candidateId),
+          metadata: { ruleId: rule.id, action: rule.action, condition: rule.condition },
+          work: async () => {
+      if (!candidate) return;
       const stageMap: Record<string, string> = {
         move_to_screened: "screened",
         move_to_assessed: "assessed",
@@ -785,7 +930,6 @@ export async function evaluatePipelineRules(jobId: string, candidateId: string) 
       };
 
       const marker = pipelineRuleMarker(rule, candidate as any, scorePct);
-      let fired = false;
 
       if (stageMap[rule.action]) {
         const newStage = stageMap[rule.action];
@@ -895,6 +1039,15 @@ export async function evaluatePipelineRules(jobId: string, candidateId: string) 
         } catch (e) {
           console.error("[pipeline-rule] send_reminder failed:", e);
         }
+      }
+          },
+        });
+      } catch (e) {
+        if (isStandardBillingError(e)) {
+          console.warn(`[pipeline-rule] "${rule.id}" blocked by billing — skipped:`, (e as Error).message);
+          continue;
+        }
+        throw e;
       }
 
       if (fired) break;
@@ -2023,22 +2176,51 @@ recruitRouter.post("/jobs", async (req, res) => {
     const safeLanguageRequirement = typeof languageRequirement === "string" ? languageRequirement.trim().slice(0, 200) : "";
     const safeTimezoneOverlap = typeof timezoneOverlap === "string" ? timezoneOverlap.trim().slice(0, 200) : "";
 
-    const { jd, rubric } = await generateJobDescription({
-      title, department: department || "", seniority: seniority || "Mid-level",
-      location: location || "Remote", workMode: workMode || "remote",
-      responsibilities: responsibilities || "", mustHaveSkills: mustHaveSkills || "",
-      niceToHaveSkills: niceToHaveSkills || "",
-      salaryMin: salaryMin ? Number(salaryMin) : undefined,
-      salaryMax: salaryMax ? Number(salaryMax) : undefined,
-      salaryCurrency: salaryCurrency || "INR",
-      niche: niche || "AI, Data, Software & Product Tech",
-      nicheDetails: safeNicheDetails,
-      openings: safeOpenings,
-      perks: safePerks,
-      languageRequirement: safeLanguageRequirement,
-      timezoneOverlap: safeTimezoneOverlap,
-      applicationDeadline: safeDeadline,
-    });
+    // Fail-closed on plan capacity before spending an AI generation.
+    await assertStandardResourceLimit(uid, "active_jobs");
+    await assertStandardResourceLimit(uid, "stored_jobs");
+
+    let jd: string;
+    let rubric: { name: string; weight: number; description: string }[];
+    try {
+      ({ jd, rubric } = await runStandardBillingOperation({
+        ownerUid: uid,
+        operation: "job_generation",
+        idempotencyKey: standardRequestIdempotencyKey(
+          uid,
+          "job-generation",
+          standardIdempotencyHeader(req) || standardContentHash(`${title}:${responsibilities || ""}:${mustHaveSkills || ""}`),
+        ),
+        resourceType: "job",
+        work: async () => generateJobDescription({
+          title, department: department || "", seniority: seniority || "Mid-level",
+          location: location || "Remote", workMode: workMode || "remote",
+          responsibilities: responsibilities || "", mustHaveSkills: mustHaveSkills || "",
+          niceToHaveSkills: niceToHaveSkills || "",
+          salaryMin: salaryMin ? Number(salaryMin) : undefined,
+          salaryMax: salaryMax ? Number(salaryMax) : undefined,
+          salaryCurrency: salaryCurrency || "INR",
+          niche: niche || "AI, Data, Software & Product Tech",
+          nicheDetails: safeNicheDetails,
+          openings: safeOpenings,
+          perks: safePerks,
+          languageRequirement: safeLanguageRequirement,
+          timezoneOverlap: safeTimezoneOverlap,
+          applicationDeadline: safeDeadline,
+        }),
+      }));
+    } catch (genErr) {
+      // Resource limits already asserted — AI quota exhaustion should not block job create.
+      if (!isStandardBillingError(genErr)) throw genErr;
+      console.warn("[recruit] job_generation blocked by billing — creating job with template JD:", (genErr as Error).message);
+      jd = `# ${String(title).trim()}\n\n${String(responsibilities || "").trim()}\n\n## Must-have skills\n${String(mustHaveSkills || "").trim()}`;
+      rubric = [
+        { name: "Role Fit", weight: 40, description: "Alignment with the role requirements." },
+        { name: "Relevant Experience", weight: 30, description: "Years and quality of relevant experience." },
+        { name: "Communication & Culture Fit", weight: 20, description: "Clarity and professionalism." },
+        { name: "Growth & Initiative", weight: 10, description: "Evidence of learning and initiative." },
+      ];
+    }
 
     const job = await RecruitJob.create({
       uid, title,
@@ -2072,6 +2254,7 @@ recruitRouter.post("/jobs", async (req, res) => {
     trackEvent("recruiter_job_posted", uid, { jobId: String(job._id), niche, title });
     return res.json({ job });
   } catch (err: any) {
+    if (await respondStandardBillingError(res, err, getUid(req))) return;
     console.error("[recruit] POST /jobs", err);
     return res.status(500).json({ error: err.message || "Failed to create job." });
   }
@@ -2102,11 +2285,13 @@ recruitRouter.get("/jobs/:jobId", async (req, res) => {
 });
 
 recruitRouter.patch("/jobs/:jobId", async (req, res) => {
+  let billingOwnerUid = "";
   try {
     await connectMongo();
     const uid = getUid(req);
     const access = await getCollaborationAccess(req.params.jobId, uid);
     if (!access || !hasPermission(access, "configure_job")) return res.status(403).json({ error: "You do not have permission to configure this job." });
+    billingOwnerUid = standardBillingOwnerUid(access.job);
     const allowed = [
       "status", "title", "niche", "companyName", "companyType", "jobType",
       "department", "location", "workMode", "salaryMin", "salaryMax",
@@ -2151,10 +2336,20 @@ recruitRouter.patch("/jobs/:jobId", async (req, res) => {
     }
     const companyProfileForPatch = await RecruitCompanyProfile.findOne({ uid }).lean();
     update.verifiedCompany = (companyProfileForPatch as any)?.verificationStatus === "verified";
+
+    // Reactivating (or activating) a job consumes an active-jobs slot — fail closed.
+    if (
+      update.status === "active" &&
+      (access.job as any).status !== "active"
+    ) {
+      await assertStandardResourceLimit(standardBillingOwnerUid(access.job), "active_jobs");
+    }
+
     const job = await RecruitJob.findOneAndUpdate({ _id: req.params.jobId, uid: access.job.uid }, update, { returnDocument: "after" }).lean();
     if (!job) return res.status(404).json({ error: "Job not found." });
     return res.json({ job: serializeRecruitJob(job) });
   } catch (err: any) {
+    if (billingOwnerUid && await respondStandardBillingError(res, err, billingOwnerUid)) return;
     return res.status(500).json({ error: err.message });
   }
 });
@@ -2363,34 +2558,59 @@ recruitPublicRouter.post("/jobs/:jobId/apply", async (req, res) => {
 
     const rubricMaxScore = (job.rubric ?? []).reduce((sum: number, r: any) => sum + (r.weight ?? 0), 0) || 100;
 
-    // Save immediately — score + automation run in background (non-blocking for candidate).
-    const candidate = await RecruitCandidate.create({
-      jobId: job._id,
-      uid: job.uid,
-      name: name.trim(),
-      email,
-      phone: phone || "",
-      resumeText,
-      totalScore: 0,
-      maxScore: rubricMaxScore,
-      scoreBreakdown: [],
-      aiSummary: "",
-      redFlags: [],
-      strengths: [],
-      stage: "applied",
-      stageMovedAt: new Date(),
-      assessmentStatus: "not_sent",
-      previousResumeScore: 0,
-      scoringFailed: true,
-      source: source || "Rolebolt Jobs",
-      location: location || "",
-      currentStatus: currentStatus || "",
-      educationLevel: educationLevel || "",
-      currentClassYear: currentClassYear || "",
-      availability: availability || "",
-      coverLetter: coverLetter || "",
-      linkedinUrl: linkedinUrl || "",
-    });
+    // Owner (job.uid) is billed for public applications — never the applicant.
+    const ownerUid = standardBillingOwnerUid(job);
+    if (!ownerUid) return res.status(503).json({ error: "This job cannot accept applications right now." });
+
+    // Reserve owner capacity BEFORE persisting the applicant (Pattern C).
+    let candidate;
+    try {
+      candidate = await runStandardBillingOperation({
+        ownerUid,
+        operation: "new_candidate_intake",
+        idempotencyKey: standardIdempotencyKey(ownerUid, [
+          "intake",
+          String(job._id),
+          normalizedEmail || standardContentHash(resumeText),
+        ]),
+        resourceType: "job",
+        resourceId: String(job._id),
+        // Save immediately — score + automation run in background (non-blocking for candidate).
+        work: async () => {
+          await assertStandardResourceLimit(ownerUid, "stored_candidates");
+          return RecruitCandidate.create({
+            jobId: job._id,
+            uid: job.uid,
+            name: name.trim(),
+            email,
+            phone: phone || "",
+            resumeText,
+            totalScore: 0,
+            maxScore: rubricMaxScore,
+            scoreBreakdown: [],
+            aiSummary: "",
+            redFlags: [],
+            strengths: [],
+            stage: "applied",
+            stageMovedAt: new Date(),
+            assessmentStatus: "not_sent",
+            previousResumeScore: 0,
+            scoringFailed: true,
+            source: source || "Rolebolt Jobs",
+            location: location || "",
+            currentStatus: currentStatus || "",
+            educationLevel: educationLevel || "",
+            currentClassYear: currentClassYear || "",
+            availability: availability || "",
+            coverLetter: coverLetter || "",
+            linkedinUrl: linkedinUrl || "",
+          });
+        },
+      });
+    } catch (billingErr) {
+      if (await respondStandardBillingError(res, billingErr, ownerUid)) return;
+      throw billingErr;
+    }
 
     await RecruitJob.updateOne({ _id: job._id }, { $inc: { candidateCount: 1 } });
 
@@ -2400,11 +2620,7 @@ recruitPublicRouter.post("/jobs/:jobId/apply", async (req, res) => {
     const jobLean = job;
     setImmediate(async () => {
       try {
-        const scored = await scoreCandidate({
-          resumeText,
-          jobTitle: jobLean.title,
-          rubric: jobLean.rubric,
-        });
+        const scored = await meterCandidateScore(ownerUid, jobLean, resumeText);
         await finalizeScoredCandidate({
           job: jobLean,
           candidateId,
@@ -2420,6 +2636,10 @@ recruitPublicRouter.post("/jobs/:jobId/apply", async (req, res) => {
   } catch (err: any) {
     console.error("[recruit-public] POST /jobs/:jobId/apply", err);
     if (!res.headersSent) {
+      const owner = standardBillingOwnerUid(
+        await RecruitJob.findOne({ _id: req.params.jobId }).select("uid").lean().catch(() => null),
+      );
+      if (owner && await respondStandardBillingError(res, err, owner)) return;
       return res.status(500).json({ error: err.message || "Failed to submit application." });
     }
   }
@@ -2810,10 +3030,24 @@ Suggestion to apply: ${suggestion}
 Rewrite the job description incorporating this suggestion to attract more qualified candidates.
 Keep it professional, structured, and under 600 words. Return ONLY the new job description text.`;
 
-    const newJD = await callGeminiChain({ prompt });
+    const ownerUid = standardBillingOwnerUid(access.job);
+    const newJD = await runStandardBillingOperation({
+      ownerUid,
+      operation: "short_rewrite_standard",
+      idempotencyKey: standardRequestIdempotencyKey(
+        ownerUid,
+        "performance-apply",
+        standardIdempotencyHeader(req) || standardContentHash(`${req.params.jobId}:${suggestion}`),
+      ),
+      resourceType: "job",
+      resourceId: String(req.params.jobId),
+      work: async () => callGeminiChain({ prompt }),
+    });
     await RecruitJob.updateOne({ _id: req.params.jobId, uid: access.job.uid }, { $set: { generatedJD: newJD } });
     return res.json({ ok: true, newJD });
   } catch (err: any) {
+    const job = (await getCollaborationAccess(req.params.jobId, getUid(req)))?.job;
+    if (await respondStandardBillingError(res, err, standardBillingOwnerUid(job))) return;
     console.error("[perf-monitor] apply suggestion failed:", err);
     return res.status(500).json({ error: err.message });
   }
@@ -2872,18 +3106,33 @@ Rules:
     let newJD = providedJD?.trim() ?? "";
 
     if (!newJD) {
-      try {
-        newJD = (await callGeminiChain({ prompt, temperature: 0.7, maxOutputTokens: 1500 })) ?? "";
-        console.log("[recruit] regenerate-jd: Gemini succeeded ✓");
-      } catch {
-        try {
-          newJD = (await callNvidia({ messages: [{ role: "user", content: prompt }], temperature: 0.7, max_tokens: 1500 })) ?? "";
-          console.log("[recruit] regenerate-jd: Nvidia fallback succeeded ✓");
-        } catch {
-          return res.status(500).json({ error: "AI generation failed. Please try again." });
-        }
-      }
-      newJD = newJD.trim();
+      const ownerUid = standardBillingOwnerUid(job);
+      newJD = await runStandardBillingOperation({
+        ownerUid,
+        operation: "job_generation",
+        idempotencyKey: standardRequestIdempotencyKey(
+          ownerUid,
+          "regenerate-jd",
+          standardIdempotencyHeader(req) || standardContentHash(`${req.params.jobId}:${variant}`),
+        ),
+        resourceType: "job",
+        resourceId: String(req.params.jobId),
+        work: async () => {
+          let generated = "";
+          try {
+            generated = (await callGeminiChain({ prompt, temperature: 0.7, maxOutputTokens: 1500 })) ?? "";
+            console.log("[recruit] regenerate-jd: Gemini succeeded ✓");
+          } catch {
+            try {
+              generated = (await callNvidia({ messages: [{ role: "user", content: prompt }], temperature: 0.7, max_tokens: 1500 })) ?? "";
+              console.log("[recruit] regenerate-jd: Nvidia fallback succeeded ✓");
+            } catch {
+              throw new Error("AI generation failed. Please try again.");
+            }
+          }
+          return generated.trim();
+        },
+      });
     }
 
     if (save && newJD) {
@@ -2892,6 +3141,7 @@ Rules:
 
     return res.json({ ok: true, newJD, variant });
   } catch (err: any) {
+    if (await respondStandardBillingError(res, err, getUid(req))) return;
     console.error("[recruit] regenerate-jd failed:", err);
     return res.status(500).json({ error: err.message });
   }
@@ -2955,9 +3205,15 @@ recruitRouter.post("/briefing/send-now", async (req, res) => {
     await connectMongo();
     const uid = getUid(req);
     const { generateBriefingForUser } = await import("./jobs/dailyBriefing.js");
-    await generateBriefingForUser(uid);
+    await runStandardBillingOperation({
+      ownerUid: uid,
+      operation: "daily_briefing",
+      idempotencyKey: standardIdempotencyKey(uid, ["daily-briefing", new Date().toISOString().slice(0, 13)]),
+      work: async () => generateBriefingForUser(uid),
+    });
     return res.json({ ok: true, message: "Briefing sent to your email." });
   } catch (e: any) {
+    if (await respondStandardBillingError(res, e, getUid(req))) return;
     console.error("[briefing] manual trigger failed:", e);
     return res.status(500).json({ error: e.message || "Failed to send briefing." });
   }
@@ -2992,6 +3248,7 @@ recruitRouter.post("/jobs/:jobId/pipeline-rules", async (req, res) => {
     if (validationError) {
       return res.status(400).json({ error: validationError });
     }
+    await assertStandardResourceLimit(standardBillingOwnerUid(access.job), "pipeline_rules");
     const rule = {
       id: crypto.randomUUID(),
       condition,
@@ -3009,6 +3266,8 @@ recruitRouter.post("/jobs/:jobId/pipeline-rules", async (req, res) => {
     if (!job) return res.status(404).json({ error: "Job not found." });
     return res.status(201).json({ ok: true, rule });
   } catch (err: any) {
+    const job = (await getCollaborationAccess(req.params.jobId, getUid(req)))?.job;
+    if (await respondStandardBillingError(res, err, standardBillingOwnerUid(job))) return;
     return res.status(500).json({ error: err.message });
   }
 });
@@ -3022,15 +3281,19 @@ recruitRouter.patch("/jobs/:jobId/pipeline-rules/:ruleId", async (req, res) => {
       return res.status(403).json({ error: "You do not have permission to manage pipeline rules." });
     }
     const { enabled, condition, threshold, fromStage, action } = req.body;
+    const existingRule = ((access.job as any).pipelineRules ?? []).find((r: any) => r.id === req.params.ruleId);
     if (condition !== undefined || action !== undefined || threshold !== undefined) {
-      const existing = ((access.job as any).pipelineRules ?? []).find((r: any) => r.id === req.params.ruleId);
       const toValidate = {
-        condition: condition ?? existing?.condition,
-        threshold: threshold ?? existing?.threshold,
-        action: action ?? existing?.action,
+        condition: condition ?? existingRule?.condition,
+        threshold: threshold ?? existingRule?.threshold,
+        action: action ?? existingRule?.action,
       };
       const err = validatePipelineRuleInput(toValidate);
       if (err) return res.status(400).json({ error: err });
+    }
+    // Re-enabling a disabled rule consumes an active pipeline-rule slot.
+    if (enabled !== undefined && Boolean(enabled) && existingRule && existingRule.enabled === false) {
+      await assertStandardResourceLimit(standardBillingOwnerUid(access.job), "pipeline_rules");
     }
     const setFields: Record<string, unknown> = {};
     if (enabled !== undefined) setFields["pipelineRules.$.enabled"] = Boolean(enabled);
@@ -3047,6 +3310,8 @@ recruitRouter.patch("/jobs/:jobId/pipeline-rules/:ruleId", async (req, res) => {
     const updated = ((job as any).pipelineRules ?? []).find((r: any) => r.id === req.params.ruleId);
     return res.json({ ok: true, rule: updated });
   } catch (err: any) {
+    const job = (await getCollaborationAccess(req.params.jobId, getUid(req)))?.job;
+    if (await respondStandardBillingError(res, err, standardBillingOwnerUid(job))) return;
     return res.status(500).json({ error: err.message });
   }
 });
@@ -3082,11 +3347,10 @@ recruitRouter.post("/jobs/:jobId/candidates", async (req, res) => {
     const { resumeText } = req.body;
     if (!resumeText?.trim()) return res.status(400).json({ error: "Resume text is required." });
 
-    const scored = await scoreCandidate({
-      resumeText,
-      jobTitle: job.title,
-      rubric: job.rubric,
-    });
+    const ownerUid = standardBillingOwnerUid(job);
+    await assertStandardResourceLimit(ownerUid, "stored_candidates");
+
+    const scored = await meterCandidateScore(ownerUid, job, resumeText);
 
     const { source } = req.body;
 
@@ -3129,24 +3393,35 @@ recruitRouter.post("/jobs/:jobId/candidates", async (req, res) => {
       scored.scoringFailed,
     );
 
-    const candidate = await RecruitCandidate.create({
-      jobId: job._id,
-      uid: job.uid,
-      name: scored.name,
-      email: scored.email,
-      resumeText,
-      totalScore: scored.totalScore,
-      maxScore: scored.maxScore,
-      scoreBreakdown: scored.scoreBreakdown,
-      aiSummary: scored.aiSummary,
-      redFlags: scored.redFlags,
-      strengths: scored.strengths,
-      stage: initialStage,
-      stageMovedAt: new Date(),
-      assessmentStatus: "not_sent",
-      previousResumeScore: scored.totalScore,
-      scoringFailed: scored.scoringFailed,
-      source: source || "",
+    const candidate = await runStandardBillingOperation({
+      ownerUid,
+      operation: "new_candidate_intake",
+      idempotencyKey: standardIdempotencyKey(ownerUid, [
+        "intake",
+        String(job._id),
+        scored.email || standardContentHash(resumeText),
+      ]),
+      resourceType: "job",
+      resourceId: String(job._id),
+      work: async () => RecruitCandidate.create({
+        jobId: job._id,
+        uid: job.uid,
+        name: scored.name,
+        email: scored.email,
+        resumeText,
+        totalScore: scored.totalScore,
+        maxScore: scored.maxScore,
+        scoreBreakdown: scored.scoreBreakdown,
+        aiSummary: scored.aiSummary,
+        redFlags: scored.redFlags,
+        strengths: scored.strengths,
+        stage: initialStage,
+        stageMovedAt: new Date(),
+        assessmentStatus: "not_sent",
+        previousResumeScore: scored.totalScore,
+        scoringFailed: scored.scoringFailed,
+        source: source || "",
+      }),
     });
 
     await RecruitJob.updateOne({ _id: job._id }, { $inc: { candidateCount: 1 } });
@@ -3174,6 +3449,8 @@ recruitRouter.post("/jobs/:jobId/candidates", async (req, res) => {
     trackEvent("recruiter_candidate_added", uid, { jobId: req.params.jobId, source: source || "" });
     return res.json({ candidate, previousApplication });
   } catch (err: any) {
+    const job = (await getCollaborationAccess(req.params.jobId, getUid(req)))?.job;
+    if (await respondStandardBillingError(res, err, standardBillingOwnerUid(job))) return;
     console.error("[recruit] POST /candidates", err);
     return res.status(500).json({ error: err.message });
   }
@@ -3237,6 +3514,30 @@ recruitRouter.post(
       const files = (req.files as Express.Multer.File[]) ?? [];
       if (files.length === 0) return res.status(400).json({ error: "No files uploaded." });
 
+      // ── CRITICAL billing gate: everything here runs BEFORE SSE headers so a
+      // plan-limit rejection is returned as a normal JSON 409 the frontend
+      // BulkImportModal can surface (rather than a mid-stream SSE error). ──
+      const ownerUid = standardBillingOwnerUid(job);
+      const batchId = crypto.randomUUID();
+      try {
+        // Enforce plan ceilings before SSE so Free (3 files / 1 import) fails as JSON 409.
+        await assertStandardBulkActionSize(ownerUid, files.length);
+        await assertStandardBulkImportFileCount(ownerUid, files.length);
+        // One batch reservation (quantity=1), not one per file.
+        await runStandardBillingOperation({
+          ownerUid,
+          operation: "bulk_import_batch",
+          idempotencyKey: standardIdempotencyKey(ownerUid, ["bulk-batch", String(job._id), batchId]),
+          resourceType: "job",
+          resourceId: String(job._id),
+          metadata: { fileCount: files.length },
+          work: async () => true,
+        });
+      } catch (gateErr) {
+        if (await respondStandardBillingError(res, gateErr, ownerUid)) return;
+        throw gateErr;
+      }
+
       // Switch to SSE streaming
       res.setHeader("Content-Type", "text/event-stream");
       res.setHeader("Cache-Control", "no-cache");
@@ -3251,6 +3552,7 @@ recruitRouter.post(
 
       let succeeded = 0;
       let failed = 0;
+      let planLimitHit = false;
 
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
@@ -3260,26 +3562,45 @@ recruitRouter.post(
 
         try {
           const resumeText = await extractResumeText(file);
-          const scored = await scoreCandidate({ resumeText, jobTitle: job.title, rubric: job.rubric });
+          // candidate_score degrades to unscored on billing block (never fails intake).
+          const scored = await meterCandidateScore(ownerUid, job, resumeText);
 
-          const candidate = await RecruitCandidate.create({
-            jobId: job._id,
-            uid: job.uid,
-            name: scored.name || filename.replace(/\.[^.]+$/, ""),
-            email: scored.email || "",
-            resumeText,
-            totalScore: scored.totalScore,
-            maxScore: scored.maxScore,
-            scoreBreakdown: scored.scoreBreakdown,
-            aiSummary: scored.aiSummary,
-            redFlags: scored.redFlags,
-            strengths: scored.strengths,
-            stage: "applied",
-            stageMovedAt: new Date(),
-            assessmentStatus: "not_sent",
-            previousResumeScore: scored.totalScore,
-            scoringFailed: scored.scoringFailed,
-            source: "bulk_import",
+          // Meter per-file work; intake capacity (stored_candidates) fails closed.
+          const candidate = await runStandardBillingOperation({
+            ownerUid,
+            operation: "bulk_import_item",
+            idempotencyKey: standardIdempotencyKey(ownerUid, ["bulk-item", String(job._id), batchId, String(i)]),
+            resourceType: "job",
+            resourceId: String(job._id),
+            work: async () => {
+              await assertStandardResourceLimit(ownerUid, "stored_candidates");
+              return runStandardBillingOperation({
+                ownerUid,
+                operation: "new_candidate_intake",
+                idempotencyKey: standardIdempotencyKey(ownerUid, ["bulk-intake", String(job._id), batchId, String(i)]),
+                resourceType: "job",
+                resourceId: String(job._id),
+                work: async () => RecruitCandidate.create({
+                  jobId: job._id,
+                  uid: job.uid,
+                  name: scored.name || filename.replace(/\.[^.]+$/, ""),
+                  email: scored.email || "",
+                  resumeText,
+                  totalScore: scored.totalScore,
+                  maxScore: scored.maxScore,
+                  scoreBreakdown: scored.scoreBreakdown,
+                  aiSummary: scored.aiSummary,
+                  redFlags: scored.redFlags,
+                  strengths: scored.strengths,
+                  stage: "applied",
+                  stageMovedAt: new Date(),
+                  assessmentStatus: "not_sent",
+                  previousResumeScore: scored.totalScore,
+                  scoringFailed: scored.scoringFailed,
+                  source: "bulk_import",
+                }),
+              });
+            },
           });
 
           await RecruitJob.updateOne({ _id: job._id }, { $inc: { candidateCount: 1 } });
@@ -3310,11 +3631,25 @@ recruitRouter.post(
           });
         } catch (fileErr: any) {
           failed++;
+          if (isStandardBillingError(fileErr)) {
+            // Candidate-storage capacity exhausted mid-batch — surface PLAN_LIMIT
+            // and stop; remaining files would all fail the same way.
+            planLimitHit = true;
+            sendEvent({
+              type: "file", index: i, total: files.length, filename, status: "failed",
+              error: "PLAN_LIMIT_REACHED", code: "PLAN_LIMIT_REACHED", planLimit: true,
+            });
+            sendEvent({
+              type: "error", code: "PLAN_LIMIT_REACHED", planLimit: true,
+              error: "Your plan's stored candidate limit has been reached. Upgrade to import more.",
+            });
+            break;
+          }
           sendEvent({ type: "file", index: i, total: files.length, filename, status: "failed", error: fileErr.message });
         }
       }
 
-      sendEvent({ type: "complete", total: files.length, succeeded, failed });
+      sendEvent({ type: "complete", total: files.length, succeeded, failed, planLimitHit });
       res.end();
     } catch (err: any) {
       console.error("[recruit] POST /candidates/bulk", err);
@@ -3433,10 +3768,22 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/retry-score", async (re
     const candidate = await RecruitCandidate.findOne({ _id: req.params.candidateId, jobId: req.params.jobId, uid: job.uid });
     if (!candidate) return res.status(404).json({ error: "Candidate not found." });
 
-    const scored = await scoreCandidate({
-      resumeText: candidate.resumeText,
-      jobTitle: job.title,
-      rubric: job.rubric,
+    const ownerUid = standardBillingOwnerUid(job);
+    const scored = await runStandardBillingOperation({
+      ownerUid,
+      operation: "candidate_score",
+      idempotencyKey: standardRequestIdempotencyKey(
+        ownerUid,
+        "candidate-rescore",
+        standardIdempotencyHeader(req) || standardContentHash(`${candidate._id}:${Date.now()}`),
+      ),
+      resourceType: "candidate",
+      resourceId: String(candidate._id),
+      work: async () => scoreCandidate({
+        resumeText: candidate.resumeText,
+        jobTitle: job.title,
+        rubric: job.rubric,
+      }),
     });
 
     const scorePct = scored.maxScore > 0 ? Math.round((scored.totalScore / scored.maxScore) * 100) : 0;
@@ -3499,6 +3846,8 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/retry-score", async (re
 
     return res.json({ candidate });
   } catch (err: any) {
+    const job = (await getCollaborationAccess(req.params.jobId, getUid(req)))?.job;
+    if (await respondStandardBillingError(res, err, standardBillingOwnerUid(job))) return;
     console.error("[recruit] POST /retry-score", err);
     return res.status(500).json({ error: err.message });
   }
@@ -3519,16 +3868,24 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/brief", async (req, res
       return res.json({ brief: candidate.interviewBrief });
     }
 
-    const brief = await generateInterviewBrief({
-      candidateName: candidate.name,
-      jobTitle: job.title,
-      resumeText: candidate.resumeText,
-      aiSummary: candidate.aiSummary,
-      redFlags: candidate.redFlags,
-      scoreBreakdown: candidate.scoreBreakdown,
-      niche: job.niche,
-      nicheDetails: job.nicheDetails,
-      languageRequirement: job.languageRequirement,
+    const ownerUid = standardBillingOwnerUid(job);
+    const brief = await runStandardBillingOperation({
+      ownerUid,
+      operation: "deep_candidate_analysis",
+      idempotencyKey: standardIdempotencyKey(ownerUid, ["interview-brief", String(candidate._id)]),
+      resourceType: "candidate",
+      resourceId: String(candidate._id),
+      work: async () => generateInterviewBrief({
+        candidateName: candidate.name,
+        jobTitle: job.title,
+        resumeText: candidate.resumeText,
+        aiSummary: candidate.aiSummary,
+        redFlags: candidate.redFlags,
+        scoreBreakdown: candidate.scoreBreakdown,
+        niche: job.niche,
+        nicheDetails: job.nicheDetails,
+        languageRequirement: job.languageRequirement,
+      }),
     });
 
     candidate.interviewBrief = brief;
@@ -3536,6 +3893,8 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/brief", async (req, res
 
     return res.json({ brief });
   } catch (err: any) {
+    const job = (await getCollaborationAccess(req.params.jobId, getUid(req)))?.job;
+    if (await respondStandardBillingError(res, err, standardBillingOwnerUid(job))) return;
     return res.status(500).json({ error: err.message });
   }
 });
@@ -3596,6 +3955,8 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/assessment/send", async
       emailSent: Boolean(candidate.email),
     });
   } catch (err: any) {
+    const job = (await getCollaborationAccess(req.params.jobId, getUid(req)))?.job;
+    if (await respondStandardBillingError(res, err, standardBillingOwnerUid(job))) return;
     console.error("[recruit] POST /assessment/send", err);
     return res.status(500).json({ error: err.message });
   }
@@ -3611,14 +3972,27 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/reject-email", async (r
     const candidate = await RecruitCandidate.findOne({ _id: req.params.candidateId, jobId: req.params.jobId, uid }).lean();
     if (!candidate) return res.status(404).json({ error: "Candidate not found." });
 
-    const email = await generateRejectionEmail({
-      candidateName: candidate.name,
-      jobTitle: job.title,
-      stage: candidate.stage,
+    const ownerUid = standardBillingOwnerUid(job);
+    const email = await runStandardBillingOperation({
+      ownerUid,
+      operation: "short_rewrite_standard",
+      idempotencyKey: standardRequestIdempotencyKey(
+        ownerUid,
+        "reject-email",
+        standardIdempotencyHeader(req) || standardContentHash(`${candidate._id}:${candidate.stage}`),
+      ),
+      resourceType: "candidate",
+      resourceId: String(candidate._id),
+      work: async () => generateRejectionEmail({
+        candidateName: candidate.name,
+        jobTitle: job.title,
+        stage: candidate.stage,
+      }),
     });
 
     return res.json({ email, candidateName: candidate.name, candidateEmail: candidate.email });
   } catch (err: any) {
+    if (await respondStandardBillingError(res, err, getUid(req))) return;
     console.error("[recruit] POST /reject-email", err);
     return res.status(500).json({ error: err.message });
   }
@@ -3656,7 +4030,19 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/send-email", async (req
       html = emailTemplates.genericEmail(candidate.name, subject.trim(), body, ctx);
     }
 
-    const result = await sendEmail({ to: candidate.email, subject: subject.trim(), html, text: body, from: NOTIFICATION_FROM });
+    const ownerUid = standardBillingOwnerUid(candidate);
+    const result = await runStandardBillingOperation({
+      ownerUid,
+      operation: "automated_email_standard",
+      idempotencyKey: standardRequestIdempotencyKey(
+        ownerUid,
+        "send-email",
+        standardIdempotencyHeader(req) || standardContentHash(`${candidate._id}:${subject.trim()}:${body.trim()}`),
+      ),
+      resourceType: "candidate",
+      resourceId: String(candidate._id),
+      work: async () => sendEmail({ to: candidate.email!, subject: subject.trim(), html, text: body, from: NOTIFICATION_FROM }),
+    });
 
     const logEntry = {
       type: type || "custom",
@@ -3675,6 +4061,7 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/send-email", async (req
     }
     return res.json({ ok: true, sentAt: logEntry.sentAt, logEntry });
   } catch (err: any) {
+    if (await respondStandardBillingError(res, err, getUid(req))) return;
     console.error("[recruit] POST /send-email", err);
     return res.status(500).json({ error: err.message });
   }
@@ -3702,23 +4089,40 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/reminder", async (req, 
       const candName  = candidate.name;
       const candEmail = candidate.email;
       const reminderUrl = assessmentUrl;
+      const ownerUid  = standardBillingOwnerUid(candidate);
       setImmediate(async () => {
         try {
           const job     = await RecruitJob.findById(req.params.jobId).lean();
           const jobTitle     = (job as any)?.title       || "";
           const companyName  = (job as any)?.companyName || "";
-          const officialContactEmail = await getCreatorOfficialEmail(uid);
+          const officialContactEmail = await getCreatorOfficialEmail(ownerUid);
           const payload = emailTemplates.assessmentReminder(candName, jobTitle, companyName, reminderUrl, { officialContactEmail });
-          const result  = await sendEmail({ to: candEmail, subject: payload.subject, html: payload.html, text: payload.text, from: NOTIFICATION_FROM });
-          await RecruitCandidate.findByIdAndUpdate(candId, {
-            $push: {
-              emailLog: {
-                type: "assessment_reminder", to: candEmail, subject: payload.subject, body: payload.text,
-                sentAt: new Date(), status: result.ok ? "sent" : "failed", error: result.error,
-              },
+          await runStandardBillingOperation({
+            ownerUid,
+            operation: "automated_email_standard",
+            idempotencyKey: standardIdempotencyKey(ownerUid, ["assessment-reminder", String(candId), new Date().toISOString().slice(0, 10)]),
+            resourceType: "candidate",
+            resourceId: String(candId),
+            work: async () => {
+              const result  = await sendEmail({ to: candEmail, subject: payload.subject, html: payload.html, text: payload.text, from: NOTIFICATION_FROM });
+              await RecruitCandidate.findByIdAndUpdate(candId, {
+                $push: {
+                  emailLog: {
+                    type: "assessment_reminder", to: candEmail, subject: payload.subject, body: payload.text,
+                    sentAt: new Date(), status: result.ok ? "sent" : "failed", error: result.error,
+                  },
+                },
+              });
+              return result;
             },
           });
-        } catch (err) { console.error("[mailer] reminder email failed:", err); }
+        } catch (err) {
+          if (isStandardBillingError(err)) {
+            console.warn("[mailer] assessment reminder skipped (billing):", (err as Error).message);
+            return;
+          }
+          console.error("[mailer] reminder email failed:", err);
+        }
       });
     }
 
@@ -3846,23 +4250,42 @@ recruitPublicRouter.post("/assessment/:token/submit", async (req, res) => {
     const job = await RecruitJob.findById(candidate.jobId).lean();
     if (!job) return res.status(404).json({ error: "Job not found." });
 
-    const result = await analyzeAssessmentAnswers({
-      candidateName: candidate.name,
-      jobTitle: job.title,
-      rubric: job.rubric,
-      questions: candidate.assessmentQuestions,
-      answers,
-      resumeScore: candidate.previousResumeScore || candidate.totalScore,
-      maxScore: candidate.maxScore,
-      resumeSummary: candidate.aiSummary,
-    });
+    // Score the submitted assessment — metered to the job owner. If billing
+    // blocks the AI scoring, still record the submission (candidate isn't
+    // penalized) and keep the prior resume-based score.
+    const ownerUid = standardBillingOwnerUid(job);
+    let result: Awaited<ReturnType<typeof analyzeAssessmentAnswers>> | null = null;
+    try {
+      result = await runStandardBillingOperation({
+        ownerUid,
+        operation: "assessment_score_standard",
+        idempotencyKey: standardIdempotencyKey(ownerUid, ["assessment-score", String(candidate._id)]),
+        resourceType: "candidate",
+        resourceId: String(candidate._id),
+        work: async () => analyzeAssessmentAnswers({
+          candidateName: candidate.name,
+          jobTitle: job.title,
+          rubric: job.rubric,
+          questions: candidate.assessmentQuestions,
+          answers,
+          resumeScore: candidate.previousResumeScore || candidate.totalScore,
+          maxScore: candidate.maxScore,
+          resumeSummary: candidate.aiSummary,
+        }),
+      });
+    } catch (scoreErr) {
+      if (!isStandardBillingError(scoreErr)) throw scoreErr;
+      console.warn("[recruit] assessment scoring blocked by billing — submission kept, prior score retained:", (scoreErr as Error).message);
+    }
 
     candidate.assessmentAnswers = answers;
     candidate.assessmentStatus = "completed";
     candidate.assessmentCompletedAt = new Date();
-    candidate.totalScore = result.newTotalScore;
-    candidate.hiringDecision = result.hiringDecision;
-    candidate.assessmentImpact = result.impact;
+    if (result) {
+      candidate.totalScore = result.newTotalScore;
+      candidate.hiringDecision = result.hiringDecision;
+      candidate.assessmentImpact = result.impact;
+    }
     candidate.stage = "assessed";
     candidate.stageMovedAt = new Date();
     await candidate.save();
@@ -4428,9 +4851,20 @@ recruitRouter.get("/jobs/:jobId/assessment-analytics/export", async (req, res) =
       return true;
     }
 
-    const allCandidates = await RecruitCandidate.find({ jobId: req.params.jobId, uid })
-      .select("name email totalScore maxScore assessmentStatus assessmentSentAt assessmentCompletedAt assessmentAnswers hiringDecision stage createdAt")
-      .lean();
+    const allCandidates = await runStandardBillingOperation({
+      ownerUid: uid,
+      operation: "export_standard",
+      idempotencyKey: standardRequestIdempotencyKey(
+        uid,
+        "assessment-export",
+        standardIdempotencyHeader(req) || standardContentHash(`${req.params.jobId}:${from ?? ""}:${to ?? ""}:${new Date().toISOString().slice(0, 13)}`),
+      ),
+      resourceType: "job",
+      resourceId: String(req.params.jobId),
+      work: async () => RecruitCandidate.find({ jobId: req.params.jobId, uid })
+        .select("name email totalScore maxScore assessmentStatus assessmentSentAt assessmentCompletedAt assessmentAnswers hiringDecision stage createdAt")
+        .lean(),
+    });
 
     function scorePct(c: { totalScore?: number; maxScore?: number }): number | null {
       if (!c.maxScore || c.maxScore <= 0) return null;
@@ -4472,6 +4906,7 @@ recruitRouter.get("/jobs/:jobId/assessment-analytics/export", async (req, res) =
 
     return res.json({ jobTitle: (job as any).title ?? "", candidates });
   } catch (err: any) {
+    if (await respondStandardBillingError(res, err, getUid(req))) return;
     console.error("[recruit] GET /assessment-analytics/export", err);
     return res.status(500).json({ error: err.message });
   }
@@ -4705,11 +5140,18 @@ Guidelines:
     };
 
     try {
-      const rawAI = await callGeminiChain({
-        prompt: aiPrompt,
-        temperature: 0.3,
-        maxOutputTokens: 3000,
-        jsonMode: true,
+      const rawAI = await runStandardBillingOperation({
+        ownerUid: uid,
+        operation: "job_analysis",
+        idempotencyKey: standardIdempotencyKey(uid, ["job-analysis", String(req.params.jobId), new Date().toISOString().slice(0, 13)]),
+        resourceType: "job",
+        resourceId: String(req.params.jobId),
+        work: async () => callGeminiChain({
+          prompt: aiPrompt,
+          temperature: 0.3,
+          maxOutputTokens: 3000,
+          jsonMode: true,
+        }),
       });
       const parsed = JSON.parse(rawAI.trim());
       if (parsed && typeof parsed.healthScore === "number" && Array.isArray(parsed.insights)) {
@@ -4983,11 +5425,10 @@ recruitRouter.post("/talent-pool/:candidateId/reuse", async (req, res) => {
       }
     }
 
-    const scored = await scoreCandidate({
-      resumeText: source.resumeText,
-      jobTitle: job.title,
-      rubric: job.rubric,
-    });
+    const ownerUid = standardBillingOwnerUid(job);
+    await assertStandardResourceLimit(ownerUid, "stored_candidates");
+
+    const scored = await meterCandidateScore(ownerUid, job, source.resumeText);
 
     const agentMode = (job as any).agentMode ?? {};
     const scorePct = scored.maxScore > 0 ? Math.round((scored.totalScore / scored.maxScore) * 100) : 0;
@@ -4997,28 +5438,39 @@ recruitRouter.post("/talent-pool/:candidateId/reuse", async (req, res) => {
       scored.scoringFailed,
     );
 
-    const candidate = await RecruitCandidate.create({
-      jobId: job._id,
-      uid: job.uid,
-      name: scored.name || source.name,
-      email: scored.email || source.email,
-      resumeText: source.resumeText,
-      totalScore: scored.totalScore,
-      maxScore: scored.maxScore,
-      scoreBreakdown: scored.scoreBreakdown,
-      aiSummary: scored.aiSummary,
-      redFlags: scored.redFlags,
-      strengths: scored.strengths,
-      stage: initialStage,
-      stageMovedAt: new Date(),
-      assessmentStatus: "not_sent",
-      previousResumeScore: scored.totalScore,
-      scoringFailed: scored.scoringFailed,
-      source: "talent_pool",
-      inTalentPool: true,
-      talentPoolNote: source.talentPoolNote
-        ? `Reused from prior role. ${source.talentPoolNote}`
-        : "Reused from talent pool.",
+    const candidate = await runStandardBillingOperation({
+      ownerUid,
+      operation: "new_candidate_intake",
+      idempotencyKey: standardIdempotencyKey(ownerUid, [
+        "intake-reuse",
+        String(job._id),
+        String(source._id),
+      ]),
+      resourceType: "job",
+      resourceId: String(job._id),
+      work: async () => RecruitCandidate.create({
+        jobId: job._id,
+        uid: job.uid,
+        name: scored.name || source.name,
+        email: scored.email || source.email,
+        resumeText: source.resumeText,
+        totalScore: scored.totalScore,
+        maxScore: scored.maxScore,
+        scoreBreakdown: scored.scoreBreakdown,
+        aiSummary: scored.aiSummary,
+        redFlags: scored.redFlags,
+        strengths: scored.strengths,
+        stage: initialStage,
+        stageMovedAt: new Date(),
+        assessmentStatus: "not_sent",
+        previousResumeScore: scored.totalScore,
+        scoringFailed: scored.scoringFailed,
+        source: "talent_pool",
+        inTalentPool: true,
+        talentPoolNote: source.talentPoolNote
+          ? `Reused from prior role. ${source.talentPoolNote}`
+          : "Reused from talent pool.",
+      }),
     });
 
     await RecruitJob.updateOne({ _id: job._id }, { $inc: { candidateCount: 1 } });
@@ -5046,6 +5498,9 @@ recruitRouter.post("/talent-pool/:candidateId/reuse", async (req, res) => {
     trackEvent("talent_pool_reuse", uid, { sourceId: source._id, jobId: job._id });
     return res.json({ ok: true, candidateId: candidate._id, jobId: job._id, stage: candidate.stage });
   } catch (err: any) {
+    const targetJobId = String(req.body?.targetJobId ?? "").trim();
+    const job = targetJobId ? (await getCollaborationAccess(targetJobId, getUid(req)))?.job : null;
+    if (await respondStandardBillingError(res, err, standardBillingOwnerUid(job))) return;
     console.error("[recruit] POST /talent-pool/:candidateId/reuse", err);
     return res.status(500).json({ error: err.message });
   }
@@ -5179,23 +5634,35 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/offer-letter", async (r
       });
     }
 
-    const letter = await generateOfferLetter({
-      candidateName: candidate.name,
-      jobTitle: (job as any).title,
-      department: (job as any).department,
-      location: (job as any).location,
-      workMode: (job as any).workMode,
-      seniority: (job as any).seniority,
-      startDate,
-      salary,
-      salaryCurrency: salaryCurrency || (job as any).salaryCurrency || "INR",
-      template: template || "full_time",
-      signingBonus,
-      benefits,
-      companyName,
-      hiringManagerName,
-      reportingManager,
-      offerExpiryDate,
+    const ownerUid = standardBillingOwnerUid(job);
+    const letter = await runStandardBillingOperation({
+      ownerUid,
+      operation: "offer_letter_standard",
+      idempotencyKey: standardRequestIdempotencyKey(
+        ownerUid,
+        "offer-letter",
+        standardIdempotencyHeader(req) || standardContentHash(`${candidate._id}:${startDate}:${salary}:${regenerate ? Date.now() : "draft"}`),
+      ),
+      resourceType: "candidate",
+      resourceId: String(candidate._id),
+      work: async () => generateOfferLetter({
+        candidateName: candidate.name,
+        jobTitle: (job as any).title,
+        department: (job as any).department,
+        location: (job as any).location,
+        workMode: (job as any).workMode,
+        seniority: (job as any).seniority,
+        startDate,
+        salary,
+        salaryCurrency: salaryCurrency || (job as any).salaryCurrency || "INR",
+        template: template || "full_time",
+        signingBonus,
+        benefits,
+        companyName,
+        hiringManagerName,
+        reportingManager,
+        offerExpiryDate,
+      }),
     });
 
     // Persist offer details, letter, and log the generation event
@@ -5210,6 +5677,8 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/offer-letter", async (r
     trackEvent("offer_draft_generated", uid, { jobId: req.params.jobId, candidateId: req.params.candidateId, template: template || "full_time" });
     return res.json({ offerLetter: letter, offerStatus: "draft", offerDetails: details, offerLog: candidate.offerLog });
   } catch (err: any) {
+    const job = (await getCollaborationAccess(req.params.jobId, getUid(req)))?.job;
+    if (await respondStandardBillingError(res, err, standardBillingOwnerUid(job))) return;
     console.error("[recruit] POST /offer-letter", err);
     return res.status(500).json({ error: err.message });
   }
@@ -5284,7 +5753,15 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/offer-letter/send", asy
     const payload = emailTemplates.offerEmailWithLink(
       candidate.name, jobTitle, companyName, candidate.offerLetter, offerUrl, { officialContactEmail },
     );
-    const result  = await sendEmail({ to: candidate.email, subject: payload.subject, html: payload.html, text: payload.text, from: NOTIFICATION_FROM });
+    const ownerUid = standardBillingOwnerUid(job);
+    const result  = await runStandardBillingOperation({
+      ownerUid,
+      operation: "automated_email_standard",
+      idempotencyKey: standardIdempotencyKey(ownerUid, ["offer-send", String(candidate._id), offerToken]),
+      resourceType: "candidate",
+      resourceId: String(candidate._id),
+      work: async () => sendEmail({ to: candidate.email!, subject: payload.subject, html: payload.html, text: payload.text, from: NOTIFICATION_FROM }),
+    });
 
     // Log offer_approved + offer_sent in offerLog
     (candidate.offerLog as any[]).push({ action: "offer_approved", note: "Recruiter approved the offer letter", timestamp: new Date() });
@@ -5333,6 +5810,8 @@ recruitRouter.post("/jobs/:jobId/candidates/:candidateId/offer-letter/send", asy
     }
     return res.json({ ok: true, sentAt, offerStatus: "sent", offerCandidateStatus: "pending", offerToken, offerUrl, offerLog: candidate.offerLog, emailEntry });
   } catch (err: any) {
+    const job = (await getCollaborationAccess(req.params.jobId, getUid(req)))?.job;
+    if (await respondStandardBillingError(res, err, standardBillingOwnerUid(job))) return;
     console.error("[recruit] POST /offer-letter/send", err);
     return res.status(500).json({ error: err.message });
   }
@@ -5804,11 +6283,22 @@ recruitRouter.get("/jobs/:jobId/export", async (req, res) => {
     const job = await RecruitJob.findOne({ _id: req.params.jobId, uid }).lean();
     if (!job) return res.status(404).json({ error: "Job not found." });
 
-    const candidates = await RecruitCandidate.find({ jobId: req.params.jobId, uid })
-      .sort({ totalScore: -1 })
-      .lean();
-
     const format = (req.query.format as string) || "csv";
+
+    const candidates = await runStandardBillingOperation({
+      ownerUid: uid,
+      operation: "export_standard",
+      idempotencyKey: standardRequestIdempotencyKey(
+        uid,
+        "export",
+        standardIdempotencyHeader(req) || standardContentHash(`${req.params.jobId}:${format}:${new Date().toISOString().slice(0, 13)}`),
+      ),
+      resourceType: "job",
+      resourceId: String(req.params.jobId),
+      work: async () => RecruitCandidate.find({ jobId: req.params.jobId, uid })
+        .sort({ totalScore: -1 })
+        .lean(),
+    });
 
     if (format === "json") {
       res.setHeader("Content-Type", "application/json");
@@ -5867,6 +6357,7 @@ recruitRouter.get("/jobs/:jobId/export", async (req, res) => {
     trackEvent("recruiter_export_csv", uid, { jobId: req.params.jobId, candidateCount: candidates.length });
     return res.send(csv);
   } catch (err: any) {
+    if (await respondStandardBillingError(res, err, getUid(req))) return;
     console.error("[recruit] GET /export", err);
     return res.status(500).json({ error: err.message });
   }

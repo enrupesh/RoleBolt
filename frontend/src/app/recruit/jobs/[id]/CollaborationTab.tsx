@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { apiUrl, readApiJson } from "@/lib/api";
+import { apiErrorFromPayload, apiUrl, readApiJson } from "@/lib/api";
 import ReactMarkdown from "react-markdown";
+import { StandardErrorNotice } from "@/components/StandardErrorNotice";
 import {
   Activity,
   Check,
@@ -344,7 +345,7 @@ function InterviewFeedbackSection({
 export default function CollaborationTab({ jobId, token, candidates, initialData, onRefresh }: CollaborationTabProps) {
   const [data, setData] = useState<CollaborationData | null>(initialData ?? null);
   const [loading, setLoading] = useState(!initialData);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<unknown>("");
   const [notice, setNotice] = useState("");
   const [selectedCandidate, setSelectedCandidate] = useState("");
   const [candidateAssignmentFilter, setCandidateAssignmentFilter] = useState("all");
@@ -386,7 +387,13 @@ export default function CollaborationTab({ jobId, token, candidates, initialData
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, ...(options.headers || {}) },
     });
     const result = await readApiJson<Record<string, unknown>>(response);
-    if (!response.ok) throw new Error(String(result.error || result.message || "The collaboration request could not be completed."));
+    if (!response.ok) {
+      throw apiErrorFromPayload(
+        response.status,
+        result as any,
+        String((result as any).message || (result as any).error || "The collaboration request could not be completed."),
+      );
+    }
     return result;
   }, [jobId, token]);
 
@@ -442,7 +449,7 @@ export default function CollaborationTab({ jobId, token, candidates, initialData
       setData((current) => ({ ...(current ?? {}), team: [...(current?.team ?? current?.members ?? []), (result.member ?? result) as TeamMember] }));
       setInviteName(""); setInviteEmail(""); setInviteOpen(false); setNotice(`Invitation sent to ${inviteEmail.trim()}.`);
       await onRefresh?.();
-    } catch (e) { setError(e instanceof Error ? e.message : "Could not send invitation."); }
+    } catch (e) { setError(e); }
     finally { setBusy(""); }
   }
 
@@ -546,7 +553,14 @@ export default function CollaborationTab({ jobId, token, candidates, initialData
         {canManage && <button type="button" onClick={() => setInviteOpen(true)} className="rb-btn rb-btn-primary rb-btn-sm self-start" data-testid="button-open-invite"><UserPlus size={15} /> Invite teammate</button>}
       </div>
 
-      {error && <div className="flex items-start justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700" role="alert" data-testid="status-collaboration-error"><span>{error}</span><button type="button" onClick={() => void load(true)} aria-label="Retry loading collaboration"><RefreshCw size={15} /></button></div>}
+      {error ? (
+        <div className="flex items-start justify-between gap-3" role="alert" data-testid="status-collaboration-error">
+          <StandardErrorNotice error={error} className="flex-1" />
+          <button type="button" onClick={() => void load(true)} aria-label="Retry loading collaboration" className="mt-2 text-slate-500 hover:text-slate-800">
+            <RefreshCw size={15} />
+          </button>
+        </div>
+      ) : null}
       {notice && <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700" role="status" data-testid="status-collaboration-success"><Check size={16} />{notice}<button type="button" className="ml-auto" onClick={() => setNotice("")} aria-label="Dismiss success message"><X size={15} /></button></div>}
 
       {notifications.filter((item) => !item.readAt).length > 0 && (
