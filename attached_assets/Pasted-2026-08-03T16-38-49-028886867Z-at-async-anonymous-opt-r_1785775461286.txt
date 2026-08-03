@@ -1,0 +1,50 @@
+2026-08-03T16:38:49.028886867Z     at async <anonymous> (/opt/render/project/src/backend/src/billing/razorpayApi.ts:194:18) {
+2026-08-03T16:38:49.028889438Z   errors: {
+2026-08-03T16:38:49.028906448Z     providerPlanId: ValidatorError: Path `providerPlanId` is required.
+2026-08-03T16:38:49.028909608Z         at SchemaString.doValidate (/opt/render/project/src/backend/node_modules/mongoose/lib/schemaType.js:1515:13)
+2026-08-03T16:38:49.028911948Z         at model.validate (/opt/render/project/src/backend/node_modules/mongoose/lib/document.js:2842:20)
+2026-08-03T16:38:49.028914448Z         at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2026-08-03T16:38:49.028916758Z         at async model.$__save (/opt/render/project/src/backend/node_modules/mongoose/lib/model.js:399:7)
+2026-08-03T16:38:49.028919178Z         at async maybeTracedSave (/opt/render/project/src/backend/node_modules/mongoose/lib/model.js:675:7) {
+2026-08-03T16:38:49.028922478Z       properties: [Object],
+2026-08-03T16:38:49.028925318Z       kind: 'required',
+2026-08-03T16:38:49.028927648Z       path: 'providerPlanId',
+2026-08-03T16:38:49.028932008Z       value: '',
+2026-08-03T16:38:49.028934468Z       reason: undefined,
+2026-08-03T16:38:49.028937459Z       [Symbol(mongoose#validatorError)]: true
+2026-08-03T16:38:49.028939749Z     }
+2026-08-03T16:38:49.028942219Z   },
+2026-08-03T16:38:49.028944599Z   _message: 'BillingCheckout validation failed'
+2026-08-03T16:38:49.028946979Z }
+2026-08-03T16:41:51.50912629Z ==> Deploying...
+2026-08-03T16:41:51.567073948Z ==> Setting WEB_CONCURRENCY=1 by default, based on available CPUs in the instance
+2026-08-03T16:42:09.885265499Z ==> Running 'npm start'
+2026-08-03T16:42:11.30121513Z 
+2026-08-03T16:42:11.301235631Z > recruit-backend@1.0.0 start
+2026-08-03T16:42:11.301241301Z > tsx src/index.ts
+2026-08-03T16:42:11.301243861Z 
+2026-08-03T16:42:31.38594691Z ◇ injected env (0) from .env // tip: ⌁ auth for agents [www.vestauth.com]
+2026-08-03T16:42:31.884654503Z Recruit backend listening on port 10000 | Auth: custom JWT
+2026-08-03T16:42:32.509770895Z ==> Your service is live 🎉
+2026-08-03T16:42:32.607350524Z ==> 
+2026-08-03T16:42:32.609866761Z ==> ///////////////////////////////////////////////////////////
+2026-08-03T16:42:32.611574876Z ==> 
+2026-08-03T16:42:32.613492625Z ==> Available at your primary URL https://back-mp9k.onrender.com
+2026-08-03T16:42:32.615305741Z ==> 
+2026-08-03T16:42:32.617290681Z ==> ///////////////////////////////////////////////////////////
+2026-08-03T16:42:33.858693143Z [db] MongoDB connected
+2026-08-03T16:42:37.715848864Z (node:96) [MONGOOSE] Warning: mongoose: Duplicate schema index on {"providerSubscriptionId":1} for model "BillingCheckout". This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+2026-08-03T16:42:37.715874034Z (Use `node --trace-warnings ...` to show where the warning was created)
+2026-08-03T16:43:53.28310061Z [billing] Razorpay checkout error: RazorpayApiError: Razorpay API returned HTTP 400.
+2026-08-03T16:43:53.283139581Z     at razorpayRequest (/opt/render/project/src/backend/src/billing/razorpay.ts:135:11)
+2026-08-03T16:43:53.283145081Z     at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2026-08-03T16:43:53.283149851Z     at async <anonymous> (/opt/render/project/src/backend/src/billing/razorpayApi.ts:246:36) {
+2026-08-03T16:43:53.283154361Z   status: 400,
+2026-08-03T16:43:53.283158431Z   responseBody: {
+2026-08-03T16:43:53.283162431Z     error: {
+2026-08-03T16:43:53.283167031Z       code: 'BAD_REQUEST_ERROR',
+2026-08-03T16:43:53.283174181Z       description: 'Perpetual subscriptions are not enabled for this account. total_count is required.'
+2026-08-03T16:43:53.283177131Z     }
+2026-08-03T16:43:53.283180042Z   },
+2026-08-03T16:43:53.283183211Z   code: 'RAZORPAY_API_ERROR'
+2026-08-03T16:43:53.283187532Z }
