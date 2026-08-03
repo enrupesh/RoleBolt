@@ -720,3 +720,10 @@ id = "FFKwV09fHHulFqAb0DQU3"
 uri = "file://%E0%A4%95%E0%A4%AD%E0%A5%80/project.part_59.zippart"
 type = "unspecified"
 title = "part 60 of 60 - project.part_59.zippart"
+
+[[outputs]]
+id = "4rrj2FqKjIgjGwBIWyvBd"
+uri = "file://screenshots/rolebolt-premium-landing-preview.jpg"
+type = "image"
+title = "Rolebolt Premium Landing Preview"
+description = "Premium landing page mockup — first viewport screenshot."
