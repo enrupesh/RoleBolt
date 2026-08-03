@@ -642,10 +642,10 @@ Primary files: `recruit.ts`, `recruitCopilot.ts`, `collaboration.ts`
 
 ### 4.3 Tasks
 
-- [ ] Add entitlement check at start of every cron job iteration
-- [ ] Add reservation before AI/email in background paths
-- [ ] Verify retry-score routes use idempotency keys
-- [ ] Test plan change while work is queued/running
+- [x] Add entitlement check at start of every cron job iteration
+- [x] Add reservation before AI/email in background paths
+- [x] Verify retry-score routes use idempotency keys
+- [x] Test plan change while work is queued/running
 
 ### 4.4 Review gate
 

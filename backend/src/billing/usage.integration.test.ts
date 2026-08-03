@@ -9,6 +9,11 @@ import { UsagePeriod } from "../models/UsagePeriod";
 import { UsageLedger } from "../models/UsageLedger";
 import { initializeFreeEntitlements } from "./entitlements";
 import { reserveUsage, commitUsage, releaseUsage } from "./usage";
+import {
+  canRunMeteredBackgroundWork,
+  tryBackgroundBillingOperation,
+  backgroundIdempotencyKey,
+} from "./backgroundEnforcement";
 
 dotenv.config();
 
@@ -205,6 +210,70 @@ describe("billing usage reservations (integration)", { skip: !canRun }, () => {
       (error: any) =>
         error.code === "PLAN_LIMIT_REACHED" && error.feature === "form_responses",
     );
+  });
+
+  it("blocks background metered work when creator_standard is past_due (Phase 4 cron gate)", async () => {
+    const userId = await createSeekerTestUser();
+    await Subscription.updateOne(
+      { userId: new mongoose.Types.ObjectId(userId), category: "creator_standard" },
+      {
+        $set: {
+          plan: "pro",
+          status: "past_due",
+          provider: "razorpay",
+          currentPeriodStart: new Date("2026-08-01T00:00:00.000Z"),
+          currentPeriodEnd: new Date("2026-09-01T00:00:00.000Z"),
+          cancelAtPeriodEnd: false,
+        },
+      },
+    ).exec();
+
+    const gate = await canRunMeteredBackgroundWork(userId, "creator_standard");
+    assert.equal(gate.allowed, false);
+    assert.equal(gate.reason, "billing_access_restricted");
+
+    const outcome = await tryBackgroundBillingOperation({
+      ownerUid: userId,
+      category: "creator_standard",
+      operation: "daily_briefing",
+      idempotencyKey: backgroundIdempotencyKey(userId, ["daily-briefing", "phase4-test"]),
+      work: async () => {
+        throw new Error("background work must not run when billing is restricted");
+      },
+    });
+    assert.equal(outcome.ok, false);
+  });
+
+  it("reuses the same reservation for duplicate background idempotency keys (no double charge)", async () => {
+    const userId = await createSeekerTestUser();
+    await Subscription.updateOne(
+      { userId: new mongoose.Types.ObjectId(userId), category: "creator_standard" },
+      { $set: { plan: "free", status: "free" } },
+    ).exec();
+
+    const key = backgroundIdempotencyKey(userId, ["offer-reminder", "cand-1", "1"]);
+    const first = await reserveUsage({
+      userId,
+      category: "creator_standard",
+      operation: "automated_email_standard",
+      idempotencyKey: key,
+    });
+    const second = await reserveUsage({
+      userId,
+      category: "creator_standard",
+      operation: "automated_email_standard",
+      idempotencyKey: key,
+    });
+    assert.equal(first.reservationId, second.reservationId);
+    await commitUsage(first.reservationId);
+    const third = await reserveUsage({
+      userId,
+      category: "creator_standard",
+      operation: "automated_email_standard",
+      idempotencyKey: key,
+    });
+    assert.equal(third.status, "committed");
+    assert.equal(third.reservationId, first.reservationId);
   });
 
   it("creates three Free subscription records on signup initialization", async () => {

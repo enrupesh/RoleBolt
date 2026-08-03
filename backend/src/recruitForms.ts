@@ -2903,6 +2903,10 @@ formPublicRouter.post(
         .filter(a => a.value?.trim() && a.value !== "__file_uploaded__")
         .map(a => ({ questionId: a.questionId, label: a.label, value: a.value }));
 
+      // Phase 4 verified: this async public-submit scoring meters at execution
+      // time via runFormBillingOperation (form_response_score) with a response-
+      // stable idempotency key, so a downgrade/cancel between submit and the
+      // background run is enforced when the reservation is taken.
       setImmediate(async () => {
         try {
           const scored = await runFormBillingOperation({
