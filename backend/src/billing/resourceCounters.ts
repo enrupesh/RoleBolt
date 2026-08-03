@@ -23,6 +23,8 @@ export type ResourceCounterKey =
   | "active_forms"
   | "stored_forms"
   | "stored_responses"
+  | "pipeline_rules"
+  | "active_assessments"
   | "active_jobs"
   | "stored_jobs"
   | "stored_candidates"
@@ -66,6 +68,8 @@ const formCounters: readonly ResourceCounterKey[] = [
   "active_forms",
   "stored_forms",
   "stored_responses",
+  "pipeline_rules",
+  "active_assessments",
   "recruiter_seats",
 ];
 
@@ -196,6 +200,24 @@ export async function countOwnedResources(
     }
     if (counter === "stored_forms") {
       return RecruitForm.countDocuments({ uid }).exec();
+    }
+    if (counter === "pipeline_rules") {
+      const forms = await RecruitForm.find({ uid })
+        .select({ pipelineRules: 1 })
+        .lean()
+        .exec();
+      return forms.reduce((total, form) => {
+        const rules = Array.isArray((form as { pipelineRules?: Array<{ enabled?: boolean }> }).pipelineRules)
+          ? (form as { pipelineRules: Array<{ enabled?: boolean }> }).pipelineRules
+          : [];
+        return total + rules.filter((rule) => rule.enabled !== false).length;
+      }, 0);
+    }
+    if (counter === "active_assessments") {
+      return RecruitFormResponse.countDocuments({
+        uid,
+        assessmentStatus: { $in: ["sent", "in_progress"] },
+      }).exec();
     }
     return RecruitFormResponse.countDocuments({ uid }).exec();
   }

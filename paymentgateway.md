@@ -550,11 +550,11 @@ When response limit exhausted:
 
 ### 2.3 Tasks
 
-- [ ] Wire all authenticated form routes
-- [ ] Implement public intake Pattern C with concurrent submission protection
-- [ ] Wire form copilot and scoring
-- [ ] Enforce `bulk_action_size` per batch, not just per request
-- [ ] Add tests: simultaneous public submissions, capacity exhaustion, AI scoring exhaustion
+- [x] Wire all authenticated form routes
+- [x] Implement public intake Pattern C with concurrent submission protection
+- [x] Wire form copilot and scoring
+- [x] Enforce `bulk_action_size` per batch, not just per request
+- [x] Add tests: simultaneous public submissions, capacity exhaustion, AI scoring exhaustion
 
 ### 2.4 Review gate
 

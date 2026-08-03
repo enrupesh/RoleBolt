@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { RecruitGuard } from "@/components/RecruitGuard";
 import Link from "next/link";
-import { apiUrl, readApiJson } from "@/lib/api";
+import { apiErrorFromPayload, apiUrl, readApiJson } from "@/lib/api";
 import { FORM_STAGE_FILTERS, matchesFormStageFilter, type FormPageTab, type FormStageFilter } from "@/lib/formTypes";
 import { isFormStageEmailNotifyStage, type FormStageEmailNotifyStage } from "@/lib/formStageEmailTemplates";
 import FormStageEmailFlow, { type FormEmailLogEntry } from "./FormStageEmailFlow";
@@ -15,6 +15,7 @@ import FormTabNav from "./FormTabNav";
 import FormTopPicks from "./FormTopPicks";
 import FormPostCreateChecklist, { markFormChecklistStep } from "@/components/FormPostCreateChecklist";
 import FormCopilotDrawer from "./FormCopilotDrawer";
+import { FormErrorNotice } from "@/components/FormErrorNotice";
 
 type Stage =
   | "new"
@@ -2051,7 +2052,7 @@ function PipelineRulesCard({ formId, token, rules, onChange }: {
   const [fromStage, setFromStage] = useState<"" | Stage>("");
   const [action, setAction] = useState<RuleAction>("move_to_shortlisted");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<unknown>("");
 
   const authHeaders = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
 
@@ -2068,9 +2069,14 @@ function PipelineRulesCard({ formId, token, rules, onChange }: {
         body: JSON.stringify({ condition, threshold, fromStage, action }),
       });
       const data = await readApiJson(res);
-      if (!res.ok) { setError(data.error || "Could not add rule."); return; }
+      if (!res.ok) {
+        setError(apiErrorFromPayload(res.status, data, data.message || data.error || "Could not add rule."));
+        return;
+      }
       onChange(data.rules);
-    } catch { setError("Could not add rule."); }
+    } catch (err) {
+      setError(err);
+    }
     finally { setBusy(false); }
   }
 
@@ -2080,6 +2086,7 @@ function PipelineRulesCard({ formId, token, rules, onChange }: {
     });
     const data = await readApiJson(res);
     if (res.ok) onChange(data.rules);
+    else setError(apiErrorFromPayload(res.status, data, data.message || data.error || "Could not update rule."));
   }
 
   async function removeRule(rule: PipelineRule) {
@@ -2155,7 +2162,7 @@ function PipelineRulesCard({ formId, token, rules, onChange }: {
                 ))}
               </select>
             </div>
-            {error && <p className="text-[11px] font-medium text-rose-500">{error}</p>}
+            {error ? <FormErrorNotice error={error} className="text-[11px]" /> : null}
             <button
               onClick={addRule}
               disabled={busy}
@@ -2766,6 +2773,7 @@ function FormResponsesContent({ id }: { id: string }) {
   const [activeTab, setActiveTab] = useState<FormPageTab>("responses");
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<unknown>("");
   const [showCopilot, setShowCopilot] = useState(false);
 
   const { sessionToken } = useRecruitAuth();
@@ -2802,11 +2810,15 @@ function FormResponsesContent({ id }: { id: string }) {
   async function exportResponses(format: "csv" | "json") {
     if (!token) return;
     setExporting(true);
+    setExportError("");
     try {
       const res = await fetch(apiUrl(`/recruit/forms/${id}/export?format=${format}`), {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) return;
+      if (!res.ok) {
+        const data = await readApiJson(res).catch(() => ({}));
+        throw apiErrorFromPayload(res.status, data, data.message || data.error || "Export failed.");
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -2814,7 +2826,9 @@ function FormResponsesContent({ id }: { id: string }) {
       a.download = `${(form?.title || "form").replace(/[^a-z0-9]/gi, "_")}_responses.${format}`;
       a.click();
       URL.revokeObjectURL(url);
-    } catch { /* silent */ }
+    } catch (err) {
+      setExportError(err);
+    }
     finally { setExporting(false); }
   }
 
@@ -2958,6 +2972,7 @@ function FormResponsesContent({ id }: { id: string }) {
       </header>
 
       <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 space-y-5">
+        {exportError ? <FormErrorNotice error={exportError} /> : null}
         <FormTabNav active={activeTab} onChange={setActiveTab} responseCount={responses.length} />
 
         <FormPostCreateChecklist
