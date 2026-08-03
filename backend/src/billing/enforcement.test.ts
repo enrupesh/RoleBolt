@@ -3,10 +3,12 @@ import { describe, it } from "node:test";
 import { getPlanDefinition } from "./planCatalog";
 import {
   assertWithinLimit,
+  assertMeteredAccessAllowed,
   requireFeature,
   serializeBillingError,
   FeatureNotAvailableError,
   BillingConfigurationError,
+  BillingAccessRestrictedError,
 } from "./enforcement";
 import type { ResolvedEntitlement } from "../billingTypes";
 
@@ -80,5 +82,23 @@ describe("central billing enforcement", () => {
       resetAt: "2026-08-31T23:59:59.999Z",
       upgradeRequired: true,
     });
+  });
+
+  it("serializes a stable restricted-access response for past_due/halted", () => {
+    const restricted = entitlement("pro");
+    restricted.meteredAccessAllowed = false;
+    restricted.billingWarning = "past_due";
+    assert.throws(
+      () => assertMeteredAccessAllowed(restricted),
+      BillingAccessRestrictedError,
+    );
+    try {
+      assertMeteredAccessAllowed(restricted);
+    } catch (error) {
+      const response = serializeBillingError(error, restricted);
+      assert.equal(response.status, 403);
+      assert.equal(response.body.error, "BILLING_ACCESS_RESTRICTED");
+      assert.equal(response.body.code, "BILLING_ACCESS_RESTRICTED");
+    }
   });
 });

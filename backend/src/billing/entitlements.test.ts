@@ -38,6 +38,7 @@ describe("normalizeStoredSubscription", () => {
       NOW_INSIDE,
     );
     assert.equal(normalized.plan, "pro");
+    assert.equal(normalized.meteredAccessAllowed, true);
     assert.equal(normalized.billingWarning, "cancel_scheduled");
   });
 
@@ -60,24 +61,36 @@ describe("normalizeStoredSubscription", () => {
     assert.equal(normalized.plan, "free");
   });
 
-  it("retains paid limits for past_due until the period ends", () => {
+  it("retains paid plan metadata for past_due but blocks new metered work", () => {
     const normalized = normalizeStoredSubscription(
       paidSub({ status: "past_due" }),
       "seeker",
       NOW_INSIDE,
     );
     assert.equal(normalized.plan, "pro");
+    assert.equal(normalized.meteredAccessAllowed, false);
     assert.equal(normalized.billingWarning, "past_due");
   });
 
-  it("retains paid limits for halted until the period ends", () => {
+  it("retains paid plan metadata for halted but blocks new metered work", () => {
     const normalized = normalizeStoredSubscription(
       paidSub({ status: "halted", category: "creator_standard" }),
       "creator_standard",
       NOW_INSIDE,
     );
     assert.equal(normalized.plan, "pro");
+    assert.equal(normalized.meteredAccessAllowed, false);
     assert.equal(normalized.billingWarning, "halted");
+  });
+
+  it("downgrades past_due to Free after the period ends", () => {
+    const normalized = normalizeStoredSubscription(
+      paidSub({ status: "past_due" }),
+      "seeker",
+      NOW_AFTER,
+    );
+    assert.equal(normalized.plan, "free");
+    assert.equal(normalized.meteredAccessAllowed, true);
   });
 
   it("does not treat trialing as paid access", () => {

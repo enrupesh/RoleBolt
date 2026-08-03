@@ -112,6 +112,32 @@ describe("billing usage reservations (integration)", { skip: !canRun }, () => {
     await releaseUsage(first.reservationId);
   });
 
+  it("makes commit and release transitions idempotent", async () => {
+    const userId = await createSeekerTestUser();
+    const reservation = await reserveUsage({
+      userId,
+      category: "seeker",
+      operation: "email_intelligence",
+      idempotencyKey: `commit-idempotent-${userId}`,
+    });
+    const firstCommit = await commitUsage(reservation.reservationId);
+    const secondCommit = await commitUsage(reservation.reservationId);
+    assert.equal(firstCommit.status, "committed");
+    assert.equal(secondCommit.status, "committed");
+    assert.equal(firstCommit.reservationId, secondCommit.reservationId);
+
+    const releaseReservation = await reserveUsage({
+      userId,
+      category: "seeker",
+      operation: "email_intelligence",
+      idempotencyKey: `release-idempotent-${userId}`,
+    });
+    const firstRelease = await releaseUsage(releaseReservation.reservationId);
+    const secondRelease = await releaseUsage(releaseReservation.reservationId);
+    assert.equal(firstRelease.status, "released");
+    assert.equal(secondRelease.status, "released");
+  });
+
   it("prevents concurrent reservations from exceeding the limit", async () => {
     const userId = await createSeekerTestUser();
     const attempts = Array.from({ length: 12 }, (_, index) =>
@@ -155,6 +181,11 @@ describe("billing usage reservations (integration)", { skip: !canRun }, () => {
       subs.map((sub) => sub.category).sort(),
       ["creator_form", "creator_standard", "seeker"],
     );
+    for (const sub of subs) {
+      assert.equal(sub.plan, "free");
+      assert.equal(sub.status, "free");
+      assert.equal(sub.provider, "razorpay");
+    }
   });
 });
 
