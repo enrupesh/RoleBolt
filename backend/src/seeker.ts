@@ -27,12 +27,16 @@ import {
 } from "./resumeExport";
 import {
   assertSeekerResourceLimit,
+  assertSeekerProposedResourceCount,
+  enforceAndSyncSeekerResumeVersion,
   respondSeekerBillingError,
   runSeekerBillingOperation,
   seekerContentHash,
   seekerIdempotencyKey,
   seekerRequestIdempotencyKey,
+  seekerIdempotencyHeader,
   isSeekerBillingError,
+  isActiveSeekerTrackerStage,
 } from "./billing/seekerEnforcement";
 
 export const seekerRouter = express.Router();
@@ -368,6 +372,37 @@ seekerRouter.put("/profile", async (req, res) => {
     for (const key of allowed) {
       if (req.body[key] !== undefined) update[key] = req.body[key];
     }
+
+    const existing = await RecruitSeekerProfile.findOne({ uid })
+      .select({ resumeText: 1, resumeFileName: 1, projects: 1, certifications: 1 })
+      .lean()
+      .exec();
+
+    // Manual profile edits remain free. Resource capacity gates only capacity growth.
+    if (Array.isArray(update.projects)) {
+      await assertSeekerProposedResourceCount(uid, "projects", update.projects.length);
+    }
+    if (Array.isArray(update.certifications)) {
+      await assertSeekerProposedResourceCount(uid, "certifications", update.certifications.length);
+    }
+
+    const nextResumeText = update.resumeText !== undefined
+      ? String(update.resumeText ?? "")
+      : existing?.resumeText;
+    const nextResumeFileName = update.resumeFileName !== undefined
+      ? String(update.resumeFileName ?? "")
+      : existing?.resumeFileName;
+    if (update.resumeText !== undefined || update.resumeFileName !== undefined) {
+      await enforceAndSyncSeekerResumeVersion({
+        uid,
+        previousResumeText: existing?.resumeText,
+        previousResumeFileName: existing?.resumeFileName,
+        nextResumeText,
+        nextResumeFileName,
+        source: "profile_sync",
+      });
+    }
+
     const profile = await RecruitSeekerProfile.findOneAndUpdate(
       { uid },
       { $set: update },
@@ -375,6 +410,7 @@ seekerRouter.put("/profile", async (req, res) => {
     ).lean();
     return res.json({ profile });
   } catch (err: any) {
+    if (await respondSeekerBillingError(res, err, getUid(req))) return;
     return res.status(500).json({ error: err.message });
   }
 });
@@ -438,6 +474,7 @@ seekerRouter.post("/workspace", async (req, res) => {
     }
 
      await assertSeekerResourceLimit(uid, "workspace_items");
+     await assertSeekerResourceLimit(uid, "application_history");
      const normalizedStatus = ["saved", "applied", "archived"].includes(status) ? status : "saved";
      if (normalizedStatus === "applied") {
        await assertSeekerResourceLimit(uid, "active_applications");
@@ -784,6 +821,17 @@ Rules:
 
     let entry = null;
     if (trackerEntryId && workspaceIdIsValid(trackerEntryId)) {
+      const existingEntry = await RecruitSeekerTrackerEntry.findOne({ _id: trackerEntryId, uid }).lean();
+      if (!existingEntry) {
+        return res.status(404).json({ error: "Tracker entry not found." });
+      }
+      const nextStage = intel.suggestedStage || existingEntry.stage;
+      if (
+        isActiveSeekerTrackerStage(nextStage) &&
+        !isActiveSeekerTrackerStage(existingEntry.stage)
+      ) {
+        await assertSeekerResourceLimit(uid, "active_applications");
+      }
       entry = await RecruitSeekerTrackerEntry.findOneAndUpdate(
         { _id: trackerEntryId, uid },
         {
@@ -800,13 +848,16 @@ Rules:
         { new: true }
       ).lean();
     } else if (parsed.companyName || parsed.jobTitle) {
-      await assertSeekerResourceLimit(uid, "active_applications");
+      const createStage = intel.suggestedStage || "applied";
+      if (isActiveSeekerTrackerStage(createStage)) {
+        await assertSeekerResourceLimit(uid, "active_applications");
+      }
       entry = await RecruitSeekerTrackerEntry.create({
         uid,
         title: String(parsed.jobTitle || "Recruiter update").slice(0, 240),
         companyName: String(parsed.companyName || "").slice(0, 180),
         platform: "other",
-        stage: intel.suggestedStage || "applied",
+        stage: createStage,
         sourceUrl: "",
         notes: "Created from Email Intelligence",
         emailIntel: [intel],
@@ -847,7 +898,11 @@ seekerRouter.post("/workspace/extension-analyze", async (req, res) => {
     const analysis = await runSeekerBillingOperation({
       uid,
       operation: "extension_analysis",
-      idempotencyKey: seekerIdempotencyKey(uid, ["extension-analysis", seekerContentHash(payload.sourceUrl)]),
+      idempotencyKey: seekerRequestIdempotencyKey(
+        uid,
+        "extension-analysis",
+        seekerIdempotencyHeader(req),
+      ),
       resourceType: "extension",
       resourceId: payload.sourceUrl,
       work: async () => buildWorkspaceAnalysis(uid, payload),
@@ -890,6 +945,7 @@ seekerRouter.post("/workspace/extension-save", async (req, res) => {
       await workspace.save();
     } else {
       await assertSeekerResourceLimit(uid, "workspace_items");
+      await assertSeekerResourceLimit(uid, "application_history");
       workspace = await RecruitSeekerWorkspace.create({
         uid,
         sourceUrl: payload.sourceUrl,

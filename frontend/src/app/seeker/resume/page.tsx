@@ -123,6 +123,7 @@ function ResumeContent() {
 
   async function saveToProfile(text: string) {
     if (!sessionToken || !text.trim()) return;
+    setImproveError("");
     const res = await fetch(apiUrl("/recruit/seeker/profile"), {
       method: "PUT",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${sessionToken}` },
@@ -130,7 +131,7 @@ function ResumeContent() {
     });
     if (!res.ok) {
       const d = await res.json().catch(() => ({}));
-      throw new Error(d.error || "Could not save to profile");
+      throw apiErrorFromPayload(res.status, d, "Could not save to profile");
     }
     setProfileHasResume(true);
   }
@@ -228,7 +229,7 @@ function ResumeContent() {
                   {copied ? "Copied!" : "Copy"}
                 </button>
                 <button
-                  onClick={() => saveToProfile(builtResume.fullText ?? "").then(() => { setProfileSaved(true); setTimeout(() => setProfileSaved(false), 2500); }).catch(() => undefined)}
+                  onClick={() => saveToProfile(builtResume.fullText ?? "").then(() => { setProfileSaved(true); setTimeout(() => setProfileSaved(false), 2500); }).catch((e) => setBuildError(e))}
                   className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition">
                   {profileSaved ? "Saved to profile!" : "Save to profile"}
                 </button>
@@ -364,7 +365,7 @@ function ResumeContent() {
                   {copied ? "Copied!" : "Copy"}
                 </button>
                 <button
-                  onClick={() => saveToProfile(improvedResult.improvedResume).then(() => { setProfileSaved(true); setTimeout(() => setProfileSaved(false), 2500); }).catch(() => undefined)}
+                  onClick={() => saveToProfile(improvedResult.improvedResume).then(() => { setProfileSaved(true); setTimeout(() => setProfileSaved(false), 2500); }).catch((e) => setImproveError(e))}
                   className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition">
                   {profileSaved ? "Saved to profile!" : "Save to profile"}
                 </button>
