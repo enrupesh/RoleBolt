@@ -15,8 +15,8 @@ const capabilities = [
     eyebrow: "Run the room",
     title: "A hiring command center that keeps the signal visible.",
     copy: "Job Health shows what is moving, what needs attention, and where a role is losing momentum. See the hiring timeline, live assessment progress, and next best action without opening six tabs.",
-    image: "/screenshots/dashboard.png",
-    alt: "Rolebolt hiring dashboard showing active roles and candidate pipeline",
+    image: "/landing/recruitment-pipeline.png",
+    alt: "Rolebolt recruitment pipeline workspace showing active roles and candidate signals",
     accent: "bg-[#e7f0ff]",
   },
   {
@@ -24,7 +24,7 @@ const capabilities = [
     eyebrow: "Make better calls",
     title: "A pipeline built for judgement, not just storage.",
     copy: "Bring in resumes in bulk, calibrate an AI rubric, compare candidates against the actual job, and use what-if simulation before you move someone forward. Review-zone actions and Autopilot rules take care of the repeatable work.",
-    image: "/screenshots/pipeline.png",
+    image: "/landing/talent-pool.png",
     alt: "Rolebolt applicant tracking pipeline with candidate fit scores",
     accent: "bg-[#f3edff]",
   },
@@ -33,7 +33,7 @@ const capabilities = [
     eyebrow: "Go structured",
     title: "Form jobs for the roles that need a little more context.",
     copy: "Build structured applications, score async assessments, and see an applicant timeline from first answer to final review. Form Copilot helps you shape questions that reveal how someone thinks.",
-    image: "/screenshots/form-jobs.png",
+    image: "/landing/form-jobs.png",
     alt: "Rolebolt form jobs workspace for structured applications",
     accent: "bg-[#e8f7f3]",
   },
@@ -106,8 +106,6 @@ export default function RecruitLandingPage() {
   useEffect(() => {
     if (!loading && isLoggedIn) router.replace("/recruit/dashboard");
   }, [loading, isLoggedIn, router]);
-
-  if (loading) return <div className="min-h-[100dvh] bg-[#f8fbfd]" />;
 
   async function signOut() {
     try {
@@ -199,7 +197,7 @@ export default function RecruitLandingPage() {
                     <div><p className="text-[11px] font-semibold uppercase tracking-[.14em] text-[#8093a4]">Hiring command center</p><p className="mt-1 text-sm font-semibold">AI Backend Engineer</p></div>
                     <span className="rounded-full bg-[#e7f8f0] px-2.5 py-1 text-[10px] font-semibold text-[#188866]">Healthy</span>
                   </div>
-                  <Image src="/screenshots/dashboard.png" alt="Rolebolt dashboard preview" width={1024} height={576} priority loading="eager" className="h-auto w-full object-cover" />
+                   <Image src="/landing/recruitment-pipeline.png" alt="Rolebolt recruitment pipeline dashboard preview" width={1921} height={1082} priority loading="eager" className="h-auto w-full object-cover" />
                   <div className="grid grid-cols-3 divide-x border-t border-[#edf1f5] bg-[#fbfcfd]">
                     <div className="px-4 py-4"><p className="text-xl font-semibold text-[#10263d]">11</p><p className="text-[10px] text-[#8093a4]">candidates</p></div>
                     <div className="px-4 py-4"><p className="text-xl font-semibold text-[#10263d]">4</p><p className="text-[10px] text-[#8093a4]">shortlisted</p></div>
@@ -280,12 +278,58 @@ export default function RecruitLandingPage() {
           </div>
         </section>
 
-        <section id="seekers" className="scroll-mt-20 bg-[#eef6fb]">
+         <section id="seekers" className="scroll-mt-20 bg-[#eef6fb]">
           <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 py-24 lg:grid-cols-[1fr_1.08fr] lg:px-8">
             <div><p className="text-xs font-semibold uppercase tracking-[.17em] text-[#0a66c2]">For job seekers</p><h2 className="mt-4 font-display text-4xl font-semibold leading-tight tracking-[-.055em] text-[#10263d]">Your next role deserves more than a browser tab.</h2><p className="mt-5 max-w-xl text-base leading-7 text-[#5d7285]">Discover public opportunities, understand your match, and keep the whole search moving in one place — from resume and cover letter to interview preparation.</p><div className="mt-7 flex flex-col gap-3 sm:flex-row"><Link href="/recruit/opportunities" className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#10263d] px-5 py-3.5 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#1d405c]">Find your next opportunity <Arrow /></Link><Link href="/seeker/workspace" className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#cbd9e4] bg-white px-5 py-3.5 text-sm font-semibold text-[#31536e] transition hover:border-[#0a66c2]">Open your workspace <Arrow /></Link></div></div>
             <div className="grid gap-4 sm:grid-cols-2">{seekerFeatures.map(([title, copy], index) => <div key={title} className={`rounded-2xl border border-[#d4e4ee] bg-white p-6 shadow-[0_8px_26px_rgba(32,79,112,.06)] ${index === 1 ? "sm:translate-y-8" : ""}`}><div className="mb-8 flex h-9 w-9 items-center justify-center rounded-lg bg-[#e7f0ff] text-sm font-semibold text-[#0a66c2]">0{index + 1}</div><h3 className="text-sm font-semibold text-[#203d56]">{title}</h3><p className="mt-2 text-sm leading-6 text-[#718496]">{copy}</p></div>)}</div>
           </div>
         </section>
+
+         <section id="human-layer" className="border-b border-[#dfe8ef] bg-white scroll-mt-20">
+           <div className="mx-auto max-w-7xl px-5 py-24 lg:px-8">
+             <div className="grid items-stretch gap-5 lg:grid-cols-[1.12fr_.88fr]">
+               <div className="relative min-h-[380px] overflow-hidden rounded-3xl bg-[#10263d] p-8 text-white sm:p-12">
+                 <Image
+                   src="/landing/team-collaboration.jpg"
+                   alt="Hiring team collaborating around a table"
+                   fill
+                   className="object-cover opacity-30 mix-blend-screen"
+                   sizes="(max-width: 1024px) 100vw, 60vw"
+                 />
+                 <div className="relative flex h-full max-w-xl flex-col justify-between">
+                   <div>
+                     <p className="text-xs font-semibold uppercase tracking-[.17em] text-[#8ec7f7]">The human layer</p>
+                     <h2 className="mt-8 font-display text-4xl font-semibold leading-tight tracking-[-.055em] text-white sm:text-5xl">
+                       Hiring is a conversation. Give it somewhere to land.
+                     </h2>
+                     <p className="mt-5 max-w-lg text-base leading-7 text-[#c7d8e5]">
+                       Rolebolt keeps the context close to the people making the decision — so collaboration feels clear, timely and considered instead of scattered across tabs.
+                     </p>
+                   </div>
+                   <Link href="/about" className="mt-8 inline-flex w-fit items-center gap-2 text-sm font-semibold text-white transition hover:gap-3">
+                     Why we built Rolebolt <Arrow />
+                   </Link>
+                 </div>
+               </div>
+               <div className="relative min-h-[380px] overflow-hidden rounded-3xl border border-[#d9e5ee] bg-[#f8fbfd]">
+                 <Image
+                   src="/landing/interview.jpg"
+                   alt="Professional interview conversation"
+                   fill
+                   className="object-cover"
+                   sizes="(max-width: 1024px) 100vw, 40vw"
+                 />
+                 <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#10263d]/90 via-[#10263d]/35 to-transparent p-7 pt-28 text-white sm:p-9 sm:pt-32">
+                   <p className="text-xs font-semibold uppercase tracking-[.17em] text-[#b7dcfb]">For every next step</p>
+                   <p className="mt-3 max-w-sm text-xl font-semibold leading-snug">Candidates deserve a process they can understand, too.</p>
+                   <Link href="/seeker" className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-white hover:gap-3">
+                     Explore the candidate workspace <Arrow />
+                   </Link>
+                 </div>
+               </div>
+             </div>
+           </div>
+         </section>
 
         <section id="ai-copilot" className="border-b border-[#dfe8ef] bg-[#10263d] scroll-mt-20">
           <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 py-24 lg:grid-cols-[.8fr_1.2fr] lg:px-8">

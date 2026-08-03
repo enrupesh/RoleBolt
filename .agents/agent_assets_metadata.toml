@@ -727,3 +727,10 @@ uri = "file://screenshots/rolebolt-premium-landing-preview.jpg"
 type = "image"
 title = "Rolebolt Premium Landing Preview"
 description = "Premium landing page mockup — first viewport screenshot."
+
+[[outputs]]
+id = "lrL_OD1Pf0TwHRDScj_4w"
+uri = "file://screenshots/rolebolt-production-landing-final.jpg"
+type = "image"
+title = "Rolebolt Production Landing — Blue Theme"
+description = "Verified production landing page screenshot with the existing Rolebolt blue and white theme, latest recruitment pipeline preview, and expanded hero layout."

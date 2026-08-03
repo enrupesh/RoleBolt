@@ -41,3 +41,4 @@
 - [Production build type checks](production-build-type-checks.md) — deployment builds can expose stale renamed context fields and strict shared-template shape errors missed by local route-only checks.
 - [Signup welcome experience](signup-welcome-experience.md) — celebrate completed signup after auth/onboarding, keep verification uninterrupted, and route plan exploration by account role.
 - [SEO foundation](seo-foundation.md) — public SEO uses Rolebolt recruiting/job-search metadata, generated robots/sitemap/OG image, and noindex governance for private routes.
+- [Landing brand theme](landing-brand-theme.md) — public marketing pages must retain the approved existing blue-and-white Rolebolt visual identity.
