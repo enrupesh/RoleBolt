@@ -77,6 +77,8 @@ const standardCounters: readonly ResourceCounterKey[] = [
   "active_jobs",
   "stored_jobs",
   "stored_candidates",
+  "pipeline_rules",
+  "active_assessments",
   "recruiter_seats",
 ];
 
@@ -190,6 +192,24 @@ export async function countOwnedResources(
     }
     if (counter === "stored_jobs") {
       return RecruitJob.countDocuments({ uid }).exec();
+    }
+    if (counter === "pipeline_rules") {
+      const jobs = await RecruitJob.find({ uid })
+        .select({ pipelineRules: 1 })
+        .lean()
+        .exec();
+      return jobs.reduce((total, job) => {
+        const rules = Array.isArray((job as { pipelineRules?: Array<{ enabled?: boolean }> }).pipelineRules)
+          ? (job as { pipelineRules: Array<{ enabled?: boolean }> }).pipelineRules
+          : [];
+        return total + rules.filter((rule) => rule.enabled !== false).length;
+      }, 0);
+    }
+    if (counter === "active_assessments") {
+      return RecruitCandidate.countDocuments({
+        uid,
+        assessmentStatus: { $in: ["sent", "invited", "in_progress"] },
+      }).exec();
     }
     return RecruitCandidate.countDocuments({ uid }).exec();
   }

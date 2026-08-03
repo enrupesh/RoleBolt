@@ -17,6 +17,11 @@ import { sendEmail } from "./mailer";
 import { NOTIFICATION_FROM } from "./emailConfig";
 import { callMeshChatCompletions } from "./ai/meshClient";
 import * as emailTemplates from "./emailTemplates";
+import {
+  assertStandardResourceLimit,
+  respondStandardBillingError,
+  standardBillingOwnerUid,
+} from "./billing/standardEnforcement";
 
 const GEMINI_MESH_KEY = process.env.GEMINI_MESH_KEY ?? "";
 
@@ -281,6 +286,12 @@ collaborationRouter.post("/jobs/:jobId/team", async (req, res) => {
     if (!Object.prototype.hasOwnProperty.call(ROLE_PERMISSIONS, role)) return res.status(400).json({ error: "Invalid team role." });
     const existing = await RecruitTeamMember.findOne({ jobId: req.params.jobId, email });
     if (existing && existing.status !== "revoked") return res.status(409).json({ error: "That person is already on this job team." });
+    // Recruiter seats are a Standard plan resource (Free = 1 seat). Fail closed
+    // before creating a new invite when re-inviting a previously revoked member
+    // or adding a brand-new one.
+    if (!existing || existing.status === "revoked") {
+      await assertStandardResourceLimit(standardBillingOwnerUid(access.job), "recruiter_seats");
+    }
     const invitedUser = await User.findOne({ email }).select("_id name email").lean() as any;
     const inviteToken = invitedUser ? undefined : crypto.randomBytes(24).toString("hex");
     const inviteExpiresAt = invitedUser ? undefined : inviteExpiryDate();
@@ -317,6 +328,8 @@ collaborationRouter.post("/jobs/:jobId/team", async (req, res) => {
     }
     return res.status(201).json({ member });
   } catch (err: any) {
+    const access = await getCollaborationAccess(req.params.jobId, uidOf(req)).catch(() => null);
+    if (access && await respondStandardBillingError(res, err, standardBillingOwnerUid(access.job))) return;
     return res.status(500).json({ error: err.message });
   }
 });
