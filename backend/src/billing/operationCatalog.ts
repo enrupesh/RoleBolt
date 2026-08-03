@@ -37,8 +37,11 @@ const operations: BillingOperation[] = [
   { key: "assessment_score_form", category: "creator_form", units: 1, counter: "ai_units", description: "Score a Form Job assessment response." },
   { key: "assessment_send_form", category: "creator_form", units: 0, counter: "assessment_sends", description: "Send a Form Job assessment invitation." },
   { key: "automated_email_form", category: "creator_form", units: 0, counter: "automated_emails", description: "Send a Form Job automated email." },
-  { key: "pipeline_rule_execution_form", category: "creator_form", units: 0, counter: "automated_emails", description: "Execute a Form Job pipeline rule action." },
+  // Stage-only rule firings — metered for access/audit, not against automated_emails.
+  { key: "pipeline_rule_execution_form", category: "creator_form", units: 0, description: "Execute a Form Job pipeline rule action." },
   { key: "export_form", category: "creator_form", units: 0, counter: "exports", description: "Export Form Job responses." },
+  { key: "interview_questions_form", category: "creator_form", units: 2, description: "Generate interview questions for a Form Job candidate." },
+  { key: "reject_email_draft_form", category: "creator_form", units: 1, counter: "ai_content_actions", description: "Draft a Form Job rejection email." },
 
   // ── Standard Jobs ──────────────────────────────────────────────────────────
   { key: "candidate_score", category: "creator_standard", units: 1, counter: "ai_scored_candidates", description: "Score a Standard Job candidate." },
@@ -105,6 +108,8 @@ export const REQUIRED_BILLING_OPERATION_KEYS = [
   "export_seeker",
   "export_form",
   "export_standard",
+  "interview_questions_form",
+  "reject_email_draft_form",
   "short_rewrite",
   "short_rewrite_standard",
   "assessment_generate",

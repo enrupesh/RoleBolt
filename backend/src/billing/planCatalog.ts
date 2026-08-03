@@ -121,6 +121,7 @@ const formLimits: Record<BillingPlan, PlanLimits> = {
     bulk_action_size: 5,
     exports: 1,
     hiring_summaries: 1,
+    copilot_turns: 10,
   },
   pro: {
     active_forms: 5,
@@ -139,6 +140,7 @@ const formLimits: Record<BillingPlan, PlanLimits> = {
     bulk_action_size: 100,
     exports: 25,
     hiring_summaries: 10,
+    copilot_turns: 300,
   },
   ultra: {
     active_forms: 20,
@@ -157,6 +159,7 @@ const formLimits: Record<BillingPlan, PlanLimits> = {
     bulk_action_size: 500,
     exports: 100,
     hiring_summaries: 50,
+    copilot_turns: 1500,
   },
 };
 

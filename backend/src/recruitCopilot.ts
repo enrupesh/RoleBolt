@@ -29,6 +29,12 @@ import type { JobPipelineStat } from "./ai/globalHiringStats";
 import { computeGlobalFormStats, globalFormStatsToPromptText } from "./ai/globalFormStats";
 import type { FormPipelineStat } from "./ai/globalFormStats";
 import type { CopilotWorkspace } from "./models/RecruitCopilotConversation";
+import {
+  formIdempotencyHeader,
+  formRequestIdempotencyKey,
+  respondFormBillingError,
+  runFormBillingOperation,
+} from "./billing/formEnforcement";
 
 export const copilotRouter = express.Router();
 
@@ -735,7 +741,7 @@ copilotRouter.post("/chat", async (req, res) => {
 
     const aiMessages = buildMessageHistory(systemPrompt, conversation, message.trim());
 
-    const rawAi = await callMeshChatCompletions({
+    const runAi = async () => callMeshChatCompletions({
       apiKey,
       model: "openai/gpt-4o-mini",
       fallbackModels: ["google/gemini-2.5-flash-lite", "anthropic/claude-3-5-sonnet"],
@@ -746,6 +752,22 @@ copilotRouter.post("/chat", async (req, res) => {
       timeoutMs: 60_000,
       nvidiaFallback: true,
     });
+
+    // Phase 2: Form Job workspace turns are metered; Standard Jobs deferred to Phase 3.
+    const rawAi = context.workspace === "form"
+      ? await runFormBillingOperation({
+          ownerUid: uid,
+          operation: "copilot_turn_form",
+          idempotencyKey: formRequestIdempotencyKey(
+            uid,
+            `copilot-chat:${context.level}:${context.formId || "global"}:${conversation._id}`,
+            formIdempotencyHeader(req),
+          ),
+          resourceType: "form",
+          resourceId: context.formId || String(conversation._id),
+          work: runAi,
+        })
+      : await runAi();
 
     const parsed = parseAiResponse(rawAi);
     parsed.sources = await attachSourceDetails(uid, parsed.sources, context.workspace!);
@@ -766,6 +788,7 @@ copilotRouter.post("/chat", async (req, res) => {
       title: conversation.title,
     });
   } catch (err: any) {
+    if (await respondFormBillingError(res, err, uid)) return;
     console.error("[copilot] chat error:", err?.message ?? err);
     return res.status(500).json({ error: "AI Copilot request failed. Please try again." });
   }
@@ -806,14 +829,21 @@ copilotRouter.post("/chat/stream", async (req, res) => {
   const apiKey = process.env.GEMINI_MESH_KEY;
   if (!apiKey) return res.status(500).json({ error: "AI service not configured" });
 
-  // ── Set up SSE ─────────────────────────────────────────────────────────────
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection", "keep-alive");
-  res.setHeader("X-Accel-Buffering", "no");
-  res.flushHeaders();
+  const meterFormTurn = context.workspace === "form";
+  let sseStarted = false;
+
+  function beginSse() {
+    if (sseStarted) return;
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    res.flushHeaders();
+    sseStarted = true;
+  }
 
   function sendEvent(data: Record<string, unknown>) {
+    beginSse();
     res.write(`data: ${JSON.stringify(data)}\n\n`);
   }
 
@@ -842,90 +872,110 @@ copilotRouter.post("/chat/stream", async (req, res) => {
     const data = await loadContextData(uid, context);
     const err = validateContext(context, data);
     if (err) {
+      if (meterFormTurn && !sseStarted) {
+        return res.status(404).json({ error: err });
+      }
       sendEvent({ type: "error", error: err });
       return res.end();
     }
 
     const systemPrompt = buildPromptFromContext(context, data, "stream");
-
     const aiMessages = buildMessageHistory(systemPrompt, conversation, message.trim());
 
-    // ── 4. Stream tokens, detect sentinel ────────────────────────────────────
-    let fullText = "";
-    let sentinelFound = false;
-    let emittedUpTo = 0;
+    const runStreamedTurn = async () => {
+      // Headers start only after a successful reserve for Form Job turns.
+      beginSse();
 
-    // We keep a lookbehind buffer of SENTINEL.length chars to handle sentinels
-    // split across two SSE chunks.
-    const SENTINEL_LEN = STREAM_SENTINEL.length;
+      let fullText = "";
+      let sentinelFound = false;
+      let emittedUpTo = 0;
+      const SENTINEL_LEN = STREAM_SENTINEL.length;
 
-    for await (const token of streamMeshChatCompletions({
-      apiKey,
-      model: "openai/gpt-4o-mini",
-      messages: aiMessages,
-      max_tokens: 2500,
-      temperature: 0.5,
-      timeoutMs: 90_000,
-    })) {
-      fullText += token;
+      for await (const token of streamMeshChatCompletions({
+        apiKey,
+        model: "openai/gpt-4o-mini",
+        messages: aiMessages,
+        max_tokens: 2500,
+        temperature: 0.5,
+        timeoutMs: 90_000,
+      })) {
+        fullText += token;
+
+        const sentinelIdx = fullText.indexOf(STREAM_SENTINEL);
+        if (sentinelIdx !== -1) {
+          if (sentinelIdx > emittedUpTo) {
+            sendEvent({ type: "token", token: fullText.slice(emittedUpTo, sentinelIdx) });
+          }
+          sentinelFound = true;
+          break;
+        }
+
+        const safeUpTo = Math.max(emittedUpTo, fullText.length - SENTINEL_LEN);
+        if (safeUpTo > emittedUpTo) {
+          sendEvent({ type: "token", token: fullText.slice(emittedUpTo, safeUpTo) });
+          emittedUpTo = safeUpTo;
+        }
+      }
+
+      if (!sentinelFound && emittedUpTo < fullText.length) {
+        sendEvent({ type: "token", token: fullText.slice(emittedUpTo) });
+      }
 
       const sentinelIdx = fullText.indexOf(STREAM_SENTINEL);
-      if (sentinelIdx !== -1) {
-        // Emit any reply text before the sentinel that hasn't been emitted yet
-        if (sentinelIdx > emittedUpTo) {
-          sendEvent({ type: "token", token: fullText.slice(emittedUpTo, sentinelIdx) });
-        }
-        sentinelFound = true;
-        break;
-      }
+      const replyText = sentinelFound
+        ? fullText.slice(0, sentinelIdx).trim()
+        : fullText.trim();
+      const metaRaw = sentinelFound
+        ? fullText.slice(sentinelIdx + STREAM_SENTINEL.length)
+        : "";
 
-      // Safe to emit up to (length - SENTINEL_LEN) to avoid splitting the sentinel
-      const safeUpTo = Math.max(emittedUpTo, fullText.length - SENTINEL_LEN);
-      if (safeUpTo > emittedUpTo) {
-        sendEvent({ type: "token", token: fullText.slice(emittedUpTo, safeUpTo) });
-        emittedUpTo = safeUpTo;
-      }
+      const meta = parseStreamMeta(metaRaw);
+      const parsed: ParsedAiResponse = { reply: replyText, ...meta };
+      parsed.sources = await attachSourceDetails(uid, parsed.sources, context.workspace!);
+
+      await persistExchange(
+        conversation!, message.trim(), parsed, isNew,
+        data.job, data.candidate, data.form, data.formResponse,
+      );
+
+      sendEvent({
+        type: "done",
+        conversationId: String(conversation!._id),
+        recommendation: parsed.recommendation,
+        confidence: parsed.confidence,
+        reasoning: parsed.reasoning,
+        sources: parsed.sources,
+        quickActions: parsed.quickActions,
+        title: conversation!.title,
+      });
+      return parsed;
+    };
+
+    if (meterFormTurn) {
+      // Critical: reserve BEFORE SSE headers so capacity errors remain JSON.
+      await runFormBillingOperation({
+        ownerUid: uid,
+        operation: "copilot_turn_form",
+        idempotencyKey: formRequestIdempotencyKey(
+          uid,
+          `copilot-stream:${context.level}:${context.formId || "global"}:${conversation._id}`,
+          formIdempotencyHeader(req),
+        ),
+        resourceType: "form",
+        resourceId: context.formId || String(conversation._id),
+        work: runStreamedTurn,
+      });
+    } else {
+      await runStreamedTurn();
     }
-
-    // If sentinel wasn't found in the stream, the model returned plain text
-    // (e.g. fallback or format error). Emit remaining buffer and use empty meta.
-    if (!sentinelFound && emittedUpTo < fullText.length) {
-      sendEvent({ type: "token", token: fullText.slice(emittedUpTo) });
-    }
-
-    // ── 5. Parse metadata ─────────────────────────────────────────────────────
-    const sentinelIdx = fullText.indexOf(STREAM_SENTINEL);
-    const replyText = sentinelFound
-      ? fullText.slice(0, sentinelIdx).trim()
-      : fullText.trim();
-    const metaRaw = sentinelFound
-      ? fullText.slice(sentinelIdx + STREAM_SENTINEL.length)
-      : "";
-
-    const meta = parseStreamMeta(metaRaw);
-    const parsed: ParsedAiResponse = { reply: replyText, ...meta };
-    parsed.sources = await attachSourceDetails(uid, parsed.sources, context.workspace!);
-
-    await persistExchange(
-      conversation, message.trim(), parsed, isNew,
-      data.job, data.candidate, data.form, data.formResponse,
-    );
-
-    // ── 7. Send done event ────────────────────────────────────────────────────
-    sendEvent({
-      type: "done",
-      conversationId: String(conversation._id),
-      recommendation: parsed.recommendation,
-      confidence: parsed.confidence,
-      reasoning: parsed.reasoning,
-      sources: parsed.sources,
-      quickActions: parsed.quickActions,
-      title: conversation.title,
-    });
 
     return res.end();
   } catch (err: any) {
+    if (!sseStarted && await respondFormBillingError(res, err, uid)) return;
     console.error("[copilot] stream error:", err?.message ?? err);
+    if (!sseStarted) {
+      return res.status(500).json({ error: "AI Copilot stream failed. Please try again." });
+    }
     sendEvent({ type: "error", error: "AI Copilot stream failed. Please try again." });
     return res.end();
   }
@@ -1241,16 +1291,27 @@ copilotRouter.post("/form-insights", async (req, res) => {
       { role: "user", content: "Generate today's Form Job overview." },
     ];
 
-    const rawAi = await callMeshChatCompletions({
-      apiKey,
-      model: "openai/gpt-4o-mini",
-      fallbackModels: ["google/gemini-2.5-flash-lite"],
-      messages: aiMessages,
-      max_tokens: 1200,
-      temperature: 0.5,
-      retries: 2,
-      timeoutMs: 60_000,
-      nvidiaFallback: true,
+    const rawAi = await runFormBillingOperation({
+      ownerUid: uid,
+      operation: "copilot_turn_form",
+      idempotencyKey: formRequestIdempotencyKey(
+        uid,
+        `form-insights:${conversation._id}`,
+        formIdempotencyHeader(req),
+      ),
+      resourceType: "form",
+      resourceId: String(conversation._id),
+      work: async () => callMeshChatCompletions({
+        apiKey,
+        model: "openai/gpt-4o-mini",
+        fallbackModels: ["google/gemini-2.5-flash-lite"],
+        messages: aiMessages,
+        max_tokens: 1200,
+        temperature: 0.5,
+        retries: 2,
+        timeoutMs: 60_000,
+        nvidiaFallback: true,
+      }),
     });
 
     const parsed = parseAiResponse(rawAi);
@@ -1281,6 +1342,7 @@ copilotRouter.post("/form-insights", async (req, res) => {
       title: conversation.title,
     });
   } catch (err: any) {
+    if (await respondFormBillingError(res, err, uid)) return;
     console.error("[copilot] form-insights error:", err?.message ?? err);
     return res.status(500).json({ error: "Failed to generate form insights" });
   }

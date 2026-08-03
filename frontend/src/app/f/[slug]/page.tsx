@@ -275,7 +275,7 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
         body: fd,
       });
       const data = await readApiJson(res);
-      if (!res.ok) throw new Error(data.error || "Submission failed.");
+      if (!res.ok) throw new Error(data.message || data.error || "Submission failed.");
       setSubmitted(true);
     } catch (err: any) {
       setGlobalError(err.message || "Something went wrong. Please try again.");
