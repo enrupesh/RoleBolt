@@ -36,7 +36,10 @@ export function LegalPageShell({
           <h1 className="mt-4 font-display text-4xl font-semibold tracking-[-.055em] text-[#10263d] sm:text-5xl">{title}</h1>
           <p className="mt-5 max-w-2xl text-base leading-7 text-[#647a8d]">{intro}</p>
           <p className="mt-4 text-xs font-medium uppercase tracking-[.12em] text-[#8aa0b1]">Last updated: {updated}</p>
-          <div className="mt-10 border-t border-[#edf1f5] pt-10">{children}</div>
+           <div className="mt-8 rounded-2xl border border-[#f0d9a8] bg-[#fff9eb] px-4 py-3.5 text-sm leading-6 text-[#765a24]">
+             This page explains Rolebolt&apos;s current product practices in plain language. It is not legal advice. If you need advice about your specific obligations, please consult a qualified professional.
+           </div>
+           <div className="mt-10 border-t border-[#edf1f5] pt-10">{children}</div>
         </div>
       </main>
       <MarketingFooter />
@@ -44,9 +47,9 @@ export function LegalPageShell({
   );
 }
 
-export function LegalSection({ title, children }: { title: string; children: ReactNode }) {
+export function LegalSection({ title, id, children }: { title: string; id?: string; children: ReactNode }) {
   return (
-    <section className="not-prose mb-9 last:mb-0">
+    <section id={id} className="not-prose mb-9 scroll-mt-8 last:mb-0">
       <h2 className="font-display text-xl font-semibold tracking-[-.035em] text-[#203d56]">{title}</h2>
       <div className="mt-3 space-y-3 text-sm leading-7 text-[#647a8d]">{children}</div>
     </section>
