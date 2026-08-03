@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { useBillingEntitlements } from "@/contexts/BillingEntitlementContext";
+import { FeedbackModal } from "@/components/FeedbackModal";
 import { ApiError, errorText } from "@/lib/api";
 import {
   billingHref,
@@ -53,6 +54,8 @@ function PricingContent() {
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [internationalRequested, setInternationalRequested] = useState(false);
 
   useEffect(() => {
     setCategory(parseCategory(searchParams.get("category")));
@@ -333,7 +336,51 @@ function PricingContent() {
             On mobile, choose UPI and your payment app. On desktop, scan the Razorpay QR with another phone.
           </p>
         </div>
+
+        <div className="mt-10 grid gap-4 border-t border-slate-200/80 pt-8 sm:grid-cols-2">
+          <div className="rounded-3xl border border-slate-200 bg-white/85 p-5 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-rose-600">Help us fix it</p>
+            <h2 className="mt-2 text-xl font-bold text-slate-900">Find a bug?</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              Tell us what went wrong. Your report goes directly to the Rolebolt admin Feedback inbox.
+            </p>
+            <button
+              type="button"
+              onClick={() => setFeedbackOpen(true)}
+              className="mt-4 inline-flex items-center rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-slate-800"
+            >
+              Report a bug
+              <span className="ml-2" aria-hidden="true">↗</span>
+            </button>
+          </div>
+
+          <div className="rounded-3xl border border-teal-200 bg-teal-50/80 p-5 shadow-[0_10px_30px_rgba(15,118,110,0.05)]">
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-teal-700">Coming soon</p>
+            <h2 className="mt-2 text-xl font-bold text-slate-900">Need International Payment?</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-700">
+              We&apos;re bringing international payments to Rolebolt so users outside India can subscribe too.
+            </p>
+            <button
+              type="button"
+              onClick={() => setInternationalRequested(true)}
+              className="mt-4 inline-flex items-center rounded-2xl border border-teal-700 bg-white px-4 py-2.5 text-sm font-bold text-teal-800 transition hover:bg-teal-100"
+            >
+              {internationalRequested ? "Request noted" : "Request international payments"}
+            </button>
+            {internationalRequested && (
+              <p className="mt-3 rounded-2xl border border-teal-200 bg-white/80 px-3 py-2.5 text-xs font-semibold leading-5 text-teal-900">
+                We&apos;ve already requested international payment support from Razorpay. We&apos;re working to bring it soon.
+              </p>
+            )}
+          </div>
+        </div>
       </main>
+      {feedbackOpen && (
+        <FeedbackModal
+          initialCategory="bug"
+          onClose={() => setFeedbackOpen(false)}
+        />
+      )}
     </div>
   );
 }

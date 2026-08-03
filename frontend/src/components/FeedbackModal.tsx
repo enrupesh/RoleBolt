@@ -22,8 +22,14 @@ const feedbackCategories = [
   { value: "other", label: "Something else" },
 ] as const;
 
-export function FeedbackModal({ onClose }: { onClose: () => void }) {
-  const [category, setCategory] = useState("product");
+export function FeedbackModal({
+  onClose,
+  initialCategory = "product",
+}: {
+  onClose: () => void;
+  initialCategory?: string;
+}) {
+  const [category, setCategory] = useState(initialCategory);
   const [message, setMessage] = useState("");
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
