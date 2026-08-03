@@ -20,7 +20,7 @@ const recruitFaqs = [
   {
     question: "Is Recruit AI really free?",
     answer:
-      "Yes. Recruit AI is completely free for recruiters and hiring teams — no per-job, per-candidate, per-seat, or monthly subscription fees.",
+      "Yes — every account includes a Free plan with real product access and strict limits. Paid Pro and Ultra Pro plans (INR via Razorpay) unlock higher AI capacity, more active jobs, pipeline automation, and priority processing. Checkout never activates paid access client-side; only verified webhooks do.",
   },
   {
     question: "How does AI candidate scoring work?",
@@ -130,6 +130,8 @@ export default function RecruitLayout({ children }: { children: React.ReactNode 
             "Application analytics and hiring funnel",
           ],
           rating: { value: "4.8", count: "263" },
+          priceCurrency: "INR",
+          lowPrice: "0",
         })}
       />
       {children}

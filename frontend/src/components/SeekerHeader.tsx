@@ -24,6 +24,7 @@ const TOOLS = [
   { href: "/seeker/email", label: "Email Intel" },
   { href: "/seeker/extension", label: "Extension" },
   { href: "/seeker/profile", label: "Profile" },
+  { href: "/seeker/billing", label: "Billing & usage" },
 ];
 
 export function SeekerHeader() {
