@@ -11,6 +11,11 @@ import {
   revokeAdminPlans,
 } from "./adminPlanGrant";
 import { BILLING_CATEGORIES, type BillingCategory } from "../billingTypes";
+import {
+  FEEDBACK_CATEGORIES,
+  RecruitFeedback,
+  type FeedbackCategory,
+} from "../models/RecruitFeedback";
 
 export const raka98AdminRouter = Router();
 
@@ -227,6 +232,94 @@ function parseCategories(input: unknown): BillingCategory[] {
     );
   return Array.from(new Set(categories));
 }
+
+function feedbackDto(feedback: Record<string, any>) {
+  return {
+    id: String(feedback._id),
+    category: feedback.category,
+    message: feedback.message,
+    email: feedback.email || "",
+    pageUrl: feedback.pageUrl || "",
+    readAt: feedback.readAt || null,
+    createdAt: feedback.createdAt || null,
+  };
+}
+
+function isFeedbackCategory(value: string): value is FeedbackCategory {
+  return (FEEDBACK_CATEGORIES as readonly string[]).includes(value);
+}
+
+raka98AdminRouter.get("/feedback", async (req, res) => {
+  try {
+    await connectMongo();
+    const category = String(req.query.category ?? "all").trim();
+    const status = String(req.query.status ?? "all").trim();
+
+    const filter: Record<string, unknown> = {};
+    if (category !== "all") {
+      if (!isFeedbackCategory(category)) {
+        return res.status(400).json({ error: "Invalid feedback category." });
+      }
+      filter.category = category;
+    }
+    if (status === "unread") filter.readAt = null;
+    else if (status === "read") filter.readAt = { $ne: null };
+    else if (status !== "all") return res.status(400).json({ error: "Invalid feedback status." });
+
+    const [feedback, unreadCount] = await Promise.all([
+      RecruitFeedback.find(filter).sort({ createdAt: -1 }).limit(200).lean(),
+      RecruitFeedback.countDocuments({ readAt: null }),
+    ]);
+
+    return res.json({
+      feedback: feedback.map((item) => feedbackDto(item as Record<string, any>)),
+      count: feedback.length,
+      unreadCount,
+      categories: FEEDBACK_CATEGORIES,
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to load feedback.";
+    console.error("[admin] GET /feedback", err);
+    return res.status(500).json({ error: message });
+  }
+});
+
+raka98AdminRouter.patch("/feedback/:id/read", async (req, res) => {
+  try {
+    await connectMongo();
+    const id = String(req.params.id || "").trim();
+    if (!id) return res.status(400).json({ error: "Missing feedback id." });
+
+    const read = req.body?.read !== false;
+    const feedback = await RecruitFeedback.findByIdAndUpdate(
+      id,
+      { $set: { readAt: read ? new Date() : null } },
+      { new: true },
+    ).lean();
+    if (!feedback) return res.status(404).json({ error: "Feedback not found." });
+
+    return res.json({ ok: true, feedback: feedbackDto(feedback as Record<string, any>) });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to update feedback.";
+    console.error("[admin] PATCH /feedback/:id/read", err);
+    return res.status(500).json({ error: message });
+  }
+});
+
+raka98AdminRouter.delete("/feedback/:id", async (req, res) => {
+  try {
+    await connectMongo();
+    const id = String(req.params.id || "").trim();
+    if (!id) return res.status(400).json({ error: "Missing feedback id." });
+    const result = await RecruitFeedback.findByIdAndDelete(id);
+    if (!result) return res.status(404).json({ error: "Feedback not found." });
+    return res.json({ ok: true });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to delete feedback.";
+    console.error("[admin] DELETE /feedback/:id", err);
+    return res.status(500).json({ error: message });
+  }
+});
 
 raka98AdminRouter.post("/users/:uid/plans/grant", async (req, res) => {
   try {

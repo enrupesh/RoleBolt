@@ -44,6 +44,10 @@ const nextConfig: NextConfig = {
     const siteGuideRewrites = isDev
       ? [
           {
+            source: "/backend/recruit-public/feedback",
+            destination: `${LOCAL_BACKEND_URL}/recruit-public/feedback`,
+          },
+          {
             source: "/backend/recruit-public/site-guide/:path*",
             destination: `${LOCAL_BACKEND_URL}/recruit-public/site-guide/:path*`,
           },

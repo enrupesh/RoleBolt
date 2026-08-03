@@ -1,5 +1,9 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
 import { RoleboltLogo } from "@/components/RoleboltLogo";
+import { FeedbackModal } from "@/components/FeedbackModal";
 
 const productLinks = [
   ["AI Copilot", "/recruit/copilot"],
@@ -56,8 +60,11 @@ function FooterColumn({ title, links }: { title: string; links: readonly (readon
 }
 
 export function MarketingFooter() {
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+
   return (
-    <footer className="relative overflow-hidden bg-[#071a2b] text-white">
+    <>
+      <footer className="relative overflow-hidden bg-[#071a2b] text-white">
       <div className="pointer-events-none absolute -right-40 -top-48 h-[34rem] w-[34rem] rounded-full bg-[#0a66c2]/20 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-56 left-1/3 h-[28rem] w-[28rem] rounded-full bg-[#2bb58a]/10 blur-3xl" />
 
@@ -91,10 +98,10 @@ export function MarketingFooter() {
               Tell us what is working, what is missing, or what we should build next.
             </p>
             <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-              <a href="mailto:support@rolebolt.tech?subject=Rolebolt%20feedback" className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-white px-4 py-3 text-sm font-semibold text-[#102d46] transition hover:bg-[#e8f4fb]">
+              <button type="button" onClick={() => setFeedbackOpen(true)} className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-white px-4 py-3 text-sm font-semibold text-[#102d46] transition hover:bg-[#e8f4fb]">
                 Give feedback
                 <ExternalArrow />
-              </a>
+              </button>
               <a href="mailto:support@rolebolt.tech" className="text-center text-xs font-semibold text-[#a9c5d8] transition hover:text-white sm:text-left">
                 support@rolebolt.tech
               </a>
@@ -128,6 +135,8 @@ export function MarketingFooter() {
           </div>
         </div>
       </div>
-    </footer>
+      </footer>
+      {feedbackOpen && <FeedbackModal onClose={() => setFeedbackOpen(false)} />}
+    </>
   );
 }
