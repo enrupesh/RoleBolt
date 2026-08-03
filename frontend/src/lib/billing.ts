@@ -31,6 +31,7 @@ export type BillingCatalogResponse = {
   plans: BillingPlan[];
   intervals: BillingInterval[];
   razorpayKeyId?: string | null;
+  razorpayCheckoutConfigId?: string | null;
   plansByCategory: PublicPlanDefinition[];
 };
 
@@ -302,6 +303,7 @@ export function loadRazorpayCheckoutScript(): Promise<void> {
 export async function openRazorpaySubscriptionCheckout(input: {
   keyId: string;
   subscriptionId: string;
+  checkoutConfigId?: string | null;
   description: string;
   onSuccess: (result: {
     razorpay_payment_id: string;
@@ -314,12 +316,26 @@ export async function openRazorpaySubscriptionCheckout(input: {
   if (!window.Razorpay) throw new Error("Razorpay Checkout is unavailable.");
 
   await new Promise<void>((resolve, reject) => {
-    const rzp = new window.Razorpay!({
+    const checkoutOptions: Record<string, unknown> = {
       key: input.keyId,
       subscription_id: input.subscriptionId,
       name: "Rolebolt",
       description: input.description,
       theme: { color: "#0f766e" },
+      // On mobile web Razorpay can show UPI Intent when it is enabled for
+      // the merchant. Desktop keeps Razorpay's documented QR fallback.
+      config: {
+        display: {
+          blocks: {
+            rolebolt_upi: {
+              name: "Pay with UPI",
+              instruments: [{ method: "upi" }],
+            },
+          },
+          sequence: ["block.rolebolt_upi"],
+          preferences: { show_default_blocks: true },
+        },
+      },
       handler: async (response: {
         razorpay_payment_id: string;
         razorpay_subscription_id: string;
@@ -338,6 +354,17 @@ export async function openRazorpaySubscriptionCheckout(input: {
           resolve();
         },
       },
+    };
+    if (input.checkoutConfigId?.trim()) {
+      checkoutOptions.checkout_config_id = input.checkoutConfigId.trim();
+    }
+    const rzp = new window.Razorpay!(checkoutOptions);
+    rzp.on("payment.failed", (response: unknown) => {
+      const failure = response as {
+        error?: { description?: string; reason?: string };
+      };
+      const message = failure?.error?.description || failure?.error?.reason;
+      reject(new Error(message || "Razorpay could not complete the payment."));
     });
     rzp.open();
   });
