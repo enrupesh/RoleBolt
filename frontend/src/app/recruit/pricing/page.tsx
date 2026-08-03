@@ -119,17 +119,25 @@ function PricingContent() {
       }
 
       const subscriptionId = checkout.checkout.subscriptionId;
-      const keyId = catalog?.razorpayKeyId?.trim() || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID?.trim();
+      const keyId = catalog?.razorpayKeyId?.trim();
+      if (checkout.checkout.subscriptionStatus && checkout.checkout.subscriptionStatus !== "created") {
+        throw new Error("This checkout session is no longer valid. Please try again.");
+      }
 
       if (subscriptionId && keyId) {
         await openRazorpaySubscriptionCheckout({
           keyId,
           subscriptionId,
           description: `${CATEGORY_LABELS[category]} ${PLAN_LABELS[plan]}`,
+          prefill: checkout.checkout.prefill,
           onSuccess: async (result) => {
-            await verifyCheckout(sessionToken, result);
-            await refresh();
-            router.push(billingHref(category, { checkout: "pending" }));
+            try {
+              await verifyCheckout(sessionToken, result);
+              await refresh();
+              router.push(billingHref(category, { checkout: "pending" }));
+            } finally {
+              setLoadingKey(null);
+            }
           },
           onDismiss: () => setLoadingKey(null),
         });

@@ -2,9 +2,13 @@ import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import { describe, it } from "node:test";
 import {
+  buildRazorpayCheckoutPrefill,
+  formatRazorpayNotifyPhone,
+  formatRazorpayPrefillContact,
   getConfiguredRazorpayPlanId,
   getRazorpayPlanEnvKey,
   getRazorpaySubscriptionTotalCount,
+  subscriptionSupportsCheckoutAuth,
   verifySubscriptionCheckoutSignature,
   verifyWebhookSignature,
   RazorpayNotConfiguredError,
@@ -38,6 +42,30 @@ describe("Razorpay provider boundary", () => {
   it("bounds subscriptions without changing monthly or yearly billing cadence", () => {
     assert.equal(getRazorpaySubscriptionTotalCount("monthly"), 1200);
     assert.equal(getRazorpaySubscriptionTotalCount("yearly"), 100);
+  });
+
+  it("formats Indian phone numbers for Razorpay checkout prefill and notify_info", () => {
+    assert.equal(formatRazorpayPrefillContact("9876543210"), "+919876543210");
+    assert.equal(formatRazorpayPrefillContact("+91 98765 43210"), "+919876543210");
+    assert.equal(formatRazorpayNotifyPhone("9876543210"), "9876543210");
+    assert.deepEqual(
+      buildRazorpayCheckoutPrefill({
+        name: "Rolebolt User",
+        email: "User@Example.com",
+        phone: "9876543210",
+      }),
+      {
+        name: "Rolebolt User",
+        email: "user@example.com",
+        contact: "+919876543210",
+      },
+    );
+  });
+
+  it("allows checkout auth only for subscriptions awaiting first payment", () => {
+    assert.equal(subscriptionSupportsCheckoutAuth("created"), true);
+    assert.equal(subscriptionSupportsCheckoutAuth("active"), false);
+    assert.equal(subscriptionSupportsCheckoutAuth("authenticated"), false);
   });
 
   it("verifies checkout signatures using subscription and payment IDs", () => {

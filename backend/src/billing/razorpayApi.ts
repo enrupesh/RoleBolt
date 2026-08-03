@@ -3,13 +3,17 @@ import mongoose from "mongoose";
 import { connectMongo } from "../db";
 import { BillingCheckout } from "../models/BillingCheckout";
 import { Subscription } from "../models/Subscription";
+import { User } from "../models/User";
 import { getEntitlement } from "./entitlements";
 import {
+  buildRazorpayCheckoutPrefill,
   createRazorpaySubscription,
+  fetchRazorpaySubscription,
   getConfiguredRazorpayPlanId,
   RazorpayApiError,
   RazorpayNotConfiguredError,
   RazorpaySignatureError,
+  subscriptionSupportsCheckoutAuth,
   verifySubscriptionCheckoutSignature,
   verifyWebhookSignature,
 } from "./razorpay";
@@ -73,6 +77,83 @@ function idempotencyKey(req: express.Request): string {
     : undefined;
   const value = typeof header === "string" ? header : typeof body === "string" ? body : "";
   return value.trim();
+}
+
+async function loadCheckoutCustomer(uid: string): Promise<{
+  prefill: ReturnType<typeof buildRazorpayCheckoutPrefill>;
+  notifyEmail?: string;
+  notifyPhone?: string;
+}> {
+  const user = await User.findById(uid).lean().exec();
+  const prefill = buildRazorpayCheckoutPrefill({
+    name: user?.name,
+    email: user?.email,
+    phone: user?.phoneNumber,
+  });
+  return {
+    prefill,
+    notifyEmail: prefill.email,
+    notifyPhone: user?.phoneNumber ?? undefined,
+  };
+}
+
+function serializeCheckoutResponse(input: {
+  checkout: {
+    status: string;
+    providerSubscriptionId?: string | null;
+    category: BillingCategory;
+    plan: BillingPlan;
+    interval: BillingInterval;
+    providerPlanId?: string;
+  };
+  providerSubscription?: {
+    id?: string;
+    plan_id?: string;
+    status?: string;
+    short_url?: string;
+  } | null;
+  prefill: ReturnType<typeof buildRazorpayCheckoutPrefill>;
+}) {
+  const subscriptionId =
+    input.providerSubscription?.id ??
+    input.checkout.providerSubscriptionId ??
+    null;
+  return {
+    checkout: {
+      status: input.checkout.status,
+      provider: "razorpay" as const,
+      subscriptionId,
+      subscriptionStatus: input.providerSubscription?.status ?? null,
+      planId: input.providerSubscription?.plan_id ?? input.checkout.providerPlanId,
+      shortUrl: input.providerSubscription?.short_url ?? null,
+      prefill: input.prefill,
+      category: input.checkout.category,
+      plan: input.checkout.plan,
+      interval: input.checkout.interval,
+    },
+    activation: "webhook_required" as const,
+  };
+}
+
+async function resolveProviderSubscriptionForCheckout(
+  subscriptionId: string | null | undefined,
+): Promise<{ id: string; plan_id?: string; status: string; short_url?: string } | null> {
+  const id = subscriptionId?.trim();
+  if (!id) return null;
+  const providerSubscription = await fetchRazorpaySubscription(id);
+  if (!subscriptionSupportsCheckoutAuth(providerSubscription.status)) {
+    throw new SubscriptionLifecycleError(
+      "CHECKOUT_SUBSCRIPTION_UNAVAILABLE",
+      "This checkout session is no longer valid. Start checkout again.",
+      409,
+    );
+  }
+  return {
+    id: providerSubscription.id,
+    plan_id: providerSubscription.plan_id,
+    status: providerSubscription.status,
+    short_url: providerSubscription.short_url,
+  };
 }
 
 function serializedProviderError(error: unknown): { status: number; body: Record<string, unknown> } {
@@ -154,6 +235,8 @@ razorpayBillingRouter.post("/create-checkout", async (req, res) => {
       }
     }
 
+    const customer = await loadCheckoutCustomer(uid);
+
     const existing = await BillingCheckout.findOne({
       idempotencyKey: key,
     }).lean().exec();
@@ -169,17 +252,16 @@ razorpayBillingRouter.post("/create-checkout", async (req, res) => {
           message: "The idempotency key was used for a different billing plan.",
         });
       }
-      return res.json({
-        checkout: {
-          status: existing.status,
-          subscriptionId: existing.providerSubscriptionId ?? null,
-          provider: "razorpay",
-          category: existing.category,
-          plan: existing.plan,
-          interval: existing.interval,
-        },
-        activation: "webhook_required",
-      });
+      const providerSubscription = await resolveProviderSubscriptionForCheckout(
+        existing.providerSubscriptionId,
+      );
+      return res.json(
+        serializeCheckoutResponse({
+          checkout: existing,
+          providerSubscription,
+          prefill: customer.prefill,
+        }),
+      );
     }
 
     const entitlement = await getEntitlement(uid, requested.category);
@@ -229,17 +311,15 @@ razorpayBillingRouter.post("/create-checkout", async (req, res) => {
           message: "The idempotency key was used for a different billing plan.",
         });
       }
-      return res.json({
-        checkout: {
-          status: raced.status,
-          subscriptionId: raced.providerSubscriptionId ?? null,
-          provider: "razorpay",
-          category: raced.category,
-          plan: raced.plan,
-          interval: raced.interval,
-        },
-        activation: "webhook_required",
-      });
+      return res.json(
+        serializeCheckoutResponse({
+          checkout: raced,
+          providerSubscription: await resolveProviderSubscriptionForCheckout(
+            raced.providerSubscriptionId,
+          ),
+          prefill: customer.prefill,
+        }),
+      );
     }
 
     try {
@@ -247,24 +327,27 @@ razorpayBillingRouter.post("/create-checkout", async (req, res) => {
         ...requested,
         userId: uid,
         idempotencyKey: key,
+        notifyEmail: customer.notifyEmail,
+        notifyPhone: customer.notifyPhone,
       });
+      if (!subscriptionSupportsCheckoutAuth(providerSubscription.status)) {
+        throw new RazorpayApiError(
+          "Razorpay returned a subscription that is not ready for checkout authentication.",
+          502,
+          { status: providerSubscription.status },
+        );
+      }
       checkout.status = "created";
       checkout.providerPlanId = providerSubscription.plan_id;
       checkout.providerSubscriptionId = providerSubscription.id;
       await checkout.save();
-      return res.status(201).json({
-        checkout: {
-          status: checkout.status,
-          provider: "razorpay",
-          subscriptionId: providerSubscription.id,
-          planId: providerSubscription.plan_id,
-          shortUrl: providerSubscription.short_url ?? null,
-          category: requested.category,
-          plan: requested.plan,
-          interval: requested.interval,
-        },
-        activation: "webhook_required",
-      });
+      return res.status(201).json(
+        serializeCheckoutResponse({
+          checkout,
+          providerSubscription,
+          prefill: customer.prefill,
+        }),
+      );
     } catch (error) {
       checkout.status = "failed";
       checkout.failureReason = error instanceof Error ? error.message.slice(0, 500) : "Provider error";
@@ -302,7 +385,7 @@ razorpayBillingRouter.post("/verify-checkout", async (req, res) => {
     const checkout = await BillingCheckout.findOne({
       provider: "razorpay",
       providerSubscriptionId: subscriptionId,
-      userId: uid,
+      userId: new mongoose.Types.ObjectId(uid),
     }).exec();
     if (!checkout) return res.status(404).json({ error: "CHECKOUT_NOT_FOUND" });
 
