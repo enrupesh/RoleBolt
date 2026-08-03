@@ -161,6 +161,52 @@ describe("billing usage reservations (integration)", { skip: !canRun }, () => {
     }
   });
 
+  it("prevents concurrent Form Job intake from exceeding Free form_responses (25)", async () => {
+    const userId = await createSeekerTestUser();
+    await Subscription.updateOne(
+      { userId: new mongoose.Types.ObjectId(userId), category: "creator_form" },
+      { $set: { plan: "free", status: "free" } },
+    ).exec();
+
+    const attempts = Array.from({ length: 30 }, (_, index) =>
+      reserveUsage({
+        userId,
+        category: "creator_form",
+        operation: "form_response_intake",
+        idempotencyKey: `form-intake-concurrent-${userId}-${index}`,
+      }).then(
+        (reservation) => ({ ok: true as const, reservation }),
+        (error) => ({ ok: false as const, error }),
+      ),
+    );
+    const results = await Promise.all(attempts);
+    const succeeded = results.filter((result) => result.ok);
+    const failed = results.filter((result) => !result.ok);
+    assert.equal(succeeded.length, 25);
+    assert.equal(failed.length, 5);
+    for (const result of failed) {
+      if (!result.ok) {
+        assert.equal((result.error as any).code, "PLAN_LIMIT_REACHED");
+        assert.equal((result.error as any).feature, "form_responses");
+      }
+    }
+    for (const result of succeeded) {
+      if (result.ok) await commitUsage(result.reservation.reservationId);
+    }
+
+    await assert.rejects(
+      () =>
+        reserveUsage({
+          userId,
+          category: "creator_form",
+          operation: "form_response_intake",
+          idempotencyKey: `form-intake-overflow-${userId}`,
+        }),
+      (error: any) =>
+        error.code === "PLAN_LIMIT_REACHED" && error.feature === "form_responses",
+    );
+  });
+
   it("creates three Free subscription records on signup initialization", async () => {
     if (!mongoReady) {
       process.env.MONGODB_URI = TEST_URI;
