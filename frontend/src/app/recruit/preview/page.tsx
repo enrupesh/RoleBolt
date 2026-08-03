@@ -213,7 +213,7 @@ export default function ProductPreviewPage() {
               href="/recruit/signup"
               className="inline-flex rounded-lg bg-[#0a66c2] px-3.5 py-2 text-[13px] font-bold text-white shadow-sm hover:bg-[#004182] transition-all"
             >
-              Get started free
+              Get started
             </Link>
           </div>
         </div>
@@ -322,29 +322,29 @@ export default function ProductPreviewPage() {
           <JudgesTestingKit dark={false} />
         </div>
 
-        {/* ── How Google M API Powers Rolebolt ─────────────────────────────────── */}
+        {/* ── How Rolebolt's AI workflow supports hiring ─────────────────────── */}
         <div className="mt-24">
           {/* Header */}
           <div className="max-w-2xl mx-auto text-center mb-12">
             <div className="inline-flex items-center gap-2 rounded-full border border-[#0a66c2]/30 bg-[#0a66c2]/8 px-4 py-1.5 text-[11px] font-bold text-[#0a66c2] mb-5 uppercase tracking-widest">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-              Powered by Google M API
+              AI workflow
             </div>
             <h2 className="text-3xl font-black text-slate-900 tracking-tight sm:text-4xl leading-tight">
-              How Google M API powers Rolebolt
+              How Rolebolt's AI workflow supports hiring
             </h2>
             <p className="mt-4 text-slate-500 leading-relaxed max-w-lg mx-auto">
-              Every AI capability in Rolebolt is routed through Google M API — giving us access to 1,000+ models with automatic fallback chains, so hiring never stops even when a single provider has issues.
+              Rolebolt turns job context, candidate information and structured answers into useful hiring signals, with resilient AI workflows designed to keep review moving.
             </p>
           </div>
 
           {/* Model badge */}
           <div className="flex flex-wrap items-center justify-center gap-2.5 mb-10">
-            {[
-              { label: "Primary", model: "GPT-4o mini", color: "bg-emerald-50 border-emerald-200 text-emerald-700" },
-              { label: "Fallback 1", model: "Claude 3 Haiku", color: "bg-violet-50 border-violet-200 text-violet-700" },
-              { label: "Fallback 2", model: "Gemini 2.5 Flash Lite", color: "bg-blue-50 border-blue-200 text-blue-700" },
-            ].map((m) => (
+              {[
+                { label: "Primary", model: "Role-aware reasoning", color: "bg-emerald-50 border-emerald-200 text-emerald-700" },
+                { label: "Fallback 1", model: "Structured review", color: "bg-violet-50 border-violet-200 text-violet-700" },
+                { label: "Fallback 2", model: "Human verification", color: "bg-blue-50 border-blue-200 text-blue-700" },
+              ].map((m) => (
               <span key={m.model} className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[12px] font-semibold ${m.color}`}>
                 <span className="text-[9px] font-bold uppercase tracking-wider opacity-60">{m.label}</span>
                 <span className="h-3 w-px bg-current opacity-20" />
@@ -363,8 +363,8 @@ export default function ProductPreviewPage() {
                   </svg>
                 ),
                 title: "AI Resume Analysis",
-                desc: "When a candidate applies, Google M API parses the uploaded PDF/DOCX resume and extracts structured signals: skills, experience depth, career trajectory, and role alignment — all in seconds.",
-                model: "openai/gpt-4o-mini",
+                desc: "When a candidate applies, Rolebolt extracts structured signals from the uploaded resume: skills, experience depth, career trajectory, and role alignment.",
+                model: "Resume signal extraction",
                 accentColor: "text-[#0a66c2]",
                 accentBg: "bg-blue-50 border-blue-100",
                 badge: "Application pipeline",
@@ -377,7 +377,7 @@ export default function ProductPreviewPage() {
                 ),
                 title: "AI Candidate Scoring",
                 desc: "Every applicant receives a 0–100 AI fit score broken down across 5 weighted criteria: Technical Skills, Experience Depth, Communication, Role Fit, and Cultural Ownership — with written rationale for each.",
-                model: "openai/gpt-4o-mini",
+                model: "Rubric-based scoring",
                 accentColor: "text-amber-500",
                 accentBg: "bg-amber-50 border-amber-100",
                 badge: "AI Evaluation",
@@ -390,7 +390,7 @@ export default function ProductPreviewPage() {
                 ),
                 title: "AI Candidate Matching",
                 desc: "Rolebolt cross-references each candidate's full profile — resume, background, and self-reported experience — against the job's scoring rubric to produce a precise match signal.",
-                model: "openai/gpt-4o-mini",
+                model: "Role-aware matching",
                 accentColor: "text-emerald-600",
                 accentBg: "bg-emerald-50 border-emerald-100",
                 badge: "Matching engine",
@@ -402,8 +402,8 @@ export default function ProductPreviewPage() {
                   </svg>
                 ),
                 title: "AI Job Description Generation",
-                desc: "A 4-step wizard collects the role basics, and Google M API generates a full job description — including requirements, responsibilities, and a custom scoring rubric — ready to publish instantly.",
-                model: "openai/gpt-4o-mini",
+                desc: "A guided wizard collects the role basics and generates a full job description with requirements, responsibilities, and a custom scoring rubric.",
+                model: "Job context generation",
                 accentColor: "text-violet-600",
                 accentBg: "bg-violet-50 border-violet-100",
                 badge: "Job creation",
@@ -416,7 +416,7 @@ export default function ProductPreviewPage() {
                 ),
                 title: "AI Copilot — Recruitment Assistant",
                 desc: "Recruiters can chat with an AI that already knows their jobs, candidates, resumes, and scores. Ask 'who are my top 3 candidates for this role?' or 'should I hire this candidate?' and get sourced, grounded answers instantly.",
-                model: "openai/gpt-4o",
+                model: "Grounded recruiter assistance",
                 accentColor: "text-rose-500",
                 accentBg: "bg-rose-50 border-rose-100",
                 badge: "Recruiter tools",
@@ -428,8 +428,8 @@ export default function ProductPreviewPage() {
                   </svg>
                 ),
                 title: "AI Form Response Scoring",
-                desc: "When candidates submit custom intake forms, Google M API scores each answer against the form's criteria — giving small businesses the same AI evaluation power as the full pipeline, without requiring a resume.",
-                model: "openai/gpt-4o-mini",
+                desc: "When candidates submit custom intake forms, Rolebolt scores each answer against the form's criteria, giving teams structured evidence even when a resume is not required.",
+                model: "Form response scoring",
                 accentColor: "text-indigo-600",
                 accentBg: "bg-indigo-50 border-indigo-100",
                 badge: "Form jobs",
@@ -450,7 +450,7 @@ export default function ProductPreviewPage() {
                 <div className="mt-4 pt-4 border-t border-slate-100 flex items-center gap-1.5">
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-300"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
                   <span className="text-[11px] font-mono text-slate-400">{wf.model}</span>
-                  <span className="ml-auto text-[10px] text-slate-300 font-medium">+ 2 fallbacks</span>
+                  <span className="ml-auto text-[10px] text-slate-300 font-medium">Human-checkable</span>
                 </div>
               </div>
             ))}
@@ -463,7 +463,7 @@ export default function ProductPreviewPage() {
             </div>
             <div className="flex-1">
               <p className="text-[13px] font-semibold text-slate-800">Automatic fallback chain on every AI call</p>
-              <p className="text-[12px] text-slate-500 mt-0.5">If GPT-4o mini is unavailable or rate-limited, Google M API automatically retries with Claude 3 Haiku, then Gemini 2.5 Flash Lite — so AI scoring never blocks a candidate&apos;s application.</p>
+              <p className="text-[12px] text-slate-500 mt-0.5">Structured outputs and reviewable rationale help teams keep candidate evaluation moving without hiding the evidence behind a single score.</p>
             </div>
           </div>
         </div>
@@ -535,11 +535,11 @@ export default function ProductPreviewPage() {
                   />
                   <ArchArrow label="AI workflow triggered" />
 
-                  {/* Google M API */}
+                  {/* AI workflow */}
                   <ArchNode
                     icon={<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>}
-                    label="Google M API"
-                    sublabel="api.meshapi.ai · 1,000+ models"
+                    label="AI workflow"
+                    sublabel="Role context · structured outputs"
                     color="bg-violet-600 text-white"
                     borderColor="border-violet-500"
                     highlight
@@ -549,9 +549,9 @@ export default function ProductPreviewPage() {
                   {/* AI Models */}
                   <div className="flex items-center gap-3 w-full justify-center">
                     {[
-                      { name: "GPT-4o mini", tag: "Primary", color: "border-emerald-300 bg-emerald-50 text-emerald-800" },
-                      { name: "Claude 3 Haiku", tag: "Fallback 1", color: "border-violet-300 bg-violet-50 text-violet-800" },
-                      { name: "Gemini Flash", tag: "Fallback 2", color: "border-blue-300 bg-blue-50 text-blue-800" },
+                      { name: "Role-aware reasoning", tag: "Primary", color: "border-emerald-300 bg-emerald-50 text-emerald-800" },
+                      { name: "Structured review", tag: "Fallback 1", color: "border-violet-300 bg-violet-50 text-violet-800" },
+                      { name: "Human verification", tag: "Fallback 2", color: "border-blue-300 bg-blue-50 text-blue-800" },
                     ].map((m) => (
                       <div key={m.name} className={`rounded-xl border ${m.color} px-3 py-2.5 text-center flex-1`}>
                         <p className="text-[9px] font-bold uppercase tracking-wider opacity-50 mb-0.5">{m.tag}</p>
@@ -610,8 +610,8 @@ export default function ProductPreviewPage() {
                   { label: "Next.js Frontend", sub: "Rolebolt UI · Port 5000", bg: "bg-[#0a66c2] text-white" },
                   { label: "Express Backend", sub: "Node.js API · Port 8080", bg: "bg-slate-700 text-white" },
                   { label: "MongoDB Atlas", sub: "Jobs, Candidates, Forms", bg: "bg-emerald-600 text-white" },
-                  { label: "Google M API", sub: "Model router · 1,000+ models", bg: "bg-violet-600 text-white", highlight: true },
-                  { label: "AI Models", sub: "GPT-4o mini → Claude 3 Haiku → Gemini Flash", bg: "bg-slate-100 text-slate-700" },
+                  { label: "AI workflow", sub: "Role context · structured outputs", bg: "bg-violet-600 text-white", highlight: true },
+                  { label: "Review signals", sub: "Scores → rationale → human decision", bg: "bg-slate-100 text-slate-700" },
                 ].map((node, i, arr) => (
                   <div key={node.label} className="flex flex-col items-center w-full max-w-xs">
                     <div className={`w-full rounded-xl px-4 py-3 text-center ${node.bg} ${node.highlight ? "ring-2 ring-violet-400 ring-offset-2" : ""}`}>
@@ -634,7 +634,7 @@ export default function ProductPreviewPage() {
               {[
                 { color: "bg-[#0a66c2]", label: "Frontend (Next.js)" },
                 { color: "bg-slate-700", label: "Backend (Express / Node)" },
-                { color: "bg-violet-600", label: "Google M API (AI gateway)" },
+                { color: "bg-violet-600", label: "AI workflow" },
                 { color: "bg-emerald-600", label: "MongoDB (persistence)" },
                 { color: "bg-amber-500", label: "Custom Auth" },
               ].map((l) => (
@@ -740,17 +740,17 @@ export default function ProductPreviewPage() {
           <div className="relative">
             <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#60a5fa] mb-3">Ready to try it?</p>
             <h2 className="text-2xl font-black text-white tracking-tight sm:text-3xl">
-              Start hiring smarter — for free.
+              See the product in action.
             </h2>
             <p className="mt-3 text-slate-400 text-sm max-w-sm mx-auto">
-              No credit card. No time limit. Your first job post takes 90 seconds.
+              Explore the workflow, then choose the path that fits your team.
             </p>
             <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
               <Link
                 href="/recruit/signup"
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0a66c2] px-7 py-3.5 text-sm font-bold text-white shadow-[0_4px_20px_rgba(10,102,194,0.45)] hover:bg-[#1d77d2] hover:-translate-y-0.5 transition-all"
               >
-                Get started free
+                Get started
                 <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
               </Link>
               <Link

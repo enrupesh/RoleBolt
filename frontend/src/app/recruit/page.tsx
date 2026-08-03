@@ -162,7 +162,7 @@ export default function RecruitLandingPage() {
             <RoleboltLogo size="md" />
             <span className="font-display text-[15px] font-semibold tracking-[-0.03em]">Rolebolt</span>
           </Link>
-          <nav className="hidden items-center gap-1 md:flex" aria-label="Primary navigation">
+          <nav className="hidden items-center gap-1 min-[1180px]:flex" aria-label="Primary navigation">
             <Link href="/recruit/opportunities" className="rounded-lg px-3 py-2 text-sm text-[#5d7285] transition hover:bg-white hover:text-[#10263d]">Find jobs</Link>
             <a href="#how-it-works" className="rounded-lg px-3 py-2 text-sm text-[#5d7285] transition hover:bg-white hover:text-[#10263d]">How it works</a>
             <a href="#recruiters" className="rounded-lg px-3 py-2 text-sm text-[#5d7285] transition hover:bg-white hover:text-[#10263d]">For recruiters</a>
@@ -182,7 +182,7 @@ export default function RecruitLandingPage() {
                 <Link href="/recruit/signup" className="inline-flex items-center gap-2 rounded-lg bg-[#0a66c2] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_5px_16px_rgba(10,102,194,.18)] transition hover:-translate-y-0.5 hover:bg-[#07559f]">Get started <Arrow /></Link>
               </>
             )}
-            <button aria-label="Toggle navigation" onClick={() => setMenuOpen((open) => !open)} className="flex h-10 w-10 items-center justify-center rounded-lg border border-[#d7e2eb] bg-white md:hidden">
+            <button aria-label="Toggle navigation" onClick={() => setMenuOpen((open) => !open)} className="flex h-10 w-10 items-center justify-center rounded-lg border border-[#d7e2eb] bg-white min-[1180px]:hidden">
               {menuOpen ? (
                 <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
               ) : (
@@ -192,7 +192,7 @@ export default function RecruitLandingPage() {
           </div>
         </div>
         {menuOpen && (
-          <nav className="border-t border-[#dfe8ef] bg-[#f8fbfd] px-5 py-3 md:hidden">
+          <nav className="border-t border-[#dfe8ef] bg-[#f8fbfd] px-5 py-3 min-[1180px]:hidden">
             <div className="mx-auto flex max-w-7xl flex-col gap-1">
               <Link onClick={() => setMenuOpen(false)} href="/recruit/opportunities" className="rounded-lg px-3 py-3 text-sm">Find jobs</Link>
               <a onClick={() => setMenuOpen(false)} href="#how-it-works" className="rounded-lg px-3 py-3 text-sm">How it works</a>
@@ -210,7 +210,7 @@ export default function RecruitLandingPage() {
           <div className="pointer-events-none absolute -left-24 top-16 h-80 w-80 rounded-full bg-[#d9ecff] blur-3xl" />
           <div className="pointer-events-none absolute -right-24 top-0 h-96 w-96 rounded-full bg-[#e7e1ff] blur-3xl" />
           <div className="relative mx-auto max-w-7xl px-5 pb-20 pt-20 lg:px-8 lg:pb-24 lg:pt-28">
-            <div className="grid items-center gap-14 lg:grid-cols-[1fr_0.92fr] lg:gap-20">
+            <div className="grid items-center gap-12 min-[900px]:grid-cols-[1fr_0.92fr] min-[900px]:gap-14 lg:gap-20">
               <div>
                 <p className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#cbddea] bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-[#3873a5]">
                   <span className="h-1.5 w-1.5 rounded-full bg-[#2bb58a]" /> AI hiring workspace
@@ -221,9 +221,10 @@ export default function RecruitLandingPage() {
                 <p className="mt-7 max-w-xl text-lg leading-8 text-[#5d7285]">
                   Rolebolt brings jobs, applications, candidate assessment, hiring automation and job search into one thoughtful workspace — for teams and the people they hope to meet.
                 </p>
-                <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+                <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                   <Link href="/recruit/signup" className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0a66c2] px-5 py-3.5 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(10,102,194,.18)] transition hover:-translate-y-0.5 hover:bg-[#07559f]">Build your hiring workspace <Arrow /></Link>
                   <Link href="/recruit/opportunities" className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#cbd9e4] bg-white px-5 py-3.5 text-sm font-semibold text-[#31536e] transition hover:border-[#0a66c2] hover:text-[#0a66c2]">Explore open roles <Arrow /></Link>
+                  <Link href="/recruit/preview" className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#cbd9e4] bg-white/70 px-5 py-3.5 text-sm font-semibold text-[#31536e] transition hover:border-[#0a66c2] hover:text-[#0a66c2]">See product preview <Arrow /></Link>
                 </div>
                 <p className="mt-4 text-xs text-[#7a8c9b]">Start with the entry plan. Upgrade when your workflow needs more.</p>
               </div>
@@ -283,7 +284,7 @@ export default function RecruitLandingPage() {
 
         <section id="product" className="border-y border-[#dfe8ef] bg-white scroll-mt-20">
           <div className="mx-auto max-w-7xl px-5 py-24 lg:px-8">
-            <div className="max-w-2xl"><p className="text-xs font-semibold uppercase tracking-[.17em] text-[#0a66c2]">The product, in practice</p><h2 className="mt-4 font-display text-4xl font-semibold tracking-[-.055em] text-[#10263d]">A more considered path from “we’re hiring” to “welcome aboard”.</h2></div>
+             <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between"><div className="max-w-2xl"><p className="text-xs font-semibold uppercase tracking-[.17em] text-[#0a66c2]">The product, in practice</p><h2 className="mt-4 font-display text-4xl font-semibold tracking-[-.055em] text-[#10263d]">A more considered path from “we’re hiring” to “welcome aboard”.</h2></div><Link href="/recruit/preview" className="inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-[#0a66c2] transition hover:gap-3">Open product preview <Arrow /></Link></div>
             <div className="mt-14 space-y-20 lg:mt-20">
               {capabilities.map((item, index) => (
                 <article key={item.number} className={`grid items-center gap-10 lg:grid-cols-2 lg:gap-20 ${index % 2 ? "lg:[&>div:first-child]:order-2" : ""}`}>
@@ -369,13 +370,13 @@ export default function RecruitLandingPage() {
           </div>
         </section>
 
-        <section className="bg-white">
-          <div className="mx-auto max-w-4xl px-5 py-24 text-center lg:px-8"><p className="text-xs font-semibold uppercase tracking-[.17em] text-[#0a66c2]">Ready when your team is</p><h2 className="mt-4 font-display text-4xl font-semibold tracking-[-.055em] text-[#10263d] sm:text-5xl">Make the next hiring decision with the whole picture.</h2><p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-[#667d8f]">Start with the tools that fit today. Rolebolt plans are designed to grow with your hiring volume, with payment-ready upgrades when you need them.</p><div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row"><Link href="/recruit/signup" className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0a66c2] px-6 py-3.5 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#07559f]">Start free <Arrow /></Link><Link href="/recruit/opportunities" className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#cbd9e4] px-6 py-3.5 text-sm font-semibold text-[#31536e] transition hover:border-[#0a66c2]">Browse opportunities <Arrow /></Link></div></div>
+         <section className="bg-white">
+          <div className="mx-auto max-w-4xl px-5 py-24 text-center lg:px-8"><p className="text-xs font-semibold uppercase tracking-[.17em] text-[#0a66c2]">Ready when your team is</p><h2 className="mt-4 font-display text-4xl font-semibold tracking-[-.055em] text-[#10263d] sm:text-5xl">Make the next hiring decision with the whole picture.</h2><p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-[#667d8f]">Start with the tools that fit today. Rolebolt plans are designed to grow with your hiring volume, with payment-ready upgrades when you need them.</p><div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row"><Link href="/recruit/signup" className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0a66c2] px-6 py-3.5 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#07559f]">Start building <Arrow /></Link><Link href="/recruit/opportunities" className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#cbd9e4] px-6 py-3.5 text-sm font-semibold text-[#31536e] transition hover:border-[#0a66c2]">Browse opportunities <Arrow /></Link></div></div>
         </section>
       </main>
 
       <footer className="border-t border-[#dfe8ef] bg-[#f8fbfd]">
-        <div className="mx-auto flex max-w-7xl flex-col gap-5 px-5 py-8 sm:flex-row sm:items-center sm:justify-between lg:px-8"><div className="flex items-center gap-2"><RoleboltLogo size="sm" /><span className="text-sm font-semibold">Rolebolt</span></div><p className="text-xs text-[#7a8c9b]">A shared workspace for better hiring and better job searches.</p><div className="flex flex-wrap gap-4 text-xs font-medium text-[#60778a]"><Link href="/recruit/opportunities" className="hover:text-[#0a66c2]">Find jobs</Link><Link href="/seeker/workspace" className="hover:text-[#0a66c2]">Seeker workspace</Link><Link href="/recruit/pricing" className="hover:text-[#0a66c2]">Plans</Link><Link href="/recruit/login" className="hover:text-[#0a66c2]">Sign in</Link></div></div>
+        <div className="mx-auto flex max-w-7xl flex-col gap-5 px-5 py-8 sm:flex-row sm:items-center sm:justify-between lg:px-8"><div className="flex items-center gap-2"><RoleboltLogo size="sm" /><span className="text-sm font-semibold">Rolebolt</span></div><p className="text-xs text-[#7a8c9b]">A shared workspace for better hiring and better job searches.</p><div className="flex flex-wrap gap-x-4 gap-y-2 text-xs font-medium text-[#60778a]"><Link href="/recruit/opportunities" className="hover:text-[#0a66c2]">Find jobs</Link><Link href="/recruit/preview" className="hover:text-[#0a66c2]">Product preview</Link><Link href="/recruit/status" className="hover:text-[#0a66c2]">Status</Link><Link href="/recruit/analytics" className="hover:text-[#0a66c2]">Analytics</Link><Link href="/recruit/talent-pool" className="hover:text-[#0a66c2]">Talent pool</Link><Link href="/recruit/recruiter-profile" className="hover:text-[#0a66c2]">Recruiter profile</Link><Link href="/seeker/workspace" className="hover:text-[#0a66c2]">Seeker workspace</Link><Link href="/recruit/pricing" className="hover:text-[#0a66c2]">Plans</Link><Link href="/recruit/login" className="hover:text-[#0a66c2]">Sign in</Link></div></div>
       </footer>
       <SiteGuideChatbot />
     </div>
