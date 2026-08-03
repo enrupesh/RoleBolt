@@ -31,6 +31,7 @@ import {
 } from "./billing/seekerEnforcement";
 import {
   assertStandardBulkActionSize,
+  assertStandardBulkImportFileCount,
   assertStandardFeature,
   assertStandardResourceLimit,
   isStandardBillingError,
@@ -2179,32 +2180,47 @@ recruitRouter.post("/jobs", async (req, res) => {
     await assertStandardResourceLimit(uid, "active_jobs");
     await assertStandardResourceLimit(uid, "stored_jobs");
 
-    const { jd, rubric } = await runStandardBillingOperation({
-      ownerUid: uid,
-      operation: "job_generation",
-      idempotencyKey: standardRequestIdempotencyKey(
-        uid,
-        "job-generation",
-        standardIdempotencyHeader(req) || standardContentHash(`${title}:${responsibilities || ""}:${mustHaveSkills || ""}`),
-      ),
-      resourceType: "job",
-      work: async () => generateJobDescription({
-        title, department: department || "", seniority: seniority || "Mid-level",
-        location: location || "Remote", workMode: workMode || "remote",
-        responsibilities: responsibilities || "", mustHaveSkills: mustHaveSkills || "",
-        niceToHaveSkills: niceToHaveSkills || "",
-        salaryMin: salaryMin ? Number(salaryMin) : undefined,
-        salaryMax: salaryMax ? Number(salaryMax) : undefined,
-        salaryCurrency: salaryCurrency || "INR",
-        niche: niche || "AI, Data, Software & Product Tech",
-        nicheDetails: safeNicheDetails,
-        openings: safeOpenings,
-        perks: safePerks,
-        languageRequirement: safeLanguageRequirement,
-        timezoneOverlap: safeTimezoneOverlap,
-        applicationDeadline: safeDeadline,
-      }),
-    });
+    let jd: string;
+    let rubric: { name: string; weight: number; description: string }[];
+    try {
+      ({ jd, rubric } = await runStandardBillingOperation({
+        ownerUid: uid,
+        operation: "job_generation",
+        idempotencyKey: standardRequestIdempotencyKey(
+          uid,
+          "job-generation",
+          standardIdempotencyHeader(req) || standardContentHash(`${title}:${responsibilities || ""}:${mustHaveSkills || ""}`),
+        ),
+        resourceType: "job",
+        work: async () => generateJobDescription({
+          title, department: department || "", seniority: seniority || "Mid-level",
+          location: location || "Remote", workMode: workMode || "remote",
+          responsibilities: responsibilities || "", mustHaveSkills: mustHaveSkills || "",
+          niceToHaveSkills: niceToHaveSkills || "",
+          salaryMin: salaryMin ? Number(salaryMin) : undefined,
+          salaryMax: salaryMax ? Number(salaryMax) : undefined,
+          salaryCurrency: salaryCurrency || "INR",
+          niche: niche || "AI, Data, Software & Product Tech",
+          nicheDetails: safeNicheDetails,
+          openings: safeOpenings,
+          perks: safePerks,
+          languageRequirement: safeLanguageRequirement,
+          timezoneOverlap: safeTimezoneOverlap,
+          applicationDeadline: safeDeadline,
+        }),
+      }));
+    } catch (genErr) {
+      // Resource limits already asserted — AI quota exhaustion should not block job create.
+      if (!isStandardBillingError(genErr)) throw genErr;
+      console.warn("[recruit] job_generation blocked by billing — creating job with template JD:", (genErr as Error).message);
+      jd = `# ${String(title).trim()}\n\n${String(responsibilities || "").trim()}\n\n## Must-have skills\n${String(mustHaveSkills || "").trim()}`;
+      rubric = [
+        { name: "Role Fit", weight: 40, description: "Alignment with the role requirements." },
+        { name: "Relevant Experience", weight: 30, description: "Years and quality of relevant experience." },
+        { name: "Communication & Culture Fit", weight: 20, description: "Clarity and professionalism." },
+        { name: "Growth & Initiative", weight: 10, description: "Evidence of learning and initiative." },
+      ];
+    }
 
     const job = await RecruitJob.create({
       uid, title,
@@ -3504,16 +3520,16 @@ recruitRouter.post(
       const ownerUid = standardBillingOwnerUid(job);
       const batchId = crypto.randomUUID();
       try {
-        // Enforce the plan's per-batch size ceiling (e.g. Free = 3 files).
+        // Enforce plan ceilings before SSE so Free (3 files / 1 import) fails as JSON 409.
         await assertStandardBulkActionSize(ownerUid, files.length);
-        // Reserve the batch itself before streaming begins.
+        await assertStandardBulkImportFileCount(ownerUid, files.length);
+        // One batch reservation (quantity=1), not one per file.
         await runStandardBillingOperation({
           ownerUid,
           operation: "bulk_import_batch",
           idempotencyKey: standardIdempotencyKey(ownerUid, ["bulk-batch", String(job._id), batchId]),
           resourceType: "job",
           resourceId: String(job._id),
-          quantity: files.length,
           metadata: { fileCount: files.length },
           work: async () => true,
         });

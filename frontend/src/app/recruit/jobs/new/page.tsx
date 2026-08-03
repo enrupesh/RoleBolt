@@ -6,8 +6,9 @@ import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { RecruitGuard } from "@/components/RecruitGuard";
 import Link from "next/link";
 import { computeJobQuality } from "@/lib/jobQuality";
-import { apiUrl, readApiJson } from "@/lib/api";
+import { apiErrorFromPayload, apiUrl, readApiJson } from "@/lib/api";
 import { registerPostCreateChecklist } from "@/components/PostCreateChecklist";
+import { StandardErrorNotice } from "@/components/StandardErrorNotice";
 
 function ChevronLeftIcon() {
   return (
@@ -533,7 +534,7 @@ function NewJobContent() {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormData>(DEFAULT);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<unknown>("");
   const [token, setToken] = useState<string | null>(null);
   const [createdJob, setCreatedJob] = useState<{ id: string; title: string } | null>(null);
   const [copied, setCopied] = useState(false);
@@ -644,11 +645,13 @@ function NewJobContent() {
         }),
       });
       const data = await readApiJson(res);
-      if (!res.ok) throw new Error(data.error || "Failed to create job.");
+      if (!res.ok) {
+        throw apiErrorFromPayload(res.status, data, data.message || data.error || "Failed to create job.");
+      }
       setCreatedJob({ id: data.job._id, title: form.title });
       registerPostCreateChecklist(data.job._id, form.title);
     } catch (e: any) {
-      setError(e.message);
+      setError(e);
       setLoading(false);
     }
   }
@@ -1213,9 +1216,7 @@ function NewJobContent() {
                 </ul>
               </div>
 
-              {error && (
-                <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{error}</div>
-              )}
+              {error ? <StandardErrorNotice error={error} /> : null}
             </div>
           )}
         </div>

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { apiUrl } from "@/lib/api";
+import { apiErrorFromPayload, apiUrl, readApiJson } from "@/lib/api";
+import { StandardErrorNotice } from "@/components/StandardErrorNotice";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -79,7 +80,7 @@ export default function BulkImportModal({
   const [entries, setEntries] = useState<FileEntry[]>([]);
   const [currentIndex, setCurrentIndex] = useState(-1);
   const [dragOver, setDragOver] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<unknown>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const resultsEndRef = useRef<HTMLDivElement>(null);
 
@@ -137,8 +138,8 @@ export default function BulkImportModal({
       });
 
       if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        setError(j.error || "Upload failed.");
+        const j = await readApiJson(res).catch(() => ({} as any));
+        setError(apiErrorFromPayload(res.status, j, j.message || j.error || "Upload failed."));
         setStep("pick");
         return;
       }
@@ -191,8 +192,22 @@ export default function BulkImportModal({
               setStep("results");
               if (ev.succeeded > 0) onImported(ev.succeeded);
             } else if (ev.type === "error") {
-              setError(ev.error || "Import failed.");
-              setStep("pick");
+              if (ev.planLimit || ev.code === "PLAN_LIMIT_REACHED") {
+                setError(apiErrorFromPayload(409, {
+                  error: "PLAN_LIMIT_REACHED",
+                  code: ev.code || "PLAN_LIMIT_REACHED",
+                  message: ev.error,
+                  upgradeRequired: true,
+                  category: "creator_standard",
+                }, ev.error || "Plan limit reached."));
+              } else {
+                setError(ev.error || "Import failed.");
+              }
+              if (ev.planLimit) {
+                // Keep results view if some files already succeeded.
+              } else {
+                setStep("pick");
+              }
             }
           } catch {}
         }
@@ -254,9 +269,7 @@ export default function BulkImportModal({
               onChange={e => { if (e.target.files) addFiles(e.target.files); e.target.value = ""; }}
             />
 
-            {error && (
-              <p className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2">{error}</p>
-            )}
+            {error ? <StandardErrorNotice error={error} /> : null}
 
             {/* File list */}
             {entries.length > 0 && (
