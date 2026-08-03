@@ -50,7 +50,7 @@ Reads / deletes / manual field edits remain unmetered.
 | Resource limits before create | ✅ | workspace, applications, saved jobs, projects, certs, resumes, alerts, history |
 | reserveUsage before every AI call | ✅ | via `runSeekerBillingOperation` / `executeBillingOperation` |
 | One charge per provider fallback chain | ✅ | `callAI` inside billing wrapper |
-| Stable error codes + frontend hooks | ✅ | `SeekerErrorNotice` on seeker pages + match/alerts |
+| Stable error codes + frontend hooks | ✅ | `SeekerErrorNotice` on seeker pages + match/alerts + profile save |
 | Manual ops free when AI exhausted | ✅ | profile PUT non-capacity fields; status edits |
 | Tests: AI exhaustion, resource, downgrade, bypass | ✅ | `seekerEnforcement.test.ts` |
 
@@ -65,7 +65,7 @@ Reads / deletes / manual field edits remain unmetered.
 | Forged plan / non-razorpay provider → Free | ✅ |
 | Manual profile capacity when AI exhausted | ✅ |
 | Free catalog spot-check values | ✅ match `payment.md` §4.2 |
-| `tsc --noEmit` / `npm test` | ✅ |
+| `tsc --noEmit` / `npm test` | ✅ 64/64 pass |
 
 ---
 
@@ -76,7 +76,10 @@ Reads / deletes / manual field edits remain unmetered.
 3. **Extension analyze** — uses request-level idempotency keys so re-analyze is a new billable action unless the client retries with the same `Idempotency-Key`.
 4. **Public match** — requires auth and meters `job_fit_analysis` (closes unauthenticated AI bypass).
 5. **Job alerts** — owner-scoped via profile email; anonymous emails capped at Free `job_alerts` limit.
+6. **Tests are unit-level** for review-gate semantics. Live Mongo/HTTP seeker route smoke remains optional when `MONGODB_URI` is available.
 
 ---
 
-3. **Tests are unit-level** for review-gate semantics (limit serialization, Free catalog values, forged provider → Free). Live Mongo/HTTP seeker route smoke remains optional when `MONGODB_URI` is available.
+## 6. Verdict
+
+**Phase 1 is complete.** Proceed to **Phase 2 — Form Jobs enforcement (including public intake)**.
