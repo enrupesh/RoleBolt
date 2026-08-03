@@ -776,7 +776,7 @@ export function JudgesTestingKit({ dark }: { dark?: boolean }) {
         </div>
         <div className={`relative mt-6 aspect-[1024/500] w-full border-t ${dividerCls} ${dark ? "bg-black/20" : "bg-slate-50"}`}>
           <Image
-            src="/screenshots/ai-copilot.png"
+            src="/screenshots/ai-copilot-rolebolt.png"
             alt="Ask Rolebolt AI Copilot focused on a candidate, showing quick prompts and candidate context panel"
             fill
             className="object-cover object-top"
