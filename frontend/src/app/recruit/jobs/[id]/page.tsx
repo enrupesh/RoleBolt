@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, use, Suspense } from "react";
+import { useState, useEffect, useCallback, useRef, use, Suspense, useMemo } from "react";
 import HiringAutopilotHub from "./HiringAutopilotHub";
 import type { HubSection } from "./HiringAutopilotHub";
 import JobTabNav, { type JobTabId } from "./JobTabNav";
@@ -24,6 +24,7 @@ import JobPageTour from "./JobPageTour";
 import CopilotDrawer from "./CopilotDrawer";
 import StageEmailFlow, { isStageEmailNotifyStage } from "./StageEmailFlow";
 import { markChecklistStep } from "@/components/PostCreateChecklist";
+import { CreatorEmailComposer, type CreatorEmailRecipient } from "@/components/CreatorEmailComposer";
 
 function getFrontendUrl(): string {
   if (typeof window !== "undefined" && window.location?.origin) return window.location.origin;
@@ -2017,13 +2018,14 @@ function AiRecommendationBadge({
   );
 }
 
-function CandidateCard({ c, jobId, job, token, onUpdate, onDelete, highlighted, selected, onToggleSelect }: {
+function CandidateCard({ c, jobId, job, token, onUpdate, onDelete, highlighted, selected, onToggleSelect, recipientPool }: {
   c: Candidate; jobId: string; job: Job; token: string;
   onUpdate: (id: string, update: Partial<Candidate>) => void;
   onDelete: (id: string) => void;
   highlighted?: boolean;
   selected?: boolean;
   onToggleSelect?: (id: string) => void;
+  recipientPool: CreatorEmailRecipient[];
 }) {
   const [expanded, setExpanded] = useState(false);
   const [loadingBrief, setLoadingBrief] = useState(false);
@@ -2052,6 +2054,8 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete, highlighted, 
     createdAt?: string;
   }> | null>(null);
   const [pendingStageEmail, setPendingStageEmail] = useState<CandidateStage | null>(null);
+  const [showCreatorEmail, setShowCreatorEmail] = useState(false);
+  const { user } = useRecruitAuth();
 
   useEffect(() => {
     if (!expanded || !token) return;
@@ -2304,6 +2308,34 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete, highlighted, 
           onUpdate={(update) => onUpdate(c._id, update)}
         />
       )}
+      <CreatorEmailComposer
+        open={showCreatorEmail}
+        onClose={() => setShowCreatorEmail(false)}
+        channel="standard"
+        contextId={jobId}
+        token={token}
+        billingCategory="creator_standard"
+        initialRecipientIds={[c._id]}
+        recipientPool={recipientPool}
+        senderPreview={{
+          username: user?.username,
+          email: user?.email,
+          companyName: job.companyName,
+        }}
+        onSent={() => {
+          setLocalEmailLog((prev) => [
+            ...prev,
+            {
+              type: "creator_premium",
+              to: c.email || "",
+              subject: "Creator email",
+              body: "",
+              sentAt: new Date().toISOString(),
+              status: "sent",
+            },
+          ]);
+        }}
+      />
       {showApplicantDetails && (
         <ApplicantDetailsModal
           c={c}
@@ -2475,6 +2507,16 @@ function CandidateCard({ c, jobId, job, token, onUpdate, onDelete, highlighted, 
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
               Info
             </button>
+
+            {c.email && (
+              <button
+                onClick={() => setShowCreatorEmail(true)}
+                className="flex items-center gap-1 rounded-xl border border-[#0a66c2]/25 bg-[#0a66c2]/10 px-3 py-1.5 text-[11px] font-semibold text-[#7cc0ff] hover:bg-[#0a66c2]/15 transition"
+              >
+                <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                Send Email
+              </button>
+            )}
 
             <button
               onClick={() => setExpanded(e => !e)}
@@ -2779,6 +2821,18 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkMessage, setBulkMessage] = useState<string | null>(null);
   const [showCopilot, setShowCopilot] = useState(false);
+
+  const emailRecipients = useMemo<CreatorEmailRecipient[]>(
+    () =>
+      candidates
+        .filter((candidate) => candidate.email?.trim())
+        .map((candidate) => ({
+          id: candidate._id,
+          name: candidate.name,
+          email: candidate.email!.trim(),
+        })),
+    [candidates],
+  );
 
   const { sessionToken } = useRecruitAuth();
   useEffect(() => {
@@ -3519,6 +3573,7 @@ function JobDetailContent({ params }: { params: Promise<{ id: string }> }) {
                               highlighted={focusCandidateId === c._id}
                               selected={selectedIds.has(c._id)}
                               onToggleSelect={toggleSelectCandidate}
+                              recipientPool={emailRecipients}
                             />
                           ))}
                         </div>

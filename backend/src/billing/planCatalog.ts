@@ -239,14 +239,14 @@ const featureFlagsByCategory: Record<BillingCategory, Record<BillingPlan, Featur
     ultra: { ...commonFlags, advancedMatching: true, priorityProcessing: true },
   },
   creator_form: {
-    free: { ...commonFlags, assessments: true, advancedAnalytics: false, customBranding: false },
-    pro: { ...commonFlags, assessments: true, advancedAnalytics: true, customBranding: true },
-    ultra: { ...commonFlags, assessments: true, advancedAnalytics: true, customBranding: true },
+    free: { ...commonFlags, assessments: true, advancedAnalytics: false, customBranding: false, creatorEmailComposer: false },
+    pro: { ...commonFlags, assessments: true, advancedAnalytics: true, customBranding: true, creatorEmailComposer: true },
+    ultra: { ...commonFlags, assessments: true, advancedAnalytics: true, customBranding: true, creatorEmailComposer: true },
   },
   creator_standard: {
-    free: { ...commonFlags, assessments: true, advancedAnalytics: false, customBranding: false },
-    pro: { ...commonFlags, assessments: true, advancedAnalytics: true, customBranding: true },
-    ultra: { ...commonFlags, assessments: true, advancedAnalytics: true, customBranding: true },
+    free: { ...commonFlags, assessments: true, advancedAnalytics: false, customBranding: false, creatorEmailComposer: false },
+    pro: { ...commonFlags, assessments: true, advancedAnalytics: true, customBranding: true, creatorEmailComposer: true },
+    ultra: { ...commonFlags, assessments: true, advancedAnalytics: true, customBranding: true, creatorEmailComposer: true },
   },
 };
 

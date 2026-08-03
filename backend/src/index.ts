@@ -18,6 +18,7 @@ import { billingCatalogRouter, billingFoundationRouter } from "./billing/api";
 import { handleRazorpayWebhook, razorpayBillingRouter } from "./billing/razorpayApi";
 import { collaborationRouter, collaborationPublicRouter } from "./collaboration";
 import { raka98AdminRouter } from "./admin/raka98AdminRouter";
+import { creatorEmailRouter } from "./creatorEmailRouter";
 
 dotenv.config();
 
@@ -77,6 +78,7 @@ app.use("/recruit/copilot", requireAuth, copilotRouter);
 app.use("/recruit/seeker", requireAuth, requireSeekerRole, seekerRouter);
 app.use("/recruit/collaboration", requireAuth, collaborationRouter);
 app.use("/recruit", requireAuth, recruitRouter);
+app.use("/recruit/creator-emails", requireAuth, creatorEmailRouter);
 app.use("/recruit/forms", requireAuth, formRouter);
 // Pricing metadata is safe to expose publicly; account entitlements and all
 // mutation/legacy billing routes remain behind JWT authentication.
