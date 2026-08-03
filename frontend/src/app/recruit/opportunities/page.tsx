@@ -1,9 +1,11 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import RecruitHeader from "@/components/RecruitHeader";
 import FilterDropdown from "./FilterDropdown";
 import PageTracker from "@/components/PageTracker";
 import JobAlertSubscribe from "./JobAlertSubscribe";
 import { apiUrl, readApiJson } from "@/lib/api";
+import { buildMetadata } from "@/lib/seo";
 
 type PageSearchParams = Record<string, string | string[] | undefined>;
 
@@ -68,6 +70,19 @@ function buildQuery(params: PageSearchParams) {
     if (value && value !== "all") query.set(key, value);
   });
   return query;
+}
+
+export async function generateMetadata({ searchParams }: { searchParams: Promise<PageSearchParams> }): Promise<Metadata> {
+  const params = await searchParams;
+  const hasQuery = buildQuery(params).size > 0;
+  return buildMetadata({
+    title: hasQuery ? "Filtered Job Search | Rolebolt" : "Find Jobs & AI-Matched Opportunities | Rolebolt",
+    description:
+      "Search open jobs by role, skill, location and work mode. Discover public opportunities and apply through Rolebolt's focused job-search experience.",
+    path: "/recruit/opportunities",
+    keywords: ["find jobs", "AI job matching", "open job opportunities", "remote jobs", "job search platform"],
+    noIndex: hasQuery,
+  });
 }
 
 async function loadJobs(params: PageSearchParams) {

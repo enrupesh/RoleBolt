@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { apiUrl, readApiJson } from "@/lib/api";
 import { SITE_URL } from "@/lib/seo";
+import { resourceArticles } from "@/lib/resourceContent";
 
 export const revalidate = 3600;
 
@@ -25,6 +26,11 @@ const publicPages: MetadataRoute.Sitemap = [
     url: `${SITE_URL}/recruit/pricing`,
     changeFrequency: "monthly",
     priority: 0.7,
+  },
+  {
+    url: `${SITE_URL}/resources`,
+    changeFrequency: "weekly",
+    priority: 0.8,
   },
   { url: `${SITE_URL}/privacy`, changeFrequency: "yearly", priority: 0.2 },
   { url: `${SITE_URL}/terms`, changeFrequency: "yearly", priority: 0.2 },
@@ -64,5 +70,11 @@ async function publicJobUrls(): Promise<MetadataRoute.Sitemap> {
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  return [...publicPages, ...(await publicJobUrls())];
+  const resourceUrls: MetadataRoute.Sitemap = resourceArticles.map((article) => ({
+    url: `${SITE_URL}/resources/${article.slug}`,
+    lastModified: new Date(article.modifiedAt),
+    changeFrequency: "monthly",
+    priority: 0.7,
+  }));
+  return [...publicPages, ...resourceUrls, ...(await publicJobUrls())];
 }
