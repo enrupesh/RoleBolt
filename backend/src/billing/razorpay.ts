@@ -62,6 +62,16 @@ export interface RazorpayPlanResponse {
   interval?: number;
 }
 
+/**
+ * Razorpay requires a bounded subscription when perpetual subscriptions are
+ * not enabled on the account. One hundred years preserves the product's
+ * ongoing-renewal behavior while staying within Razorpay's documented maximum
+ * subscription duration.
+ */
+export function getRazorpaySubscriptionTotalCount(interval: BillingInterval): number {
+  return interval === "monthly" ? 1200 : 100;
+}
+
 function getApiConfig(): { keyId: string; keySecret: string } {
   const keyId = process.env.RAZORPAY_KEY_ID?.trim();
   const keySecret = process.env.RAZORPAY_KEY_SECRET?.trim();
@@ -279,6 +289,7 @@ export async function createRazorpaySubscription(input: {
     method: "POST",
     body: {
       plan_id: planId,
+      total_count: getRazorpaySubscriptionTotalCount(input.interval),
       quantity: 1,
       customer_notify: true,
       notes: {

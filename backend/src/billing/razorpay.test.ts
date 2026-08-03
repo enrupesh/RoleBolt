@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import {
   getConfiguredRazorpayPlanId,
   getRazorpayPlanEnvKey,
+  getRazorpaySubscriptionTotalCount,
   verifySubscriptionCheckoutSignature,
   verifyWebhookSignature,
   RazorpayNotConfiguredError,
@@ -32,6 +33,11 @@ describe("Razorpay provider boundary", () => {
       if (previous === undefined) delete process.env[key];
       else process.env[key] = previous;
     }
+  });
+
+  it("bounds subscriptions without changing monthly or yearly billing cadence", () => {
+    assert.equal(getRazorpaySubscriptionTotalCount("monthly"), 1200);
+    assert.equal(getRazorpaySubscriptionTotalCount("yearly"), 100);
   });
 
   it("verifies checkout signatures using subscription and payment IDs", () => {
