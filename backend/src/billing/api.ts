@@ -26,6 +26,7 @@ function mapCounters(source: unknown): Record<string, number> {
 /** Backend-owned pricing/limits catalog. Provider IDs are intentionally omitted. */
 billingCatalogRouter.get("/catalog", (_req, res) => {
   const razorpayKeyId = process.env.RAZORPAY_KEY_ID?.trim() || null;
+  const razorpayCheckoutConfigId = process.env.RAZORPAY_CHECKOUT_CONFIG_ID?.trim() || null;
   return res.json({
     version: 1,
     currency: "INR",
@@ -34,6 +35,8 @@ billingCatalogRouter.get("/catalog", (_req, res) => {
     intervals: ["monthly", "yearly"],
     /** Public Razorpay key for Checkout.js only — never includes secrets or plan IDs. */
     razorpayKeyId,
+    /** Optional public Checkout configuration ID created in the Razorpay Dashboard. */
+    razorpayCheckoutConfigId,
     plansByCategory: getPublicPlanCatalog(),
   });
 });

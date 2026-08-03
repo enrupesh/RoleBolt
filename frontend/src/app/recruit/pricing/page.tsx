@@ -125,6 +125,7 @@ function PricingContent() {
         await openRazorpaySubscriptionCheckout({
           keyId,
           subscriptionId,
+          checkoutConfigId: catalog?.razorpayCheckoutConfigId,
           description: `${CATEGORY_LABELS[category]} ${PLAN_LABELS[plan]}`,
           onSuccess: async (result) => {
             await verifyCheckout(sessionToken, result);
@@ -319,9 +320,12 @@ function PricingContent() {
           </div>
         )}
 
-        <p className="mt-10 text-center text-sm text-slate-500">
-          Payments by Razorpay · INR · Cancel anytime · Paid access activates only after webhook verification
-        </p>
+        <div className="mt-10 space-y-2 text-center text-sm text-slate-500">
+          <p>Payments by Razorpay · INR · Cancel anytime · Paid access activates only after webhook verification</p>
+          <p className="text-xs">
+            On mobile, choose UPI and your payment app. On desktop, scan the Razorpay QR with another phone.
+          </p>
+        </div>
       </main>
     </div>
   );
