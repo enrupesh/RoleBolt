@@ -19,6 +19,18 @@ export type AdminUserLookup = {
 };
 
 export type VerificationRequestStatus = "pending" | "verified" | "rejected" | "all";
+export type FeedbackCategoryFilter = "all" | "product" | "bug" | "feature" | "recruiter" | "job_seeker" | "billing" | "other";
+export type FeedbackStatusFilter = "all" | "unread" | "read";
+
+export type AdminFeedback = {
+  id: string;
+  category: Exclude<FeedbackCategoryFilter, "all">;
+  message: string;
+  email: string;
+  pageUrl: string;
+  readAt: string | null;
+  createdAt: string | null;
+};
 
 export type AdminVerificationRequest = {
   uid: string;
@@ -99,4 +111,23 @@ export async function unverifyCompany(uid: string, note = "") {
     method: "POST",
     body: JSON.stringify({ note }),
   });
+}
+
+export async function fetchFeedback(category: FeedbackCategoryFilter, status: FeedbackStatusFilter) {
+  const data = await adminFetch(`/admin/feedback?category=${encodeURIComponent(category)}&status=${encodeURIComponent(status)}`);
+  return {
+    feedback: data.feedback as AdminFeedback[],
+    unreadCount: Number(data.unreadCount ?? 0),
+  };
+}
+
+export async function setFeedbackRead(id: string, read: boolean) {
+  return adminFetch(`/admin/feedback/${encodeURIComponent(id)}/read`, {
+    method: "PATCH",
+    body: JSON.stringify({ read }),
+  });
+}
+
+export async function deleteFeedback(id: string) {
+  return adminFetch(`/admin/feedback/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
