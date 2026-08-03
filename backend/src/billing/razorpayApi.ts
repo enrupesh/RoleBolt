@@ -2,6 +2,7 @@ import express from "express";
 import mongoose from "mongoose";
 import { connectMongo } from "../db";
 import { BillingCheckout } from "../models/BillingCheckout";
+import { Subscription } from "../models/Subscription";
 import { getEntitlement } from "./entitlements";
 import {
   createRazorpaySubscription,
@@ -12,6 +13,13 @@ import {
   verifyWebhookSignature,
 } from "./razorpay";
 import { processRazorpayWebhook, getRazorpayEventId } from "./razorpayLifecycle";
+import {
+  cancelPendingSubscriptionPlanChange,
+  reconcileSubscription,
+  requestSubscriptionPlanChange,
+  scheduleSubscriptionCancellation,
+  SubscriptionLifecycleError,
+} from "./subscriptionLifecycle";
 import {
   isBillingCategory,
   isBillingInterval,
@@ -51,6 +59,12 @@ function parseRequestedPlan(body: unknown): {
   return { category: input.category, plan: input.plan, interval: input.interval };
 }
 
+function parseCategory(body: unknown): BillingCategory | null {
+  if (!body || typeof body !== "object") return null;
+  const category = (body as Record<string, unknown>).category;
+  return typeof category === "string" && isBillingCategory(category) ? category : null;
+}
+
 function idempotencyKey(req: express.Request): string {
   const header = req.header("Idempotency-Key") ?? req.header("X-Idempotency-Key");
   const body = req.body && typeof req.body === "object"
@@ -61,6 +75,12 @@ function idempotencyKey(req: express.Request): string {
 }
 
 function serializedProviderError(error: unknown): { status: number; body: Record<string, unknown> } {
+  if (error instanceof SubscriptionLifecycleError) {
+    return {
+      status: error.httpStatus,
+      body: { error: error.code, message: error.message },
+    };
+  }
   if (error instanceof RazorpayNotConfiguredError) {
     return {
       status: 503,
@@ -109,6 +129,30 @@ razorpayBillingRouter.post("/create-checkout", async (req, res) => {
 
     await connectMongo();
     const objectId = new mongoose.Types.ObjectId(uid);
+
+    // Existing paid Razorpay subscriptions must use change-plan, not a second checkout.
+    const existingPaid = await Subscription.findOne({
+      userId: objectId,
+      category: requested.category,
+      provider: "razorpay",
+      providerSubscriptionId: { $type: "string", $gt: "" },
+      plan: { $in: ["pro", "ultra"] },
+    }).lean();
+    if (existingPaid) {
+      const entitlement = await getEntitlement(uid, requested.category);
+      if (entitlement.plan !== "free") {
+        return res.status(409).json({
+          error: "CHANGE_PLAN_REQUIRED",
+          message:
+            "This category already has a Razorpay subscription. Use /billing/change-plan for upgrades or downgrades, or /billing/cancel-subscription to leave paid.",
+          endpoints: {
+            changePlan: "/billing/change-plan",
+            cancelSubscription: "/billing/cancel-subscription",
+          },
+        });
+      }
+    }
+
     const existing = await BillingCheckout.findOne({
       idempotencyKey: key,
     }).lean().exec();
@@ -268,6 +312,134 @@ razorpayBillingRouter.post("/verify-checkout", async (req, res) => {
   } catch (error) {
     const serialized = serializedProviderError(error);
     console.error("[billing] Razorpay checkout verification error:", error);
+    return res.status(serialized.status).json(serialized.body);
+  }
+});
+
+/**
+ * Schedule cancellation at period end (default) or cancel immediately when explicitly requested.
+ * Paid access is retained until currentPeriodEnd when cancelAtPeriodEnd is set.
+ */
+razorpayBillingRouter.post("/cancel-subscription", async (req, res) => {
+  try {
+    const uid = uidFromRequest(req);
+    if (!uid) return res.status(401).json({ error: "Unauthorized" });
+    const category = parseCategory(req.body);
+    if (!category) {
+      return res.status(422).json({
+        error: "INVALID_BILLING_CATEGORY",
+        message: "Provide a valid billing category.",
+      });
+    }
+    const body = req.body && typeof req.body === "object"
+      ? req.body as Record<string, unknown>
+      : {};
+    const cancelAtCycleEnd = body.cancelAtCycleEnd !== false && body.immediate !== true;
+
+    await connectMongo();
+    const result = await scheduleSubscriptionCancellation({
+      userId: uid,
+      category,
+      cancelAtCycleEnd,
+    });
+    return res.json({
+      ...result,
+      message: result.cancelAtPeriodEnd
+        ? "Cancellation scheduled at period end. Paid access continues until the current period ends."
+        : "Subscription cancelled immediately.",
+    });
+  } catch (error) {
+    const serialized = serializedProviderError(error);
+    console.error("[billing] cancel-subscription error:", error);
+    return res.status(serialized.status).json(serialized.body);
+  }
+});
+
+/**
+ * Upgrade (now) or downgrade (cycle_end) an existing Razorpay subscription.
+ * Never grants the target plan from this response — webhook/reconciliation required.
+ */
+razorpayBillingRouter.post("/change-plan", async (req, res) => {
+  try {
+    const uid = uidFromRequest(req);
+    if (!uid) return res.status(401).json({ error: "Unauthorized" });
+    const requested = parseRequestedPlan(req.body);
+    if (!requested || requested.plan === "free") {
+      return res.status(422).json({
+        error: "INVALID_BILLING_PLAN",
+        message:
+          "Choose a paid plan, category, and interval. Use /billing/cancel-subscription to leave paid.",
+      });
+    }
+
+    await connectMongo();
+    const result = await requestSubscriptionPlanChange({
+      userId: uid,
+      ...requested,
+    });
+    return res.json({
+      ...result,
+      message:
+        result.changeType === "upgrade"
+          ? "Upgrade requested. Paid entitlement updates only after Razorpay webhook confirmation."
+          : "Downgrade scheduled at period end. Current paid limits remain until then.",
+    });
+  } catch (error) {
+    const serialized = serializedProviderError(error);
+    console.error("[billing] change-plan error:", error);
+    return res.status(serialized.status).json(serialized.body);
+  }
+});
+
+razorpayBillingRouter.post("/cancel-pending-plan-change", async (req, res) => {
+  try {
+    const uid = uidFromRequest(req);
+    if (!uid) return res.status(401).json({ error: "Unauthorized" });
+    const category = parseCategory(req.body);
+    if (!category) {
+      return res.status(422).json({
+        error: "INVALID_BILLING_CATEGORY",
+        message: "Provide a valid billing category.",
+      });
+    }
+    await connectMongo();
+    const result = await cancelPendingSubscriptionPlanChange({ userId: uid, category });
+    return res.json(result);
+  } catch (error) {
+    const serialized = serializedProviderError(error);
+    console.error("[billing] cancel-pending-plan-change error:", error);
+    return res.status(serialized.status).json(serialized.body);
+  }
+});
+
+/**
+ * Authenticated self-service reconciliation for one category.
+ * Admin/batch repairs belong to the CLI (`npm run billing:reconcile`).
+ */
+razorpayBillingRouter.post("/reconcile-subscription", async (req, res) => {
+  try {
+    const uid = uidFromRequest(req);
+    if (!uid) return res.status(401).json({ error: "Unauthorized" });
+    const category = parseCategory(req.body);
+    if (!category) {
+      return res.status(422).json({
+        error: "INVALID_BILLING_CATEGORY",
+        message: "Provide a valid billing category.",
+      });
+    }
+    await connectMongo();
+    const result = await reconcileSubscription({
+      userId: uid,
+      category,
+      actor: "user",
+    });
+    return res.json({
+      ...result,
+      activation: "provider_verified",
+    });
+  } catch (error) {
+    const serialized = serializedProviderError(error);
+    console.error("[billing] reconcile-subscription error:", error);
     return res.status(serialized.status).json(serialized.body);
   }
 });

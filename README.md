@@ -80,9 +80,69 @@ MONGODB_URI=mongodb://127.0.0.1:27017/rolebolt_billing_test npm test
 # or MONGODB_TEST_URI=...
 ```
 
-### Razorpay plan sync (later phases)
+### Razorpay billing (Phase 5)
+
+**Required server environment variables (never expose to the frontend):**
+
+```text
+RAZORPAY_KEY_ID
+RAZORPAY_KEY_SECRET
+RAZORPAY_WEBHOOK_SECRET
+RAZORPAY_PLAN_SEEKER_PRO_MONTHLY
+RAZORPAY_PLAN_SEEKER_PRO_YEARLY
+RAZORPAY_PLAN_SEEKER_ULTRA_MONTHLY
+RAZORPAY_PLAN_SEEKER_ULTRA_YEARLY
+RAZORPAY_PLAN_CREATOR_FORM_PRO_MONTHLY
+RAZORPAY_PLAN_CREATOR_FORM_PRO_YEARLY
+RAZORPAY_PLAN_CREATOR_FORM_ULTRA_MONTHLY
+RAZORPAY_PLAN_CREATOR_FORM_ULTRA_YEARLY
+RAZORPAY_PLAN_CREATOR_STANDARD_PRO_MONTHLY
+RAZORPAY_PLAN_CREATOR_STANDARD_PRO_YEARLY
+RAZORPAY_PLAN_CREATOR_STANDARD_ULTRA_MONTHLY
+RAZORPAY_PLAN_CREATOR_STANDARD_ULTRA_YEARLY
+# (18 paid plan IDs total — sync command prints any missing keys)
+```
+
+**Plan sync (test mode first):**
 
 ```bash
 cd backend
 npm run billing:sync-razorpay-plans
 ```
+
+**Webhook registration (Razorpay Dashboard):**
+
+- URL: `https://<API_HOST>/billing/webhook`
+- Must receive the **raw** JSON body (the backend mounts this route before `express.json()`)
+- Subscribe to subscription lifecycle events (activated, charged, pending, halted, cancelled, completed, etc.) and payment failed events when available
+
+**Authenticated billing APIs:**
+
+| Method | Path | Purpose |
+|---|---|---|
+| POST | `/billing/create-checkout` | Free → paid (Idempotency-Key required) |
+| POST | `/billing/verify-checkout` | Ack client signature only — **never activates** |
+| POST | `/billing/cancel-subscription` | Schedule cancel at period end |
+| POST | `/billing/change-plan` | Upgrade now / downgrade at cycle end |
+| POST | `/billing/cancel-pending-plan-change` | Undo a scheduled downgrade |
+| POST | `/billing/reconcile-subscription` | Repair one category from Razorpay |
+| POST | `/billing/webhook` | Provider HMAC webhook (public, raw body) |
+
+Checkout success redirects and `verify-checkout` **cannot** grant paid access. Only a verified webhook or reconciliation write can.
+
+**Reconciliation CLI (missed webhooks / drift):**
+
+```bash
+cd backend
+npm run billing:reconcile -- --dry-run
+npm run billing:reconcile -- --user <userId> --category seeker
+npm run billing:reconcile
+```
+
+**Go-live sequence:**
+
+1. Configure test-mode Razorpay keys + 18 plan IDs + webhook secret
+2. Register test webhook URL and run checkout → webhook → entitlement smoke
+3. Verify cancel-at-period-end, failed payment (`pending`/`past_due`), and reconciliation repair
+4. Only then switch to live keys
+5. Deploy Phase 6 frontend before advertising paid checkout to customers

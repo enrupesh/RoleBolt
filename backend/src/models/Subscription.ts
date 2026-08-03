@@ -2,6 +2,7 @@ import mongoose, { Document, Schema } from "mongoose";
 import type {
   BillingCategory,
   BillingInterval,
+  BillingPlan,
   StoredBillingPlan,
 } from "../billingTypes";
 
@@ -39,6 +40,13 @@ export interface ISubscription extends Document {
   cancelledAt?: Date;
   endedAt?: Date;
   lastWebhookAt?: Date;
+  /** Provider event/created timestamp used to ignore out-of-order webhooks. */
+  lastProviderEventAt?: Date;
+  /** Scheduled plan change awaiting verified webhook confirmation. */
+  pendingPlan?: BillingPlan | "";
+  pendingInterval?: BillingInterval | "";
+  pendingProviderPlanId?: string;
+  pendingChangeAt?: "now" | "cycle_end" | "";
   createdAt: Date;
   updatedAt: Date;
 
@@ -111,6 +119,23 @@ const SubscriptionSchema = new Schema<ISubscription>(
     cancelledAt: { type: Date },
     endedAt: { type: Date },
     lastWebhookAt: { type: Date },
+    lastProviderEventAt: { type: Date },
+    pendingPlan: {
+      type: String,
+      enum: ["", "free", "pro", "ultra"],
+      default: "",
+    },
+    pendingInterval: {
+      type: String,
+      enum: ["", "monthly", "yearly"],
+      default: "",
+    },
+    pendingProviderPlanId: { type: String, default: "" },
+    pendingChangeAt: {
+      type: String,
+      enum: ["", "now", "cycle_end"],
+      default: "",
+    },
 
     // Temporary compatibility fields. They are never consulted by the new
     // entitlement service and will be removed with the Stripe migration.
