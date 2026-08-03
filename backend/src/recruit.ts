@@ -2618,6 +2618,10 @@ recruitPublicRouter.post("/jobs/:jobId/apply", async (req, res) => {
 
     const candidateId = String(candidate._id);
     const jobLean = job;
+    // Phase 4 verified: this async public-apply scoring meters at execution time
+    // via meterCandidateScore (candidate_score, owner-stable idempotency key), and
+    // the downstream finalize → schedulePostIntakeAutomation / dispatchAgentActions
+    // / evaluatePipelineRules legs each meter their own AI/email operations.
     setImmediate(async () => {
       try {
         const scored = await meterCandidateScore(ownerUid, jobLean, resumeText);
@@ -3517,6 +3521,9 @@ recruitRouter.post(
       // ── CRITICAL billing gate: everything here runs BEFORE SSE headers so a
       // plan-limit rejection is returned as a normal JSON 409 the frontend
       // BulkImportModal can surface (rather than a mid-stream SSE error). ──
+      // Phase 4 verified: entitlement + batch reservation are taken at execution
+      // time before the stream opens, so a downgraded / cancelled / past_due owner
+      // is blocked (fail closed) before any metered AI import work begins.
       const ownerUid = standardBillingOwnerUid(job);
       const batchId = crypto.randomUUID();
       try {
@@ -4506,6 +4513,11 @@ async function checkAssessmentCompletionRateAlert(
     hour: "numeric", minute: "2-digit",
   });
 
+  // Phase 4 audit: this is an operational alert about the recruiter's own
+  // dashboard (completion-rate drop), fired at most once per episode as a
+  // side-effect of viewing analytics — not creator-initiated automated AI/email
+  // campaign work. Left unmetered like other system notifications so a billing
+  // lapse never suppresses an operational alert about the recruiter's own data.
   const dashboardUrl = `${FRONTEND_URL}/recruit/jobs/${jobId}`;
   const { subject, html, text } = emailTemplates.assessmentCompletionAlertEmail(
     user.name || user.email.split("@")[0],
@@ -6160,7 +6172,10 @@ recruitPublicRouter.post("/offer/:token/respond", async (req, res) => {
     }
     await candidate.save();
 
-    // Notify recruiter asynchronously
+    // Phase 4 audit: this is a transactional recruiter notification triggered by a
+    // candidate's own action (accept/decline), not creator-initiated automated
+    // AI/email work. Left unmetered on purpose — a recruiter must always learn that
+    // their candidate responded even if the account's metered access is restricted.
     setImmediate(async () => {
       try {
         const user = await User.findOne({ uid: candidate.uid }).lean() as any;
