@@ -25,7 +25,6 @@ export function LegalPageShell({
             <span className="font-display text-[15px] font-semibold tracking-[-0.03em]">Rolebolt</span>
           </Link>
           <div className="flex items-center gap-3">
-            <Link href="/recruit/preview" className="hidden text-sm font-medium text-[#5d7285] transition hover:text-[#0a66c2] sm:inline-flex">Product preview</Link>
             <Link href="/recruit" className="inline-flex rounded-lg border border-[#cbd9e4] bg-white px-3.5 py-2 text-sm font-semibold text-[#31536e] transition hover:border-[#0a66c2]">Back to Rolebolt</Link>
           </div>
         </div>
