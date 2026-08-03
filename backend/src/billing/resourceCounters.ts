@@ -6,6 +6,7 @@ import { RecruitSeekerProfile } from "../models/RecruitSeekerProfile";
 import { RecruitSeekerWorkspace } from "../models/RecruitSeekerWorkspace";
 import { RecruitSeekerTrackerEntry } from "../models/RecruitSeekerTrackerEntry";
 import { RecruitTeamMember } from "../models/RecruitTeamMember";
+import { RecruitSeekerResumeVersion } from "../models/RecruitSeekerResumeVersion";
 import type { BillingCategory } from "../billingTypes";
 
 export type ResourceCounterKey =
@@ -85,17 +86,84 @@ async function countRecruiterSeats(ownerUid: string): Promise<number> {
   }).exec();
 }
 
-/**
- * Resume versions are stored on the single seeker profile document today.
- * When a dedicated version collection is added, update this counter to query it.
- */
-function countResumeVersions(profile: {
+function profileHasResume(profile: {
   resumeText?: string;
   resumeFileName?: string;
-} | null): number {
-  return profile && (profile.resumeText || profile.resumeFileName) ? 1 : 0;
+} | null): boolean {
+  return Boolean(profile && ((profile.resumeText ?? "").trim() || (profile.resumeFileName ?? "").trim()));
 }
 
+/**
+ * Upsert the active seeker resume version from the current profile fields.
+ * Call this when resume text/file is saved so stored/active counters stay accurate.
+ */
+export async function syncSeekerResumeVersionFromProfile(input: {
+  uid: string;
+  resumeText?: string;
+  resumeFileName?: string;
+  source?: "profile_sync" | "upload" | "build" | "import";
+}): Promise<void> {
+  const uid = input.uid.trim();
+  if (!uid) throw new Error("An owner ID is required to sync resume versions.");
+  const resumeText = (input.resumeText ?? "").trim();
+  const resumeFileName = (input.resumeFileName ?? "").trim();
+  if (!resumeText && !resumeFileName) return;
+
+  const existingActive = await RecruitSeekerResumeVersion.findOne({ uid, isActive: true }).exec();
+  if (
+    existingActive &&
+    existingActive.resumeText === resumeText &&
+    existingActive.resumeFileName === resumeFileName
+  ) {
+    return;
+  }
+
+  const latest = await RecruitSeekerResumeVersion.findOne({ uid })
+    .sort({ versionNumber: -1 })
+    .select({ versionNumber: 1 })
+    .lean()
+    .exec();
+  const nextVersion = (latest?.versionNumber ?? 0) + 1;
+
+  await RecruitSeekerResumeVersion.updateMany(
+    { uid, isActive: true },
+    { $set: { isActive: false } },
+  ).exec();
+
+  await RecruitSeekerResumeVersion.create({
+    uid,
+    versionNumber: nextVersion,
+    resumeText,
+    resumeFileName,
+    isActive: true,
+    source: input.source ?? "profile_sync",
+  });
+}
+
+async function countResumeVersions(
+  uid: string,
+  mode: "active" | "stored",
+): Promise<number> {
+  const filter = mode === "active" ? { uid, isActive: true } : { uid };
+  const versionCount = await RecruitSeekerResumeVersion.countDocuments(filter).exec();
+  if (versionCount > 0) return versionCount;
+
+  // Backward-compatible fallback while historical profiles have no version rows yet.
+  const profile = await RecruitSeekerProfile.findOne({ uid })
+    .select({ resumeText: 1, resumeFileName: 1 })
+    .lean()
+    .exec();
+  return profileHasResume(profile) ? 1 : 0;
+}
+
+/**
+ * Owner-scoped resource counters.
+ * Verified owner fields:
+ * - RecruitJob.uid, RecruitCandidate.uid
+ * - RecruitForm.uid, RecruitFormResponse.uid
+ * - RecruitTeamMember.ownerUid
+ * - RecruitSeeker* documents keyed by uid
+ */
 export async function countOwnedResources(
   uid: string,
   category: BillingCategory,
@@ -129,17 +197,21 @@ export async function countOwnedResources(
     return RecruitFormResponse.countDocuments({ uid }).exec();
   }
 
+  if (counter === "active_resume_versions") {
+    return countResumeVersions(uid, "active");
+  }
+  if (counter === "stored_resume_versions") {
+    return countResumeVersions(uid, "stored");
+  }
+
   const profile = await RecruitSeekerProfile.findOne({ uid })
-    .select({ email: 1, savedJobIds: 1, resumeText: 1, resumeFileName: 1, projects: 1, certifications: 1 })
+    .select({ email: 1, savedJobIds: 1, projects: 1, certifications: 1 })
     .lean()
     .exec();
 
   if (counter === "saved_jobs") return profile?.savedJobIds?.length ?? 0;
   if (counter === "projects") return profile?.projects?.length ?? 0;
   if (counter === "certifications") return profile?.certifications?.length ?? 0;
-  if (counter === "active_resume_versions" || counter === "stored_resume_versions") {
-    return countResumeVersions(profile);
-  }
   if (counter === "active_applications") {
     const activeCandidateStages = ["applied", "review_zone", "screened", "assessed", "interview", "offer"];
     const [workspaceApplied, trackerActive, roleboltActive] = await Promise.all([

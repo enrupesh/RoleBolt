@@ -5,8 +5,8 @@ import {
   requireFeature,
   assertResourceLimit,
   serializeBillingError,
-  assertMeteredAccessAllowed,
 } from "./enforcement";
+import { assertMeteredAccessAllowed } from "../billingTypes";
 import { resolveBillingOwner, type BillingOwnerResource } from "./billingOwner";
 import { getBillingOperation } from "./operationCatalog";
 import { reserveUsage, type UsageReservation } from "./usage";
