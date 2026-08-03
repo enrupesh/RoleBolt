@@ -74,6 +74,7 @@ export async function throwApiError(res: Response, fallback: string): Promise<ne
 }
 
 export function errorText(error: unknown, fallback = "Something went wrong."): string {
+  if (typeof error === "string" && error.trim()) return error;
   return error instanceof Error ? error.message : fallback;
 }
 

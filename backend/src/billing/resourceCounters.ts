@@ -7,6 +7,7 @@ import { RecruitSeekerWorkspace } from "../models/RecruitSeekerWorkspace";
 import { RecruitSeekerTrackerEntry } from "../models/RecruitSeekerTrackerEntry";
 import { RecruitTeamMember } from "../models/RecruitTeamMember";
 import { RecruitSeekerResumeVersion } from "../models/RecruitSeekerResumeVersion";
+import { RecruitJobAlert } from "../models/RecruitJobAlert";
 import type { BillingCategory } from "../billingTypes";
 
 export type ResourceCounterKey =
@@ -18,6 +19,7 @@ export type ResourceCounterKey =
   | "workspace_items"
   | "projects"
   | "certifications"
+  | "job_alerts"
   | "active_forms"
   | "stored_forms"
   | "stored_responses"
@@ -57,6 +59,7 @@ const seekerCounters: readonly ResourceCounterKey[] = [
   "workspace_items",
   "projects",
   "certifications",
+  "job_alerts",
 ];
 
 const formCounters: readonly ResourceCounterKey[] = [
@@ -208,6 +211,12 @@ export async function countOwnedResources(
     .select({ email: 1, savedJobIds: 1, projects: 1, certifications: 1 })
     .lean()
     .exec();
+
+  if (counter === "job_alerts") {
+    const email = (profile?.email ?? "").trim().toLowerCase();
+    if (!email) return 0;
+    return RecruitJobAlert.countDocuments({ email }).exec();
+  }
 
   if (counter === "saved_jobs") return profile?.savedJobIds?.length ?? 0;
   if (counter === "projects") return profile?.projects?.length ?? 0;

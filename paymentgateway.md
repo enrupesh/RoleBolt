@@ -471,13 +471,13 @@ Primary file: `backend/src/seeker.ts`, `seekerCore.ts`, `resumeExport.ts`
 
 ### 1.2 Tasks
 
-- [ ] Add billing owner resolution to all seeker routes (`category: seeker`)
-- [ ] Wire resource limits before create operations
-- [ ] Wire `reserveUsage` before every AI provider call
-- [ ] Ensure provider fallback chain commits **once**
-- [ ] Return stable error codes; seeker frontend hooks (minimal) for limit display
-- [ ] Verify manual operations (profile edit, manual status change) remain free within resource limits
-- [ ] Add seeker route tests or integration tests for at least: AI exhaustion, resource limit, downgrade
+- [x] Add billing owner resolution to all seeker routes (`category: seeker`)
+- [x] Wire resource limits before create operations
+- [x] Wire `reserveUsage` before every AI provider call
+- [x] Ensure provider fallback chain commits **once**
+- [x] Return stable error codes; seeker frontend hooks (minimal) for limit display
+- [x] Verify manual operations (profile edit, manual status change) remain free within resource limits
+- [x] Add seeker route tests or integration tests for at least: AI exhaustion, resource limit, downgrade
 
 ### 1.3 Free plan spot-check (`payment.md` §4.2)
 
@@ -504,6 +504,8 @@ When Free AI exhausted: another AI request **must fail**; manual resume editing 
 | Bypass test | curl with forged plan header → still Free |
 | Audit matrix | Every seeker row marked ✅ |
 | Manual fallback | Profile edit works when AI exhausted |
+
+**Phase 1 status:** Complete — see [`phase-one-seeker-enforcement-review.md`](./phase-one-seeker-enforcement-review.md).
 
 ---
 
