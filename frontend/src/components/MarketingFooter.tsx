@@ -33,11 +33,19 @@ const resourceLinks = [
   ["Resume builder guide", "/resources/ai-resume-builder"],
 ] as const;
 
+const companyLinks = [
+  ["About Rolebolt", "/about"],
+  ["Blog", "/blog"],
+  ["Careers", "/careers"],
+  ["Contact", "/contact"],
+] as const;
+
 const legalLinks = [
   ["Privacy policy", "/privacy"],
   ["Terms & conditions", "/terms"],
   ["Refund & cancellation", "/refund-policy"],
   ["Payment & billing", "/recruit/billing"],
+  ["Sitemap XML", "/sitemap.xml"],
 ] as const;
 
 function ExternalArrow() {
@@ -190,11 +198,12 @@ export function MarketingFooter() {
           </div>
         </div>
 
-        <div className="grid gap-8 border-b border-white/10 py-9 sm:grid-cols-2 lg:grid-cols-5 lg:gap-8">
+        <div className="grid gap-8 border-b border-white/10 py-9 sm:grid-cols-2 lg:grid-cols-6 lg:gap-7">
           <FooterColumn title="Product" links={productLinks} />
           <FooterColumn title="For recruiters" links={recruiterLinks} />
           <FooterColumn title="For job seekers" links={seekerLinks} />
           <FooterColumn title="Resources" links={resourceLinks} />
+          <FooterColumn title="Company" links={companyLinks} />
           <FooterColumn title="Trust & billing" links={legalLinks} />
         </div>
 
