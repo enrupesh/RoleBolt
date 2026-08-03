@@ -21,6 +21,38 @@ services:
         sync: false
       - key: CORS_ORIGIN
         sync: false
+      # Razorpay billing credentials and one provider plan ID per paid catalog entry.
+      # Values must be entered in Render's environment settings; never commit them.
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+      - key: RAZORPAY_PLAN_SEEKER_PRO_MONTHLY
+        sync: false
+      - key: RAZORPAY_PLAN_SEEKER_PRO_YEARLY
+        sync: false
+      - key: RAZORPAY_PLAN_SEEKER_ULTRA_MONTHLY
+        sync: false
+      - key: RAZORPAY_PLAN_SEEKER_ULTRA_YEARLY
+        sync: false
+      - key: RAZORPAY_PLAN_CREATOR_FORM_PRO_MONTHLY
+        sync: false
+      - key: RAZORPAY_PLAN_CREATOR_FORM_PRO_YEARLY
+        sync: false
+      - key: RAZORPAY_PLAN_CREATOR_FORM_ULTRA_MONTHLY
+        sync: false
+      - key: RAZORPAY_PLAN_CREATOR_FORM_ULTRA_YEARLY
+        sync: false
+      - key: RAZORPAY_PLAN_CREATOR_STANDARD_PRO_MONTHLY
+        sync: false
+      - key: RAZORPAY_PLAN_CREATOR_STANDARD_PRO_YEARLY
+        sync: false
+      - key: RAZORPAY_PLAN_CREATOR_STANDARD_ULTRA_MONTHLY
+        sync: false
+      - key: RAZORPAY_PLAN_CREATOR_STANDARD_ULTRA_YEARLY
+        sync: false
 
   - type: web
     name: recruit-frontend

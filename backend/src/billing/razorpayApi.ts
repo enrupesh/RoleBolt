@@ -168,7 +168,7 @@ function serializedProviderError(error: unknown): { status: number; body: Record
       status: 503,
       body: {
         error: "RAZORPAY_NOT_CONFIGURED",
-        message: "Razorpay billing is not configured for this environment.",
+        message: error.message,
       },
     };
   }
