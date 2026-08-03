@@ -120,32 +120,32 @@ export default function RecruitLandingPage() {
   return (
     <div className="min-h-[100dvh] overflow-x-hidden bg-[#f8fbfd] text-[#10263d]">
       <header className="sticky top-0 z-50 border-b border-[#dfe8ef]/80 bg-[#f8fbfd]/90 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 lg:px-8">
-          <Link href="/" className="flex items-center gap-2.5" aria-label="Rolebolt home">
+        <div className="mx-auto flex max-w-7xl items-center gap-2 px-4 py-3 lg:gap-4 lg:px-8 lg:py-4">
+          <Link href="/" className="flex shrink-0 items-center gap-2.5" aria-label="Rolebolt home">
             <RoleboltLogo size="md" />
             <span className="font-display text-[15px] font-semibold tracking-[-0.03em]">Rolebolt</span>
           </Link>
-          <nav className="hidden items-center gap-0 min-[1024px]:flex" aria-label="Primary navigation">
-            <Link href="/recruit/opportunities" className="rounded-lg px-2 py-2 text-[13px] text-[#5d7285] transition hover:bg-white hover:text-[#10263d] min-[1180px]:px-3 min-[1180px]:text-sm">Find jobs</Link>
-            <a href="#how-it-works" className="rounded-lg px-2 py-2 text-[13px] text-[#5d7285] transition hover:bg-white hover:text-[#10263d] min-[1180px]:px-3 min-[1180px]:text-sm">How it works</a>
-            <a href="#recruiters" className="rounded-lg px-2 py-2 text-[13px] text-[#5d7285] transition hover:bg-white hover:text-[#10263d] min-[1180px]:px-3 min-[1180px]:text-sm">For recruiters</a>
-            <a href="#seekers" className="rounded-lg px-2 py-2 text-[13px] text-[#5d7285] transition hover:bg-white hover:text-[#10263d] min-[1180px]:px-3 min-[1180px]:text-sm">For job seekers</a>
-            <a href="#product" className="rounded-lg px-2 py-2 text-[13px] text-[#5d7285] transition hover:bg-white hover:text-[#10263d] min-[1180px]:px-3 min-[1180px]:text-sm">Product</a>
-            <Link href="/recruit/pricing" className="rounded-lg px-2 py-2 text-[13px] text-[#5d7285] transition hover:bg-white hover:text-[#10263d] min-[1180px]:px-3 min-[1180px]:text-sm">Plans</Link>
+          <nav className="hidden min-w-0 flex-1 items-center justify-center gap-0 min-[900px]:flex" aria-label="Primary navigation">
+            <Link href="/recruit/opportunities" className="whitespace-nowrap rounded-lg px-1.5 py-2 text-[12px] text-[#5d7285] transition hover:bg-white hover:text-[#10263d] min-[1180px]:px-3 min-[1180px]:text-sm">Find jobs</Link>
+            <a href="#how-it-works" className="whitespace-nowrap rounded-lg px-1.5 py-2 text-[12px] text-[#5d7285] transition hover:bg-white hover:text-[#10263d] min-[1180px]:px-3 min-[1180px]:text-sm">How it works</a>
+            <a href="#recruiters" className="whitespace-nowrap rounded-lg px-1.5 py-2 text-[12px] text-[#5d7285] transition hover:bg-white hover:text-[#10263d] min-[1180px]:px-3 min-[1180px]:text-sm">For recruiters</a>
+            <a href="#seekers" className="whitespace-nowrap rounded-lg px-1.5 py-2 text-[12px] text-[#5d7285] transition hover:bg-white hover:text-[#10263d] min-[1180px]:px-3 min-[1180px]:text-sm">For job seekers</a>
+            <a href="#product" className="whitespace-nowrap rounded-lg px-1.5 py-2 text-[12px] text-[#5d7285] transition hover:bg-white hover:text-[#10263d] min-[1180px]:px-3 min-[1180px]:text-sm">Product</a>
+            <Link href="/recruit/pricing" className="whitespace-nowrap rounded-lg px-1.5 py-2 text-[12px] text-[#5d7285] transition hover:bg-white hover:text-[#10263d] min-[1180px]:px-3 min-[1180px]:text-sm">Plans</Link>
           </nav>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5 lg:gap-2">
             {isLoggedIn ? (
               <>
-                <Link href="/recruit/dashboard" className="hidden rounded-lg border border-[#d7e2eb] bg-white px-3.5 py-2 text-sm font-medium text-[#38546d] transition hover:border-[#0a66c2] sm:inline-flex">Dashboard</Link>
-                <button onClick={signOut} className="hidden rounded-lg px-3.5 py-2 text-sm text-[#6e8193] transition hover:bg-white sm:inline-flex">Sign out</button>
+                <Link href="/recruit/dashboard" className="hidden rounded-lg border border-[#d7e2eb] bg-white px-2.5 py-2 text-[12px] font-medium text-[#38546d] transition hover:border-[#0a66c2] sm:inline-flex min-[1180px]:px-3.5 min-[1180px]:text-sm">Dashboard</Link>
+                <button onClick={signOut} className="hidden rounded-lg px-2.5 py-2 text-[12px] text-[#6e8193] transition hover:bg-white sm:inline-flex min-[1180px]:px-3.5 min-[1180px]:text-sm">Sign out</button>
               </>
             ) : (
               <>
-                <Link href="/recruit/login" className="hidden px-3.5 py-2 text-sm font-medium text-[#38546d] sm:inline-flex">Sign in</Link>
-                <Link href="/recruit/signup" className="inline-flex items-center gap-2 rounded-lg bg-[#0a66c2] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_5px_16px_rgba(10,102,194,.18)] transition hover:-translate-y-0.5 hover:bg-[#07559f]">Get started <Arrow /></Link>
+                <Link href="/recruit/login" className="hidden whitespace-nowrap px-2 py-2 text-[12px] font-medium text-[#38546d] sm:inline-flex min-[1180px]:px-3.5 min-[1180px]:text-sm">Sign in</Link>
+                <Link href="/recruit/signup" className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-[#0a66c2] px-3 py-2 text-[12px] font-semibold text-white shadow-[0_5px_16px_rgba(10,102,194,.18)] transition hover:-translate-y-0.5 hover:bg-[#07559f] min-[1180px]:gap-2 min-[1180px]:px-4 min-[1180px]:py-2.5 min-[1180px]:text-sm">Get started <Arrow /></Link>
               </>
             )}
-            <button aria-label="Toggle navigation" onClick={() => setMenuOpen((open) => !open)} className="flex h-10 w-10 items-center justify-center rounded-lg border border-[#d7e2eb] bg-white min-[1024px]:hidden">
+            <button aria-label="Toggle navigation" onClick={() => setMenuOpen((open) => !open)} className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#d7e2eb] bg-white min-[900px]:hidden">
               {menuOpen ? (
                 <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
               ) : (
@@ -155,7 +155,7 @@ export default function RecruitLandingPage() {
           </div>
         </div>
         {menuOpen && (
-          <nav className="border-t border-[#dfe8ef] bg-[#f8fbfd] px-5 py-3 min-[1024px]:hidden">
+          <nav className="border-t border-[#dfe8ef] bg-[#f8fbfd] px-5 py-3 min-[900px]:hidden">
             <div className="mx-auto flex max-w-7xl flex-col gap-1">
               <Link onClick={() => setMenuOpen(false)} href="/recruit/opportunities" className="rounded-lg px-3 py-3 text-sm">Find jobs</Link>
               <a onClick={() => setMenuOpen(false)} href="#how-it-works" className="rounded-lg px-3 py-3 text-sm">How it works</a>
