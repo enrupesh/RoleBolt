@@ -35,6 +35,12 @@ import {
   respondFormBillingError,
   runFormBillingOperation,
 } from "./billing/formEnforcement";
+import {
+  standardIdempotencyHeader,
+  standardRequestIdempotencyKey,
+  respondStandardBillingError,
+  runStandardBillingOperation,
+} from "./billing/standardEnforcement";
 
 export const copilotRouter = express.Router();
 
@@ -753,7 +759,7 @@ copilotRouter.post("/chat", async (req, res) => {
       nvidiaFallback: true,
     });
 
-    // Phase 2: Form Job workspace turns are metered; Standard Jobs deferred to Phase 3.
+    // Phase 2: Form Job workspace turns. Phase 3: Standard Jobs workspace turns.
     const rawAi = context.workspace === "form"
       ? await runFormBillingOperation({
           ownerUid: uid,
@@ -767,7 +773,18 @@ copilotRouter.post("/chat", async (req, res) => {
           resourceId: context.formId || String(conversation._id),
           work: runAi,
         })
-      : await runAi();
+      : await runStandardBillingOperation({
+          ownerUid: uid,
+          operation: "copilot_turn_standard",
+          idempotencyKey: standardRequestIdempotencyKey(
+            uid,
+            `copilot-chat:${context.level}:${context.jobId || "global"}:${conversation._id}`,
+            standardIdempotencyHeader(req),
+          ),
+          resourceType: "job",
+          resourceId: context.jobId || String(conversation._id),
+          work: runAi,
+        });
 
     const parsed = parseAiResponse(rawAi);
     parsed.sources = await attachSourceDetails(uid, parsed.sources, context.workspace!);
@@ -789,6 +806,7 @@ copilotRouter.post("/chat", async (req, res) => {
     });
   } catch (err: any) {
     if (await respondFormBillingError(res, err, uid)) return;
+    if (await respondStandardBillingError(res, err, uid)) return;
     console.error("[copilot] chat error:", err?.message ?? err);
     return res.status(500).json({ error: "AI Copilot request failed. Please try again." });
   }
@@ -830,6 +848,8 @@ copilotRouter.post("/chat/stream", async (req, res) => {
   if (!apiKey) return res.status(500).json({ error: "AI service not configured" });
 
   const meterFormTurn = context.workspace === "form";
+  const meterStandardTurn = context.workspace === "standard";
+  const meterTurn = meterFormTurn || meterStandardTurn;
   let sseStarted = false;
 
   function beginSse() {
@@ -872,7 +892,7 @@ copilotRouter.post("/chat/stream", async (req, res) => {
     const data = await loadContextData(uid, context);
     const err = validateContext(context, data);
     if (err) {
-      if (meterFormTurn && !sseStarted) {
+      if (meterTurn && !sseStarted) {
         return res.status(404).json({ error: err });
       }
       sendEvent({ type: "error", error: err });
@@ -965,6 +985,20 @@ copilotRouter.post("/chat/stream", async (req, res) => {
         resourceId: context.formId || String(conversation._id),
         work: runStreamedTurn,
       });
+    } else if (meterStandardTurn) {
+      // Critical: reserve BEFORE SSE headers so capacity errors remain JSON.
+      await runStandardBillingOperation({
+        ownerUid: uid,
+        operation: "copilot_turn_standard",
+        idempotencyKey: standardRequestIdempotencyKey(
+          uid,
+          `copilot-stream:${context.level}:${context.jobId || "global"}:${conversation._id}`,
+          standardIdempotencyHeader(req),
+        ),
+        resourceType: "job",
+        resourceId: context.jobId || String(conversation._id),
+        work: runStreamedTurn,
+      });
     } else {
       await runStreamedTurn();
     }
@@ -972,6 +1006,7 @@ copilotRouter.post("/chat/stream", async (req, res) => {
     return res.end();
   } catch (err: any) {
     if (!sseStarted && await respondFormBillingError(res, err, uid)) return;
+    if (!sseStarted && await respondStandardBillingError(res, err, uid)) return;
     console.error("[copilot] stream error:", err?.message ?? err);
     if (!sseStarted) {
       return res.status(500).json({ error: "AI Copilot stream failed. Please try again." });
@@ -1195,16 +1230,27 @@ copilotRouter.post("/insights", async (req, res) => {
       { role: "user", content: "Generate today's hiring overview." },
     ];
 
-    const rawAi = await callMeshChatCompletions({
-      apiKey,
-      model: "openai/gpt-4o-mini",
-      fallbackModels: ["google/gemini-2.5-flash-lite", "anthropic/claude-3-5-sonnet"],
-      messages: aiMessages,
-      max_tokens: 1200,
-      temperature: 0.5,
-      retries: 2,
-      timeoutMs: 60_000,
-      nvidiaFallback: true,
+    const rawAi = await runStandardBillingOperation({
+      ownerUid: uid,
+      operation: "copilot_turn_standard",
+      idempotencyKey: standardRequestIdempotencyKey(
+        uid,
+        `insights:${conversation._id}`,
+        standardIdempotencyHeader(req),
+      ),
+      resourceType: "job",
+      resourceId: String(conversation._id),
+      work: async () => callMeshChatCompletions({
+        apiKey,
+        model: "openai/gpt-4o-mini",
+        fallbackModels: ["google/gemini-2.5-flash-lite", "anthropic/claude-3-5-sonnet"],
+        messages: aiMessages,
+        max_tokens: 1200,
+        temperature: 0.5,
+        retries: 2,
+        timeoutMs: 60_000,
+        nvidiaFallback: true,
+      }),
     });
 
     const parsed = parseAiResponse(rawAi);
@@ -1234,6 +1280,7 @@ copilotRouter.post("/insights", async (req, res) => {
       title: conversation.title,
     });
   } catch (err: any) {
+    if (await respondStandardBillingError(res, err, uid)) return;
     console.error("[copilot] insights error:", err?.message ?? err);
     return res.status(500).json({ error: "Failed to generate organization insights" });
   }
