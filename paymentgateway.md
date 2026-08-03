@@ -596,12 +596,12 @@ Primary files: `recruit.ts`, `recruitCopilot.ts`, `collaboration.ts`
 
 ### 3.2 Tasks
 
-- [ ] Wire all Standard Job CRUD and candidate routes
-- [ ] Wire copilot streaming: reserve **before** SSE headers sent
-- [ ] Wire bulk import: reserve per file/candidate, not per batch
-- [ ] Wire agent mode: re-check at execution time
-- [ ] Wire collaboration invites with seat limits
-- [ ] Add tests for all three plan tiers on representative routes
+- [x] Wire all Standard Job CRUD and candidate routes
+- [x] Wire copilot streaming: reserve **before** SSE headers sent
+- [x] Wire bulk import: reserve per file/candidate, not per batch
+- [x] Wire agent mode: re-check at execution time
+- [x] Wire collaboration invites with seat limits
+- [x] Add tests for all three plan tiers on representative routes
 
 ### 3.3 Review gate
 
