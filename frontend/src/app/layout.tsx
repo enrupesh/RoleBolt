@@ -5,6 +5,8 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { RecruitAuthProvider } from "@/contexts/RecruitAuthContext";
 import { BillingEntitlementProvider } from "@/contexts/BillingEntitlementContext";
 import { SignupWelcomeModal } from "@/components/SignupWelcomeModal";
+import { JsonLd } from "@/components/JsonLd";
+import { buildMetadata, organizationJsonLd, websiteJsonLd, softwareApplicationJsonLd, productKeywords } from "@/lib/seo";
 import "./globals.css";
 
 const sora = Sora({
@@ -37,11 +39,13 @@ const inter = localFont({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://www.rolebolt.tech"),
-  title: {
-    default: "Recruit — Find Jobs & Hire Talent",
-    template: "%s | Recruit",
-  },
-  description: "Post jobs, discover opportunities, and match candidates with AI-powered scoring.",
+  ...buildMetadata({
+    title: "AI Recruiting Software & Job Search Workspace | Rolebolt",
+    description:
+      "Rolebolt combines AI recruiting software, applicant tracking, candidate evaluation and job-search tools in one focused workspace.",
+    path: "/",
+    keywords: [...productKeywords.recruit, "AI recruiting workspace", "job search workspace"],
+  }),
   icons: {
     icon: [
       { url: "/rolebolt-icon.png", type: "image/png", sizes: "512x512" },
@@ -80,6 +84,9 @@ export default function RootLayout({
           <BillingEntitlementProvider>
             <ThemeProvider>
               <div className="min-h-screen">
+                <JsonLd id="ld-rolebolt-organization" data={organizationJsonLd()} />
+                <JsonLd id="ld-rolebolt-website" data={websiteJsonLd()} />
+                <JsonLd id="ld-rolebolt-application" data={softwareApplicationJsonLd()} />
                 {children}
                 <SignupWelcomeModal onlyRole="seeker" />
               </div>
