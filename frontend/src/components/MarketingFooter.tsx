@@ -26,6 +26,13 @@ const seekerLinks = [
   ["Interview preparation", "/seeker/interview-prep"],
 ] as const;
 
+const resourceLinks = [
+  ["Recruiting resources", "/resources#recruiter-guides"],
+  ["Job-search resources", "/resources#job-seeker-guides"],
+  ["AI recruiting guide", "/resources/ai-recruiting-software"],
+  ["Resume builder guide", "/resources/ai-resume-builder"],
+] as const;
+
 const legalLinks = [
   ["Privacy policy", "/privacy"],
   ["Terms & conditions", "/terms"],
@@ -183,10 +190,11 @@ export function MarketingFooter() {
           </div>
         </div>
 
-        <div className="grid gap-8 border-b border-white/10 py-9 sm:grid-cols-2 lg:grid-cols-4 lg:gap-8">
+        <div className="grid gap-8 border-b border-white/10 py-9 sm:grid-cols-2 lg:grid-cols-5 lg:gap-8">
           <FooterColumn title="Product" links={productLinks} />
           <FooterColumn title="For recruiters" links={recruiterLinks} />
           <FooterColumn title="For job seekers" links={seekerLinks} />
+          <FooterColumn title="Resources" links={resourceLinks} />
           <FooterColumn title="Trust & billing" links={legalLinks} />
         </div>
 

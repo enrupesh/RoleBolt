@@ -132,6 +132,7 @@ export default function RecruitLandingPage() {
             <a href="#seekers" className="whitespace-nowrap rounded-lg px-1.5 py-2 text-[12px] text-[#5d7285] transition hover:bg-white hover:text-[#10263d] min-[1180px]:px-3 min-[1180px]:text-sm">For job seekers</a>
             <a href="#product" className="whitespace-nowrap rounded-lg px-1.5 py-2 text-[12px] text-[#5d7285] transition hover:bg-white hover:text-[#10263d] min-[1180px]:px-3 min-[1180px]:text-sm">Product</a>
             <Link href="/recruit/pricing" className="whitespace-nowrap rounded-lg px-1.5 py-2 text-[12px] text-[#5d7285] transition hover:bg-white hover:text-[#10263d] min-[1180px]:px-3 min-[1180px]:text-sm">Plans</Link>
+            <Link href="/resources" className="whitespace-nowrap rounded-lg px-1.5 py-2 text-[12px] text-[#5d7285] transition hover:bg-white hover:text-[#10263d] min-[1180px]:px-3 min-[1180px]:text-sm">Guides</Link>
           </nav>
           <div className="flex shrink-0 items-center gap-1.5 lg:gap-2">
             {isLoggedIn ? (
@@ -163,6 +164,7 @@ export default function RecruitLandingPage() {
               <a onClick={() => setMenuOpen(false)} href="#seekers" className="rounded-lg px-3 py-3 text-sm">For job seekers</a>
               <a onClick={() => setMenuOpen(false)} href="#product" className="rounded-lg px-3 py-3 text-sm">Product</a>
               <Link onClick={() => setMenuOpen(false)} href="/recruit/pricing" className="rounded-lg px-3 py-3 text-sm">Plans</Link>
+              <Link onClick={() => setMenuOpen(false)} href="/resources" className="rounded-lg px-3 py-3 text-sm">Guides</Link>
             </div>
           </nav>
         )}
