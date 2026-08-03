@@ -45,6 +45,7 @@ const NO_INDEX_PREFIXES = [
   "/seeker/resume",
   "/seeker/signup",
   "/seeker/tracker",
+  "/seeker/verify-email",
   "/seeker/workspace",
 ];
 
