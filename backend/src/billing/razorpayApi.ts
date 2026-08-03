@@ -6,6 +6,7 @@ import { Subscription } from "../models/Subscription";
 import { getEntitlement } from "./entitlements";
 import {
   createRazorpaySubscription,
+  getConfiguredRazorpayPlanId,
   RazorpayApiError,
   RazorpayNotConfiguredError,
   RazorpaySignatureError,
@@ -189,6 +190,16 @@ razorpayBillingRouter.post("/create-checkout", async (req, res) => {
       });
     }
 
+    // Resolve the server-owned provider plan before creating the checkout
+    // record. BillingCheckout.providerPlanId is required, and keeping the
+    // same resolved ID in the record lets reconciliation compare our
+    // requested catalog entry with Razorpay's returned subscription.
+    const providerPlanId = getConfiguredRazorpayPlanId(
+      requested.category,
+      requested.plan,
+      requested.interval,
+    );
+
     let checkout;
     try {
       checkout = await BillingCheckout.create({
@@ -199,7 +210,7 @@ razorpayBillingRouter.post("/create-checkout", async (req, res) => {
         idempotencyKey: key,
         status: "creating",
         provider: "razorpay",
-        providerPlanId: "",
+        providerPlanId,
       });
     } catch (error: any) {
       if (error?.code !== 11000) throw error;
