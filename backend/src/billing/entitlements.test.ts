@@ -102,12 +102,28 @@ describe("normalizeStoredSubscription", () => {
     assert.equal(normalized.plan, "free");
   });
 
-  it("ignores legacy Stripe plan names", () => {
+  it("keeps paid access with payment_pending warning while status is pending", () => {
     const normalized = normalizeStoredSubscription(
-      paidSub({ plan: "agency" as ISubscription["plan"] }),
-      "creator_standard",
+      paidSub({ status: "pending" }),
+      "seeker",
       NOW_INSIDE,
     );
-    assert.equal(normalized.plan, "free");
+    assert.equal(normalized.plan, "pro");
+    assert.equal(normalized.meteredAccessAllowed, true);
+    assert.equal(normalized.billingWarning, "payment_pending");
+  });
+
+  it("surfaces plan_change_pending while retaining the current entitled plan", () => {
+    const normalized = normalizeStoredSubscription(
+      paidSub({
+        plan: "pro",
+        pendingPlan: "ultra" as ISubscription["pendingPlan"],
+        pendingChangeAt: "now" as ISubscription["pendingChangeAt"],
+      }),
+      "seeker",
+      NOW_INSIDE,
+    );
+    assert.equal(normalized.plan, "pro");
+    assert.equal(normalized.billingWarning, "plan_change_pending");
   });
 });

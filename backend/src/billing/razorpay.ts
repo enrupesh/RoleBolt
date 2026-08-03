@@ -45,6 +45,13 @@ export interface RazorpaySubscriptionResponse {
   current_end?: number;
   start_at?: number;
   end_at?: number;
+  ended_at?: number;
+  charge_at?: number;
+  created_at?: number;
+  cancel_at_cycle_end?: boolean;
+  has_scheduled_changes?: boolean;
+  change_scheduled_at?: number | string | null;
+  payment_id?: string;
   notes?: Record<string, string>;
 }
 
@@ -106,7 +113,7 @@ function authorizationHeader(keyId: string, keySecret: string): string {
 
 async function razorpayRequest<T>(
   path: string,
-  init: { method: "GET" | "POST"; body?: Record<string, unknown> },
+  init: { method: "GET" | "POST" | "PATCH"; body?: Record<string, unknown> },
 ): Promise<T> {
   const { keyId, keySecret } = getApiConfig();
   const response = await fetch(`${RAZORPAY_API_URL}${path}`, {
@@ -132,6 +139,99 @@ async function razorpayRequest<T>(
     );
   }
   return parsed as T;
+}
+
+/**
+ * Reverse-lookup a Rolebolt catalog entry from a server-configured Razorpay plan ID.
+ * Webhooks for plan changes must prefer this over stale subscription notes.
+ */
+export function resolveCatalogEntryByRazorpayPlanId(
+  providerPlanId: string,
+): { category: BillingCategory; plan: BillingPlan; interval: BillingInterval } | null {
+  const needle = providerPlanId.trim();
+  if (!needle) return null;
+  const categories: BillingCategory[] = ["seeker", "creator_form", "creator_standard"];
+  const plans: BillingPlan[] = ["pro", "ultra"];
+  const intervals: BillingInterval[] = ["monthly", "yearly"];
+  for (const category of categories) {
+    for (const plan of plans) {
+      for (const interval of intervals) {
+        const configured = process.env[getRazorpayPlanEnvKey(category, plan, interval)]?.trim();
+        if (configured && configured === needle) {
+          return { category, plan, interval };
+        }
+      }
+    }
+  }
+  return null;
+}
+
+export async function fetchRazorpaySubscription(
+  subscriptionId: string,
+): Promise<RazorpaySubscriptionResponse> {
+  const id = subscriptionId.trim();
+  if (!id) throw new RazorpayApiError("Missing Razorpay subscription id.", 400);
+  return razorpayRequest<RazorpaySubscriptionResponse>(`/v1/subscriptions/${encodeURIComponent(id)}`, {
+    method: "GET",
+  });
+}
+
+/**
+ * Schedule cancellation at cycle end (preferred) or cancel immediately.
+ * Launch policy uses cancel_at_cycle_end=true so paid access continues until period end.
+ */
+export async function cancelRazorpaySubscription(
+  subscriptionId: string,
+  options: { cancelAtCycleEnd?: boolean } = {},
+): Promise<RazorpaySubscriptionResponse> {
+  const id = subscriptionId.trim();
+  if (!id) throw new RazorpayApiError("Missing Razorpay subscription id.", 400);
+  return razorpayRequest<RazorpaySubscriptionResponse>(
+    `/v1/subscriptions/${encodeURIComponent(id)}/cancel`,
+    {
+      method: "POST",
+      body: {
+        cancel_at_cycle_end: options.cancelAtCycleEnd !== false,
+      },
+    },
+  );
+}
+
+/**
+ * Change the Razorpay plan linked to an existing subscription.
+ * Upgrades use schedule_change_at=now; downgrades use cycle_end per payment.md §13.3–13.4.
+ * Local entitlement must still wait for webhook/reconciliation — never trust this response alone.
+ */
+export async function updateRazorpaySubscriptionPlan(input: {
+  subscriptionId: string;
+  planId: string;
+  scheduleChangeAt: "now" | "cycle_end";
+}): Promise<RazorpaySubscriptionResponse> {
+  const id = input.subscriptionId.trim();
+  if (!id) throw new RazorpayApiError("Missing Razorpay subscription id.", 400);
+  return razorpayRequest<RazorpaySubscriptionResponse>(
+    `/v1/subscriptions/${encodeURIComponent(id)}`,
+    {
+      method: "PATCH",
+      body: {
+        plan_id: input.planId,
+        schedule_change_at: input.scheduleChangeAt,
+        customer_notify: true,
+      },
+    },
+  );
+}
+
+/** Cancel a pending plan update that has not yet taken effect. */
+export async function cancelRazorpaySubscriptionPendingUpdate(
+  subscriptionId: string,
+): Promise<RazorpaySubscriptionResponse> {
+  const id = subscriptionId.trim();
+  if (!id) throw new RazorpayApiError("Missing Razorpay subscription id.", 400);
+  return razorpayRequest<RazorpaySubscriptionResponse>(
+    `/v1/subscriptions/${encodeURIComponent(id)}/cancel_scheduled_changes`,
+    { method: "POST", body: {} },
+  );
 }
 
 export function verifyWebhookSignature(rawBody: Buffer, signature: string): void {
