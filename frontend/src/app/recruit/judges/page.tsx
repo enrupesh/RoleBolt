@@ -25,12 +25,6 @@ export default function JudgesHackathonPage() {
               <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
               Back to Home
             </Link>
-            <Link
-              href="/recruit/preview"
-              className="inline-flex rounded-lg border border-slate-200 px-3.5 py-2 text-[13px] font-medium text-slate-600 hover:bg-slate-50 transition-all"
-            >
-              Product Preview
-            </Link>
           </div>
         </div>
       </header>
