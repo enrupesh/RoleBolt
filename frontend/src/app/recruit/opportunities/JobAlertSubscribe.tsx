@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { apiUrl } from "@/lib/api";
+import { apiErrorFromPayload, apiUrl } from "@/lib/api";
+import { SeekerErrorNotice } from "@/components/SeekerErrorNotice";
 
 export default function JobAlertSubscribe() {
   const [email, setEmail]       = useState("");
@@ -9,13 +10,13 @@ export default function JobAlertSubscribe() {
   const [workMode, setWorkMode] = useState("");
   const [loading, setLoading]   = useState(false);
   const [success, setSuccess]   = useState(false);
-  const [error, setError]       = useState("");
+  const [error, setError]       = useState<unknown>(null);
   const [expanded, setExpanded] = useState(false);
 
   async function handleSubscribe(e: React.FormEvent) {
     e.preventDefault();
     if (!email.trim()) { setError("Email is required."); return; }
-    setLoading(true); setError(""); setSuccess(false);
+    setLoading(true); setError(null); setSuccess(false);
     try {
       const res = await fetch(apiUrl("/recruit-public/job-alerts"), {
         method: "POST",
@@ -23,11 +24,11 @@ export default function JobAlertSubscribe() {
         body: JSON.stringify({ email: email.trim(), keywords, workMode }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Subscription failed.");
+      if (!res.ok) throw apiErrorFromPayload(res.status, data, "Subscription failed.");
       setSuccess(true);
       setEmail(""); setKeywords(""); setWorkMode("");
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e);
     } finally {
       setLoading(false);
     }
@@ -105,7 +106,7 @@ export default function JobAlertSubscribe() {
                 </select>
               </div>
 
-              {error && <p className="text-sm text-rose-600">{error}</p>}
+              {error ? <SeekerErrorNotice error={error} /> : null}
 
               <button
                 type="submit"
