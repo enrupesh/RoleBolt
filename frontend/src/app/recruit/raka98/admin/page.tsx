@@ -2,22 +2,17 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { VerificationAdminPanel } from "@/components/VerificationAdminPanel";
+import { RAKA98_ADMIN_PASSWORD, RAKA98_ADMIN_SESSION_KEY } from "@/lib/raka98Admin";
 
-const ADMIN_PASSWORD = "raka@9800";
-const SESSION_KEY = "raka98_admin_authed";
-
-function AdminLogin({
-  onSuccess,
-}: {
-  onSuccess: () => void;
-}) {
+function AdminLogin({ onSuccess }: { onSuccess: () => void }) {
   const [input, setInput] = useState("");
   const [error, setError] = useState(false);
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    if (input === ADMIN_PASSWORD) {
-      sessionStorage.setItem(SESSION_KEY, "1");
+    if (input === RAKA98_ADMIN_PASSWORD) {
+      sessionStorage.setItem(RAKA98_ADMIN_SESSION_KEY, "1");
       setError(false);
       onSuccess();
       return;
@@ -109,34 +104,8 @@ function AdminShell({ onLock }: { onLock: () => void }) {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-6 py-10 space-y-8">
-        <section className="rounded-2xl border border-white/8 bg-white/[0.02] px-6 py-8">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/30 mb-3">
-            Admin Panel
-          </p>
-          <h2 className="text-2xl font-semibold text-white/90 tracking-tight">
-            Welcome back
-          </h2>
-          <p className="mt-2 text-sm text-white/45 max-w-2xl leading-relaxed">
-            This panel is ready. Tell me what tools, dashboards, or controls you want here and I will wire them in.
-          </p>
-        </section>
-
-        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {[
-            { title: "Billing & Plans", note: "Coming soon" },
-            { title: "Users & Accounts", note: "Coming soon" },
-            { title: "System Health", note: "Coming soon" },
-          ].map((card) => (
-            <div
-              key={card.title}
-              className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-5 py-6"
-            >
-              <h3 className="text-sm font-medium text-white/75">{card.title}</h3>
-              <p className="mt-2 text-xs text-white/30">{card.note}</p>
-            </div>
-          ))}
-        </section>
+      <main className="max-w-6xl mx-auto px-6 py-10">
+        <VerificationAdminPanel />
       </main>
     </div>
   );
@@ -147,12 +116,12 @@ export default function Raka98AdminPage() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    setAuthed(sessionStorage.getItem(SESSION_KEY) === "1");
+    setAuthed(sessionStorage.getItem(RAKA98_ADMIN_SESSION_KEY) === "1");
     setReady(true);
   }, []);
 
   function lock() {
-    sessionStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem(RAKA98_ADMIN_SESSION_KEY);
     setAuthed(false);
   }
 
