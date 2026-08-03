@@ -39,9 +39,9 @@ describe("Razorpay provider boundary", () => {
     }
   });
 
-  it("bounds subscriptions without changing monthly or yearly billing cadence", () => {
-    assert.equal(getRazorpaySubscriptionTotalCount("monthly"), 1200);
-    assert.equal(getRazorpaySubscriptionTotalCount("yearly"), 100);
+  it("keeps subscription end times inside Razorpay's UPI mandate boundary", () => {
+    assert.equal(getRazorpaySubscriptionTotalCount("monthly"), 1080);
+    assert.equal(getRazorpaySubscriptionTotalCount("yearly"), 90);
   });
 
   it("formats Indian phone numbers for Razorpay checkout prefill and notify_info", () => {
