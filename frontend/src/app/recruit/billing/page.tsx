@@ -26,6 +26,42 @@ import {
 
 const CATEGORIES: BillingCategory[] = ["seeker", "creator_form", "creator_standard"];
 
+const BILLING_STEPS = [
+  {
+    number: "01",
+    title: "Choose a category",
+    body: "Job Seeker, Form Jobs, and Standard Jobs have separate plans and entitlements.",
+  },
+  {
+    number: "02",
+    title: "Pay securely",
+    body: "Checkout is handled through Razorpay in INR. Rolebolt does not store full card details.",
+  },
+  {
+    number: "03",
+    title: "Access is verified",
+    body: "Paid capacity activates only after server-side payment or subscription verification.",
+  },
+];
+
+const CATEGORY_DESCRIPTIONS: Record<BillingCategory, { label: string; description: string; features: string[] }> = {
+  seeker: {
+    label: "Job Seeker",
+    description: "Career workspace for resumes, applications, matching, cover letters, and interview preparation.",
+    features: ["Resume versions", "Application tracking", "AI career tools"],
+  },
+  creator_form: {
+    label: "Form Jobs",
+    description: "Lightweight hiring forms for collecting responses, reviewing applicants, and running small campaigns.",
+    features: ["Public forms", "Response review", "Assessments and exports"],
+  },
+  creator_standard: {
+    label: "Standard Jobs",
+    description: "Full recruiting workspace with pipelines, scoring, collaboration, automation, analytics, and offers.",
+    features: ["Candidate pipeline", "AI hiring tools", "Team collaboration"],
+  },
+};
+
 function parseCategory(value: string | null): BillingCategory {
   if (value === "seeker" || value === "creator_form" || value === "creator_standard") return value;
   return "creator_standard";
@@ -233,12 +269,46 @@ function BillingContent() {
       <main className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
         <p className="text-xs font-bold uppercase tracking-[0.16em] text-teal-700">Rolebolt</p>
         <h1 className="mt-2 font-[family-name:var(--font-display)] text-3xl font-extrabold text-slate-900">
-          Billing & usage
+          Payment & billing
         </h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600">
-          Each category has its own Free / Pro / Ultra Pro entitlement. Usage below comes from the
-          server — not from browser plan flags.
+          Manage your Rolebolt plans, payment status, cancellation, and usage in one place. Each category
+          has its own Free / Pro / Ultra Pro entitlement, and usage below comes from the server—not from
+          browser plan flags.
         </p>
+
+        <section className="mt-7 rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_10px_40px_rgba(15,23,42,0.04)] sm:p-6">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-teal-700">How billing works</p>
+              <h2 className="mt-2 font-[family-name:var(--font-display)] text-2xl font-bold tracking-tight text-slate-900">
+                Clear plans. Verified payments. No surprise overages.
+              </h2>
+            </div>
+            <span className="rounded-full bg-teal-50 px-3 py-1.5 text-xs font-bold text-teal-800">
+              INR · Razorpay
+            </span>
+          </div>
+          <div className="mt-5 grid gap-3 md:grid-cols-3">
+            {BILLING_STEPS.map((step) => (
+              <div key={step.number} className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
+                <p className="text-xs font-black tracking-[0.14em] text-teal-600">{step.number}</p>
+                <h3 className="mt-2 text-sm font-bold text-slate-900">{step.title}</h3>
+                <p className="mt-1.5 text-xs leading-5 text-slate-600">{step.body}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 grid gap-3 text-xs leading-5 text-slate-600 sm:grid-cols-2">
+            <p className="rounded-2xl border border-slate-100 px-4 py-3">
+              <span className="font-bold text-slate-800">Billing periods:</span> Monthly and yearly options
+              are shown on the plan page. Unused quota resets and does not roll over.
+            </p>
+            <p className="rounded-2xl border border-slate-100 px-4 py-3">
+              <span className="font-bold text-slate-800">Cancellation:</span> Schedule cancellation at period
+              end and keep paid access through the current period.
+            </p>
+          </div>
+        </section>
 
         <div className="mt-6 flex flex-wrap gap-2">
           {CATEGORIES.map((item) => (
@@ -259,6 +329,37 @@ function BillingContent() {
             </button>
           ))}
         </div>
+
+        <section className="mt-5 grid gap-3 md:grid-cols-3">
+          {CATEGORIES.map((item) => {
+            const details = CATEGORY_DESCRIPTIONS[item];
+            return (
+              <button
+                key={item}
+                type="button"
+                onClick={() => {
+                  setCategory(item);
+                  router.replace(billingHref(item, checkoutPending ? { checkout: "pending" } : undefined));
+                }}
+                className={`text-left rounded-2xl border p-4 transition ${
+                  category === item
+                    ? "border-teal-300 bg-teal-50/70 ring-1 ring-teal-200"
+                    : "border-slate-200 bg-white hover:border-slate-300"
+                }`}
+              >
+                <p className="text-sm font-bold text-slate-900">{details.label}</p>
+                <p className="mt-1.5 text-xs leading-5 text-slate-600">{details.description}</p>
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {details.features.map((feature) => (
+                    <span key={feature} className="rounded-full bg-white px-2 py-1 text-[10px] font-bold text-slate-600 ring-1 ring-slate-200">
+                      {feature}
+                    </span>
+                  ))}
+                </div>
+              </button>
+            );
+          })}
+        </section>
 
         {(actionNotice || checkoutPending) && (
           <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
@@ -428,10 +529,41 @@ function BillingContent() {
           </section>
         )}
 
-        <p className="mt-8 text-center text-xs text-slate-400">
-          Payments processed by Razorpay. Checkout success never unlocks paid plans — only a verified
-          webhook or reconciliation does.
-        </p>
+        <section className="mt-8 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <div className="grid gap-5 md:grid-cols-[1fr_auto] md:items-center">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Need billing help?</p>
+              <h2 className="mt-2 font-[family-name:var(--font-display)] text-xl font-bold text-slate-900">
+                Payment, cancellation, and refund support
+              </h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+                For a pending payment, duplicate charge, unauthorised transaction, or cancellation request,
+                contact <a className="font-semibold text-teal-700 hover:underline" href="mailto:billing@rolebolt.tech">billing@rolebolt.tech</a>.
+                Include your account email, category, payment reference, date, and amount. Never send a
+                password, OTP, full card number, CVV, API key, or authentication token.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2 md:max-w-[230px] md:justify-end">
+              <Link href="/refund-policy" className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50">
+                Refund policy
+              </Link>
+              <Link href="/terms" className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50">
+                Terms
+              </Link>
+              <Link href="/privacy" className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50">
+                Privacy
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-center text-xs text-slate-400">
+          <span>Payments processed by Razorpay</span>
+          <span>·</span>
+          <span>INR billing</span>
+          <span>·</span>
+          <span>Paid access activates only after verified webhook or reconciliation</span>
+        </div>
       </main>
     </div>
   );
