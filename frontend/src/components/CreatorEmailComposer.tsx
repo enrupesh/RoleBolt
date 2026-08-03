@@ -86,11 +86,16 @@ export function CreatorEmailComposer({
 
   useEffect(() => {
     if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     function onKey(event: KeyboardEvent) {
       if (event.key === "Escape") onClose();
     }
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", onKey);
+    };
   }, [open, onClose]);
 
   function applyTemplate(key: CreatorEmailTemplateKey) {
@@ -186,9 +191,9 @@ export function CreatorEmailComposer({
         <div
           role="dialog"
           aria-modal="true"
-          className="w-full max-w-5xl max-h-[92vh] overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.18)] flex flex-col"
+          className="flex max-h-[calc(100dvh-2rem)] min-h-0 w-full max-w-5xl flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.18)]"
         >
-          <div className="px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-slate-950 via-[#132238] to-[#0a66c2] text-white flex items-start justify-between gap-4">
+          <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-100 bg-gradient-to-r from-slate-950 via-[#132238] to-[#0a66c2] px-6 py-5 text-white">
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-white/80">
                 <MailIcon />
@@ -230,8 +235,9 @@ export function CreatorEmailComposer({
               </div>
             </div>
           ) : (
-            <div className="grid lg:grid-cols-[320px_minmax(0,1fr)] min-h-0 flex-1 overflow-hidden">
-              <div className="border-b lg:border-b-0 lg:border-r border-slate-100 bg-slate-50/70 p-5 overflow-y-auto">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+              <div className="grid lg:grid-cols-[320px_minmax(0,1fr)]">
+              <div className="border-b border-slate-100 bg-slate-50/70 p-5 lg:border-b-0 lg:border-r">
                 <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Recipients</p>
                 <p className="mt-1 text-xs text-slate-500 mb-4">Select one or more candidates with an email on file.</p>
                 <div className="space-y-2">
@@ -264,7 +270,7 @@ export function CreatorEmailComposer({
                 </div>
               </div>
 
-              <div className="p-5 overflow-y-auto space-y-5">
+              <div className="space-y-5 p-5">
                 <div>
                   <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400 mb-3">Templates</p>
                   <div className="flex flex-wrap gap-2">
@@ -348,6 +354,7 @@ export function CreatorEmailComposer({
                     {sending ? "Sending…" : `Send Email${selectedIds.length > 1 ? ` (${selectedIds.length})` : ""}`}
                   </button>
                 </div>
+              </div>
               </div>
             </div>
           )}
