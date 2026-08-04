@@ -23,6 +23,7 @@ import { verifyFirebaseToken } from "./firebaseAdmin";
 import { RecruitProfile } from "./models/RecruitProfile";
 import { RecruitSeekerProfile } from "./models/RecruitSeekerProfile";
 import { initializeFreeEntitlements } from "./billing/entitlements";
+import { RecruitAuthSettings } from "./models/RecruitAuthSettings";
 
 export const authRouter = express.Router();
 
@@ -104,6 +105,11 @@ function makeVerificationToken(): string { return makeToken(); }
 
 type SignupRole = "creator" | "seeker";
 
+async function emailVerificationIsRequired(): Promise<boolean> {
+  const settings = await RecruitAuthSettings.findOne().select("requireEmailVerification").lean();
+  return settings?.requireEmailVerification !== false;
+}
+
 function parseSignupRole(raw: unknown): SignupRole | null {
   if (raw === undefined || raw === null || raw === "") return "creator";
   return raw === "creator" || raw === "seeker" ? raw : null;
@@ -115,7 +121,7 @@ function parseRequestedRole(raw: unknown): SignupRole | null {
 }
 
 async function resolveRequestedRole(
-  user: { _id: { toString(): string }; signupRole?: SignupRole },
+  user: { _id: { toString(): string }; signupRole?: SignupRole; save(): Promise<unknown> },
   requestedRole: SignupRole | null,
 ): Promise<{ role: SignupRole | null; mismatch: boolean }> {
   const storedRole = await getStoredSignupRole(user);
@@ -583,6 +589,7 @@ authRouter.patch("/username", requireAuth, async (req, res) => {
 authRouter.post("/signup", async (req, res) => {
   try {
     await connectMongo();
+    const requireEmailVerification = await emailVerificationIsRequired();
 
     const { email, password, username, role } = req.body as {
       email?: string;
@@ -613,6 +620,21 @@ authRouter.post("/signup", async (req, res) => {
     const existing = await User.findOne({ email: normalizedEmail });
     if (existing) {
       if (!existing.isVerified) {
+        if (!requireEmailVerification) {
+          const existingRole = await getStoredSignupRole(existing) ?? signupRole;
+          if (!existing.signupRole) existing.signupRole = existingRole;
+          existing.isVerified = true;
+          existing.verificationToken = undefined;
+          existing.verificationTokenExpiry = undefined;
+          await existing.save();
+          const token = signToken({ sub: existing._id.toString(), email: existing.email });
+          return res.status(200).json({
+            message: "Your account is active. Email verification is currently disabled.",
+            verificationRequired: false,
+            token,
+            user: userPublicDto(existing),
+          });
+        }
         // Resend verification instead of erroring out
         const token = makeVerificationToken();
         const existingRole = await getStoredSignupRole(existing) ?? signupRole;
@@ -638,18 +660,35 @@ authRouter.post("/signup", async (req, res) => {
       passwordHash,
       name:                    "",
       signupRole,
-      isVerified:              false,
-      verificationToken,
-      verificationTokenExpiry: new Date(Date.now() + TOKEN_TTL_MS),
+      isVerified:              !requireEmailVerification,
+      ...(requireEmailVerification
+        ? {
+            verificationToken,
+            verificationTokenExpiry: new Date(Date.now() + TOKEN_TTL_MS),
+          }
+        : {}),
     });
 
-    // Fire-and-forget — don't block the response on email delivery
-    sendVerificationEmail(normalizedEmail, user.username || user.name, verificationToken, signupRole).catch((err) => {
-      console.error("[auth] Failed to send verification email:", err?.message);
-    });
+    if (requireEmailVerification) {
+      // Fire-and-forget — don't block the response on email delivery
+      sendVerificationEmail(normalizedEmail, user.username || user.name, verificationToken, signupRole).catch((err) => {
+        console.error("[auth] Failed to send verification email:", err?.message);
+      });
+    }
+
+    if (!requireEmailVerification) {
+      const token = signToken({ sub: user._id.toString(), email: user.email });
+      return res.status(201).json({
+        message: "Account created. Your account is active.",
+        verificationRequired: false,
+        token,
+        user: userPublicDto(user),
+      });
+    }
 
     return res.status(201).json({
       message: "Account created. Please check your email to verify your account.",
+      verificationRequired: true,
       username: user.username,
     });
   } catch (err: any) {
@@ -713,7 +752,14 @@ authRouter.post("/login", async (req, res) => {
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) return res.status(401).json({ error: invalidMessage });
 
-    if (!user.isVerified) {
+    const requireEmailVerification = await emailVerificationIsRequired();
+    if (!requireEmailVerification && !user.isVerified) {
+      user.isVerified = true;
+      user.verificationToken = undefined;
+      user.verificationTokenExpiry = undefined;
+      await user.save();
+    }
+    if (requireEmailVerification && !user.isVerified) {
       return res.status(403).json({
         code:  "EMAIL_NOT_VERIFIED",
         error: "Please verify your email before signing in. Check your inbox for a verification link.",

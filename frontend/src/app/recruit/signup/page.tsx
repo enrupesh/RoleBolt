@@ -211,7 +211,18 @@ export default function RecruitSignUpPage() {
       }
 
       markSignupWelcome("creator");
-      setStep("check-email");
+      if (data.verificationRequired === false && data.token) {
+        const session = await signInWithToken(data.token);
+        if (session.error) {
+          setError(session.error);
+          return;
+        }
+        router.replace(session.username?.trim()
+          ? nextPath
+          : `/recruit/choose-username?next=${encodeURIComponent(nextPath)}`);
+      } else {
+        setStep("check-email");
+      }
     } catch {
       setError("Network error. Please check your connection and try again.");
     } finally {
