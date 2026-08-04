@@ -51,8 +51,10 @@ function SeekerLoginPageContent() {
   }
 
   useEffect(() => {
-    if (!loading && authUser && recruitProfile?.role === "seeker") {
-      if (authUser.username?.trim()) {
+    if (!loading && authUser && recruitProfile) {
+      if (recruitProfile.role === "creator") {
+        router.replace("/recruit/dashboard");
+      } else if (authUser.username?.trim()) {
         goAfterLogin();
       } else {
         router.replace(`/recruit/choose-username?role=seeker&next=${encodeURIComponent(redirectTo.startsWith("/") ? redirectTo : "/seeker/dashboard")}`);
@@ -129,7 +131,7 @@ function SeekerLoginPageContent() {
       const res = await fetch(apiUrl("/auth/social"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idToken, provider: "google" }),
+        body: JSON.stringify({ idToken, provider: "google", role: "seeker" }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -212,7 +214,7 @@ function SeekerLoginPageContent() {
       const res = await fetch(apiUrl("/auth/social"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idToken, provider: "phone" }),
+        body: JSON.stringify({ idToken, provider: "phone", role: "seeker" }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -245,8 +247,8 @@ function SeekerLoginPageContent() {
     try {
       const result = await signIn(
         loginMode === "email"
-          ? { email: email.trim(), password }
-          : { username: normalizeUsernameInput(username), password },
+          ? { email: email.trim(), password, role: "seeker" }
+          : { username: normalizeUsernameInput(username), password, role: "seeker" },
       );
       if (result.error) {
         if (result.code === "EMAIL_NOT_VERIFIED") {

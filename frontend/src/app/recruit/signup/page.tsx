@@ -102,7 +102,7 @@ export default function RecruitSignUpPage() {
       const res = await fetch(apiUrl("/auth/social"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idToken, provider: "google" }),
+        body: JSON.stringify({ idToken, provider: "google", role: "creator" }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Google sign-up failed. Please try again."); return; }
@@ -163,7 +163,7 @@ export default function RecruitSignUpPage() {
       const res = await fetch(apiUrl("/auth/social"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idToken, provider: "phone" }),
+        body: JSON.stringify({ idToken, provider: "phone", role: "creator" }),
       });
       const data = await res.json();
       if (!res.ok) { setPhoneError(data.error ?? "Phone sign-up failed."); return; }

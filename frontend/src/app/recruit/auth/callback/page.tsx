@@ -49,6 +49,7 @@ function OAuthCallbackInner() {
         no_github_email:     "Your GitHub account has no public or verified email. Please add one in GitHub settings and try again.",
         github_token_failed: "GitHub token exchange failed. Please try again.",
         github_failed:       "GitHub sign-in failed. Please try again.",
+        role_mismatch:       "This account belongs to the other Rolebolt workspace. Please use the correct sign-in page.",
       };
       setErrMsg(messages[error ?? ""] || "Something went wrong. Please try again.");
       setStatus("error");
@@ -62,17 +63,24 @@ function OAuthCallbackInner() {
           const meRes = await fetch(apiUrl("/auth/me"), { headers });
           const me = meRes.ok ? await meRes.json() : null;
 
-          await fetch(apiUrl("/recruit/auth/profile"), {
+          const profileRes = await fetch(apiUrl("/recruit/auth/profile"), {
             method: "PATCH",
             headers: { ...headers, "Content-Type": "application/json" },
             body: JSON.stringify({ role: "seeker", username: me?.username, email: me?.email }),
           });
+          if (!profileRes.ok) {
+            const profileError = await profileRes.json().catch(() => ({}));
+            throw new Error(profileError.error ?? "This account belongs to the creator workspace.");
+          }
 
-          await fetch(apiUrl("/recruit/seeker/profile"), {
+          const seekerProfileRes = await fetch(apiUrl("/recruit/seeker/profile"), {
             method: "PUT",
             headers: { ...headers, "Content-Type": "application/json" },
             body: JSON.stringify({ username: me?.username, email: me?.email }),
           });
+          if (!seekerProfileRes.ok) {
+            throw new Error("Could not create the seeker profile.");
+          }
         }
 
         const result = await signInWithToken(token);

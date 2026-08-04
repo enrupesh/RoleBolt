@@ -57,9 +57,13 @@ export default function RecruitLoginPage() {
 
   useEffect(() => {
     if (!loading && authUser && recruitProfile) {
-      router.replace(authUser.username?.trim()
-        ? nextPath
-        : `/recruit/choose-username?next=${encodeURIComponent(nextPath)}`);
+      if (recruitProfile.role === "seeker") {
+        router.replace("/seeker/dashboard");
+      } else {
+        router.replace(authUser.username?.trim()
+          ? nextPath
+          : `/recruit/choose-username?next=${encodeURIComponent(nextPath)}`);
+      }
     }
   }, [loading, authUser, recruitProfile, router, nextPath]);
 
@@ -99,7 +103,7 @@ export default function RecruitLoginPage() {
       const res = await fetch(apiUrl("/auth/social"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idToken, provider: "google" }),
+        body: JSON.stringify({ idToken, provider: "google", role: "creator" }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Google sign-in failed. Please try again."); return; }
@@ -157,7 +161,7 @@ export default function RecruitLoginPage() {
       const res = await fetch(apiUrl("/auth/social"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idToken, provider: "phone" }),
+        body: JSON.stringify({ idToken, provider: "phone", role: "creator" }),
       });
       const data = await res.json();
       if (!res.ok) { setPhoneError(data.error ?? "Phone sign-in failed."); return; }
@@ -187,8 +191,8 @@ export default function RecruitLoginPage() {
     setSubmitting(true);
     const result = await signIn(
       loginMode === "email"
-        ? { email: email.trim(), password }
-        : { username: normalizeUsernameInput(username), password },
+        ? { email: email.trim(), password, role: "creator" }
+        : { username: normalizeUsernameInput(username), password, role: "creator" },
     );
     setSubmitting(false);
 

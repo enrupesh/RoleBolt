@@ -1086,13 +1086,27 @@ recruitRouter.post("/auth/profile", async (req, res) => {
       return res.status(400).json({ error: "Invalid role. Must be 'creator' or 'seeker'." });
     }
     const jwtEmail = (req as any).user?.email ?? "";
-    const authUser = await User.findById(uid).lean();
-    const resolvedUsername = username?.trim().toLowerCase() || authUser?.username || "";
+    const authUser = await User.findById(uid);
     const existing = await RecruitProfile.findOne({ uid });
+    const profileRole = existing?.role === "creator" || existing?.role === "seeker"
+      ? existing.role
+      : undefined;
+    const canonicalRole = authUser?.signupRole ?? profileRole;
+    if (authUser && !authUser.signupRole && canonicalRole) {
+      authUser.signupRole = canonicalRole;
+      await authUser.save();
+    }
+    if (canonicalRole && canonicalRole !== role) {
+      return res.status(409).json({
+        code: "ROLE_MISMATCH",
+        error: `This account is registered as a ${canonicalRole === "seeker" ? "job seeker" : "job creator"}.`,
+      });
+    }
+    const resolvedUsername = username?.trim().toLowerCase() || authUser?.username || "";
     if (existing) {
       return res.json({
         uid: existing.uid,
-        role: existing.role,
+        role: canonicalRole ?? existing.role,
         username: existing.username || resolvedUsername,
         name: existing.name,
         email: existing.email || jwtEmail,
@@ -1126,14 +1140,24 @@ recruitRouter.get("/auth/profile", async (req, res) => {
     if (!uid) return res.status(401).json({ error: "Unauthorized" });
     const profile = await RecruitProfile.findOne({ uid });
     if (!profile) return res.status(404).json({ error: "No recruit profile found" });
+    const authUser = await User.findById(uid);
+    const profileRole = profile.role === "creator" || profile.role === "seeker" ? profile.role : undefined;
+    const canonicalRole = authUser?.signupRole ?? profileRole;
+    if (authUser && !authUser.signupRole && canonicalRole) {
+      authUser.signupRole = canonicalRole;
+      await authUser.save();
+    }
+    if (canonicalRole && profile.role !== canonicalRole) {
+      profile.role = canonicalRole;
+      await profile.save();
+    }
     let username = profile.username;
     if (!username) {
-      const authUser = await User.findById(uid).lean();
       username = authUser?.username ?? "";
     }
     return res.json({
       uid: profile.uid,
-      role: profile.role,
+      role: canonicalRole ?? profile.role,
       username,
       name: profile.name,
       email: profile.email,
@@ -1158,6 +1182,22 @@ recruitRouter.patch("/auth/profile", async (req, res) => {
     // role is optional on PATCH — only validate if explicitly provided
     if (role && !["creator", "seeker"].includes(role)) {
       return res.status(400).json({ error: "Invalid role. Must be 'creator' or 'seeker'." });
+    }
+    const authUser = await User.findById(uid);
+    const existing = await RecruitProfile.findOne({ uid });
+    const profileRole = existing?.role === "creator" || existing?.role === "seeker"
+      ? existing.role
+      : undefined;
+    const canonicalRole = authUser?.signupRole ?? profileRole;
+    if (authUser && !authUser.signupRole && canonicalRole) {
+      authUser.signupRole = canonicalRole;
+      await authUser.save();
+    }
+    if (role && canonicalRole && role !== canonicalRole) {
+      return res.status(409).json({
+        code: "ROLE_MISMATCH",
+        error: `This account is registered as a ${canonicalRole === "seeker" ? "job seeker" : "job creator"}.`,
+      });
     }
 
     const $set: Record<string, any> = {};
