@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { RoleboltLogo } from "@/components/RoleboltLogo";
 import { FeedbackModal } from "@/components/FeedbackModal";
+import { ReviewModal } from "@/components/ReviewModal";
 
 const productLinks = [
   ["AI Copilot", "/recruit/copilot"],
@@ -117,6 +118,7 @@ const trustBadges = [
 
 export function MarketingFooter() {
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
 
   return (
     <>
@@ -154,6 +156,10 @@ export function MarketingFooter() {
               Tell us what is working, what is missing, or what we should build next.
             </p>
             <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <button type="button" onClick={() => setReviewOpen(true)} className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-[#8fc4e9]/40 bg-[#0a66c2] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#07559f]">
+                Write a review
+                <ExternalArrow />
+              </button>
               <button type="button" onClick={() => setFeedbackOpen(true)} className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-white px-4 py-3 text-sm font-semibold text-[#102d46] transition hover:bg-[#e8f4fb]">
                 Give feedback
                 <ExternalArrow />
@@ -162,6 +168,9 @@ export function MarketingFooter() {
                 support@rolebolt.tech
               </a>
             </div>
+            <Link href="/reviews" className="mt-3 inline-flex text-xs font-semibold text-[#9ed2ee] transition hover:text-white">
+              Read all community reviews →
+            </Link>
           </div>
         </div>
 
@@ -228,6 +237,7 @@ export function MarketingFooter() {
       </div>
       </footer>
       {feedbackOpen && <FeedbackModal onClose={() => setFeedbackOpen(false)} />}
+      {reviewOpen && <ReviewModal onClose={() => setReviewOpen(false)} />}
     </>
   );
 }

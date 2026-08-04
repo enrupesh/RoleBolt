@@ -5,9 +5,10 @@ import { useEffect, useState } from "react";
 import { VerificationAdminPanel } from "@/components/VerificationAdminPanel";
 import { PlanGrantAdminPanel } from "@/components/PlanGrantAdminPanel";
 import { FeedbackAdminPanel } from "@/components/FeedbackAdminPanel";
+import { ReviewAdminPanel } from "@/components/ReviewAdminPanel";
 import { RAKA98_ADMIN_PASSWORD, RAKA98_ADMIN_SESSION_KEY } from "@/lib/raka98Admin";
 
-type AdminTab = "verification" | "plans" | "feedback";
+type AdminTab = "verification" | "plans" | "feedback" | "reviews";
 
 function AdminLogin({ onSuccess }: { onSuccess: () => void }) {
   const [input, setInput] = useState("");
@@ -145,9 +146,20 @@ function AdminShell({ onLock }: { onLock: () => void }) {
           >
             Feedback
           </button>
+          <button
+            type="button"
+            onClick={() => setTab("reviews")}
+            className={`rounded-full px-4 py-2 text-xs font-semibold border transition ${
+              tab === "reviews"
+                ? "bg-white text-black border-white"
+                : "border-white/10 text-white/45 hover:border-white/20"
+            }`}
+          >
+            Reviews
+          </button>
         </div>
 
-        {tab === "verification" ? <VerificationAdminPanel /> : tab === "plans" ? <PlanGrantAdminPanel /> : <FeedbackAdminPanel />}
+        {tab === "verification" ? <VerificationAdminPanel /> : tab === "plans" ? <PlanGrantAdminPanel /> : tab === "feedback" ? <FeedbackAdminPanel /> : <ReviewAdminPanel />}
       </main>
     </div>
   );

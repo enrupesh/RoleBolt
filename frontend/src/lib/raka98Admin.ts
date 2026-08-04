@@ -32,6 +32,25 @@ export type AdminFeedback = {
   createdAt: string | null;
 };
 
+export type AdminReview = {
+  id: string;
+  rating: number;
+  title: string;
+  message: string;
+  displayName: string;
+  role: "creator" | "seeker";
+  isGuest: boolean;
+  featured: boolean;
+  visible: boolean;
+  createdAt: string | null;
+  email: string;
+};
+
+export type AdminReviewSettings = {
+  allowGuestReviews: boolean;
+  showFeaturedReviews: boolean;
+};
+
 export type AdminVerificationRequest = {
   uid: string;
   email: string;
@@ -130,4 +149,30 @@ export async function setFeedbackRead(id: string, read: boolean) {
 
 export async function deleteFeedback(id: string) {
   return adminFetch(`/admin/feedback/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+export async function fetchReviews() {
+  const data = await adminFetch("/admin/reviews");
+  return {
+    reviews: data.reviews as AdminReview[],
+    settings: data.settings as AdminReviewSettings,
+  };
+}
+
+export async function updateReview(id: string, update: { featured?: boolean; visible?: boolean }) {
+  return adminFetch(`/admin/reviews/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(update),
+  });
+}
+
+export async function deleteReview(id: string) {
+  return adminFetch(`/admin/reviews/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+export async function updateReviewSettings(update: Partial<AdminReviewSettings>) {
+  return adminFetch("/admin/reviews/settings", {
+    method: "PATCH",
+    body: JSON.stringify(update),
+  });
 }

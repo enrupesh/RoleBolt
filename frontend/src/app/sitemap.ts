@@ -28,6 +28,11 @@ const publicPages: MetadataRoute.Sitemap = [
     priority: 0.7,
   },
   {
+    url: `${SITE_URL}/reviews`,
+    changeFrequency: "weekly",
+    priority: 0.7,
+  },
+  {
     url: `${SITE_URL}/resources`,
     changeFrequency: "weekly",
     priority: 0.8,
