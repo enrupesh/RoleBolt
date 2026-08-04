@@ -14,6 +14,7 @@ function SeekerVerifyEmailContent() {
   const token = searchParams.get("token");
   const [status, setStatus] = useState<Status>(token ? "loading" : "no-token");
   const [message, setMessage] = useState("");
+  const [verifiedRole, setVerifiedRole] = useState<"creator" | "seeker">("seeker");
   const calledRef = useRef(false);
 
   useEffect(() => {
@@ -28,7 +29,9 @@ function SeekerVerifyEmailContent() {
       .then(async (res) => {
         const data = await res.json();
         if (res.ok) {
-          markSignupWelcome("seeker");
+          const role = data.role === "creator" ? "creator" : "seeker";
+          setVerifiedRole(role);
+          markSignupWelcome(role);
           setStatus("success");
         }
         else if (data.code === "TOKEN_EXPIRED") setStatus("expired");
@@ -80,9 +83,11 @@ function SeekerVerifyEmailContent() {
               </div>
               <h1 className="mb-2 text-xl font-extrabold text-slate-950">Email verified!</h1>
               <p className="mb-6 text-sm leading-relaxed text-slate-500">
-                Your seeker account is ready. Sign in to continue your job search.
+                Your {verifiedRole === "seeker" ? "seeker" : "creator"} account is ready. Sign in to continue.
               </p>
-              <Link href="/seeker/login" className={buttonClass}>Sign in as a job seeker</Link>
+              <Link href={verifiedRole === "seeker" ? "/seeker/login" : "/recruit/login"} className={buttonClass}>
+                {verifiedRole === "seeker" ? "Sign in as a job seeker" : "Sign in as a job creator"}
+              </Link>
             </>
           )}
 

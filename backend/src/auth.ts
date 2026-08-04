@@ -109,6 +109,26 @@ function parseSignupRole(raw: unknown): SignupRole | null {
   return raw === "creator" || raw === "seeker" ? raw : null;
 }
 
+function parseRequestedRole(raw: unknown): SignupRole | null {
+  if (raw === undefined || raw === null || raw === "") return null;
+  return raw === "creator" || raw === "seeker" ? raw : null;
+}
+
+async function resolveRequestedRole(
+  user: { _id: { toString(): string }; signupRole?: SignupRole },
+  requestedRole: SignupRole | null,
+): Promise<{ role: SignupRole | null; mismatch: boolean }> {
+  const storedRole = await getStoredSignupRole(user);
+  if (requestedRole && storedRole && requestedRole !== storedRole) {
+    return { role: storedRole, mismatch: true };
+  }
+  if (requestedRole && !user.signupRole) {
+    user.signupRole = requestedRole;
+    await user.save();
+  }
+  return { role: storedRole ?? requestedRole, mismatch: false };
+}
+
 async function getStoredSignupRole(
   user: { _id: { toString(): string }; signupRole?: SignupRole },
 ): Promise<SignupRole | null> {
@@ -229,12 +249,20 @@ function buildGitHubFrontendCallback(
 
 authRouter.post("/social", async (req, res) => {
   try {
-    const { idToken, provider } = req.body as { idToken?: string; provider?: string };
+    const { idToken, provider, role } = req.body as {
+      idToken?: string;
+      provider?: string;
+      role?: string;
+    };
 
     if (!idToken?.trim()) return res.status(400).json({ error: "idToken is required." });
     if (!provider || !["google", "phone"].includes(provider)) {
       return res.status(400).json({ error: "provider must be 'google' or 'phone'." });
     }
+    if (role !== undefined && !parseRequestedRole(role)) {
+      return res.status(400).json({ error: "Invalid account role." });
+    }
+    const requestedRole = parseRequestedRole(role);
 
     // Verify the Firebase ID token
     let decoded: import("firebase-admin").auth.DecodedIdToken;
@@ -262,6 +290,13 @@ authRouter.post("/social", async (req, res) => {
       let isNewAccount = false;
 
       if (user) {
+        const resolved = await resolveRequestedRole(user, requestedRole);
+        if (resolved.mismatch) {
+          return res.status(409).json({
+            code: "ROLE_MISMATCH",
+            error: `This account is registered as a ${resolved.role === "seeker" ? "job seeker" : "job creator"}. Please use the ${resolved.role === "seeker" ? "job seeker" : "job creator"} sign-in.`,
+          });
+        }
         let changed = false;
         if (!user.phoneId)      { user.phoneId = firebaseUid; changed = true; }
         if (!user.phoneNumber)  { user.phoneNumber = phoneNumber; changed = true; }
@@ -275,6 +310,7 @@ authRouter.post("/social", async (req, res) => {
           isVerified:   true,
           phoneNumber,
           phoneId:      firebaseUid,
+          signupRole:   requestedRole ?? "creator",
         });
       }
 
@@ -299,6 +335,13 @@ authRouter.post("/social", async (req, res) => {
     let isNewAccount = false;
 
     if (user) {
+      const resolved = await resolveRequestedRole(user, requestedRole);
+      if (resolved.mismatch) {
+        return res.status(409).json({
+          code: "ROLE_MISMATCH",
+          error: `This account is registered as a ${resolved.role === "seeker" ? "job seeker" : "job creator"}. Please use the ${resolved.role === "seeker" ? "job seeker" : "job creator"} sign-in.`,
+        });
+      }
       let changed = false;
       if (!(user as any)[idField]) { (user as any)[idField] = firebaseUid; changed = true; }
       if (!user.isVerified)        { user.isVerified = true;               changed = true; }
@@ -312,6 +355,7 @@ authRouter.post("/social", async (req, res) => {
         name,
         isVerified:   true,
         [idField]:    firebaseUid,
+        signupRole:   requestedRole ?? "creator",
       });
     }
 
@@ -429,8 +473,13 @@ authRouter.get("/github/callback", async (req, res) => {
       $or: [{ githubId: String(githubUser.id) }, { email }],
     });
     let isNewAccount = false;
+    const requestedSignupRole: SignupRole = target === "seeker" ? "seeker" : "creator";
 
     if (user) {
+      const resolved = await resolveRequestedRole(user, requestedSignupRole);
+      if (resolved.mismatch) {
+        return res.redirect(buildGitHubFrontendCallback(target, intent, { error: "role_mismatch" }));
+      }
       // Link githubId to existing account if not already set
       let changed = false;
       if (!user.githubId) { user.githubId = String(githubUser.id); changed = true; }
@@ -445,6 +494,7 @@ authRouter.get("/github/callback", async (req, res) => {
         name:          (githubUser.name || githubUser.login || "").trim(),
         isVerified:    true,
         githubId:      String(githubUser.id),
+        signupRole:    requestedSignupRole,
       });
     }
 
@@ -619,11 +669,16 @@ authRouter.post("/login", async (req, res) => {
   try {
     await connectMongo();
 
-    const { email, username, password } = req.body as {
+    const { email, username, password, role } = req.body as {
       email?: string;
       username?: string;
       password?: string;
+      role?: string;
     };
+    if (role !== undefined && !parseRequestedRole(role)) {
+      return res.status(400).json({ error: "Invalid account role." });
+    }
+    const requestedRole = parseRequestedRole(role);
 
     if (!password) {
       return res.status(400).json({ error: "Password is required." });
@@ -663,6 +718,14 @@ authRouter.post("/login", async (req, res) => {
         code:  "EMAIL_NOT_VERIFIED",
         error: "Please verify your email before signing in. Check your inbox for a verification link.",
         email: user.email,
+      });
+    }
+
+    const resolvedRole = await resolveRequestedRole(user, requestedRole);
+    if (resolvedRole.mismatch) {
+      return res.status(409).json({
+        code: "ROLE_MISMATCH",
+        error: `This account is registered as a ${resolvedRole.role === "seeker" ? "job seeker" : "job creator"}. Please use the ${resolvedRole.role === "seeker" ? "job seeker" : "job creator"} sign-in.`,
       });
     }
 

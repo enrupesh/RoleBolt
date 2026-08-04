@@ -14,3 +14,9 @@ The welcome modal must be mounted once above both recruiter and seeker routes. A
 **Why:** Nested auth providers caused recruiter and seeker post-signup state to diverge, and provider login flows otherwise cannot distinguish a newly created account from an existing account.
 
 **How to apply:** Keep role resolution in the shared auth provider; mark signup intent only for newly created Google/GitHub/phone accounts and after successful email verification.
+
+Role is an account boundary, not a UI preference: provider signup/login requests must carry the intended role, and profile APIs must reject cross-role changes or backfill legacy users from an existing canonical profile.
+
+**Why:** A seeker verification flow once reached the creator dashboard because older social/legacy accounts could create or mutate the shared profile with the default creator role.
+
+**How to apply:** Resolve the stored account role before creating or patching a recruit profile; return a stable mismatch error instead of silently switching workspaces.

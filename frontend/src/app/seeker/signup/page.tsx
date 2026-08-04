@@ -110,7 +110,7 @@ export default function SeekerSignupPage() {
       const res = await fetch(apiUrl("/auth/social"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idToken, provider: "google" }),
+        body: JSON.stringify({ idToken, provider: "google", role: "seeker" }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -186,7 +186,7 @@ export default function SeekerSignupPage() {
       const res = await fetch(apiUrl("/auth/social"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idToken, provider: "phone" }),
+        body: JSON.stringify({ idToken, provider: "phone", role: "seeker" }),
       });
       const data = await res.json();
       if (!res.ok) {
