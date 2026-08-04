@@ -21,7 +21,7 @@ export interface IRecruitReview extends Document {
 
 const RecruitReviewSchema = new Schema<IRecruitReview>(
   {
-    uid: { type: String, index: true, sparse: true },
+  uid: { type: String, sparse: true },
     editToken: { type: String, index: true, sparse: true, select: false },
     email: { type: String, trim: true, lowercase: true, maxlength: 254 },
     rating: { type: Number, required: true, min: 1, max: 5 },
