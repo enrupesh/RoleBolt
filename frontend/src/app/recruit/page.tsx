@@ -8,6 +8,7 @@ import { RoleboltLogo } from "@/components/RoleboltLogo";
 import { SiteGuideChatbot } from "@/components/SiteGuideChatbot";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { FeaturedReviews } from "@/components/FeaturedReviews";
+import { NewVisitorWelcomePopup } from "@/components/NewVisitorWelcomePopup";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 
 const capabilities = [
@@ -185,11 +186,12 @@ export default function RecruitLandingPage() {
                 <p className="mt-7 max-w-xl text-lg leading-8 text-[#5d7285]">
                   Rolebolt brings jobs, applications, candidate assessment, hiring automation and job search into one thoughtful workspace — for teams and the people they hope to meet.
                 </p>
-                <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                <div className="mt-9 flex flex-col gap-3 sm:flex-row">
                   <Link href="/recruit/signup" className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0a66c2] px-5 py-3.5 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(10,102,194,.18)] transition hover:-translate-y-0.5 hover:bg-[#07559f]">Build your hiring workspace <Arrow /></Link>
                   <Link href="/recruit/opportunities" className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#cbd9e4] bg-white px-5 py-3.5 text-sm font-semibold text-[#31536e] transition hover:border-[#0a66c2] hover:text-[#0a66c2]">Explore open roles <Arrow /></Link>
                 </div>
-                <p className="mt-4 text-xs text-[#7a8c9b]">Start with the entry plan. Upgrade when your workflow needs more.</p>
+                <Link href="/recruit/preview" className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[#0a66c2] transition hover:text-[#07559f]">See the product preview <Arrow /></Link>
+                <p className="mt-3 text-xs text-[#7a8c9b]">Start with the entry plan. Upgrade when your workflow needs more.</p>
               </div>
               <div className="relative">
                 <div className="absolute -inset-3 rounded-3xl bg-white/70 shadow-[0_22px_60px_rgba(34,72,104,.12)] ring-1 ring-[#d9e5ee]" />
@@ -385,6 +387,7 @@ export default function RecruitLandingPage() {
 
       <MarketingFooter />
       <SiteGuideChatbot />
+      <NewVisitorWelcomePopup disabled={isLoggedIn} />
     </div>
   );
 }
