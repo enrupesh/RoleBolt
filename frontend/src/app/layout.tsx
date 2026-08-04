@@ -6,6 +6,7 @@ import { RecruitAuthProvider } from "@/contexts/RecruitAuthContext";
 import { BillingEntitlementProvider } from "@/contexts/BillingEntitlementContext";
 import { SignupWelcomeModal } from "@/components/SignupWelcomeModal";
 import { JsonLd } from "@/components/JsonLd";
+import { PwaInstallPrompt } from "@/components/PwaInstallPrompt";
 import { buildMetadata, organizationJsonLd, websiteJsonLd, softwareApplicationJsonLd, productKeywords } from "@/lib/seo";
 import "./globals.css";
 
@@ -55,6 +56,14 @@ export const metadata: Metadata = {
       { url: "/rolebolt-icon.png", type: "image/png", sizes: "512x512" },
     ],
     shortcut: "/rolebolt-icon.png",
+    other: [
+      { rel: "manifest", url: "/manifest.webmanifest" },
+    ],
+  },
+  appleWebApp: {
+    capable: true,
+    title: "Rolebolt",
+    statusBarStyle: "default",
   },
 };
 
@@ -90,6 +99,7 @@ export default function RootLayout({
                 <JsonLd id="ld-rolebolt-application" data={softwareApplicationJsonLd()} />
                 {children}
                 <SignupWelcomeModal />
+                <PwaInstallPrompt />
               </div>
             </ThemeProvider>
           </BillingEntitlementProvider>
