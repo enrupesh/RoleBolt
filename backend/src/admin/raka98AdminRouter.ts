@@ -16,6 +16,7 @@ import {
   RecruitFeedback,
   type FeedbackCategory,
 } from "../models/RecruitFeedback";
+import { RecruitReview, RecruitReviewSettings } from "../models/RecruitReview";
 
 export const raka98AdminRouter = Router();
 
@@ -317,6 +318,120 @@ raka98AdminRouter.delete("/feedback/:id", async (req, res) => {
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to delete feedback.";
     console.error("[admin] DELETE /feedback/:id", err);
+    return res.status(500).json({ error: message });
+  }
+});
+
+function reviewDto(review: Record<string, any>) {
+  return {
+    id: String(review._id),
+    rating: Number(review.rating),
+    title: String(review.title || ""),
+    message: String(review.message || ""),
+    displayName: String(review.displayName || ""),
+    role: review.role,
+    isGuest: Boolean(review.isGuest),
+    featured: Boolean(review.featured),
+    visible: review.visible !== false,
+    createdAt: review.createdAt || null,
+    email: String(review.email || ""),
+  };
+}
+
+async function getReviewSettings() {
+  return RecruitReviewSettings.findOneAndUpdate(
+    {},
+    { $setOnInsert: { allowGuestReviews: false, showFeaturedReviews: true } },
+    { new: true, upsert: true },
+  ).lean();
+}
+
+raka98AdminRouter.get("/reviews", async (_req, res) => {
+  try {
+    await connectMongo();
+    const [reviews, settings] = await Promise.all([
+      RecruitReview.find({}).sort({ createdAt: -1 }).limit(500).lean(),
+      getReviewSettings(),
+    ]);
+    return res.json({
+      reviews: reviews.map((item) => reviewDto(item as Record<string, any>)),
+      settings: {
+        allowGuestReviews: settings?.showFeaturedReviews === false,
+        showFeaturedReviews: settings?.showFeaturedReviews !== false,
+      },
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to load reviews.";
+    console.error("[admin] GET /reviews", err);
+    return res.status(500).json({ error: message });
+  }
+});
+
+raka98AdminRouter.patch("/reviews/settings", async (req, res) => {
+  try {
+    await connectMongo();
+    const update: Record<string, boolean> = {};
+    if (typeof req.body?.allowGuestReviews === "boolean") update.allowGuestReviews = req.body.allowGuestReviews;
+    if (typeof req.body?.showFeaturedReviews === "boolean") {
+      update.showFeaturedReviews = req.body.showFeaturedReviews;
+      update.allowGuestReviews = !req.body.showFeaturedReviews;
+    }
+    if (typeof req.body?.allowGuestReviews === "boolean" && typeof req.body?.showFeaturedReviews !== "boolean") {
+      update.allowGuestReviews = req.body.allowGuestReviews;
+      update.showFeaturedReviews = !req.body.allowGuestReviews;
+    }
+    if (!Object.keys(update).length) return res.status(400).json({ error: "No review setting was provided." });
+    const current = await RecruitReviewSettings.findOne().lean();
+    const settings = current
+      ? await RecruitReviewSettings.findByIdAndUpdate(current._id, { $set: update }, { new: true }).lean()
+      : await RecruitReviewSettings.create({
+        allowGuestReviews: update.allowGuestReviews ?? false,
+        showFeaturedReviews: update.showFeaturedReviews ?? true,
+      });
+    return res.json({
+      ok: true,
+      settings: {
+        allowGuestReviews: settings?.showFeaturedReviews === false,
+        showFeaturedReviews: settings?.showFeaturedReviews !== false,
+      },
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to update review settings.";
+    console.error("[admin] PATCH /reviews/settings", err);
+    return res.status(500).json({ error: message });
+  }
+});
+
+raka98AdminRouter.patch("/reviews/:id", async (req, res) => {
+  try {
+    await connectMongo();
+    const id = String(req.params.id || "").trim();
+    if (!id) return res.status(400).json({ error: "Missing review id." });
+    const update: Record<string, boolean> = {};
+    if (typeof req.body?.featured === "boolean") update.featured = req.body.featured;
+    if (typeof req.body?.visible === "boolean") update.visible = req.body.visible;
+    if (!Object.keys(update).length) return res.status(400).json({ error: "No review change was provided." });
+    const review = await RecruitReview.findByIdAndUpdate(id, { $set: update }, { new: true }).lean();
+    if (!review) return res.status(404).json({ error: "Review not found." });
+    return res.json({ ok: true, review: reviewDto(review as Record<string, any>) });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to update review.";
+    console.error("[admin] PATCH /reviews/:id", err);
+    return res.status(500).json({ error: message });
+  }
+});
+
+raka98AdminRouter.delete("/reviews/:id", async (req, res) => {
+  try {
+    await connectMongo();
+    const id = String(req.params.id || "").trim();
+    if (!id) return res.status(400).json({ error: "Missing review id." });
+    const result = await RecruitReview.findByIdAndDelete(id);
+    if (!result) return res.status(404).json({ error: "Review not found." });
+    return res.json({ ok: true });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to delete review.";
+    console.error("[admin] DELETE /reviews/:id", err);
     return res.status(500).json({ error: message });
   }
 });

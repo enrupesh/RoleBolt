@@ -11,6 +11,7 @@ import { RecruitGuard } from "@/components/RecruitGuard";
 import { SkStatCard, SkJobCard } from "@/components/Skeleton";
 import { RoleboltLogo } from "@/components/RoleboltLogo";
 import PostCreateChecklist from "@/components/PostCreateChecklist";
+import { ReviewModal } from "@/components/ReviewModal";
 
 type Job = {
   _id: string;
@@ -369,6 +370,7 @@ function RecruitDashboardContent() {
   const [formToDelete, setFormToDelete] = useState<Form | null>(null);
 
   const { sessionToken, authUser, recruitProfile } = useRecruitAuth();
+  const [reviewOpen, setReviewOpen] = useState(false);
   useEffect(() => {
     if (sessionToken) setToken(sessionToken);
   }, [sessionToken]);
@@ -521,6 +523,13 @@ function RecruitDashboardContent() {
               ? "Manage all your open roles and candidate pipelines from one place."
               : "Collect and screen applicants through custom forms, without a full pipeline."}
           </p>
+          <button
+            type="button"
+            onClick={() => setReviewOpen(true)}
+            className="mt-4 inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-indigo-300 hover:text-indigo-600"
+          >
+            Write a review
+          </button>
         </div>
 
         {/* ── Stats ─────────────────────────────────────────────────────── */}
@@ -913,6 +922,7 @@ function RecruitDashboardContent() {
           </Link>
         </div>
       </main>
+      {reviewOpen && <ReviewModal onClose={() => setReviewOpen(false)} />}
     </div>
   );
 }
