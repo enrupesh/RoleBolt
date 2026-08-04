@@ -171,7 +171,7 @@ export function ReviewModal({ onClose, onSaved }: { onClose: () => void; onSaved
           <p className="mt-1 text-right text-[11px] text-[#9aaab8]">{message.length}/2000</p>
         </div>
         {error && <p className="rounded-xl border border-[#f0c8c8] bg-[#fff4f4] px-3.5 py-3 text-sm text-[#b54343]">{error}</p>}
-        <button type="submit" disabled={busy || loading || (!isRegistered && !allowGuestReviews)} className="w-full rounded-xl bg-[#0a66c2] px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-[#07559f] disabled:cursor-not-allowed disabled:opacity-50">
+        <button type="submit" disabled={busy} className="w-full rounded-xl bg-[#0a66c2] px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-[#07559f] disabled:cursor-not-allowed disabled:opacity-50">
           {busy ? "Saving…" : existing ? "Update review" : "Publish review"}
         </button>
       </form>
