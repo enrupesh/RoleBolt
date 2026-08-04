@@ -33,6 +33,7 @@ export type SignInCredentials = {
   password: string;
   email?: string;
   username?: string;
+  role?: RecruitRole;
 };
 
 interface RecruitAuthState {
@@ -230,6 +231,7 @@ export function RecruitAuthProvider({ children }: { children: ReactNode }) {
         if (credentials.email?.trim()) body.email = credentials.email.trim();
         else if (credentials.username?.trim()) body.username = credentials.username.trim();
         else return { error: "Provide email or username to sign in." };
+        if (credentials.role) body.role = credentials.role;
 
         const res = await fetch(apiUrl("/auth/login"), {
           method: "POST",
