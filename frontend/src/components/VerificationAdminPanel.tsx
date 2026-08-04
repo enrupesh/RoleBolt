@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import {
   fetchVerificationRequests,
+  fetchAuthSettings,
+  updateAuthSettings,
   rejectCompany,
   unverifyCompany,
   verifyCompany,
@@ -216,6 +218,9 @@ export function VerificationAdminPanel() {
   const [requests, setRequests] = useState<AdminVerificationRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [authSettings, setAuthSettings] = useState({ requireEmailVerification: true });
+  const [authSettingsLoading, setAuthSettingsLoading] = useState(true);
+  const [authSettingsSaving, setAuthSettingsSaving] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -235,8 +240,60 @@ export function VerificationAdminPanel() {
     load();
   }, [load]);
 
+  useEffect(() => {
+    let cancelled = false;
+    void fetchAuthSettings()
+      .then((settings) => {
+        if (!cancelled) setAuthSettings(settings);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load authentication settings.");
+      })
+      .finally(() => {
+        if (!cancelled) setAuthSettingsLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  async function toggleEmailVerification() {
+    setAuthSettingsSaving(true);
+    setError("");
+    try {
+      const settings = await updateAuthSettings({
+        requireEmailVerification: !authSettings.requireEmailVerification,
+      });
+      setAuthSettings(settings);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to update authentication settings.");
+    } finally {
+      setAuthSettingsSaving(false);
+    }
+  }
+
   return (
     <section className="space-y-5">
+      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#74d8ba]">Account access</p>
+            <h3 className="mt-1 text-base font-semibold text-white/90">Require email verification for manual signups</h3>
+            <p className="mt-1 max-w-2xl text-xs leading-5 text-white/45">
+              {authSettings.requireEmailVerification
+                ? "ON: email/password users must verify their email before signing in."
+                : "OFF: new and existing unverified email/password users can access their account immediately. Social sign-in is unchanged."}
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={authSettingsLoading || authSettingsSaving}
+            onClick={() => void toggleEmailVerification()}
+            aria-label="Toggle email verification requirement"
+            className={`relative h-6 w-11 shrink-0 rounded-full transition ${authSettings.requireEmailVerification ? "bg-[#41d2a0]" : "bg-white/15"} disabled:opacity-50`}
+          >
+            <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition ${authSettings.requireEmailVerification ? "left-6" : "left-1"}`} />
+          </button>
+        </div>
+      </div>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/30 mb-2">

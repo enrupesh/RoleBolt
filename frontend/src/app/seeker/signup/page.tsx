@@ -234,7 +234,20 @@ export default function SeekerSignupPage() {
         return;
       }
       markSignupWelcome("seeker");
-      setStep("check-email");
+      if (data.verificationRequired === false && data.token) {
+        await ensureSeekerProfile(data.token, {
+          username: data.user?.username,
+          email: data.user?.email ?? email.trim(),
+        });
+        const session = await signInWithToken(data.token);
+        if (session.error) {
+          setError(session.error);
+          return;
+        }
+        routeAfterSocialLogin(session.username);
+      } else {
+        setStep("check-email");
+      }
     } catch {
       setError("Network error. Please try again.");
     } finally {

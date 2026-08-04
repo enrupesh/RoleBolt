@@ -17,6 +17,7 @@ import {
   type FeedbackCategory,
 } from "../models/RecruitFeedback";
 import { RecruitReview, RecruitReviewSettings } from "../models/RecruitReview";
+import { RecruitAuthSettings } from "../models/RecruitAuthSettings";
 
 export const raka98AdminRouter = Router();
 
@@ -34,6 +35,43 @@ function requireAdminPassword(req: Request, res: Response, next: NextFunction): 
 }
 
 raka98AdminRouter.use(requireAdminPassword);
+
+raka98AdminRouter.get("/auth-settings", async (_req, res) => {
+  try {
+    await connectMongo();
+    const settings = await RecruitAuthSettings.findOne().lean();
+    return res.json({
+      settings: {
+        requireEmailVerification: settings?.requireEmailVerification !== false,
+      },
+    });
+  } catch (err: any) {
+    console.error("[admin] GET /auth-settings", err);
+    return res.status(500).json({ error: "Failed to load authentication settings." });
+  }
+});
+
+raka98AdminRouter.patch("/auth-settings", async (req, res) => {
+  try {
+    await connectMongo();
+    if (typeof req.body?.requireEmailVerification !== "boolean") {
+      return res.status(400).json({ error: "requireEmailVerification must be a boolean." });
+    }
+    const settings = await RecruitAuthSettings.findOneAndUpdate(
+      {},
+      { $set: { requireEmailVerification: req.body.requireEmailVerification } },
+      { new: true, upsert: true, setDefaultsOnInsert: true },
+    ).lean();
+    return res.json({
+      settings: {
+        requireEmailVerification: settings?.requireEmailVerification !== false,
+      },
+    });
+  } catch (err: any) {
+    console.error("[admin] PATCH /auth-settings", err);
+    return res.status(500).json({ error: "Failed to update authentication settings." });
+  }
+});
 
 const PROFILE_TYPE_LABELS: Record<string, string> = {
   company: "Company / Organisation",
