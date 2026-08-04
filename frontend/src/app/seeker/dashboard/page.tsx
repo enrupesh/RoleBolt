@@ -7,6 +7,7 @@ import { RecruitGuard } from "@/components/RecruitGuard";
 import { SeekerHeader } from "@/components/SeekerHeader";
 import { displayHandle } from "@/lib/username";
 import { apiUrl } from "@/lib/api";
+import { ReviewModal } from "@/components/ReviewModal";
 
 import type { CareerGpsPayload } from "@/lib/seekerTypes";
 
@@ -45,6 +46,7 @@ const AI_TOOLS = [
 
 function DashboardContent() {
   const { sessionToken, authUser, recruitProfile } = useRecruitAuth();
+  const [reviewOpen, setReviewOpen] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [applications, setApplications] = useState<Application[]>([]);
   const [savedJobs, setSavedJobs]       = useState<SavedJob[]>([]);
@@ -83,6 +85,13 @@ function DashboardContent() {
             Hey {displayHandle(authUser ?? recruitProfile)}!
           </h1>
           <p className="mt-1 text-sm text-slate-500">Here&apos;s your job search overview.</p>
+          <button
+            type="button"
+            onClick={() => setReviewOpen(true)}
+            className="mt-4 inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-indigo-300 hover:text-indigo-600"
+          >
+            Write a review
+          </button>
         </div>
 
         {fetchError && (
@@ -200,6 +209,7 @@ function DashboardContent() {
           </div>
         </div>
       </main>
+      {reviewOpen && <ReviewModal onClose={() => setReviewOpen(false)} />}
     </div>
   );
 }

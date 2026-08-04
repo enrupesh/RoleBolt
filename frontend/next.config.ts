@@ -48,6 +48,14 @@ const nextConfig: NextConfig = {
             destination: `${LOCAL_BACKEND_URL}/recruit-public/feedback`,
           },
           {
+            source: "/backend/recruit-public/reviews",
+            destination: `${LOCAL_BACKEND_URL}/recruit-public/reviews`,
+          },
+          {
+            source: "/backend/recruit-public/reviews/:path*",
+            destination: `${LOCAL_BACKEND_URL}/recruit-public/reviews/:path*`,
+          },
+          {
             source: "/backend/recruit-public/site-guide/:path*",
             destination: `${LOCAL_BACKEND_URL}/recruit-public/site-guide/:path*`,
           },
