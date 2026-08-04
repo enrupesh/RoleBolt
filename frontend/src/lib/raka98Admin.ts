@@ -19,6 +19,9 @@ export type AdminUserLookup = {
 };
 
 export type VerificationRequestStatus = "pending" | "verified" | "rejected" | "all";
+export type AdminAuthSettings = {
+  requireEmailVerification: boolean;
+};
 export type FeedbackCategoryFilter = "all" | "product" | "bug" | "feature" | "recruiter" | "job_seeker" | "billing" | "other";
 export type FeedbackStatusFilter = "all" | "unread" | "read";
 
@@ -109,6 +112,19 @@ export async function adminFetch(path: string, init?: RequestInit) {
 export async function fetchVerificationRequests(status: VerificationRequestStatus) {
   const data = await adminFetch(`/admin/verification-requests?status=${encodeURIComponent(status)}`);
   return data.requests as AdminVerificationRequest[];
+}
+
+export async function fetchAuthSettings() {
+  const data = await adminFetch("/admin/auth-settings");
+  return data.settings as AdminAuthSettings;
+}
+
+export async function updateAuthSettings(update: AdminAuthSettings) {
+  const data = await adminFetch("/admin/auth-settings", {
+    method: "PATCH",
+    body: JSON.stringify(update),
+  });
+  return data.settings as AdminAuthSettings;
 }
 
 export async function verifyCompany(uid: string, note = "") {
