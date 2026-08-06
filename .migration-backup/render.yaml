@@ -2,7 +2,7 @@ services:
   - type: web
     name: recruit-backend
     runtime: node
-    rootDir: backend
+    rootDir: .migration-backup/backend
     plan: starter
     buildCommand: rm -rf node_modules .cache && npm install --no-audit --no-fund && npm run build
     startCommand: npm start
@@ -57,7 +57,7 @@ services:
   - type: web
     name: recruit-frontend
     runtime: node
-    rootDir: frontend
+    rootDir: .migration-backup/frontend
     plan: starter
     buildCommand: rm -rf node_modules .next .cache && corepack enable && corepack prepare pnpm@9.15.4 --activate && pnpm install --no-frozen-lockfile && pnpm run build
     startCommand: npm start
