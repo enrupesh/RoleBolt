@@ -83,7 +83,7 @@ function paidSub(overrides: Partial<ISubscription> = {}): ISubscription {
 }
 
 function schemaIndexNames(model: mongoose.Model<unknown>): string[] {
-  const indexes = model.schema.indexes() as Array<[Record<string, number>]>;
+  const indexes = model.schema.indexes() as unknown as Array<[Record<string, number>]>;
   return indexes.map(([spec]) => JSON.stringify(spec));
 }
 

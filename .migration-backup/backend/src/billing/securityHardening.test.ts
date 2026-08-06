@@ -276,6 +276,8 @@ describe("Phase 7 — security controls checklist", () => {
         plan: "free",
         interval: "monthly",
         status: "free",
+        currentPeriodStart: new Date("2026-08-01T00:00:00.000Z"),
+        currentPeriodEnd: new Date("2026-08-31T23:59:59.999Z"),
         definition: getPlanDefinition("seeker", "free"),
         cancelAtPeriodEnd: false,
         meteredAccessAllowed: true,

@@ -3,11 +3,12 @@ import { describe, it } from "node:test";
 
 describe("company verification sync contract", () => {
   it("maps verification status to job badge propagation", () => {
-    const verified = "verified" === "verified";
-    const rejected = "rejected" === "verified";
-    const none = "none" === "verified";
+    const badgeStatus = "verified";
+    const verified = badgeStatus === "verified";
+    const rejected: string = "rejected";
+    const none: string = "none";
+    assert.equal(rejected === badgeStatus, false);
+    assert.equal(none === badgeStatus, false);
     assert.equal(verified, true);
-    assert.equal(rejected, false);
-    assert.equal(none, false);
   });
 });

@@ -8,7 +8,7 @@ import { RoleboltLogo } from "@/components/RoleboltLogo";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { UsernameField } from "@/components/UsernameField";
 import { validateUsername } from "@/lib/username";
-import { firebaseAuth, googleProvider } from "@/lib/firebaseClient";
+import { getFirebaseAuth, getGoogleProvider } from "@/lib/firebaseClient";
 import { signInWithPopup, RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from "firebase/auth";
 import { markSignupWelcome } from "@/lib/signupWelcome";
 
@@ -97,7 +97,7 @@ export default function RecruitSignUpPage() {
     setError("");
     setSocialLoading("google");
     try {
-      const result = await signInWithPopup(firebaseAuth, googleProvider);
+      const result = await signInWithPopup(getFirebaseAuth(), getGoogleProvider());
       const idToken = await result.user.getIdToken();
       const res = await fetch(apiUrl("/auth/social"), {
         method: "POST",
@@ -140,9 +140,9 @@ export default function RecruitSignUpPage() {
     setPhoneLoading(true);
     try {
       if (!recaptchaVerifierRef.current) {
-        recaptchaVerifierRef.current = new RecaptchaVerifier(firebaseAuth, "recaptcha-container", { size: "invisible" });
+        recaptchaVerifierRef.current = new RecaptchaVerifier(getFirebaseAuth(), "recaptcha-container", { size: "invisible" });
       }
-      confirmationRef.current = await signInWithPhoneNumber(firebaseAuth, trimmed, recaptchaVerifierRef.current);
+      confirmationRef.current = await signInWithPhoneNumber(getFirebaseAuth(), trimmed, recaptchaVerifierRef.current);
       setPhoneStep("otp");
     } catch (err: any) {
       setPhoneError(err?.message ?? "Failed to send OTP. Please try again.");
