@@ -1,11 +1,16 @@
-import { Router } from "express";
+import express, { Router } from "express";
 import { connectMongo } from "./db";
 import { sendCreatorPremiumEmails } from "./creatorEmailService";
 import { respondStandardBillingError } from "./billing/standardEnforcement";
 import { respondFormBillingError } from "./billing/formEnforcement";
 
-function getUid(req: { user?: { uid?: string } }): string {
-  return req.user?.uid ?? "";
+function getUid(req: express.Request): string {
+  const uid =
+    (req as any).user?.uid ??
+    (req as any).user?._id?.toString() ??
+    (req as any).user?.id?.toString() ??
+    "";
+  return uid;
 }
 
 export const creatorEmailRouter = Router();
