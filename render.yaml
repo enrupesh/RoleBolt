@@ -57,7 +57,7 @@ services:
     runtime: node
     rootDir: frontend
     plan: starter
-    buildCommand: rm -rf node_modules .next .cache && npm install --no-audit --no-fund && npm run build
+    buildCommand: bash render-build.sh
     startCommand: npm start
     envVars:
       - key: NODE_VERSION
