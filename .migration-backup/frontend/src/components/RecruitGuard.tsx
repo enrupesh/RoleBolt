@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useRecruitAuth, type RecruitRole } from "@/contexts/RecruitAuthContext";
 import { Sk, SkStatCard, SkJobCard } from "@/components/Skeleton";
+import { isJudgeReviewerEmail } from "@/lib/judgeReviewer";
 
 interface RecruitGuardProps {
   requiredRole: RecruitRole;
@@ -83,7 +84,12 @@ export function RecruitGuard({ requiredRole, children }: RecruitGuardProps) {
       return;
     }
     if (!recruitProfile) return;
-    if (recruitProfile.role !== requiredRole) {
+    const canAccessRequiredRole =
+      recruitProfile.role === requiredRole ||
+      (requiredRole === "seeker" &&
+        recruitProfile.canAccessSeeker === true &&
+        isJudgeReviewerEmail(authUser.email));
+    if (!canAccessRequiredRole) {
       router.replace(recruitProfile.role === "creator" ? "/recruit/dashboard" : "/seeker/dashboard");
     }
   }, [loading, authUser, recruitProfile, requiredRole, router]);
@@ -94,6 +100,11 @@ export function RecruitGuard({ requiredRole, children }: RecruitGuardProps) {
     if (profileError) return <BackendErrorScreen onRetry={refreshProfile} />;
     return null;
   }
-  if (recruitProfile.role !== requiredRole) return null;
+  const canAccessRequiredRole =
+    recruitProfile.role === requiredRole ||
+    (requiredRole === "seeker" &&
+      recruitProfile.canAccessSeeker === true &&
+      isJudgeReviewerEmail(authUser.email));
+  if (!canAccessRequiredRole) return null;
   return <>{children}</>;
 }

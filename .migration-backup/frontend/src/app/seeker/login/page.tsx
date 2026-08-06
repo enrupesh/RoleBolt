@@ -8,6 +8,7 @@ import { RoleboltLogo } from "@/components/RoleboltLogo";
 import { LoginMethodSwitch } from "@/components/LoginMethodSwitch";
 import { normalizeUsernameInput } from "@/lib/username";
 import { apiUrl } from "@/lib/api";
+import { isJudgeReviewerEmail } from "@/lib/judgeReviewer";
 import { firebaseAuth, googleProvider } from "@/lib/firebaseClient";
 import { signInWithPopup, RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from "firebase/auth";
 
@@ -52,7 +53,10 @@ function SeekerLoginPageContent() {
 
   useEffect(() => {
     if (!loading && authUser && recruitProfile) {
-      if (recruitProfile.role === "creator") {
+      if (
+        recruitProfile.role === "creator" &&
+        !isJudgeReviewerEmail(authUser.email)
+      ) {
         router.replace("/recruit/dashboard");
       } else if (authUser.username?.trim()) {
         goAfterLogin();
