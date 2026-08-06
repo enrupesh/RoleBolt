@@ -24,6 +24,7 @@ import { RecruitProfile } from "./models/RecruitProfile";
 import { RecruitSeekerProfile } from "./models/RecruitSeekerProfile";
 import { initializeFreeEntitlements } from "./billing/entitlements";
 import { RecruitAuthSettings } from "./models/RecruitAuthSettings";
+import { isJudgeReviewerEmail } from "./judgeReviewer";
 
 export const authRouter = express.Router();
 
@@ -297,7 +298,8 @@ authRouter.post("/social", async (req, res) => {
 
       if (user) {
         const resolved = await resolveRequestedRole(user, requestedRole);
-        if (resolved.mismatch) {
+        const judgeCanUseSeeker = requestedRole === "seeker" && isJudgeReviewerEmail(user.email);
+        if (resolved.mismatch && !judgeCanUseSeeker) {
           return res.status(409).json({
             code: "ROLE_MISMATCH",
             error: `This account is registered as a ${resolved.role === "seeker" ? "job seeker" : "job creator"}. Please use the ${resolved.role === "seeker" ? "job seeker" : "job creator"} sign-in.`,
@@ -342,7 +344,8 @@ authRouter.post("/social", async (req, res) => {
 
     if (user) {
       const resolved = await resolveRequestedRole(user, requestedRole);
-      if (resolved.mismatch) {
+      const judgeCanUseSeeker = requestedRole === "seeker" && isJudgeReviewerEmail(user.email);
+      if (resolved.mismatch && !judgeCanUseSeeker) {
         return res.status(409).json({
           code: "ROLE_MISMATCH",
           error: `This account is registered as a ${resolved.role === "seeker" ? "job seeker" : "job creator"}. Please use the ${resolved.role === "seeker" ? "job seeker" : "job creator"} sign-in.`,
@@ -768,7 +771,8 @@ authRouter.post("/login", async (req, res) => {
     }
 
     const resolvedRole = await resolveRequestedRole(user, requestedRole);
-    if (resolvedRole.mismatch) {
+    const judgeCanUseSeeker = requestedRole === "seeker" && isJudgeReviewerEmail(user.email);
+    if (resolvedRole.mismatch && !judgeCanUseSeeker) {
       return res.status(409).json({
         code: "ROLE_MISMATCH",
         error: `This account is registered as a ${resolvedRole.role === "seeker" ? "job seeker" : "job creator"}. Please use the ${resolvedRole.role === "seeker" ? "job seeker" : "job creator"} sign-in.`,

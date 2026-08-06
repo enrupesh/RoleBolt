@@ -12,6 +12,7 @@ import { SkStatCard, SkJobCard } from "@/components/Skeleton";
 import { RoleboltLogo } from "@/components/RoleboltLogo";
 import PostCreateChecklist from "@/components/PostCreateChecklist";
 import { ReviewModal } from "@/components/ReviewModal";
+import { isJudgeReviewerEmail } from "@/lib/judgeReviewer";
 
 type Job = {
   _id: string;
@@ -370,6 +371,9 @@ function RecruitDashboardContent() {
   const [formToDelete, setFormToDelete] = useState<Form | null>(null);
 
   const { sessionToken, authUser, recruitProfile } = useRecruitAuth();
+  const isJudgeReviewer =
+    isJudgeReviewerEmail(authUser?.email) &&
+    recruitProfile?.canAccessSeeker === true;
   const [reviewOpen, setReviewOpen] = useState(false);
   useEffect(() => {
     if (sessionToken) setToken(sessionToken);
@@ -530,6 +534,14 @@ function RecruitDashboardContent() {
           >
             Write a review
           </button>
+          {isJudgeReviewer && (
+            <Link
+              href="/seeker/dashboard"
+              className="mt-4 ml-2 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700"
+            >
+              Explore Job Seeker Features <span aria-hidden="true">→</span>
+            </Link>
+          )}
         </div>
 
         {/* ── Stats ─────────────────────────────────────────────────────── */}
