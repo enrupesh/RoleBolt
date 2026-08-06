@@ -43,3 +43,4 @@
 - [SEO foundation](seo-foundation.md) — public SEO uses Rolebolt recruiting/job-search metadata, generated robots/sitemap/OG image, and noindex governance for private routes.
 - [Landing brand theme](landing-brand-theme.md) — public marketing pages must retain the approved existing blue-and-white Rolebolt visual identity.
 - [Review system](review-system.md) — unified review modal, no dates/times, identical verified role badges, and one admin toggle controls featured display plus guest submissions.
+- [Private job visibility](private-job-visibility.md) — private Standard Jobs are immutable owner-only workspaces; every public/seeker surface must filter them out.
