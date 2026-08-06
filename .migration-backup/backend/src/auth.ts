@@ -122,18 +122,24 @@ function parseRequestedRole(raw: unknown): SignupRole | null {
 }
 
 async function resolveRequestedRole(
-  user: { _id: { toString(): string }; signupRole?: SignupRole; save(): Promise<unknown> },
+  user: { _id: { toString(): string }; email?: string; signupRole?: SignupRole; save(): Promise<unknown> },
   requestedRole: SignupRole | null,
 ): Promise<{ role: SignupRole | null; mismatch: boolean }> {
   const storedRole = await getStoredSignupRole(user);
-  if (requestedRole && storedRole && requestedRole !== storedRole) {
-    return { role: storedRole, mismatch: true };
+  const isJudgeReviewer = isJudgeReviewerEmail(user.email);
+  if (isJudgeReviewer && user.signupRole !== "creator") {
+    user.signupRole = "creator";
+    await user.save();
+  }
+  const canonicalRole = isJudgeReviewer ? "creator" : storedRole;
+  if (requestedRole && canonicalRole && requestedRole !== canonicalRole) {
+    return { role: canonicalRole, mismatch: true };
   }
   if (requestedRole && !user.signupRole) {
     user.signupRole = requestedRole;
     await user.save();
   }
-  return { role: storedRole ?? requestedRole, mismatch: false };
+  return { role: canonicalRole ?? requestedRole, mismatch: false };
 }
 
 async function getStoredSignupRole(
