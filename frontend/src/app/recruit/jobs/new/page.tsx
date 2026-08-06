@@ -536,7 +536,7 @@ function NewJobContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<unknown>("");
   const [token, setToken] = useState<string | null>(null);
-  const [createdJob, setCreatedJob] = useState<{ id: string; title: string } | null>(null);
+  const [createdJob, setCreatedJob] = useState<{ id: string; title: string; publicVisibility: boolean } | null>(null);
   const [copied, setCopied] = useState(false);
   const [benchmarkLoading, setBenchmarkLoading] = useState(false);
   const [benchmarkError, setBenchmarkError] = useState("");
@@ -648,7 +648,11 @@ function NewJobContent() {
       if (!res.ok) {
         throw apiErrorFromPayload(res.status, data, data.message || data.error || "Failed to create job.");
       }
-      setCreatedJob({ id: data.job._id, title: form.title });
+       setCreatedJob({
+         id: data.job._id,
+         title: form.title,
+         publicVisibility: data.job.publicVisibility !== false,
+       });
       registerPostCreateChecklist(data.job._id, form.title);
     } catch (e: any) {
       setError(e);
@@ -657,10 +661,15 @@ function NewJobContent() {
   }
 
   if (createdJob) {
-    const publicUrl = `${typeof window !== "undefined" ? window.location.origin : "https://www.rolebolt.tech"}/recruit/opportunities/${createdJob.id}`;
-    const shareMsg = encodeURIComponent(`We're hiring! Check out this job: ${createdJob.title}\n${publicUrl}`);
+     const publicUrl = createdJob.publicVisibility
+       ? `${typeof window !== "undefined" ? window.location.origin : "https://www.rolebolt.tech"}/recruit/opportunities/${createdJob.id}`
+       : "";
+     const shareMsg = createdJob.publicVisibility
+       ? encodeURIComponent(`We're hiring! Check out this job: ${createdJob.title}\n${publicUrl}`)
+       : "";
 
     function copyLink() {
+       if (!publicUrl) return;
       navigator.clipboard.writeText(publicUrl).then(() => {
         setCopied(true);
         setTimeout(() => setCopied(false), 2500);
@@ -701,42 +710,54 @@ function NewJobContent() {
             </svg>
           </div>
           <h1 className="text-[26px] font-bold text-slate-900 mb-2">Job Posted!</h1>
-          <p className="text-slate-500 text-sm mb-6 leading-relaxed">
-            <span className="text-slate-900 font-semibold">{createdJob.title}</span> is live. Share the link to start getting applicants.
-          </p>
+           <p className="text-slate-500 text-sm mb-6 leading-relaxed">
+             <span className="text-slate-900 font-semibold">{createdJob.title}</span>{" "}
+             {createdJob.publicVisibility
+               ? "is live. Share the link to start getting applicants."
+               : "is ready as a private hiring workspace. Import candidates from your other sources to continue hiring privately."}
+           </p>
 
-          {/* Link copy row */}
-          <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left mb-5">
-            <p className="flex-1 text-xs text-slate-500 truncate font-mono">{publicUrl}</p>
-            <button
-              onClick={copyLink}
-              className={`shrink-0 rounded-xl px-3 py-1.5 text-xs font-bold transition ${
-                copied ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-700 hover:bg-slate-300"
-              }`}
-            >
-              {copied ? "✓ Copied!" : "Copy"}
-            </button>
-          </div>
+           {createdJob.publicVisibility ? (
+             <>
+               {/* Link copy row */}
+               <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left mb-5">
+                 <p className="flex-1 text-xs text-slate-500 truncate font-mono">{publicUrl}</p>
+                 <button
+                   onClick={copyLink}
+                   className={`shrink-0 rounded-xl px-3 py-1.5 text-xs font-bold transition ${
+                     copied ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-700 hover:bg-slate-300"
+                   }`}
+                 >
+                   {copied ? "✓ Copied!" : "Copy"}
+                 </button>
+               </div>
 
-          {/* Share platforms grid */}
-          <div className="mb-6">
-            <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-3 text-left">Share on</p>
-            <div className="grid grid-cols-4 gap-2.5">
-              {sharePlatforms.map(p => (
-                <a
-                  key={p.name}
-                  href={p.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={`flex flex-col items-center gap-1.5 rounded-2xl p-3 text-white transition hover:opacity-90 active:scale-95 ${p.bg}`}
-                  title={p.name}
-                >
-                  {p.icon}
-                  <span className="text-[9px] font-bold leading-none">{p.name.split(" ")[0]}</span>
-                </a>
-              ))}
-            </div>
-          </div>
+               {/* Share platforms grid */}
+               <div className="mb-6">
+                 <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-3 text-left">Share on</p>
+                 <div className="grid grid-cols-4 gap-2.5">
+                   {sharePlatforms.map(p => (
+                     <a
+                       key={p.name}
+                       href={p.href}
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       className={`flex flex-col items-center gap-1.5 rounded-2xl p-3 text-white transition hover:opacity-90 active:scale-95 ${p.bg}`}
+                       title={p.name}
+                     >
+                       {p.icon}
+                       <span className="text-[9px] font-bold leading-none">{p.name.split(" ")[0]}</span>
+                     </a>
+                   ))}
+                 </div>
+               </div>
+             </>
+           ) : (
+             <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-left">
+               <p className="text-xs font-bold text-amber-800">Private job — no public link was created</p>
+               <p className="mt-1 text-xs leading-relaxed text-amber-700">Only you can access and manage this job from your dashboard.</p>
+             </div>
+           )}
 
           <div className="flex flex-col gap-2">
             <Link
@@ -982,11 +1003,10 @@ function NewJobContent() {
                   placeholder="e.g. Health insurance, WFH stipend, ESOPs, flexible leave..."
                 />
               </div>
-              <div className="flex flex-wrap gap-3">
-                {[
-                  ["freshersAllowed", "Freshers allowed"],
-                  ["publicVisibility", "Show on public job board"],
-                ].map(([key, label]) => (
+               <div className="flex flex-wrap gap-3">
+                 {[
+                   ["freshersAllowed", "Freshers allowed"],
+                 ].map(([key, label]) => (
                   <button
                     key={key}
                     type="button"
@@ -1120,6 +1140,52 @@ function NewJobContent() {
           {step === 3 && (
             <div className="space-y-5">
               <h2 className="text-[17px] font-bold text-slate-900 mb-6">Review & Generate</h2>
+               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                 <div className="flex items-start justify-between gap-4">
+                   <div>
+                     <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Job Visibility</p>
+                     <p className="mt-1 text-sm font-bold text-slate-900">
+                       {form.publicVisibility ? "Public job" : "Private job"}
+                     </p>
+                     <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                       {form.publicVisibility
+                         ? "Your job will appear in Find Jobs and can be shared with candidates."
+                         : "Private jobs are for employers who want to manage hiring without publishing a listing. You can import candidates from other platforms and continue the process here."}
+                     </p>
+                   </div>
+                   <div className="flex shrink-0 rounded-xl border border-slate-200 bg-white p-1">
+                     {[
+                       { value: true, label: "Public" },
+                       { value: false, label: "Private" },
+                     ].map(option => (
+                       <button
+                         key={option.label}
+                         type="button"
+                         onClick={() => setForm(prev => ({ ...prev, publicVisibility: option.value }))}
+                         className={`rounded-lg px-3 py-2 text-xs font-bold transition ${
+                           form.publicVisibility === option.value
+                             ? option.value
+                               ? "bg-indigo-600 text-white shadow-sm"
+                               : "bg-slate-800 text-white shadow-sm"
+                             : "text-slate-500 hover:bg-slate-50 hover:text-slate-700"
+                         }`}
+                       >
+                         {option.label}
+                       </button>
+                     ))}
+                   </div>
+                 </div>
+                 {!form.publicVisibility && (
+                   <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
+                     <svg className="mt-0.5 shrink-0" width="14" height="14" fill="none" stroke="#d97706" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                       <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                     </svg>
+                     <p className="text-xs font-medium leading-relaxed text-amber-800">
+                       <span className="font-bold">Warning:</span> Once a job is marked private, it cannot be changed back to public. To publish it later, you will need to create a new job.
+                     </p>
+                   </div>
+                 )}
+               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 {[
                   ["Role", `${form.seniority} ${form.title}`],

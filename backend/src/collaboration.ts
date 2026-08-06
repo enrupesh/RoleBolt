@@ -187,6 +187,9 @@ export async function getCollaborationAccess(jobId: string, uid: string) {
   const job = await RecruitJob.findById(jobId).lean();
   if (!job) return null;
   if (job.uid === uid) return { job, owner: true, member: null, permissions: [...COLLABORATION_PERMISSIONS] as CollaborationPermission[] };
+  // Private jobs are owner-only. This boundary is shared by recruiter job
+  // detail and every collaboration-protected job/candidate action.
+  if (job.publicVisibility === false) return null;
   const member = await RecruitTeamMember.findOne({ jobId, memberUid: uid, status: "active" }).lean();
   if (!member) return null;
   return { job, owner: false, member, permissions: member.permissions };
