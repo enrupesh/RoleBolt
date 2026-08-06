@@ -2349,6 +2349,12 @@ recruitRouter.patch("/jobs/:jobId", async (req, res) => {
       const d = new Date(update.applicationDeadline);
       update.applicationDeadline = isNaN(d.getTime()) ? undefined : d;
     }
+     if (update.publicVisibility !== undefined) {
+       update.publicVisibility = update.publicVisibility !== false;
+       if ((access.job as any).publicVisibility === false && update.publicVisibility === true) {
+         return res.status(400).json({ error: "Private jobs cannot be changed back to public. Create a new job to publish this role." });
+       }
+     }
     if (update.perks !== undefined) {
       update.perks = typeof update.perks === "string" ? update.perks.trim().slice(0, 1000) : "";
     }
@@ -6412,7 +6418,11 @@ recruitRouter.post("/seeker/jobs/:jobId/apply", async (req, res) => {
     const seekerProfile = await RecruitSeekerProfile.findOne({ uid }).lean() as any;
     if (!seekerProfile) return res.status(400).json({ error: "Please complete your seeker profile before applying." });
     if (!seekerProfile.resumeText) return res.status(400).json({ error: "Please add your resume to your profile before applying." });
-    const job = await RecruitJob.findOne({ _id: req.params.jobId, status: "active" }).lean() as any;
+    const job = await RecruitJob.findOne({
+      _id: req.params.jobId,
+      status: "active",
+      publicVisibility: { $ne: false },
+    }).lean() as any;
     if (!job) return res.status(404).json({ error: "Job not found." });
     const existing = await RecruitCandidate.findOne({ jobId: req.params.jobId, email: seekerProfile.email }).lean();
     if (existing) {
@@ -6775,7 +6785,7 @@ recruitPublicRouter.post("/jobs/:jobId/report", async (req, res) => {
     const { reason, details } = req.body;
     if (!reason?.trim()) return res.status(400).json({ error: "Reason is required." });
     const job = await RecruitJob.findOneAndUpdate(
-      { _id: req.params.jobId, status: "active" },
+      { _id: req.params.jobId, status: "active", publicVisibility: { $ne: false } },
       { $push: { reports: { reason: String(reason).trim(), details: String(details || "").trim(), reportedAt: new Date() } } },
       { returnDocument: "after" }
     ).lean();
@@ -6799,7 +6809,7 @@ recruitPublicRouter.get("/my-applications", async (req, res) => {
       .limit(50)
       .lean();
     const jobIds = [...new Set(candidates.map(c => c.jobId.toString()))];
-    const jobs = await RecruitJob.find({ _id: { $in: jobIds } })
+    const jobs = await RecruitJob.find({ _id: { $in: jobIds }, publicVisibility: { $ne: false } })
       .select("title companyName location workMode jobType status niche createdAt")
       .lean();
     const jobMap: Record<string, any> = {};

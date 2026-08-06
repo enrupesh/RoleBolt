@@ -1309,7 +1309,7 @@ seekerRouter.post("/cover-letter/generate", async (req, res) => {
     let jd = jobDescription ?? "";
     // If jobId provided and no JD text, fetch the JD
     if (jobId && !jd) {
-      const job = await RecruitJob.findById(jobId).lean() as any;
+      const job = await RecruitJob.findOne({ _id: jobId, publicVisibility: { $ne: false } }).lean() as any;
       if (job) jd = job.generatedJD || `${job.title} at ${job.companyName}. Required skills: ${job.mustHaveSkills}`;
     }
     if (!jd) return res.status(400).json({ error: "Job description is required." });
