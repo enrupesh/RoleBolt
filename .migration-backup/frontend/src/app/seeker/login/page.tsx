@@ -9,6 +9,7 @@ import { LoginMethodSwitch } from "@/components/LoginMethodSwitch";
 import { normalizeUsernameInput } from "@/lib/username";
 import { apiUrl } from "@/lib/api";
 import { isJudgeReviewerEmail } from "@/lib/judgeReviewer";
+import { ensureSeekerProfileReady } from "@/lib/ensureSeekerProfileReady";
 import { getFirebaseAuth, getGoogleProvider } from "@/lib/firebaseClient";
 import { signInWithPopup, RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from "firebase/auth";
 
@@ -88,34 +89,8 @@ function SeekerLoginPageContent() {
   const confirmationRef = useRef<ConfirmationResult | null>(null);
   const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
 
-  async function ensureSeekerProfile(token: string, profile?: { username?: string; email?: string }) {
-    const existingRes = await fetch(apiUrl("/recruit/auth/profile"), {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const existingData = existingRes.ok ? await existingRes.json().catch(() => ({})) : {};
-    const patchBody: Record<string, string | undefined> = {
-      email: profile?.email,
-      username: profile?.username,
-    };
-    if (existingData.role !== "creator") {
-      patchBody.role = "seeker";
-    }
-
-    await fetch(apiUrl("/recruit/auth/profile"), {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify(patchBody),
-    });
-
-    await fetch(apiUrl("/recruit/seeker/profile"), {
-      method: "PUT",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ username: profile?.username, email: profile?.email }),
-    });
-  }
-
   async function syncSeekerSession(token: string, profile?: { username?: string; email?: string }) {
-    await ensureSeekerProfile(token, profile);
+    await ensureSeekerProfileReady(token, profile);
     const result = await signInWithToken(token);
     if (result.error) {
       throw new Error(result.error);
@@ -143,7 +118,7 @@ function SeekerLoginPageContent() {
         return;
       }
 
-      await ensureSeekerProfile(data.token, {
+      await ensureSeekerProfileReady(data.token, {
         username: data.user?.username,
         email: data.user?.email ?? result.user.email ?? "",
       });
@@ -226,7 +201,7 @@ function SeekerLoginPageContent() {
         return;
       }
 
-      await ensureSeekerProfile(data.token, { username: data.user?.username, email: data.user?.email ?? "" });
+      await ensureSeekerProfileReady(data.token, { username: data.user?.username, email: data.user?.email ?? "" });
       const session = await signInWithToken(data.token);
       if (session.error) throw new Error(session.error);
       if (!session.username?.trim()) {
@@ -271,7 +246,7 @@ function SeekerLoginPageContent() {
       if (token) {
         const meRes = await fetch(apiUrl("/auth/me"), { headers: { Authorization: `Bearer ${token}` } });
         const me = meRes.ok ? await meRes.json() : {};
-        await ensureSeekerProfile(token, { username: me.username, email: me.email });
+        await ensureSeekerProfileReady(token, { username: me.username, email: me.email });
       }
 
       goAfterLogin();
