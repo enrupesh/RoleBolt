@@ -13,6 +13,7 @@ import { RoleboltLogo } from "@/components/RoleboltLogo";
 import PostCreateChecklist from "@/components/PostCreateChecklist";
 import { ReviewModal } from "@/components/ReviewModal";
 import { isJudgeReviewerEmail } from "@/lib/judgeReviewer";
+import { ensureSeekerProfileReady } from "@/lib/ensureSeekerProfileReady";
 
 type Job = {
   _id: string;
@@ -375,6 +376,21 @@ function RecruitDashboardContent() {
     isJudgeReviewerEmail(authUser?.email) &&
     recruitProfile?.canAccessSeeker === true;
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [seekerNavLoading, setSeekerNavLoading] = useState(false);
+
+  async function openSeekerDashboard() {
+    if (!sessionToken || seekerNavLoading) return;
+    setSeekerNavLoading(true);
+    try {
+      await ensureSeekerProfileReady(sessionToken, {
+        email: authUser?.email,
+        username: authUser?.username,
+      });
+      router.push("/seeker/dashboard");
+    } finally {
+      setSeekerNavLoading(false);
+    }
+  }
   useEffect(() => {
     if (sessionToken) setToken(sessionToken);
   }, [sessionToken]);
@@ -535,12 +551,15 @@ function RecruitDashboardContent() {
             Write a review
           </button>
           {isJudgeReviewer && (
-            <Link
-              href="/seeker/dashboard"
-              className="mt-4 ml-2 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700"
+            <button
+              type="button"
+              onClick={() => void openSeekerDashboard()}
+              disabled={seekerNavLoading}
+              className="mt-4 ml-2 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-60"
             >
-              Explore Job Seeker Features <span aria-hidden="true">→</span>
-            </Link>
+              {seekerNavLoading ? "Opening seeker workspace…" : "Explore Job Seeker Features"}
+              {!seekerNavLoading && <span aria-hidden="true">→</span>}
+            </button>
           )}
         </div>
 
