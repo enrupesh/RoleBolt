@@ -1,53 +1,45 @@
-# Recruit — Standalone ATS Project
+# [Project name]
 
-## Overview
-A standalone extraction of the "Recruit" tool from the main Rolebolt app. Self-contained two-part project:
+_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
 
-- `backend/` — Express + MongoDB + Firebase Admin API server (recruit routes only)
-- `frontend/` — Next.js app with `/recruit` and `/recruit-public` pages
+## Run & Operate
 
-## How to Run
-
-### Backend
-- Workflow: `Backend` → `cd backend && npm run dev` (port 8080)
-- Requires env vars: `MONGODB_URI`, `FIREBASE_SERVICE_ACCOUNT_JSON`, `GEMINI_MESH_KEY`, `GEMINI_PRIMARY_KEY`, `GEMINI_FALLBACK_KEY`, `CORS_ORIGIN`
-- Optional: `RECAPTCHA_SECRET_KEY` for bot protection
-
-### Frontend
-- Workflow: `Start application` → `cd frontend && npm run dev` (port 5000)
-- Requires env vars: `BACKEND_URL`, Firebase client keys
-- Optional: `NEXT_PUBLIC_RECAPTCHA_SITE_KEY`
+- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- `pnpm run typecheck` — full typecheck across all packages
+- `pnpm run build` — typecheck + build all packages
+- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
+- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
+- Required env: `DATABASE_URL` — Postgres connection string
 
 ## Stack
-- **Backend**: Node.js, Express, TypeScript, MongoDB/Mongoose, Firebase Admin SDK, Gemini AI (via `callGeminiChain`)
-- **Frontend**: Next.js 16 (App Router), React 19, Tailwind CSS v4, Recharts, jsPDF, Lucide React
-- **Auth**: Custom JWT (signup/login/email verify), Firebase social auth (Google, GitHub, phone OTP)
 
-## Key Features
-- Standard job postings with AI-powered resume scoring
-- Candidate pipeline (applied → screened → assessed → interview → offer → hired)
-- AI Agent mode (auto-shortlist/reject based on score thresholds)
-- Assessment system with AI scoring and decisions
-- **Job Analysis** tab — comprehensive analytics with health score, pipeline funnel, quality tiers, timeline charts, source breakdown, assessment metrics, and AI-generated insights
-- Pipeline Rules (auto-move candidates based on conditions)
-- Offer letter workflow with e-sign
-- Collaboration (job-scoped team access)
-- Daily briefing emails (cron job at 8AM UTC, `CRON_ENABLED=true`)
-- Bulk resume import (up to 50 files via SSE streaming)
+- pnpm workspaces, Node.js 24, TypeScript 5.9
+- API: Express 5
+- DB: PostgreSQL + Drizzle ORM
+- Validation: Zod (`zod/v4`), `drizzle-zod`
+- API codegen: Orval (from OpenAPI spec)
+- Build: esbuild (CJS bundle)
 
-## Route Structure
+## Where things live
 
-### Backend (`/recruit/...`)
-- `GET /jobs/:id/job-analysis` — Comprehensive job analysis with AI health score
-- `GET /jobs/:id/assessment-analytics` — Assessment-specific analytics
-- `GET /analytics` — Aggregate recruiter analytics
-- Full CRUD for jobs, candidates, pipeline rules, offers, collaboration, etc.
+_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
 
-### Frontend (`/recruit/...`)
-- `/recruit/dashboard` — Recruiter dashboard
-- `/recruit/jobs/[id]` — Job detail with tabs: Pipeline, JD, Rubric, Rules, Performance, Agent Log, Assessment Analytics, Live Progress, Collaboration, AI Hiring, **Job Analysis**
-- `/recruit/analytics` — Aggregate analytics page
-- `/recruit-public/jobs/[id]` — Public job application form
+## Architecture decisions
 
-## User Preferences
-- Keep existing project structure and stack; do not restructure or migrate
+_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+
+## Product
+
+_Describe the high-level user-facing capabilities of this app once they exist._
+
+## User preferences
+
+_Populate as you build — explicit user instructions worth remembering across sessions._
+
+## Gotchas
+
+_Populate as you build — sharp edges, "always run X before Y" rules._
+
+## Pointers
+
+- See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
