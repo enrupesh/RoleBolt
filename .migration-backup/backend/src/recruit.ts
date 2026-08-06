@@ -13,7 +13,7 @@ import { callNvidia } from "./ai/nvidiaClient";
 import { RecruitJobAlert } from "./models/RecruitJobAlert";
 import { UsageEvent } from "./models/UsageEvent";
 import { RecruitProfile } from "./models/RecruitProfile";
-import { isJudgeReviewerEmail } from "./judgeReviewer";
+import { canonicalRoleForAccount, isJudgeReviewerEmail } from "./judgeReviewer";
 import { RecruitImage } from "./models/RecruitImage";
 import { sendEmail, verifySMTP } from "./mailer";
 import { NOTIFICATION_FROM } from "./emailConfig";
@@ -1089,15 +1089,23 @@ recruitRouter.post("/auth/profile", async (req, res) => {
     const jwtEmail = (req as any).user?.email ?? "";
     const authUser = await User.findById(uid);
     const existing = await RecruitProfile.findOne({ uid });
+    const isJudgeReviewer = isJudgeReviewerEmail(authUser?.email ?? jwtEmail);
     const profileRole = existing?.role === "creator" || existing?.role === "seeker"
       ? existing.role
       : undefined;
-    const canonicalRole = authUser?.signupRole ?? profileRole;
+    const canonicalRole = canonicalRoleForAccount(
+      authUser?.email ?? jwtEmail,
+      authUser?.signupRole ?? profileRole,
+    );
+    if (isJudgeReviewer && authUser && authUser.signupRole !== "creator") {
+      authUser.signupRole = "creator";
+      await authUser.save();
+    }
     if (authUser && !authUser.signupRole && canonicalRole) {
       authUser.signupRole = canonicalRole;
       await authUser.save();
     }
-    const judgeCanUseSeeker = role === "seeker" && isJudgeReviewerEmail(authUser?.email ?? jwtEmail);
+    const judgeCanUseSeeker = role === "seeker" && isJudgeReviewer;
     if (canonicalRole && canonicalRole !== role && !judgeCanUseSeeker) {
       return res.status(409).json({
         code: "ROLE_MISMATCH",
@@ -1106,18 +1114,25 @@ recruitRouter.post("/auth/profile", async (req, res) => {
     }
     const resolvedUsername = username?.trim().toLowerCase() || authUser?.username || "";
     if (existing) {
+      if (isJudgeReviewer && existing.role !== "creator") {
+        existing.role = "creator";
+        await existing.save();
+      }
       return res.json({
         uid: existing.uid,
-        role: canonicalRole ?? existing.role,
-        canAccessSeeker: isJudgeReviewerEmail(authUser?.email ?? jwtEmail),
+        role: isJudgeReviewer ? "creator" : (canonicalRole ?? existing.role),
+        canAccessSeeker: isJudgeReviewer,
         username: existing.username || resolvedUsername,
         name: existing.name,
         email: existing.email || jwtEmail,
       });
     }
+    // A judge may initialize the seeker experience, but the canonical
+    // account/profile remains a creator so both dashboards stay available.
+    const initialRole = isJudgeReviewer ? (canonicalRole ?? "creator") : role;
     const profile = await RecruitProfile.create({
       uid,
-      role,
+      role: initialRole,
       username: resolvedUsername,
       name: name ?? "",
       email: (email ?? jwtEmail ?? "").trim(),
@@ -1126,7 +1141,7 @@ recruitRouter.post("/auth/profile", async (req, res) => {
     return res.json({
       uid: profile.uid,
       role: profile.role,
-      canAccessSeeker: isJudgeReviewerEmail(authUser?.email ?? jwtEmail),
+      canAccessSeeker: isJudgeReviewer,
       username: profile.username,
       name: profile.name,
       email: profile.email,
@@ -1145,8 +1160,16 @@ recruitRouter.get("/auth/profile", async (req, res) => {
     const profile = await RecruitProfile.findOne({ uid });
     if (!profile) return res.status(404).json({ error: "No recruit profile found" });
     const authUser = await User.findById(uid);
+    const isJudgeReviewer = isJudgeReviewerEmail(authUser?.email ?? (req as any).user?.email);
     const profileRole = profile.role === "creator" || profile.role === "seeker" ? profile.role : undefined;
-    const canonicalRole = authUser?.signupRole ?? profileRole;
+    const canonicalRole = canonicalRoleForAccount(
+      authUser?.email ?? (req as any).user?.email,
+      authUser?.signupRole ?? profileRole,
+    );
+    if (isJudgeReviewer && authUser && authUser.signupRole !== "creator") {
+      authUser.signupRole = "creator";
+      await authUser.save();
+    }
     if (authUser && !authUser.signupRole && canonicalRole) {
       authUser.signupRole = canonicalRole;
       await authUser.save();
@@ -1162,7 +1185,7 @@ recruitRouter.get("/auth/profile", async (req, res) => {
     return res.json({
       uid: profile.uid,
       role: canonicalRole ?? profile.role,
-      canAccessSeeker: isJudgeReviewerEmail(authUser?.email ?? (req as any).user?.email),
+      canAccessSeeker: isJudgeReviewer,
       username,
       name: profile.name,
       email: profile.email,
@@ -1190,15 +1213,23 @@ recruitRouter.patch("/auth/profile", async (req, res) => {
     }
     const authUser = await User.findById(uid);
     const existing = await RecruitProfile.findOne({ uid });
+    const isJudgeReviewer = isJudgeReviewerEmail(authUser?.email ?? (req as any).user?.email);
     const profileRole = existing?.role === "creator" || existing?.role === "seeker"
       ? existing.role
       : undefined;
-    const canonicalRole = authUser?.signupRole ?? profileRole;
+    const canonicalRole = canonicalRoleForAccount(
+      authUser?.email ?? (req as any).user?.email,
+      authUser?.signupRole ?? profileRole,
+    );
+    if (isJudgeReviewer && authUser && authUser.signupRole !== "creator") {
+      authUser.signupRole = "creator";
+      await authUser.save();
+    }
     if (authUser && !authUser.signupRole && canonicalRole) {
       authUser.signupRole = canonicalRole;
       await authUser.save();
     }
-    const judgeCanUseSeeker = role === "seeker" && isJudgeReviewerEmail(authUser?.email ?? (req as any).user?.email);
+    const judgeCanUseSeeker = role === "seeker" && isJudgeReviewer;
     if (role && canonicalRole && role !== canonicalRole && !judgeCanUseSeeker) {
       return res.status(409).json({
         code: "ROLE_MISMATCH",
@@ -1207,7 +1238,10 @@ recruitRouter.patch("/auth/profile", async (req, res) => {
     }
 
     const $set: Record<string, any> = {};
-    if (role) $set.role = role;
+    // Do not mutate the judge's canonical creator role when seeker onboarding
+    // calls this endpoint. Seeker access is granted by the middleware policy.
+    if (isJudgeReviewer) $set.role = "creator";
+    else if (role) $set.role = role;
     if (name !== undefined) $set.name = name;
     if (email !== undefined) $set.email = email;
     if (username !== undefined) $set.username = String(username).trim().toLowerCase();
@@ -1219,8 +1253,14 @@ recruitRouter.patch("/auth/profile", async (req, res) => {
 
     const profile = await RecruitProfile.findOneAndUpdate(
       { uid },
-      { $set },
-      { returnDocument: "after", upsert: true, setDefaultsOnInsert: true }
+      {
+        $set,
+      },
+      {
+        returnDocument: "after",
+        upsert: true,
+        setDefaultsOnInsert: true,
+      }
     ).lean() as any;
 
     let resolvedUsername = profile.username;
@@ -1232,7 +1272,7 @@ recruitRouter.patch("/auth/profile", async (req, res) => {
     return res.json({
       uid: profile.uid,
       role: profile.role,
-      canAccessSeeker: isJudgeReviewerEmail(authUser?.email ?? (req as any).user?.email),
+      canAccessSeeker: isJudgeReviewer,
       username: resolvedUsername,
       name: profile.name,
       email: profile.email,
