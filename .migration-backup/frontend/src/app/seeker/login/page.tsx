@@ -9,7 +9,7 @@ import { LoginMethodSwitch } from "@/components/LoginMethodSwitch";
 import { normalizeUsernameInput } from "@/lib/username";
 import { apiUrl } from "@/lib/api";
 import { isJudgeReviewerEmail } from "@/lib/judgeReviewer";
-import { firebaseAuth, googleProvider } from "@/lib/firebaseClient";
+import { getFirebaseAuth, getGoogleProvider } from "@/lib/firebaseClient";
 import { signInWithPopup, RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from "firebase/auth";
 
 function GoogleIcon() {
@@ -130,7 +130,7 @@ function SeekerLoginPageContent() {
     setSocialLoading("google");
 
     try {
-      const result = await signInWithPopup(firebaseAuth, googleProvider);
+      const result = await signInWithPopup(getFirebaseAuth(), getGoogleProvider());
       const idToken = await result.user.getIdToken();
       const res = await fetch(apiUrl("/auth/social"), {
         method: "POST",
@@ -187,9 +187,9 @@ function SeekerLoginPageContent() {
     setPhoneLoading(true);
     try {
       if (!recaptchaVerifierRef.current) {
-        recaptchaVerifierRef.current = new RecaptchaVerifier(firebaseAuth, "recaptcha-container", { size: "invisible" });
+        recaptchaVerifierRef.current = new RecaptchaVerifier(getFirebaseAuth(), "recaptcha-container", { size: "invisible" });
       }
-      confirmationRef.current = await signInWithPhoneNumber(firebaseAuth, trimmed, recaptchaVerifierRef.current);
+      confirmationRef.current = await signInWithPhoneNumber(getFirebaseAuth(), trimmed, recaptchaVerifierRef.current);
       setPhoneStep("otp");
     } catch (err: any) {
       setPhoneError(err?.message ?? "Failed to send OTP. Please try again.");
