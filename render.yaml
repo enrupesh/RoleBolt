@@ -21,8 +21,6 @@ services:
         sync: false
       - key: CORS_ORIGIN
         sync: false
-      # Razorpay billing credentials and one provider plan ID per paid catalog entry.
-      # Values must be entered in Render's environment settings; never commit them.
       - key: RAZORPAY_KEY_ID
         sync: false
       - key: RAZORPAY_KEY_SECRET
@@ -59,7 +57,7 @@ services:
     runtime: node
     rootDir: frontend
     plan: starter
-    buildCommand: rm -rf node_modules .next .cache && corepack enable && corepack prepare pnpm@9.15.4 --activate && pnpm install --no-frozen-lockfile && pnpm run build
+    buildCommand: rm -rf node_modules .next .cache && npm install --no-audit --no-fund && npm run build
     startCommand: npm start
     envVars:
       - key: NODE_VERSION
