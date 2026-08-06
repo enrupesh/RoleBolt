@@ -23,6 +23,7 @@ import { verifyFirebaseToken } from "./firebaseAdmin";
 import { RecruitProfile } from "./models/RecruitProfile";
 import { RecruitSeekerProfile } from "./models/RecruitSeekerProfile";
 import { initializeFreeEntitlements } from "./billing/entitlements";
+import { ensureJudgeReviewerEntitlements } from "./billing/judgeReviewerEntitlements";
 import { RecruitAuthSettings } from "./models/RecruitAuthSettings";
 import { isJudgeReviewerEmail } from "./judgeReviewer";
 
@@ -76,7 +77,12 @@ async function createUserWithBillingEntitlements(
 ): Promise<InstanceType<typeof User>> {
   const user = await User.create(data);
   await initializeFreeEntitlements(user._id.toString());
+  await ensureJudgeReviewerEntitlements(user._id.toString(), user.email);
   return user;
+}
+
+async function finalizeJudgeReviewerAccess(user: InstanceType<typeof User>): Promise<void> {
+  await ensureJudgeReviewerEntitlements(user._id.toString(), user.email);
 }
 
 function userPublicDto(user: {
@@ -328,6 +334,7 @@ authRouter.post("/social", async (req, res) => {
         });
       }
 
+      await finalizeJudgeReviewerAccess(user);
       const token = signToken({ sub: user._id.toString(), email: user.email || user.phoneNumber || firebaseUid });
       return res.json({
         token,
@@ -374,6 +381,7 @@ authRouter.post("/social", async (req, res) => {
       });
     }
 
+    await finalizeJudgeReviewerAccess(user);
     const token = signToken({ sub: user._id.toString(), email: user.email! });
     return res.json({
       token,
@@ -513,6 +521,7 @@ authRouter.get("/github/callback", async (req, res) => {
       });
     }
 
+    await finalizeJudgeReviewerAccess(user);
     const jwt = signToken({ sub: user._id.toString(), email: user.email });
 
     return res.redirect(buildGitHubFrontendCallback(target, intent, {
@@ -636,6 +645,7 @@ authRouter.post("/signup", async (req, res) => {
           existing.verificationToken = undefined;
           existing.verificationTokenExpiry = undefined;
           await existing.save();
+          await finalizeJudgeReviewerAccess(existing);
           const token = signToken({ sub: existing._id.toString(), email: existing.email });
           return res.status(200).json({
             message: "Your account is active. Email verification is currently disabled.",
@@ -686,6 +696,7 @@ authRouter.post("/signup", async (req, res) => {
     }
 
     if (!requireEmailVerification) {
+      await finalizeJudgeReviewerAccess(user);
       const token = signToken({ sub: user._id.toString(), email: user.email });
       return res.status(201).json({
         message: "Account created. Your account is active.",
@@ -786,6 +797,8 @@ authRouter.post("/login", async (req, res) => {
     }
 
     const token = signToken({ sub: user._id.toString(), email: user.email });
+
+    await finalizeJudgeReviewerAccess(user);
 
     return res.json({
       token,
@@ -1029,6 +1042,8 @@ authRouter.get("/me", requireAuth, async (req, res) => {
     const uid = (req as any).user?.uid;
     const user = await User.findById(uid).select("-passwordHash -verificationToken -verificationTokenExpiry");
     if (!user) return res.status(404).json({ error: "User not found." });
+
+    await finalizeJudgeReviewerAccess(user);
 
     return res.json({
       id:         user._id.toString(),

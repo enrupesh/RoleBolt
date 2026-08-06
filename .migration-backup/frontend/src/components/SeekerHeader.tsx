@@ -7,6 +7,7 @@ import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { RoleboltLogo } from "@/components/RoleboltLogo";
 import { displayHandle } from "@/lib/username";
 import { Menu, X } from "lucide-react";
+import { isJudgeReviewerEmail } from "@/lib/judgeReviewer";
 
 const NAV = [
   { href: "/seeker/dashboard", label: "Dashboard" },
@@ -31,6 +32,10 @@ export function SeekerHeader() {
   const pathname = usePathname();
   const { authUser, recruitProfile, signOut } = useRecruitAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const isJudgeReviewer =
+    isJudgeReviewerEmail(authUser?.email) &&
+    recruitProfile?.canAccessSeeker === true;
 
   const linkClass = (href: string) =>
     `block rounded-xl px-3 py-2 text-sm font-medium transition ${
@@ -76,6 +81,14 @@ export function SeekerHeader() {
         </nav>
 
         <div className="flex items-center gap-2">
+          {isJudgeReviewer && (
+            <Link
+              href="/recruit/dashboard"
+              className="hidden sm:inline-flex items-center gap-1.5 rounded-xl border border-[#0a66c2]/30 bg-[#0a66c2]/5 px-3 py-1.5 text-xs font-semibold text-[#0a66c2] transition hover:bg-[#0a66c2]/10"
+            >
+              Job Creator Dashboard →
+            </Link>
+          )}
           {authUser && (
             <span className="hidden sm:block text-xs text-slate-500 font-medium truncate max-w-[120px]">
               {displayHandle(authUser ?? recruitProfile)}
@@ -103,6 +116,15 @@ export function SeekerHeader() {
           <div>
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Navigate</p>
             <div className="space-y-1">
+              {isJudgeReviewer && (
+                <Link
+                  href="/recruit/dashboard"
+                  onClick={() => setMobileOpen(false)}
+                  className="block rounded-xl px-3 py-2 text-sm font-semibold text-[#0a66c2] bg-[#0a66c2]/5"
+                >
+                  Job Creator Dashboard →
+                </Link>
+              )}
               {NAV.map(({ href, label }) => (
                 <Link key={href} href={href} onClick={() => setMobileOpen(false)} className={linkClass(href)}>
                   {label}
