@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { apiErrorFromPayload, apiUrl } from "@/lib/api";
 import { SeekerErrorNotice } from "@/components/SeekerErrorNotice";
+import { isJudgeReviewerEmail } from "@/lib/judgeReviewer";
 
 export default function SeekerJobActions({
   jobId,
@@ -13,14 +14,17 @@ export default function SeekerJobActions({
   jobId: string;
   jobTitle: string;
 }) {
-  const { sessionToken, recruitProfile } = useRecruitAuth();
+  const { sessionToken, authUser, recruitProfile } = useRecruitAuth();
   const [saved, setSaved] = useState(false);
   const [applied, setApplied] = useState(false);
   const [loading, setLoading] = useState<"save" | "apply" | null>(null);
   const [error, setError] = useState<unknown>("");
   const [success, setSuccess] = useState("");
 
-  const isSeeker = recruitProfile?.role === "seeker";
+  const isSeeker =
+    recruitProfile?.role === "seeker" ||
+    (recruitProfile?.canAccessSeeker === true &&
+      isJudgeReviewerEmail(authUser?.email));
   const token = sessionToken;
 
   useEffect(() => {

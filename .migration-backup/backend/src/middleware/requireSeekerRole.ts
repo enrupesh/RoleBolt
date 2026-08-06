@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { connectMongo } from "../db";
 import { RecruitProfile } from "../models/RecruitProfile";
+import { isJudgeReviewerEmail } from "../judgeReviewer";
 
 /** Ensures the authenticated user has seeker role (not just any JWT). */
 export async function requireSeekerRole(req: Request, res: Response, next: NextFunction) {
@@ -10,7 +11,8 @@ export async function requireSeekerRole(req: Request, res: Response, next: NextF
 
     await connectMongo();
     const profile = await RecruitProfile.findOne({ uid }).select("role").lean() as { role?: string } | null;
-    if (!profile || profile.role !== "seeker") {
+    const isJudgeReviewer = isJudgeReviewerEmail((req as any).user?.email);
+    if (!profile || (profile.role !== "seeker" && !isJudgeReviewer)) {
       return res.status(403).json({ error: "This area is for job seekers only." });
     }
     next();

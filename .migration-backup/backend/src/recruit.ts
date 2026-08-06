@@ -13,6 +13,7 @@ import { callNvidia } from "./ai/nvidiaClient";
 import { RecruitJobAlert } from "./models/RecruitJobAlert";
 import { UsageEvent } from "./models/UsageEvent";
 import { RecruitProfile } from "./models/RecruitProfile";
+import { isJudgeReviewerEmail } from "./judgeReviewer";
 import { RecruitImage } from "./models/RecruitImage";
 import { sendEmail, verifySMTP } from "./mailer";
 import { NOTIFICATION_FROM } from "./emailConfig";
@@ -1096,7 +1097,8 @@ recruitRouter.post("/auth/profile", async (req, res) => {
       authUser.signupRole = canonicalRole;
       await authUser.save();
     }
-    if (canonicalRole && canonicalRole !== role) {
+    const judgeCanUseSeeker = role === "seeker" && isJudgeReviewerEmail(authUser?.email ?? jwtEmail);
+    if (canonicalRole && canonicalRole !== role && !judgeCanUseSeeker) {
       return res.status(409).json({
         code: "ROLE_MISMATCH",
         error: `This account is registered as a ${canonicalRole === "seeker" ? "job seeker" : "job creator"}.`,
@@ -1107,6 +1109,7 @@ recruitRouter.post("/auth/profile", async (req, res) => {
       return res.json({
         uid: existing.uid,
         role: canonicalRole ?? existing.role,
+        canAccessSeeker: isJudgeReviewerEmail(authUser?.email ?? jwtEmail),
         username: existing.username || resolvedUsername,
         name: existing.name,
         email: existing.email || jwtEmail,
@@ -1123,6 +1126,7 @@ recruitRouter.post("/auth/profile", async (req, res) => {
     return res.json({
       uid: profile.uid,
       role: profile.role,
+      canAccessSeeker: isJudgeReviewerEmail(authUser?.email ?? jwtEmail),
       username: profile.username,
       name: profile.name,
       email: profile.email,
@@ -1158,6 +1162,7 @@ recruitRouter.get("/auth/profile", async (req, res) => {
     return res.json({
       uid: profile.uid,
       role: canonicalRole ?? profile.role,
+      canAccessSeeker: isJudgeReviewerEmail(authUser?.email ?? (req as any).user?.email),
       username,
       name: profile.name,
       email: profile.email,
@@ -1193,7 +1198,8 @@ recruitRouter.patch("/auth/profile", async (req, res) => {
       authUser.signupRole = canonicalRole;
       await authUser.save();
     }
-    if (role && canonicalRole && role !== canonicalRole) {
+    const judgeCanUseSeeker = role === "seeker" && isJudgeReviewerEmail(authUser?.email ?? (req as any).user?.email);
+    if (role && canonicalRole && role !== canonicalRole && !judgeCanUseSeeker) {
       return res.status(409).json({
         code: "ROLE_MISMATCH",
         error: `This account is registered as a ${canonicalRole === "seeker" ? "job seeker" : "job creator"}.`,
@@ -1226,6 +1232,7 @@ recruitRouter.patch("/auth/profile", async (req, res) => {
     return res.json({
       uid: profile.uid,
       role: profile.role,
+      canAccessSeeker: isJudgeReviewerEmail(authUser?.email ?? (req as any).user?.email),
       username: resolvedUsername,
       name: profile.name,
       email: profile.email,

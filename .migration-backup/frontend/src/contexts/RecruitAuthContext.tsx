@@ -10,12 +10,14 @@ import {
 } from "react";
 import { apiUrl } from "@/lib/api";
 import { setTokenCookie, getTokenCookie, clearTokenCookie } from "@/lib/tokenCookie";
+import { isJudgeReviewerEmail } from "@/lib/judgeReviewer";
 
 export type RecruitRole = "creator" | "seeker";
 
 export interface RecruitProfile {
   uid: string;
   role: RecruitRole;
+  canAccessSeeker?: boolean;
   username?: string;
   name?: string;
   email?: string;
@@ -130,6 +132,7 @@ async function fetchOrCreateProfile(
       headers: { ...headers, "Content-Type": "application/json" },
       body: JSON.stringify({
         role: authUser?.signupRole === "seeker" ? "seeker" : "creator",
+        canAccessSeeker: isJudgeReviewerEmail(authUser?.email),
         email: authUser?.email ?? "",
         username: authUser?.username ?? "",
       }),
