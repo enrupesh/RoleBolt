@@ -3,6 +3,9 @@ import mongoose, { Document, Schema } from "mongoose";
 export const REVIEW_ROLES = ["creator", "seeker"] as const;
 export type ReviewRole = (typeof REVIEW_ROLES)[number];
 
+export const REVIEW_SUBMITTER_PLANS = ["free", "pro", "ultra"] as const;
+export type ReviewSubmitterPlan = (typeof REVIEW_SUBMITTER_PLANS)[number];
+
 export interface IRecruitReview extends Document {
   uid?: string;
   editToken?: string;
@@ -15,6 +18,8 @@ export interface IRecruitReview extends Document {
   isGuest: boolean;
   featured: boolean;
   visible: boolean;
+  videoUrl?: string;
+  submitterPlan?: ReviewSubmitterPlan;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -32,6 +37,8 @@ const RecruitReviewSchema = new Schema<IRecruitReview>(
     isGuest: { type: Boolean, required: true, default: true, index: true },
     featured: { type: Boolean, default: false, index: true },
     visible: { type: Boolean, default: true, index: true },
+    videoUrl: { type: String, trim: true, maxlength: 2048 },
+    submitterPlan: { type: String, enum: REVIEW_SUBMITTER_PLANS },
   },
   { timestamps: true },
 );
