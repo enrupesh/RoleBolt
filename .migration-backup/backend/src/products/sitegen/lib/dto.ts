@@ -14,5 +14,11 @@ export function sitegenWebsiteDto(website: ISitegenWebsite | Record<string, unkn
     seekerProfile: doc.seekerProfile || null,
     creatorProfile: doc.creatorProfile || null,
     infoCompletedAt: doc.infoCompletedAt ? new Date(doc.infoCompletedAt).toISOString() : null,
+    structuredContent: doc.structuredContent || null,
+    recommendedThemeId: doc.recommendedThemeId || null,
+    selectedThemeId: doc.selectedThemeId || null,
+    aiProcessingStatus: doc.aiProcessingStatus || "idle",
+    aiMessage: doc.aiMessage || "",
+    structuredAt: doc.structuredAt ? new Date(doc.structuredAt).toISOString() : null,
   };
 }

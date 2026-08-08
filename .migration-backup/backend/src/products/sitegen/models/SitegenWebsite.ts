@@ -4,6 +4,11 @@ import type {
   SitegenInputMode,
   SitegenSeekerProfile,
 } from "../types/profile";
+import type {
+  SitegenAiProcessingStatus,
+  SitegenStructuredContent,
+  SitegenThemeId,
+} from "../types/structuredContent";
 
 export const SITEGEN_SITE_TYPES = ["seeker", "creator"] as const;
 export type SitegenSiteType = (typeof SITEGEN_SITE_TYPES)[number];
@@ -22,6 +27,12 @@ export interface ISitegenWebsite extends Document {
   seekerProfile?: SitegenSeekerProfile;
   creatorProfile?: SitegenCreatorProfile;
   infoCompletedAt?: Date;
+  structuredContent?: SitegenStructuredContent;
+  recommendedThemeId?: SitegenThemeId;
+  selectedThemeId?: SitegenThemeId;
+  aiProcessingStatus?: SitegenAiProcessingStatus;
+  aiMessage?: string;
+  structuredAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -118,6 +129,12 @@ const SitegenWebsiteSchema = new Schema<ISitegenWebsite>(
     seekerProfile: SeekerProfileSchema,
     creatorProfile: CreatorProfileSchema,
     infoCompletedAt: { type: Date },
+    structuredContent: { type: Schema.Types.Mixed },
+    recommendedThemeId: { type: String },
+    selectedThemeId: { type: String },
+    aiProcessingStatus: { type: String, enum: ["idle", "ai_success", "ai_fallback", "failed"], default: "idle" },
+    aiMessage: { type: String, trim: true, maxlength: 500 },
+    structuredAt: { type: Date },
   },
   { timestamps: true },
 );
