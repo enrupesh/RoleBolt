@@ -1,78 +1,91 @@
 import type { SitegenSeekerStructuredContent } from "../types/structuredContent";
-import { SeekerContactBlock, hasSeekerContact } from "./shared";
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="border-t border-slate-200 py-8 sm:py-10">
-      <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{title}</h2>
-      <div className="mt-4 sm:mt-5">{children}</div>
-    </section>
-  );
-}
+import { SeekerContactBlock, seekerNavItems } from "./shared";
+import {
+  AvatarBadge,
+  BulletHighlights,
+  EducationList,
+  ExperienceTimeline,
+  PrimaryButton,
+  ProjectShowcase,
+  SkillGrid,
+  ThemeNav,
+  ThemeSection,
+} from "./theme-ui";
 
 export function SeekerClassicTheme({ content, username }: { content: SitegenSeekerStructuredContent; username: string }) {
   const displayName = content.name?.trim() || username;
+  const navItems = seekerNavItems(content);
+  const contactHref = navItems.some((item) => item.id === "contact") ? "#contact" : undefined;
 
   return (
-    <div className="min-h-full bg-white text-slate-900">
-      <header className="border-b border-slate-200 bg-slate-50 px-5 py-10 sm:px-8 sm:py-14">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">rolebolt.tech/{username}</p>
-        <h1 className="mt-4 break-words font-display text-3xl font-semibold tracking-[-0.05em] sm:text-4xl">{displayName}</h1>
-        {content.headline ? <p className="mt-3 text-base text-slate-600 sm:text-lg">{content.headline}</p> : null}
-        {content.about && content.sections.about ? <p className="mt-5 max-w-3xl text-base leading-8 text-slate-600">{content.about}</p> : null}
+    <div className="min-h-full bg-[#f8fafc] text-slate-900">
+      <ThemeNav brand={displayName} items={navItems} variant="light" />
+
+      <header id={content.about && content.sections.about ? "about" : undefined} className="border-b border-slate-200 bg-white scroll-mt-24">
+        <div className="mx-auto grid max-w-6xl gap-8 px-5 py-12 sm:px-8 sm:py-16 lg:grid-cols-[auto_1fr] lg:items-center">
+          <AvatarBadge name={displayName} size="xl" variant="brand" />
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">Professional Portfolio</p>
+            <h1 className="mt-3 break-words font-display text-4xl font-semibold tracking-[-0.05em] sm:text-5xl">{displayName}</h1>
+            {content.headline ? <p className="mt-4 text-lg font-medium text-slate-600 sm:text-xl">{content.headline}</p> : null}
+            {content.about && content.sections.about ? (
+              <p className="mt-5 max-w-3xl text-base leading-8 text-slate-600">{content.about}</p>
+            ) : null}
+            <div className="mt-7 flex flex-wrap gap-3">
+              {contactHref ? <PrimaryButton href={contactHref} variant="brand">Get in touch</PrimaryButton> : null}
+              {content.contact.portfolio ? <PrimaryButton href={content.contact.portfolio} variant="light">View portfolio</PrimaryButton> : null}
+            </div>
+          </div>
+        </div>
       </header>
-      <main className="mx-auto max-w-4xl px-5 py-4 sm:px-8">
-        {content.sections.experience && content.experience.length > 0 ? (
-          <Section title="Experience">
-            <div className="space-y-6">
-              {content.experience.map((item) => (
-                <article key={`${item.title}-${item.company}`}>
-                  <h3 className="text-lg font-semibold text-slate-900">{item.title}</h3>
-                  <p className="text-sm text-slate-500">{item.company}</p>
-                  {item.bullets.length ? <ul className="mt-3 list-disc space-y-1 pl-5 text-sm leading-7 text-slate-600">{item.bullets.map((bullet) => <li key={bullet}>{bullet}</li>)}</ul> : null}
-                </article>
-              ))}
-            </div>
-          </Section>
-        ) : null}
+
+      <main className="mx-auto max-w-6xl space-y-14 px-5 py-12 sm:px-8 sm:py-16">
         {content.sections.skills && content.skills.length > 0 ? (
-          <Section title="Skills">
-            <div className="flex flex-wrap gap-2">{content.skills.map((skill) => <span key={skill} className="rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-700">{skill}</span>)}</div>
-          </Section>
+          <ThemeSection id="skills" title="Core skills" eyebrow="Expertise">
+            <SkillGrid skills={content.skills} variant="light" />
+          </ThemeSection>
         ) : null}
-        {content.sections.education && content.education.length > 0 ? (
-          <Section title="Education">
-            <div className="space-y-4">{content.education.map((item) => <div key={item.school}><h3 className="font-semibold">{item.school}</h3><p className="text-sm text-slate-500">{[item.degree, item.field].filter(Boolean).join(" · ")}</p></div>)}</div>
-          </Section>
+
+        {content.sections.experience && content.experience.length > 0 ? (
+          <ThemeSection id="experience" title="Professional experience" eyebrow="Career">
+            <ExperienceTimeline items={content.experience} variant="light" />
+          </ThemeSection>
         ) : null}
+
         {content.sections.projects && content.projects.length > 0 ? (
-          <Section title="Projects">
-            <div className="space-y-4">
-              {content.projects.map((item) => (
-                <div key={item.name}>
-                  <h3 className="font-semibold">{item.name}</h3>
-                  {item.description ? <p className="mt-2 text-sm leading-7 text-slate-600">{item.description}</p> : null}
-                </div>
-              ))}
-            </div>
-          </Section>
+          <ThemeSection id="projects" title="Selected projects" eyebrow="Work">
+            <ProjectShowcase items={content.projects} variant="light" />
+          </ThemeSection>
         ) : null}
+
+        {content.sections.education && content.education.length > 0 ? (
+          <ThemeSection id="education" title="Education" eyebrow="Background">
+            <EducationList items={content.education} variant="light" />
+          </ThemeSection>
+        ) : null}
+
         {content.sections.certifications && content.certifications.length > 0 ? (
-          <Section title="Certifications">
-            <ul className="list-disc space-y-1 pl-5 text-sm text-slate-600">{content.certifications.map((item) => <li key={item}>{item}</li>)}</ul>
-          </Section>
+          <ThemeSection id="certifications" title="Certifications" eyebrow="Credentials">
+            <BulletHighlights items={content.certifications} variant="light" />
+          </ThemeSection>
         ) : null}
+
         {content.sections.achievements && content.achievements.length > 0 ? (
-          <Section title="Achievements">
-            <ul className="list-disc space-y-1 pl-5 text-sm text-slate-600">{content.achievements.map((item) => <li key={item}>{item}</li>)}</ul>
-          </Section>
+          <ThemeSection id="achievements" title="Achievements" eyebrow="Highlights">
+            <BulletHighlights items={content.achievements} variant="light" />
+          </ThemeSection>
         ) : null}
-        {content.sections.contact && hasSeekerContact(content.contact) ? (
-          <Section title="Contact">
-            <SeekerContactBlock contact={content.contact} />
-          </Section>
+
+        {content.sections.contact ? (
+          <ThemeSection id="contact" title="Contact" eyebrow="Connect">
+            <SeekerContactBlock contact={content.contact} variant="light" />
+          </ThemeSection>
         ) : null}
       </main>
+
+      <footer className="border-t border-slate-200 bg-white px-5 py-6 text-center text-xs text-slate-400 sm:px-8">
+        {displayName} · rolebolt.tech/{username}
+      </footer>
     </div>
   );
 }
