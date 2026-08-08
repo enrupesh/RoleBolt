@@ -11,6 +11,7 @@ export { SITEGEN_RESERVED_USERNAMES } from "./config/reserved-usernames";
 export { SitegenLandingPage } from "./components/landing/SitegenLandingPage";
 export { SitegenCreateDraftPage } from "./components/create/SitegenCreateDraftPage";
 export { SitegenBuildPage } from "./components/build/SitegenBuildPage";
+export { SitegenPreviewPage } from "./components/preview/SitegenPreviewPage";
 export { sitegenApiUrl } from "./lib/api";
 export {
   createSitegenDraft,
@@ -19,5 +20,15 @@ export {
   saveSitegenDraft,
   loginSitegen,
   uploadSitegenResume,
+  structureSitegenDraft,
+  updateSitegenTheme,
 } from "./lib/client";
 export type { SitegenWebsiteDraft } from "./types/profile";
+export type {
+  SitegenCreatorStructuredContent,
+  SitegenSeekerStructuredContent,
+  SitegenStructuredContent,
+  SitegenThemeId,
+} from "./types/structuredContent";
+export { SITEGEN_THEME_OPTIONS } from "./config/themes";
+export { SitegenThemeRenderer } from "./themes";

@@ -72,6 +72,8 @@ export type SitegenCreatorProfile = {
 
 export type SitegenInputMode = "resume" | "manual";
 
+import type { SitegenAiProcessingStatus, SitegenStructuredContent, SitegenThemeId } from "./structuredContent";
+
 export type SitegenWebsiteDraft = {
   id: string;
   username: string;
@@ -84,4 +86,10 @@ export type SitegenWebsiteDraft = {
   seekerProfile?: SitegenSeekerProfile | null;
   creatorProfile?: SitegenCreatorProfile | null;
   infoCompletedAt?: string | null;
+  structuredContent?: SitegenStructuredContent | null;
+  recommendedThemeId?: SitegenThemeId | null;
+  selectedThemeId?: SitegenThemeId | null;
+  aiProcessingStatus?: SitegenAiProcessingStatus;
+  aiMessage?: string;
+  structuredAt?: string | null;
 };
