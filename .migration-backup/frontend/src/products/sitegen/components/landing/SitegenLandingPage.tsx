@@ -1,10 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { SitegenHeader } from "../layout/SitegenHeader";
 import { SitegenFooter } from "../layout/SitegenFooter";
 import { sitegenProduct, sitegenSiteTypeLabels } from "../../config/product";
 import type { SitegenSiteType } from "../../config/product";
+import { sitegenRoutes } from "../../lib/routes";
 
 const steps = [
   { number: "01", title: "Choose your path", copy: "Pick Job Seeker or Creator / Business — each path is tailored to your goals." },
@@ -66,26 +68,16 @@ function PathCard({
   title,
   description,
   highlights,
-  onSelect,
-  selected,
 }: {
   type: SitegenSiteType;
   title: string;
   description: string;
   highlights: string[];
-  onSelect: (type: SitegenSiteType) => void;
-  selected: SitegenSiteType | null;
 }) {
-  const isSelected = selected === type;
   return (
-    <button
-      type="button"
-      onClick={() => onSelect(type)}
-      className={`group relative w-full rounded-3xl border p-7 text-left transition duration-300 sm:p-8 ${
-        isSelected
-          ? "border-violet-400/60 bg-white shadow-[0_24px_80px_rgba(124,58,237,.18)]"
-          : "border-violet-200/20 bg-white/[0.04] hover:border-violet-300/40 hover:bg-white/[0.07]"
-      }`}
+    <Link
+      href={sitegenRoutes.start(type)}
+      className="group relative block w-full rounded-3xl border border-violet-200/20 bg-white/[0.04] p-7 text-left transition duration-300 hover:border-violet-300/40 hover:bg-white/[0.07] sm:p-8"
     >
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -93,7 +85,7 @@ function PathCard({
           <h3 className="mt-3 font-display text-2xl font-semibold tracking-[-0.04em] text-white">{title}</h3>
           <p className="mt-3 text-sm leading-6 text-violet-100/60">{description}</p>
         </div>
-        <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition ${isSelected ? "bg-violet-500 text-white" : "bg-white/10 text-violet-200/70 group-hover:bg-white/15"}`}>
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-violet-200/70 transition group-hover:bg-violet-500 group-hover:text-white">
           <ArrowIcon />
         </span>
       </div>
@@ -105,17 +97,12 @@ function PathCard({
           </li>
         ))}
       </ul>
-      {isSelected && (
-        <p className="mt-5 rounded-xl border border-violet-300/20 bg-violet-500/10 px-3.5 py-2.5 text-xs leading-5 text-violet-100/80">
-          Website builder launching in the next phase. You&apos;ve selected the {sitegenSiteTypeLabels[type]} path.
-        </p>
-      )}
-    </button>
+      <p className="mt-5 text-sm font-semibold text-violet-200">Continue →</p>
+    </Link>
   );
 }
 
 export function SitegenLandingPage() {
-  const [selectedPath, setSelectedPath] = useState<SitegenSiteType | null>(null);
   const [usernamePreview, setUsernamePreview] = useState("yourname");
 
   return (
@@ -147,20 +134,20 @@ export function SitegenLandingPage() {
                   AI helps structure your content — our themes make it beautiful.
                 </p>
                 <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                  <a
-                    href="#choose-path"
+                  <Link
+                    href={sitegenRoutes.start("seeker")}
                     className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-6 py-3.5 text-sm font-semibold text-[#1a1033] shadow-[0_16px_50px_rgba(255,255,255,.14)] transition hover:bg-violet-50"
                   >
                     I&apos;m a Job Seeker
                     <ArrowIcon />
-                  </a>
-                  <a
-                    href="#choose-path"
+                  </Link>
+                  <Link
+                    href={sitegenRoutes.start("creator")}
                     className="inline-flex items-center justify-center gap-2 rounded-full border border-white/15 bg-white/5 px-6 py-3.5 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-white/10"
                   >
                     I&apos;m a Creator / Business
                     <ArrowIcon />
-                  </a>
+                  </Link>
                 </div>
                 <p className="mt-5 text-sm text-violet-200/45">No payment. No traditional signup. Start building in minutes.</p>
               </div>
@@ -225,16 +212,12 @@ export function SitegenLandingPage() {
                   title="Showcase your career"
                   description="Turn your resume and experience into a polished portfolio site that recruiters can discover."
                   highlights={["Resume upload or manual entry", "Experience, skills, and education sections", "2 professional seeker themes"]}
-                  onSelect={setSelectedPath}
-                  selected={selectedPath}
                 />
                 <PathCard
                   type="creator"
                   title="Grow your presence"
                   description="Launch a clean business or creator site — from solo consultants to startups and agencies."
                   highlights={["Flexible business information form", "Works for brands, agencies, and creators", "2 professional business themes"]}
-                  onSelect={setSelectedPath}
-                  selected={selectedPath}
                 />
               </div>
             </div>
@@ -356,10 +339,10 @@ export function SitegenLandingPage() {
                   Pick your path and start building. Your professional website is minutes away.
                 </p>
                 <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                  <a href="#choose-path" className="inline-flex items-center gap-2 rounded-full bg-white px-6 py-3.5 text-sm font-semibold text-[#1a1033] transition hover:bg-violet-50">
+                  <Link href={sitegenRoutes.start("seeker")} className="inline-flex items-center gap-2 rounded-full bg-white px-6 py-3.5 text-sm font-semibold text-[#1a1033] transition hover:bg-violet-50">
                     Get started free
                     <ArrowIcon />
-                  </a>
+                  </Link>
                 </div>
               </div>
             </div>
