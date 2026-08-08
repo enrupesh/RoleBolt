@@ -101,13 +101,16 @@ export function SitegenBuildPage() {
             <h1 className="mt-3 font-display text-3xl font-semibold tracking-[-0.05em] text-white">You&apos;re ready for the next step</h1>
             <p className="mt-4 text-sm leading-7 text-violet-100/65">
               Your {sitegenSiteTypeLabels[draft.siteType].toLowerCase()} information has been saved for <strong className="text-white">rolebolt.tech/{draft.username}</strong>.
-              Website generation will begin in Phase 4.
+              Next: structure your content with NVIDIA AI and choose a pre-built theme.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
+              <Link href={sitegenRoutes.preview} className="inline-flex items-center justify-center rounded-full bg-white px-5 py-3 text-sm font-semibold text-[#1a1033] hover:bg-violet-50">
+                Continue to preview
+              </Link>
               <button type="button" onClick={() => setCompleted(false)} className="inline-flex items-center justify-center rounded-full border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10">
                 Edit information
               </button>
-              <Link href={sitegenRoutes.landing} className="inline-flex items-center justify-center rounded-full bg-white px-5 py-3 text-sm font-semibold text-[#1a1033] hover:bg-violet-50">
+              <Link href={sitegenRoutes.landing} className="inline-flex items-center justify-center rounded-full border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10">
                 Back to Sitegen
               </Link>
             </div>
