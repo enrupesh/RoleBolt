@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { SitegenHeader } from "../layout/SitegenHeader";
 import { SitegenFooter } from "../layout/SitegenFooter";
 import { sitegenRoutes } from "../../lib/routes";
@@ -21,6 +21,7 @@ import type { SitegenThemeId } from "../../types/structuredContent";
 import { SitegenThemeRenderer } from "../../themes";
 import { SitegenFieldLabel, SitegenInput } from "../build/SitegenFormFields";
 import { SitegenShareTools } from "../share/SitegenShareTools";
+import { SitegenStructuringProgress } from "./SitegenStructuringProgress";
 
 export function SitegenPreviewPage() {
   const [accessToken, setAccessToken] = useState<string | null>(null);
@@ -33,6 +34,22 @@ export function SitegenPreviewPage() {
   const [error, setError] = useState("");
   const [loginUsername, setLoginUsername] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
+  const autoStructureAttempted = useRef(false);
+
+  const handleStructure = useCallback(async () => {
+    if (!accessToken) return;
+    setStructuring(true);
+    setError("");
+    try {
+      const website = await structureSitegenDraft(accessToken);
+      setDraft(website);
+      saveSitegenSession(accessToken, toSessionWebsite(website));
+    } catch (structureError: unknown) {
+      setError(structureError instanceof Error ? structureError.message : "Structuring failed.");
+    } finally {
+      setStructuring(false);
+    }
+  }, [accessToken]);
 
   useEffect(() => {
     const session = readSitegenSession();
@@ -43,6 +60,14 @@ export function SitegenPreviewPage() {
     setAccessToken(session.accessToken);
     void loadDraft(session.accessToken);
   }, []);
+
+  useEffect(() => {
+    if (!accessToken || !draft || structuring || loading) return;
+    if (!draft.infoCompletedAt || draft.structuredContent || draft.needsRestructure) return;
+    if (autoStructureAttempted.current) return;
+    autoStructureAttempted.current = true;
+    void handleStructure();
+  }, [accessToken, draft, structuring, loading, handleStructure]);
 
   async function loadDraft(token: string) {
     setLoading(true);
@@ -66,23 +91,9 @@ export function SitegenPreviewPage() {
       saveSitegenSession(result.accessToken, toSessionWebsite(result.website));
       setAccessToken(result.accessToken);
       setDraft(result.website);
+      autoStructureAttempted.current = false;
     } catch (loginError: unknown) {
       setError(loginError instanceof Error ? loginError.message : "Sign in failed.");
-    }
-  }
-
-  async function handleStructure() {
-    if (!accessToken) return;
-    setStructuring(true);
-    setError("");
-    try {
-      const website = await structureSitegenDraft(accessToken);
-      setDraft(website);
-      saveSitegenSession(accessToken, toSessionWebsite(website));
-    } catch (structureError: unknown) {
-      setError(structureError instanceof Error ? structureError.message : "Structuring failed.");
-    } finally {
-      setStructuring(false);
     }
   }
 
@@ -122,6 +133,7 @@ export function SitegenPreviewPage() {
   const canPublish = Boolean(draft?.structuredContent && themeId && draft.infoCompletedAt && !draft.needsRestructure);
   const isPublished = draft?.status === "published";
   const hasPendingUpdates = Boolean(draft?.hasUnpublishedChanges);
+  const hasResume = Boolean(draft?.resumeText?.trim() || draft?.resumeFileName);
 
   if (!loading && accessToken && draft && justPublished) {
     return (
@@ -200,7 +212,9 @@ export function SitegenPreviewPage() {
               ) : null}
             </div>
 
-            {!draft.structuredContent ? (
+            {structuring ? (
+              <SitegenStructuringProgress active={structuring} hasResume={hasResume} />
+            ) : !draft.structuredContent ? (
               <div className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-8 sm:p-10">
                 <h2 className="text-xl font-semibold">Ready to structure your content</h2>
                 <p className="mt-3 text-sm leading-7 text-violet-100/60">
@@ -208,7 +222,7 @@ export function SitegenPreviewPage() {
                 </p>
                 {error ? <p className="mt-4 text-sm text-red-300">{error}</p> : null}
                 <button type="button" disabled={structuring || !draft.infoCompletedAt} onClick={() => void handleStructure()} className="mt-6 rounded-full bg-white px-5 py-3 text-sm font-semibold text-[#1a1033] disabled:opacity-50">
-                  {structuring ? "Structuring with NVIDIA AI…" : "Structure my website content"}
+                  Structure my website content
                 </button>
                 {!draft.infoCompletedAt ? (
                   <p className="mt-4 text-sm text-violet-200/45">
@@ -218,19 +232,21 @@ export function SitegenPreviewPage() {
               </div>
             ) : (
               <>
-                {draft.aiMessage ? (
+                {structuring ? <SitegenStructuringProgress active={structuring} hasResume={hasResume} /> : null}
+
+                {!structuring && draft.aiMessage ? (
                   <div className={`rounded-2xl border px-4 py-3.5 text-sm ${draft.aiProcessingStatus === "ai_success" ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-100" : "border-amber-400/20 bg-amber-500/10 text-amber-100"}`}>
                     {draft.aiMessage}
                   </div>
                 ) : null}
 
-                {draft.needsRestructure ? (
+                {!structuring && draft.needsRestructure ? (
                   <div className="rounded-2xl border border-amber-400/20 bg-amber-500/10 px-4 py-3.5 text-sm text-amber-100">
                     Your information has changed since the last structuring run. Re-run AI structuring before publishing an update.
                   </div>
                 ) : null}
 
-                <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
+                <div className={`grid gap-6 lg:grid-cols-[280px_1fr] ${structuring ? "pointer-events-none opacity-40" : ""}`}>
                   <aside className="space-y-4">
                     <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-5">
                       <h2 className="text-sm font-semibold">Themes</h2>

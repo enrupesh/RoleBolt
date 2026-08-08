@@ -34,6 +34,7 @@ export async function structureSitegenWebsite(website: ISitegenWebsite): Promise
   }
 
   try {
+    const startedAt = Date.now();
     const profileJson = JSON.stringify(
       website.siteType === "seeker" ? website.seekerProfile || {} : website.creatorProfile || {},
     );
@@ -46,6 +47,9 @@ export async function structureSitegenWebsite(website: ISitegenWebsite): Promise
       : buildCreatorStructuringPrompt({ profileJson });
 
     const raw = await callSitegenNvidia(prompt, system);
+    const nvidiaMs = Date.now() - startedAt;
+    console.log(`[sitegen] NVIDIA structuring completed in ${nvidiaMs}ms (username=${website.username})`);
+
     const parsed = parseSitegenJson(raw);
 
     const structuredContent = website.siteType === "seeker"
