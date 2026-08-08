@@ -21,6 +21,7 @@ import { raka98AdminRouter } from "./admin/raka98AdminRouter";
 import { creatorEmailRouter } from "./creatorEmailRouter";
 import { feedbackPublicRouter } from "./feedback";
 import { reviewsPublicRouter } from "./reviews";
+import { sitegenPublicRouter } from "./products/sitegen";
 
 dotenv.config();
 
@@ -73,6 +74,7 @@ app.use("/recruit-public/forms", formPublicRouter);
 app.use("/recruit-public/site-guide", siteGuideRouter);
 app.use("/recruit-public", feedbackPublicRouter);
 app.use("/recruit-public", reviewsPublicRouter);
+app.use("/sitegen-public", sitegenPublicRouter);
 
 // ── Internal admin routes (password header, no JWT) ───────────────────────────
 app.use("/admin", raka98AdminRouter);
