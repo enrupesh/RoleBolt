@@ -140,7 +140,9 @@ export async function fetchPublishedSitegenSite(username: string): Promise<Siteg
       cache: "no-store",
     });
     if (response.status === 404) return null;
-    const data = await readApiJson<{ site?: SitegenPublishedSite; error?: string }>(response).catch(() => ({}));
+    const data = await readApiJson<{ site?: SitegenPublishedSite; error?: string }>(response).catch(
+      (): { site?: SitegenPublishedSite; error?: string } => ({}),
+    );
     if (!response.ok || !data.site?.structuredContent || !data.site.themeId) return null;
     return data.site;
   } catch {
