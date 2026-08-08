@@ -1,6 +1,7 @@
 import { readApiJson } from "@/lib/api";
 import { sitegenApiUrl } from "./api";
 import type { SitegenWebsiteDraft } from "../types/profile";
+import type { SitegenPublishedSite } from "../types/publicSite";
 import type { SitegenSessionWebsite } from "./session";
 
 export type SitegenUsernameCheckResponse = {
@@ -113,6 +114,28 @@ export async function updateSitegenTheme(accessToken: string, themeId: string): 
     throw new Error(data.error || "We couldn't update your theme.");
   }
   return data.website;
+}
+
+export async function publishSitegenDraft(accessToken: string): Promise<SitegenWebsiteDraft> {
+  const response = await fetch(sitegenApiUrl("/drafts/me/publish"), {
+    method: "POST",
+    headers: authHeaders(accessToken),
+  });
+  const data = await readApiJson<SitegenDraftResponse & { publicUrl?: string }>(response);
+  if (!response.ok || !data.website) {
+    throw new Error(data.error || "We couldn't publish your website.");
+  }
+  return data.website;
+}
+
+export async function fetchPublishedSitegenSite(username: string): Promise<SitegenPublishedSite | null> {
+  const response = await fetch(sitegenApiUrl(`/sites/${encodeURIComponent(username)}`), {
+    cache: "no-store",
+  });
+  if (response.status === 404) return null;
+  const data = await readApiJson<{ site?: SitegenPublishedSite; error?: string }>(response);
+  if (!response.ok || !data.site?.structuredContent || !data.site.themeId) return null;
+  return data.site;
 }
 
 export async function uploadSitegenResume(accessToken: string, file: File): Promise<SitegenDraftResponse> {

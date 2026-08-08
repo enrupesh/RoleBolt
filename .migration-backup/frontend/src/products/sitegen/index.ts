@@ -12,6 +12,8 @@ export { SitegenLandingPage } from "./components/landing/SitegenLandingPage";
 export { SitegenCreateDraftPage } from "./components/create/SitegenCreateDraftPage";
 export { SitegenBuildPage } from "./components/build/SitegenBuildPage";
 export { SitegenPreviewPage } from "./components/preview/SitegenPreviewPage";
+export { SitegenManagePage, SitegenLoginPage } from "./components/manage/SitegenManagePage";
+export { SitegenShareTools } from "./components/share/SitegenShareTools";
 export { sitegenApiUrl } from "./lib/api";
 export {
   createSitegenDraft,
@@ -22,7 +24,11 @@ export {
   uploadSitegenResume,
   structureSitegenDraft,
   updateSitegenTheme,
+  publishSitegenDraft,
+  fetchPublishedSitegenSite,
 } from "./lib/client";
+export { sitegenPublicSiteUrl, sitegenDisplayPublicUrl } from "./lib/publicUrl";
+export type { SitegenPublishedSite } from "./types/publicSite";
 export type { SitegenWebsiteDraft } from "./types/profile";
 export type {
   SitegenCreatorStructuredContent,

@@ -5,10 +5,12 @@ import { useEffect, useState } from "react";
 import { SitegenHeader } from "../layout/SitegenHeader";
 import { SitegenFooter } from "../layout/SitegenFooter";
 import { sitegenRoutes } from "../../lib/routes";
+import { sitegenDisplayPublicUrl } from "../../lib/publicUrl";
 import { SITEGEN_THEME_OPTIONS } from "../../config/themes";
 import {
   fetchSitegenDraft,
   loginSitegen,
+  publishSitegenDraft,
   structureSitegenDraft,
   toSessionWebsite,
   updateSitegenTheme,
@@ -18,6 +20,7 @@ import type { SitegenWebsiteDraft } from "../../types/profile";
 import type { SitegenThemeId } from "../../types/structuredContent";
 import { SitegenThemeRenderer } from "../../themes";
 import { SitegenFieldLabel, SitegenInput } from "../build/SitegenFormFields";
+import { SitegenShareTools } from "../share/SitegenShareTools";
 
 export function SitegenPreviewPage() {
   const [accessToken, setAccessToken] = useState<string | null>(null);
@@ -25,6 +28,8 @@ export function SitegenPreviewPage() {
   const [loading, setLoading] = useState(true);
   const [structuring, setStructuring] = useState(false);
   const [themeBusy, setThemeBusy] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [justPublished, setJustPublished] = useState(false);
   const [error, setError] = useState("");
   const [loginUsername, setLoginUsername] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -96,8 +101,68 @@ export function SitegenPreviewPage() {
     }
   }
 
+  async function handlePublish() {
+    if (!accessToken) return;
+    setPublishing(true);
+    setError("");
+    try {
+      const website = await publishSitegenDraft(accessToken);
+      setDraft(website);
+      saveSitegenSession(accessToken, toSessionWebsite(website));
+      setJustPublished(true);
+    } catch (publishError: unknown) {
+      setError(publishError instanceof Error ? publishError.message : "Publishing failed.");
+    } finally {
+      setPublishing(false);
+    }
+  }
+
   const themeId = draft?.selectedThemeId || draft?.recommendedThemeId;
   const themes = draft ? SITEGEN_THEME_OPTIONS[draft.siteType] : [];
+  const canPublish = Boolean(draft?.structuredContent && themeId && draft.infoCompletedAt);
+  const isPublished = draft?.status === "published";
+  const hasPendingUpdates = Boolean(draft?.hasUnpublishedChanges);
+
+  if (!loading && accessToken && draft && justPublished) {
+    return (
+      <div className="min-h-screen bg-[#0c0618] text-white">
+        <SitegenHeader />
+        <main className="mx-auto max-w-3xl px-5 py-14 lg:px-8 lg:py-20">
+          <div className="rounded-[2rem] border border-emerald-400/20 bg-emerald-500/10 p-8 text-center sm:p-10">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-200">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 4 4L19 6" /></svg>
+            </div>
+            <p className="mt-5 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-200">Published</p>
+            <h1 className="mt-3 font-display text-4xl font-semibold tracking-[-0.05em]">Your website is live!</h1>
+            <p className="mt-4 text-sm leading-7 text-emerald-50/80">
+              Your website is now publicly available at{" "}
+              <strong className="text-white">{sitegenDisplayPublicUrl(draft.username)}</strong>
+            </p>
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
+              <Link
+                href={sitegenRoutes.publishedSite(draft.username)}
+                target="_blank"
+                className="inline-flex items-center justify-center rounded-full bg-white px-5 py-3 text-sm font-semibold text-[#1a1033] hover:bg-violet-50"
+              >
+                View live website
+              </Link>
+              <Link
+                href={sitegenRoutes.manage}
+                className="inline-flex items-center justify-center rounded-full border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10"
+              >
+                Manage website
+              </Link>
+            </div>
+          </div>
+
+          <div className="mt-8">
+            <SitegenShareTools username={draft.username} publicUrl={draft.publicUrl} />
+          </div>
+        </main>
+        <SitegenFooter />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0c0618] text-white">
@@ -115,6 +180,9 @@ export function SitegenPreviewPage() {
               {error ? <p className="text-sm text-red-300">{error}</p> : null}
               <button type="submit" className="w-full rounded-full bg-white px-5 py-3 text-sm font-semibold text-[#1a1033]">Continue</button>
             </form>
+            <p className="mt-4 text-sm text-violet-200/45">
+              <Link href={sitegenRoutes.login} className="text-violet-200 underline">Sign in page</Link>
+            </p>
           </div>
         ) : (
           <div className="space-y-8">
@@ -122,8 +190,14 @@ export function SitegenPreviewPage() {
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-300">Step 3 · Structure & preview</p>
               <h1 className="mt-4 font-display text-4xl font-semibold tracking-[-0.05em] sm:text-5xl">Preview your website</h1>
               <p className="mt-4 text-base leading-7 text-violet-100/60">
-                NVIDIA AI organizes your information into structured website content. Our pre-built themes render the final design — AI never writes the theme code.
+                Review your structured content and theme, then publish to <span className="text-white">{sitegenDisplayPublicUrl(draft.username)}</span>.
               </p>
+              {isPublished ? (
+                <p className="mt-3 text-sm text-violet-200/55">
+                  Status: <span className="font-medium text-emerald-200">Published</span>
+                  {hasPendingUpdates ? <span className="text-amber-200"> · Unpublished changes</span> : null}
+                </p>
+              ) : null}
             </div>
 
             {!draft.structuredContent ? (
@@ -168,13 +242,13 @@ export function SitegenPreviewPage() {
                           </button>
                         ))}
                       </div>
-                      {draft.recommendedThemeId ? (
-                        <p className="mt-4 text-xs text-violet-200/45">Recommended: {draft.recommendedThemeId}</p>
-                      ) : null}
                     </div>
                     <button type="button" disabled={structuring} onClick={() => void handleStructure()} className="w-full rounded-full border border-white/15 px-4 py-2.5 text-sm font-semibold text-white hover:bg-white/5 disabled:opacity-50">
                       {structuring ? "Re-structuring…" : "Re-run AI structuring"}
                     </button>
+                    <Link href={sitegenRoutes.build} className="block w-full rounded-full border border-white/15 px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-white/5">
+                      Edit information
+                    </Link>
                   </aside>
 
                   <div className="overflow-hidden rounded-[2rem] border border-white/10 bg-white shadow-[0_30px_100px_rgba(0,0,0,.35)]">
@@ -184,8 +258,39 @@ export function SitegenPreviewPage() {
                   </div>
                 </div>
 
-                <div className="rounded-[2rem] border border-violet-400/20 bg-violet-500/10 px-6 py-5 text-sm text-violet-100/80">
-                  Phase 4 complete: your content is structured and mapped to a theme. Publishing to <strong className="text-white">rolebolt.tech/{draft.username}</strong> comes in Phase 5.
+                <div className="rounded-[2rem] border border-violet-400/20 bg-violet-500/10 px-6 py-5">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h2 className="text-lg font-semibold text-white">
+                        {isPublished && hasPendingUpdates ? "Ready to publish your update" : "Ready to publish?"}
+                      </h2>
+                      <p className="mt-1 text-sm text-violet-100/70">
+                        {isPublished && !hasPendingUpdates
+                          ? "Your live site matches this preview."
+                          : `Publishing makes your site live at ${sitegenDisplayPublicUrl(draft.username)}.`}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-3">
+                      {isPublished && !hasPendingUpdates ? (
+                        <Link href={sitegenRoutes.publishedSite(draft.username)} target="_blank" className="inline-flex items-center justify-center rounded-full border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10">
+                          View live site
+                        </Link>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={!canPublish || publishing}
+                          onClick={() => void handlePublish()}
+                          className="inline-flex items-center justify-center rounded-full bg-white px-5 py-3 text-sm font-semibold text-[#1a1033] disabled:opacity-50"
+                        >
+                          {publishing ? "Publishing…" : isPublished ? "Publish update" : "Publish website"}
+                        </button>
+                      )}
+                      <Link href={sitegenRoutes.manage} className="inline-flex items-center justify-center rounded-full border border-white/15 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10">
+                        Manage
+                      </Link>
+                    </div>
+                  </div>
+                  {error ? <p className="mt-4 text-sm text-red-300">{error}</p> : null}
                 </div>
               </>
             )}
