@@ -3,7 +3,7 @@ import { sitegenProduct } from "./product";
 
 const SITEGEN_TITLE = "Create Your Free Website | Sitegen";
 const SITEGEN_DESCRIPTION =
-  "Build a professional website in minutes. Choose Job Seeker or Creator, pick your username, and publish at rolebolt.tech/yourname — free, with no signup required to start.";
+  "Build a professional website in minutes. Choose Job Seeker or Creator, create your site with a username and password, and publish at rolebolt.tech/yourname — free, with no Rolebolt account required.";
 
 export function sitegenMetadata(): Metadata {
   return {

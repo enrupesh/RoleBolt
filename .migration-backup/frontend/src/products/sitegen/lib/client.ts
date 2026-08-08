@@ -3,6 +3,7 @@ import { sitegenApiUrl } from "./api";
 import type { SitegenWebsiteDraft } from "../types/profile";
 import type { SitegenPublishedSite } from "../types/publicSite";
 import type { SitegenSessionWebsite } from "./session";
+import { handleSitegenAuthedResponse } from "./authErrors";
 
 export type SitegenUsernameCheckResponse = {
   available: boolean;
@@ -69,6 +70,7 @@ export async function fetchSitegenDraft(accessToken: string): Promise<SitegenWeb
     cache: "no-store",
   });
   const data = await readApiJson<{ website?: SitegenWebsiteDraft; error?: string }>(response);
+  await handleSitegenAuthedResponse(response, data);
   if (!response.ok || !data.website) {
     throw new Error(data.error || "We couldn't load your website draft.");
   }
@@ -85,6 +87,7 @@ export async function saveSitegenDraft(
     body: JSON.stringify(body),
   });
   const data = await readApiJson<SitegenDraftResponse>(response);
+  await handleSitegenAuthedResponse(response, data);
   if (!response.ok || !data.website) {
     throw new Error(data.error || "We couldn't save your information.");
   }
@@ -97,6 +100,7 @@ export async function structureSitegenDraft(accessToken: string): Promise<Sitege
     headers: authHeaders(accessToken),
   });
   const data = await readApiJson<SitegenDraftResponse>(response);
+  await handleSitegenAuthedResponse(response, data);
   if (!response.ok || !data.website) {
     throw new Error(data.error || "We couldn't structure your website content.");
   }
@@ -110,6 +114,7 @@ export async function updateSitegenTheme(accessToken: string, themeId: string): 
     body: JSON.stringify({ themeId }),
   });
   const data = await readApiJson<SitegenDraftResponse>(response);
+  await handleSitegenAuthedResponse(response, data);
   if (!response.ok || !data.website) {
     throw new Error(data.error || "We couldn't update your theme.");
   }
@@ -122,6 +127,7 @@ export async function publishSitegenDraft(accessToken: string): Promise<SitegenW
     headers: authHeaders(accessToken),
   });
   const data = await readApiJson<SitegenDraftResponse & { publicUrl?: string }>(response);
+  await handleSitegenAuthedResponse(response, data);
   if (!response.ok || !data.website) {
     throw new Error(data.error || "We couldn't publish your website.");
   }
@@ -147,6 +153,7 @@ export async function uploadSitegenResume(accessToken: string, file: File): Prom
     body: formData,
   });
   const data = await readApiJson<SitegenDraftResponse>(response);
+  await handleSitegenAuthedResponse(response, data);
   if (!response.ok) throw new Error(data.error || "We couldn't read your resume.");
   return data;
 }
@@ -159,6 +166,7 @@ export async function uploadSitegenImage(accessToken: string, file: File): Promi
     body: JSON.stringify({ data: dataUrl, contentType: "image/jpeg" }),
   });
   const body = await readApiJson<{ url?: string; error?: string }>(response);
+  await handleSitegenAuthedResponse(response, body);
   if (!response.ok || !body.url) throw new Error(body.error || "Image upload failed.");
   return sitegenApiUrl(body.url);
 }

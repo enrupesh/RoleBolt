@@ -1,4 +1,5 @@
 import type { ISitegenWebsite } from "../models/SitegenWebsite";
+import { sitegenPublicSiteUrl } from "./publicUrl";
 
 export function sitegenWebsiteDto(website: ISitegenWebsite | Record<string, unknown>) {
   const doc = website as ISitegenWebsite;
@@ -7,7 +8,7 @@ export function sitegenWebsiteDto(website: ISitegenWebsite | Record<string, unkn
     username: String(doc.username),
     siteType: doc.siteType,
     status: doc.status,
-    publicUrl: `https://www.rolebolt.tech/${doc.username}`,
+    publicUrl: sitegenPublicSiteUrl(String(doc.username)),
     inputMode: doc.inputMode || null,
     resumeText: doc.resumeText || "",
     resumeFileName: doc.resumeFileName || "",
@@ -19,6 +20,7 @@ export function sitegenWebsiteDto(website: ISitegenWebsite | Record<string, unkn
     selectedThemeId: doc.selectedThemeId || null,
     publishedAt: doc.publishedAt ? new Date(doc.publishedAt).toISOString() : null,
     hasUnpublishedChanges: Boolean(doc.hasUnpublishedChanges),
+    needsRestructure: Boolean(doc.needsRestructure),
     aiProcessingStatus: doc.aiProcessingStatus || "idle",
     aiMessage: doc.aiMessage || "",
     structuredAt: doc.structuredAt ? new Date(doc.structuredAt).toISOString() : null,

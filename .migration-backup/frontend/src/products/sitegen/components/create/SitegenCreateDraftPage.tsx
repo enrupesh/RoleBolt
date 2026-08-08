@@ -8,7 +8,7 @@ import { SitegenUsernameField } from "./SitegenUsernameField";
 import { sitegenProduct, sitegenSiteTypeLabels } from "../../config/product";
 import type { SitegenSiteType } from "../../config/product";
 import { sitegenRoutes } from "../../lib/routes";
-import { createSitegenDraft } from "../../lib/client";
+import { createSitegenDraft, toSessionWebsite } from "../../lib/client";
 import { saveSitegenSession } from "../../lib/session";
 import { validateSitegenPassword } from "../../lib/username";
 
@@ -53,7 +53,7 @@ export function SitegenCreateDraftPage({ siteType }: { siteType: SitegenSiteType
       if (!result.website || !result.accessToken) {
         throw new Error("We couldn't create your website draft.");
       }
-      saveSitegenSession(result.accessToken, result.website);
+      saveSitegenSession(result.accessToken, toSessionWebsite(result.website));
       setCreated({ username: result.website.username, publicUrl: result.website.publicUrl });
     } catch (submitError: unknown) {
       setError(submitError instanceof Error ? submitError.message : "We couldn't create your website draft.");
@@ -117,7 +117,7 @@ export function SitegenCreateDraftPage({ siteType }: { siteType: SitegenSiteType
                 Claim your username
               </h1>
               <p className="mt-4 text-base leading-7 text-violet-100/60">
-                Choose the URL for your website and set a password to manage it later. No traditional signup — just username and password.
+                Create your website with a username and password. You&apos;ll use these credentials to sign in and manage your site later.
               </p>
 
               <form onSubmit={handleSubmit} className="mt-10 space-y-6 rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 sm:p-8">
