@@ -91,13 +91,19 @@ export function SitegenCreateDraftPage({ siteType }: { siteType: SitegenSiteType
               </div>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
                 <Link
+                  href={sitegenRoutes.build}
+                  className="inline-flex items-center justify-center rounded-full bg-white px-5 py-3 text-sm font-semibold text-[#1a1033] transition hover:bg-violet-50"
+                >
+                  Continue to information
+                </Link>
+                <Link
                   href={sitegenRoutes.landing}
                   className="inline-flex items-center justify-center rounded-full border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
                 >
                   Back to Sitegen
                 </Link>
               </div>
-              <p className="mt-5 text-xs text-violet-200/40">Information collection and website generation arrive in the next phase.</p>
+              <p className="mt-5 text-xs text-violet-200/40">Next: add your resume or business information.</p>
             </div>
           ) : (
             <>

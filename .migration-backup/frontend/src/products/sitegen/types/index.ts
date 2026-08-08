@@ -8,3 +8,9 @@ export type SitegenThemeId =
   | "seeker-modern"
   | "creator-business"
   | "creator-creator";
+
+export type {
+  SitegenWebsiteDraft,
+  SitegenSeekerProfile,
+  SitegenCreatorProfile,
+} from "./profile";
