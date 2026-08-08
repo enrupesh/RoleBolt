@@ -25,6 +25,7 @@ import { applyPublish, markNeedsRestructure, markUnpublishedChanges, validatePub
 import { sitegenPublicSiteDto } from "../lib/publicSiteDto";
 import { sitegenPublicSiteUrl } from "../lib/publicUrl";
 import { detectImageContentType, isSafeImageContentType } from "../lib/sanitize";
+import { sitegenRateLimit, SITEGEN_RATE_LIMITS } from "../middleware/rateLimit";
 
 export const sitegenPublicRouter = express.Router();
 
@@ -54,7 +55,11 @@ function parseSiteType(value: unknown): "seeker" | "creator" | null {
     : null;
 }
 
-sitegenPublicRouter.get("/usernames/check", async (req, res) => {
+sitegenPublicRouter.get("/usernames/check", sitegenRateLimit(
+  SITEGEN_RATE_LIMITS.usernameCheck.scope,
+  SITEGEN_RATE_LIMITS.usernameCheck.limit,
+  SITEGEN_RATE_LIMITS.usernameCheck.windowMs,
+), async (req, res) => {
   try {
     const parsed = validateSitegenUsername(req.query.username);
     if ("error" in parsed) {
@@ -69,7 +74,11 @@ sitegenPublicRouter.get("/usernames/check", async (req, res) => {
   }
 });
 
-sitegenPublicRouter.post("/drafts", async (req, res) => {
+sitegenPublicRouter.post("/drafts", sitegenRateLimit(
+  SITEGEN_RATE_LIMITS.createDraft.scope,
+  SITEGEN_RATE_LIMITS.createDraft.limit,
+  SITEGEN_RATE_LIMITS.createDraft.windowMs,
+), async (req, res) => {
   try {
     await connectMongo();
 
@@ -120,7 +129,11 @@ sitegenPublicRouter.post("/drafts", async (req, res) => {
   }
 });
 
-sitegenPublicRouter.post("/auth/login", async (req, res) => {
+sitegenPublicRouter.post("/auth/login", sitegenRateLimit(
+  SITEGEN_RATE_LIMITS.login.scope,
+  SITEGEN_RATE_LIMITS.login.limit,
+  SITEGEN_RATE_LIMITS.login.windowMs,
+), async (req, res) => {
   try {
     await connectMongo();
     const parsed = validateSitegenUsername(req.body?.username);
