@@ -15,7 +15,7 @@ You may lightly polish wording for clarity, but do not add new facts.
 Return ONLY valid JSON matching the requested schema.`;
 
 /** Keep prompts lean — very long resume text slows NVIDIA without improving output. */
-export const SITEGEN_RESUME_PROMPT_MAX_CHARS = 12_000;
+export const SITEGEN_RESUME_PROMPT_MAX_CHARS = 8_000;
 
 export function truncateResumeForPrompt(resumeText: string, maxChars = SITEGEN_RESUME_PROMPT_MAX_CHARS): string {
   const trimmed = resumeText.trim();

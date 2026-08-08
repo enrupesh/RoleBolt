@@ -19,6 +19,20 @@ function parseRecommendedThemeId(raw: unknown, siteType: "seeker" | "creator", s
   return recommendThemeId(structured);
 }
 
+function formatStructuringErrorMessage(err: unknown): string {
+  const message = err instanceof Error ? err.message : "";
+  if (message.includes("Timeout")) {
+    return "NVIDIA AI took longer than expected and timed out. Your saved information was used instead — please try “Re-run AI structuring” in a minute; it often succeeds on retry.";
+  }
+  if (message.includes("GEMINI_FALLBACK_KEY")) {
+    return "NVIDIA AI is not configured on the server right now. Your saved information was used instead.";
+  }
+  if (message) {
+    return `AI structuring unavailable (${message}). Your saved information was preserved and used instead.`;
+  }
+  return "AI structuring unavailable. Your saved information was preserved and used instead.";
+}
+
 export async function structureSitegenWebsite(website: ISitegenWebsite): Promise<SitegenStructureResult> {
   const fallbackContent = buildFallbackStructuredContent(website);
   const fallbackTheme = recommendThemeId(fallbackContent);
@@ -77,9 +91,7 @@ export async function structureSitegenWebsite(website: ISitegenWebsite): Promise
         ? website.selectedThemeId
         : fallbackTheme,
       aiProcessingStatus: "ai_fallback",
-      aiMessage: err instanceof Error
-        ? `AI structuring unavailable (${err.message}). Your saved information was preserved and used instead.`
-        : "AI structuring unavailable. Your saved information was preserved and used instead.",
+      aiMessage: formatStructuringErrorMessage(err),
     };
   }
 }
