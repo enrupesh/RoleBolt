@@ -90,6 +90,31 @@ export async function saveSitegenDraft(
   return data.website;
 }
 
+export async function structureSitegenDraft(accessToken: string): Promise<SitegenWebsiteDraft> {
+  const response = await fetch(sitegenApiUrl("/drafts/me/structure"), {
+    method: "POST",
+    headers: authHeaders(accessToken),
+  });
+  const data = await readApiJson<SitegenDraftResponse>(response);
+  if (!response.ok || !data.website) {
+    throw new Error(data.error || "We couldn't structure your website content.");
+  }
+  return data.website;
+}
+
+export async function updateSitegenTheme(accessToken: string, themeId: string): Promise<SitegenWebsiteDraft> {
+  const response = await fetch(sitegenApiUrl("/drafts/me/theme"), {
+    method: "PATCH",
+    headers: authHeaders(accessToken),
+    body: JSON.stringify({ themeId }),
+  });
+  const data = await readApiJson<SitegenDraftResponse>(response);
+  if (!response.ok || !data.website) {
+    throw new Error(data.error || "We couldn't update your theme.");
+  }
+  return data.website;
+}
+
 export async function uploadSitegenResume(accessToken: string, file: File): Promise<SitegenDraftResponse> {
   const formData = new FormData();
   formData.append("resume", file);

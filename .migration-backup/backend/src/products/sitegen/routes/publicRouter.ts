@@ -18,6 +18,9 @@ import {
   validateCreatorProfileSubmission,
   validateSeekerProfileSubmission,
 } from "../lib/validateProfile";
+import { structureSitegenWebsite } from "../ai/structuring";
+import { isThemeAllowedForSiteType } from "../ai/themeMapping";
+import type { SitegenThemeId } from "../types/structuredContent";
 
 export const sitegenPublicRouter = express.Router();
 
@@ -190,6 +193,51 @@ sitegenPublicRouter.patch("/drafts/me", requireSitegenAuth, async (req, res) => 
   } catch (err: unknown) {
     console.error("[sitegen] PATCH /drafts/me", err);
     return res.status(500).json({ error: "We couldn't save your information right now." });
+  }
+});
+
+sitegenPublicRouter.post("/drafts/me/structure", requireSitegenAuth, async (req, res) => {
+  try {
+    const website = req.sitegen!.website;
+    if (!website.infoCompletedAt) {
+      return res.status(400).json({ error: "Please complete your information before structuring your website." });
+    }
+
+    const result = await structureSitegenWebsite(website);
+    website.structuredContent = result.structuredContent;
+    website.recommendedThemeId = result.recommendedThemeId;
+    website.selectedThemeId = result.selectedThemeId;
+    website.aiProcessingStatus = result.aiProcessingStatus;
+    website.aiMessage = result.aiMessage || "";
+    website.structuredAt = new Date();
+    await website.save();
+
+    return res.json({
+      ok: true,
+      website: sitegenWebsiteDto(website),
+      aiProcessingStatus: result.aiProcessingStatus,
+      aiMessage: result.aiMessage || "",
+    });
+  } catch (err: unknown) {
+    console.error("[sitegen] POST /drafts/me/structure", err);
+    return res.status(500).json({ error: "We couldn't structure your website content right now." });
+  }
+});
+
+sitegenPublicRouter.patch("/drafts/me/theme", requireSitegenAuth, async (req, res) => {
+  try {
+    const website = req.sitegen!.website;
+    const themeId = String(req.body?.themeId || "").trim() as SitegenThemeId;
+    if (!themeId || !isThemeAllowedForSiteType(themeId, website.siteType)) {
+      return res.status(400).json({ error: "Please choose a valid theme for your website type." });
+    }
+
+    website.selectedThemeId = themeId;
+    await website.save();
+    return res.json({ ok: true, website: sitegenWebsiteDto(website) });
+  } catch (err: unknown) {
+    console.error("[sitegen] PATCH /drafts/me/theme", err);
+    return res.status(500).json({ error: "We couldn't update your theme right now." });
   }
 });
 
