@@ -6,10 +6,13 @@ import { RecruitProfile } from "./models/RecruitProfile";
 import { User } from "./models/User";
 import {
   REVIEW_ROLES,
+  REVIEW_SUBMITTER_PLANS,
   RecruitReview,
   RecruitReviewSettings,
   type ReviewRole,
+  type ReviewSubmitterPlan,
 } from "./models/RecruitReview";
+import { getEntitlement } from "./billing/entitlements";
 
 export const reviewsPublicRouter = express.Router();
 
@@ -46,6 +49,25 @@ function getOptionalAuth(req: express.Request) {
 
 function getGuestEditToken(req: express.Request): string {
   return String(req.headers["x-review-edit-token"] || "").trim();
+}
+
+function parseVideoUrl(value: unknown): string {
+  const videoUrl = String(value || "").trim();
+  if (!videoUrl) return "";
+  try {
+    const parsed = new URL(videoUrl);
+    if (!["http:", "https:"].includes(parsed.protocol)) return "";
+    return videoUrl.slice(0, 2048);
+  } catch {
+    return "";
+  }
+}
+
+function parseSubmitterPlan(value: unknown): ReviewSubmitterPlan | undefined {
+  const plan = String(value || "").trim();
+  return (REVIEW_SUBMITTER_PLANS as readonly string[]).includes(plan)
+    ? plan as ReviewSubmitterPlan
+    : undefined;
 }
 
 reviewsPublicRouter.get("/reviews", async (_req, res) => {
@@ -116,20 +138,40 @@ reviewsPublicRouter.post("/reviews", async (req, res) => {
     }
 
     const role = roleFromAccount || parseRole(req.body?.role);
-    const message = String(req.body?.message || "").trim();
+    const videoUrl = parseVideoUrl(req.body?.videoUrl);
+    const isVideoReview = Boolean(videoUrl);
+    let message = String(req.body?.message || "").trim();
     const title = String(req.body?.title || "").trim();
     const displayName = String(req.body?.displayName || "").trim();
     const rating = Number(req.body?.rating);
 
+    if (isVideoReview && !auth?.sub) {
+      return res.status(401).json({ error: "Please sign in before submitting a video review." });
+    }
+    if (String(req.body?.videoUrl || "").trim() && !videoUrl) {
+      return res.status(400).json({ error: "Please enter a valid public video URL." });
+    }
+
     if (!role) return res.status(400).json({ error: "Please choose Job Seeker or Job Creator." });
     if (!Number.isInteger(rating) || rating < 1 || rating > 5) return res.status(400).json({ error: "Please choose a rating from 1 to 5." });
-    if (message.length < 10) return res.status(400).json({ error: "Please write at least 10 characters." });
+    if (!isVideoReview && message.length < 10) return res.status(400).json({ error: "Please write at least 10 characters." });
+    if (isVideoReview && !message) message = "Video review submission — pending admin approval.";
     if (message.length > 2000) return res.status(400).json({ error: "Review must be 2,000 characters or fewer." });
     if (!displayName || displayName.length > 100) return res.status(400).json({ error: "Please enter a display name." });
     if (title.length > 120) return res.status(400).json({ error: "Review title must be 120 characters or fewer." });
 
     const email = auth?.email || String(req.body?.email || "").trim().toLowerCase();
     const guestEditToken = !auth?.sub ? String(req.body?.editToken || "").trim() : "";
+    let submitterPlan = parseSubmitterPlan(req.body?.submitterPlan);
+    if (auth?.sub && role === "seeker") {
+      try {
+        const entitlement = await getEntitlement(auth.sub, "seeker");
+        submitterPlan = entitlement.plan;
+      } catch {
+        // Keep client-provided plan as a fallback for admin reference.
+      }
+    }
+
     const update = {
       rating,
       title,
@@ -138,6 +180,15 @@ reviewsPublicRouter.post("/reviews", async (req, res) => {
       role,
       isGuest,
       ...(email ? { email } : {}),
+      ...(isVideoReview ? {
+        videoUrl,
+        visible: false,
+        featured: false,
+        ...(submitterPlan ? { submitterPlan } : {}),
+      } : {
+        videoUrl: undefined,
+        submitterPlan: undefined,
+      }),
     };
     const review = auth?.sub
       ? await RecruitReview.findOneAndUpdate(

@@ -47,6 +47,8 @@ export type AdminReview = {
   visible: boolean;
   createdAt: string | null;
   email: string;
+  videoUrl?: string;
+  submitterPlan?: "free" | "pro" | "ultra" | null;
 };
 
 export type AdminReviewSettings = {
