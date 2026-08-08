@@ -94,4 +94,5 @@ export type SitegenWebsiteDraft = {
   structuredAt?: string | null;
   publishedAt?: string | null;
   hasUnpublishedChanges?: boolean;
+  needsRestructure?: boolean;
 };

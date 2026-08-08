@@ -145,7 +145,7 @@ export function SitegenCreatorInfoForm({
           <label className="mt-2 flex cursor-pointer items-center gap-4 rounded-xl border border-white/10 bg-white/5 px-4 py-3">
             {logoUrl ? <img src={logoUrl} alt="Logo preview" className="h-12 w-12 rounded-lg object-cover" /> : <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-violet-500/20 text-xs text-violet-200">Logo</span>}
             <span className="text-sm text-violet-100/70">{logoBusy ? "Uploading…" : "Upload logo image"}</span>
-            <input type="file" accept="image/*" className="hidden" disabled={logoBusy} onChange={handleLogoUpload} />
+            <input type="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" className="hidden" disabled={logoBusy} onChange={handleLogoUpload} />
           </label>
         </div>
       </SitegenSection>
