@@ -39,6 +39,9 @@ export default function ReviewsPage() {
             <p className="text-xs font-semibold uppercase tracking-[.18em] text-[#0a66c2]">Rolebolt reviews</p>
             <h1 className="mt-5 max-w-3xl font-display text-5xl font-semibold leading-[1.06] tracking-[-.06em] sm:text-6xl">Real experiences from the Rolebolt community.</h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-[#647a8d]">See what Job Seekers and Job Creators think about their experience, then share your own.</p>
+            <Link href="/reviews/video-rules" className="mt-4 inline-flex text-sm font-semibold text-[#0a66c2] hover:underline">
+              Video Review Rules &amp; Rewards →
+            </Link>
           </div>
         </section>
         <section className="mx-auto max-w-7xl px-5 py-16 lg:px-8 lg:py-20">

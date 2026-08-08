@@ -373,6 +373,8 @@ function reviewDto(review: Record<string, any>) {
     visible: review.visible !== false,
     createdAt: review.createdAt || null,
     email: String(review.email || ""),
+    videoUrl: String(review.videoUrl || ""),
+    submitterPlan: review.submitterPlan || null,
   };
 }
 
