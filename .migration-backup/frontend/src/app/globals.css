@@ -420,6 +420,15 @@ h1, h2, h3, h4, h5, h6, li, td, th {
   0% { opacity: 1; transform: translateY(0) rotate(0deg); }
   100% { opacity: 0; transform: translateY(500px) rotate(720deg); }
 }
+@keyframes sitegen-border-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.sitegen-border-spin {
+  animation: sitegen-border-rotate 3.5s linear infinite;
+}
+
 @keyframes spin-slow {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
