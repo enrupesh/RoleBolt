@@ -42,10 +42,10 @@ function attachCreatorLogo(
 function formatStructuringErrorMessage(err: unknown): string {
   const message = err instanceof Error ? err.message : "";
   if (message.includes("Timeout")) {
-    return "NVIDIA AI took longer than expected and timed out. Your saved information was used instead — please try “Re-run AI structuring” in a minute; it often succeeds on retry.";
+    return "AI took longer than expected and timed out. Your saved information was used instead — please try “Re-run AI structuring” in a minute; it often succeeds on retry.";
   }
   if (message.includes("GEMINI_FALLBACK_KEY")) {
-    return "NVIDIA AI is not configured on the server right now. Your saved information was used instead.";
+    return "AI is not configured on the server right now. Your saved information was used instead.";
   }
   if (message) {
     return `AI structuring unavailable (${message}). Your saved information was preserved and used instead.`;
@@ -108,7 +108,7 @@ export async function structureSitegenWebsite(website: ISitegenWebsite): Promise
       recommendedThemeId,
       selectedThemeId,
       aiProcessingStatus: "ai_success",
-      aiMessage: "Your information was structured successfully with NVIDIA AI.",
+      aiMessage: "Your information was structured successfully with AI.",
     };
   } catch (err: unknown) {
     console.error("[sitegen] structureSitegenWebsite fallback", err);

@@ -113,22 +113,23 @@ function SitegenPreviewMockup({ interactive = false }: { interactive?: boolean }
 
 const showcasePoints = [
   "Job Seeker or Creator — pick the path that fits you",
-  "NVIDIA AI structures your resume into website sections",
+  "AI structures your resume into website sections",
   "Four professional themes — no code, no drag-and-drop",
   "Publish at www.rolebolt.tech/yourname in minutes",
 ];
 
 export function SitegenShowcaseSection() {
   return (
-    <section id="sitegen" className="relative scroll-mt-20 overflow-hidden border-b border-[#dfe8ef] bg-[#0c0618] text-white">
-      <div className="pointer-events-none absolute inset-0" aria-hidden="true">
-        <div className="absolute -left-32 top-0 h-[520px] w-[520px] rounded-full bg-violet-600/20 blur-[120px]" />
-        <div className="absolute right-0 top-20 h-[420px] w-[420px] rounded-full bg-fuchsia-500/15 blur-[100px]" />
-        <div className="absolute bottom-0 left-1/3 h-[360px] w-[360px] rounded-full bg-indigo-500/10 blur-[90px]" />
-      </div>
+    <section id="sitegen" className="scroll-mt-20 bg-[#f8fbfd] px-5 py-14 sm:py-16 lg:px-8">
+      <div className="relative mx-auto max-w-6xl overflow-hidden rounded-[2rem] border border-[#e4d8f8] bg-[#0c0618] text-white shadow-[0_24px_80px_rgba(91,63,140,.14)] sm:rounded-[2.25rem]">
+        <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+          <div className="absolute -left-24 top-0 h-[420px] w-[420px] rounded-full bg-violet-600/20 blur-[100px]" />
+          <div className="absolute right-0 top-10 h-[360px] w-[360px] rounded-full bg-fuchsia-500/15 blur-[90px]" />
+          <div className="absolute bottom-0 left-1/3 h-[280px] w-[280px] rounded-full bg-indigo-500/10 blur-[80px]" />
+        </div>
 
-      <div className="relative mx-auto max-w-7xl px-5 py-24 lg:px-8 lg:py-28">
-        <div className="grid items-center gap-14 lg:grid-cols-[1.02fr_0.98fr] lg:gap-16">
+        <div className="relative px-5 py-12 sm:px-8 sm:py-14 lg:px-12 lg:py-16">
+          <div className="grid items-center gap-10 lg:grid-cols-[1.02fr_0.98fr] lg:gap-14">
           <div>
             <p className="inline-flex items-center gap-2 rounded-full border border-violet-400/25 bg-violet-500/10 px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-violet-200">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
@@ -175,6 +176,7 @@ export function SitegenShowcaseSection() {
           <div className="relative">
             <SitegenPreviewMockup interactive />
           </div>
+        </div>
         </div>
       </div>
     </section>
