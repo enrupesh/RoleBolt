@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { SITEGEN_RESERVED_USERNAMES, SITEGEN_USERNAME_PATTERN } from "@/products/sitegen/config/reserved-usernames";
 import { fetchPublishedSitegenSite } from "@/products/sitegen/lib/client";
 import { SitegenThemeRenderer } from "@/products/sitegen/themes";
-import { sitegenDisplayPublicUrl } from "@/products/sitegen/lib/publicUrl";
+import { sitegenDisplayPublicUrl, sitegenPublicSiteUrl } from "@/products/sitegen/lib/publicUrl";
 
 type PageProps = {
   params: Promise<{ username: string }>;
@@ -35,6 +35,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     description: site.structuredContent.type === "seeker"
       ? site.structuredContent.headline || `Professional website for ${title}`
       : site.structuredContent.tagline || `Website for ${title}`,
+    alternates: {
+      canonical: sitegenPublicSiteUrl(username),
+    },
     robots: { index: true, follow: true },
   };
 }

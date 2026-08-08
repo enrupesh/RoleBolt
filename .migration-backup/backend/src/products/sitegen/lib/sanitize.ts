@@ -28,3 +28,11 @@ export function sanitizeHttpUrl(value: unknown, maxLen = 500): string | undefine
     return undefined;
   }
 }
+
+/** Accept canonical http(s) URLs and Sitegen upload paths served by this product. */
+export function sanitizeSitegenMediaUrl(value: unknown, maxLen = 1000): string | undefined {
+  const raw = String(value ?? "").trim().slice(0, maxLen);
+  if (!raw) return undefined;
+  if (raw.startsWith("/sitegen-public/uploads/")) return raw;
+  return sanitizeHttpUrl(raw, maxLen);
+}

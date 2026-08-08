@@ -1,5 +1,5 @@
 /**
- * Reserved usernames for Sitegen published sites at rolebolt.tech/{username}.
+ * Reserved usernames for Sitegen published sites at www.rolebolt.tech/{username}.
  * Must include all Rolebolt static routes and system words.
  * Keep in sync with backend validation in later phases.
  */
