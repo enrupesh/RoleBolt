@@ -241,7 +241,7 @@ export function SitegenPreviewPage() {
               <div className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-8 sm:p-10">
                 <h2 className="text-xl font-semibold">Ready to structure your content</h2>
                 <p className="mt-3 text-sm leading-7 text-violet-100/60">
-                  We&apos;ll send your saved information to NVIDIA AI, validate the response, and map it to a theme. If AI is unavailable, your saved data is used as a fallback.
+                  We&apos;ll send your saved information to AI, validate the response, and map it to a theme. If AI is unavailable, your saved data is used as a fallback.
                 </p>
                 {error ? <p className="mt-4 text-sm text-red-300">{error}</p> : null}
                 <button type="button" disabled={!draft.infoCompletedAt} onClick={() => void handleStructure()} className="mt-6 rounded-full bg-white px-5 py-3 text-sm font-semibold text-[#1a1033] disabled:opacity-50">
