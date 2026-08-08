@@ -28,6 +28,7 @@ export type SitegenSeekerProfile = {
   fullName: string;
   headline?: string;
   summary?: string;
+  photoUrl?: string;
   email?: string;
   phone?: string;
   location?: string;

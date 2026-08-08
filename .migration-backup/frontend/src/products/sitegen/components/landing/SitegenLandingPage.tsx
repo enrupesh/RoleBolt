@@ -13,7 +13,7 @@ const steps = [
   { number: "02", title: "Claim your username", copy: "Create your website with a username and password. Use those credentials to manage your site later." },
   { number: "03", title: "Add your information", copy: "Upload a resume or fill in your details manually. We keep it simple." },
   { number: "04", title: "AI structures your content", copy: "Our AI organizes your information into professional website sections — not arbitrary code." },
-  { number: "05", title: "Publish instantly", copy: "Preview, pick a theme, and go live at rolebolt.tech/yourname." },
+  { number: "05", title: "Publish instantly", copy: `Preview, pick a theme, and go live at ${sitegenProduct.publicUrlPattern.replace("{username}", "yourname")}.` },
 ];
 
 const features = [
@@ -21,7 +21,7 @@ const features = [
   { title: "No Rolebolt account", copy: "No account signup required. Create your website with a username and password to manage it later." },
   { title: "Template-first design", copy: "Professional themes built by us — predictable, beautiful, and secure." },
   { title: "AI-assisted content", copy: "AI understands your resume and polishes your content into structured sections." },
-  { title: "Your own URL", copy: "Get a clean, memorable link: rolebolt.tech/yourname." },
+  { title: "Your own URL", copy: `Get a clean, memorable link: ${sitegenProduct.publicUrlPattern.replace("{username}", "yourname")}.` },
   { title: "Edit anytime", copy: "Use your username and password to return and update your website." },
 ];
 
@@ -43,7 +43,7 @@ const faqs = [
   },
   {
     q: "What will my website URL look like?",
-    a: "Your published site will be available at rolebolt.tech/yourusername — for example, rolebolt.tech/rupesh or rolebolt.tech/mycompany.",
+    a: `Your published site will be available at ${sitegenProduct.publicUrlPattern.replace("{username}", "yourusername")} — for example, ${sitegenProduct.publicUrlPattern.replace("{username}", "rupesh")} or ${sitegenProduct.publicUrlPattern.replace("{username}", "mycompany")}.`,
   },
   {
     q: "Does AI write the website code?",

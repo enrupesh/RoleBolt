@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { checkSitegenUsername } from "../../lib/client";
 import { normalizeSitegenUsernameInput, validateSitegenUsername } from "../../lib/username";
+import { sitegenDisplayPublicUrl } from "../../lib/publicUrl";
 
 type Props = {
   id?: string;
@@ -58,12 +59,12 @@ export function SitegenUsernameField({ id = "sitegen-username", value, onChange,
   }, [normalized, formatError]);
 
   const statusMessage = (() => {
-    if (!normalized) return "Your site will live at rolebolt.tech/yourname";
+    if (!normalized) return `Your site will live at ${sitegenDisplayPublicUrl("yourname")}`;
     if (formatError || serverError) return formatError || serverError;
     if (availability === "checking") return "Checking availability…";
     if (availability === "available") return "This username is available.";
     if (availability === "taken") return "This username is not available.";
-    return `Your site will live at rolebolt.tech/${normalized}`;
+    return `Your site will live at ${sitegenDisplayPublicUrl(normalized)}`;
   })();
 
   const statusColor = availability === "available"

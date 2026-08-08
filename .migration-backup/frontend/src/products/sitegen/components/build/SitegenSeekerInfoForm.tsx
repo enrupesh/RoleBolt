@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import type { SitegenSeekerProfile, SitegenWebsiteDraft } from "../../types/profile";
-import { saveSitegenDraft } from "../../lib/client";
+import { saveSitegenDraft, uploadSitegenImage } from "../../lib/client";
+import { sitegenDisplayPublicUrl } from "../../lib/publicUrl";
 import { SitegenResumeUpload } from "./SitegenResumeUpload";
 import { SitegenFieldLabel, SitegenInfoBox, SitegenInput, SitegenSection, SitegenTextarea } from "./SitegenFormFields";
 
@@ -24,6 +25,7 @@ export function SitegenSeekerInfoForm({
   const [resumeText, setResumeText] = useState(draft.resumeText || "");
   const [resumeFileName, setResumeFileName] = useState(draft.resumeFileName || "");
   const [fullName, setFullName] = useState(initial?.fullName || "");
+  const [photoUrl, setPhotoUrl] = useState(initial?.photoUrl || "");
   const [headline, setHeadline] = useState(initial?.headline || "");
   const [summary, setSummary] = useState(initial?.summary || "");
   const [email, setEmail] = useState(initial?.email || "");
@@ -38,7 +40,24 @@ export function SitegenSeekerInfoForm({
   const [education, setEducation] = useState(initial?.education?.length ? initial.education : [emptyEducation()]);
   const [projects, setProjects] = useState(initial?.projects?.length ? initial.projects : [emptyProject()]);
   const [busy, setBusy] = useState(false);
+  const [photoBusy, setPhotoBusy] = useState(false);
   const [error, setError] = useState("");
+
+  async function handlePhotoUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setPhotoBusy(true);
+    setError("");
+    try {
+      const url = await uploadSitegenImage(accessToken, file);
+      setPhotoUrl(url);
+    } catch (uploadError: unknown) {
+      setError(uploadError instanceof Error ? uploadError.message : "Profile photo upload failed.");
+    } finally {
+      setPhotoBusy(false);
+      event.target.value = "";
+    }
+  }
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -47,6 +66,7 @@ export function SitegenSeekerInfoForm({
     try {
       const seekerProfile: SitegenSeekerProfile = {
         fullName: fullName.trim(),
+        photoUrl: photoUrl || undefined,
         headline: headline.trim() || undefined,
         summary: summary.trim() || undefined,
         email: email.trim() || undefined,
@@ -79,7 +99,7 @@ export function SitegenSeekerInfoForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <SitegenInfoBox>
-        This information will be used to build your professional website at <strong className="text-white">rolebolt.tech/{draft.username}</strong>.
+        This information will be used to build your professional website at <strong className="text-white">{sitegenDisplayPublicUrl(draft.username)}</strong>.
         Required fields are marked. Everything else is optional.
       </SitegenInfoBox>
 
@@ -111,6 +131,19 @@ export function SitegenSeekerInfoForm({
       ) : null}
 
       <SitegenSection title="Basic information" description="Your name and professional headline appear at the top of your website.">
+        <div>
+          <SitegenFieldLabel optional>Profile photo</SitegenFieldLabel>
+          <label className="mt-2 flex cursor-pointer items-center gap-4 rounded-xl border border-white/10 bg-white/5 px-4 py-3">
+            {photoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={photoUrl} alt="Profile photo preview" className="h-16 w-16 rounded-full object-cover" />
+            ) : (
+              <span className="flex h-16 w-16 items-center justify-center rounded-full bg-violet-500/20 text-xs text-violet-200">Photo</span>
+            )}
+            <span className="text-sm text-violet-100/70">{photoBusy ? "Uploading…" : "Upload profile photo (optional)"}</span>
+            <input type="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" className="hidden" disabled={photoBusy} onChange={handlePhotoUpload} />
+          </label>
+        </div>
         <div>
           <SitegenFieldLabel required>Full name</SitegenFieldLabel>
           <SitegenInput value={fullName} onChange={setFullName} placeholder="Rupesh Kumar" />

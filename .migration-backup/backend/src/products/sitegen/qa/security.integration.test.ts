@@ -68,7 +68,7 @@ describe("sitegen security integration", () => {
     assert.equal(json.includes("secret"), false);
     assert.equal(json.includes("Draft only"), false);
     assert.equal((dto.structuredContent as { name?: string })?.name, "Demo");
-    assert.equal(dto.publicUrl, "https://rolebolt.tech/demo");
+    assert.equal(dto.publicUrl, "https://www.rolebolt.tech/demo");
   });
 
   it("reserved username set blocks route collisions", () => {

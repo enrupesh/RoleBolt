@@ -14,17 +14,23 @@ export function recommendThemeId(content: SitegenStructuredContent): SitegenThem
 function recommendSeekerTheme(content: SitegenSeekerStructuredContent): SitegenThemeId {
   const projectHeavy = content.projects.length >= 2 || content.skills.length >= 8;
   const experienceHeavy = content.experience.length >= 3;
-  if (projectHeavy && !experienceHeavy) return "seeker-modern";
-  return "seeker-classic";
+  const educationHeavy = content.education.length >= 2 && content.experience.length <= 1;
+  const portfolioSignals = Boolean(content.contact.portfolio || content.contact.github);
+  if (projectHeavy || (portfolioSignals && !experienceHeavy)) return "seeker-modern";
+  if (educationHeavy && !experienceHeavy) return "seeker-classic";
+  if (experienceHeavy && !projectHeavy) return "seeker-classic";
+  return projectHeavy ? "seeker-modern" : "seeker-classic";
 }
 
 function recommendCreatorTheme(content: SitegenCreatorStructuredContent): SitegenThemeId {
   const category = (content.category || "").toLowerCase();
   const creatorLike = ["creator", "personal brand", "content creator", "influencer"].some((item) => category.includes(item));
   const businessLike = ["business", "startup", "agency", "company", "consultant"].some((item) => category.includes(item));
+  const leanProfile = (content.team?.length || 0) <= 1 && (content.services?.length || 0) <= 3;
   if (creatorLike && !businessLike) return "creator-studio";
-  if ((content.team?.length || 0) <= 1 && (content.services?.length || 0) <= 3) return "creator-studio";
-  return "creator-business";
+  if (leanProfile && (content.portfolio?.length || 0) >= 2) return "creator-studio";
+  if ((content.team?.length || 0) >= 2 || businessLike) return "creator-business";
+  return leanProfile ? "creator-studio" : "creator-business";
 }
 
 export function isThemeAllowedForSiteType(themeId: SitegenThemeId, siteType: "seeker" | "creator"): boolean {
