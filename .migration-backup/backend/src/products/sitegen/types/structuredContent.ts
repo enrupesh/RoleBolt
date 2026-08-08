@@ -44,6 +44,7 @@ export type SitegenSeekerStructuredContent = {
   name: string;
   headline: string | null;
   about: string | null;
+  photoUrl: string | null;
   skills: string[];
   experience: SitegenSeekerStructuredExperience[];
   education: SitegenSeekerStructuredEducation[];

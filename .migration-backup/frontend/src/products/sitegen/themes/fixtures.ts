@@ -24,6 +24,7 @@ export const aaravSharmaSeeker: SitegenSeekerStructuredContent = {
   name: "Aarav Sharma",
   headline: "Senior Product Manager · B2B SaaS · Growth",
   about: "Product leader with 8+ years building and scaling B2B SaaS platforms across fintech and HR tech. Known for turning customer insight into roadmap clarity, cross-functional execution, and measurable business outcomes.",
+  photoUrl: null,
   skills: ["Product Strategy", "Roadmapping", "User Research", "SQL", "A/B Testing", "Agile", "Stakeholder Management", "Go-to-Market"],
   experience: [
     {
@@ -99,6 +100,7 @@ export const minimalSeeker: SitegenSeekerStructuredContent = {
   name: "Mina Park",
   headline: "Junior Data Analyst",
   about: null,
+  photoUrl: null,
   skills: ["Excel", "SQL"],
   experience: [],
   education: [],

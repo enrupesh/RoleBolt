@@ -5,7 +5,7 @@ import type {
   SitegenSeekerProfile,
   SitegenSeekerProject,
 } from "../types/profile";
-import { sanitizeHttpUrl } from "./sanitize";
+import { sanitizeHttpUrl, sanitizeSitegenMediaUrl } from "./sanitize";
 
 function cleanString(value: unknown, max = 500): string {
   return String(value ?? "").trim().slice(0, max);
@@ -87,6 +87,7 @@ export function parseSeekerProfile(body: unknown): { profile?: SitegenSeekerProf
     linkedin: sanitizeHttpUrl(input.linkedin, 500),
     github: sanitizeHttpUrl(input.github, 500),
     portfolio: sanitizeHttpUrl(input.portfolio, 500),
+    photoUrl: sanitizeSitegenMediaUrl(input.photoUrl, 1000),
     skills: cleanStringArray(input.skills, 40, 80),
     experience: parseExperience(input.experience),
     education: parseEducation(input.education),
@@ -143,7 +144,7 @@ export function parseCreatorProfile(body: unknown): { profile?: SitegenCreatorPr
     category: cleanOptionalString(input.category, 80),
     tagline: cleanOptionalString(input.tagline, 200),
     description: cleanOptionalString(input.description, 4000),
-    logoUrl: sanitizeHttpUrl(input.logoUrl, 1000),
+    logoUrl: sanitizeSitegenMediaUrl(input.logoUrl, 1000),
     about: cleanOptionalString(input.about, 4000),
     services: cleanStringArray(input.services, 20, 120),
     location: cleanOptionalString(input.location, 120),
