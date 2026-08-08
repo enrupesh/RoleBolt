@@ -1,0 +1,11 @@
+/**
+ * Sitegen — extractable website-generation product.
+ * Import from `@/products/sitegen` only; do not scatter sitegen logic across Rolebolt.
+ */
+
+export { sitegenProduct, sitegenSiteTypeLabels } from "./config/product";
+export type { SitegenSiteType } from "./config/product";
+export { sitegenMetadata } from "./config/seo";
+export { sitegenRoutes } from "./lib/routes";
+export { SITEGEN_RESERVED_USERNAMES } from "./config/reserved-usernames";
+export { SitegenLandingPage } from "./components/landing/SitegenLandingPage";
