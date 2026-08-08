@@ -19,6 +19,10 @@ export default function robots(): MetadataRoute.Robots {
           "/recruit/pricing/",
            "/resources",
            "/resources/",
+           "/website",
+           "/website/",
+           "/reviews",
+           "/reviews/",
         ],
         disallow: [
           "/api/",
