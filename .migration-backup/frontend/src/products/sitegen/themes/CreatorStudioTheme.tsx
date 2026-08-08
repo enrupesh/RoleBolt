@@ -1,4 +1,5 @@
 import type { SitegenCreatorStructuredContent } from "../types/structuredContent";
+import { sitegenDisplayPublicUrl } from "../lib/publicUrl";
 import { creatorNavItems } from "./shared";
 import {
   AvatarBadge,
@@ -73,7 +74,7 @@ export function CreatorStudioTheme({ content, username }: { content: SitegenCrea
       </main>
 
       <footer className="border-t border-white/10 px-5 py-6 text-center text-xs text-violet-200/45 sm:px-8">
-        {displayName} · rolebolt.tech/{username}
+        {displayName} · {sitegenDisplayPublicUrl(username)}
       </footer>
     </div>
   );

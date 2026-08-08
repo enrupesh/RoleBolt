@@ -11,12 +11,32 @@ import {
   parseCreatorStructuredFromAi,
   parseSeekerStructuredFromAi,
 } from "./fallback";
+import { applyCreatorSectionVisibility, applySeekerSectionVisibility } from "./sections";
 import { isThemeAllowedForSiteType, recommendThemeId } from "./themeMapping";
+import { sanitizeSitegenMediaUrl } from "../lib/sanitize";
 
 function parseRecommendedThemeId(raw: unknown, siteType: "seeker" | "creator", structured: SitegenStructureResult["structuredContent"]): SitegenThemeId {
   const value = String((raw as Record<string, unknown>)?.recommendedThemeId || "").trim() as SitegenThemeId;
   if (isThemeAllowedForSiteType(value, siteType)) return value;
   return recommendThemeId(structured);
+}
+
+function attachSeekerPhoto(
+  content: SitegenStructureResult["structuredContent"],
+  website: ISitegenWebsite,
+): SitegenStructureResult["structuredContent"] {
+  if (content.type !== "seeker") return content;
+  const photoUrl = sanitizeSitegenMediaUrl(website.seekerProfile?.photoUrl, 1000) || null;
+  return { ...content, photoUrl };
+}
+
+function attachCreatorLogo(
+  content: SitegenStructureResult["structuredContent"],
+  website: ISitegenWebsite,
+): SitegenStructureResult["structuredContent"] {
+  if (content.type !== "creator") return content;
+  const logoUrl = sanitizeSitegenMediaUrl(website.creatorProfile?.logoUrl, 1000) || content.logoUrl || null;
+  return { ...content, logoUrl };
 }
 
 function formatStructuringErrorMessage(err: unknown): string {
@@ -66,9 +86,17 @@ export async function structureSitegenWebsite(website: ISitegenWebsite): Promise
 
     const parsed = parseSitegenJson(raw);
 
-    const structuredContent = website.siteType === "seeker"
+    let structuredContent = website.siteType === "seeker"
       ? parseSeekerStructuredFromAi(parsed, website)
       : parseCreatorStructuredFromAi(parsed, website);
+
+    structuredContent = website.siteType === "seeker"
+      ? applySeekerSectionVisibility(structuredContent)
+      : applyCreatorSectionVisibility(structuredContent);
+
+    structuredContent = website.siteType === "seeker"
+      ? attachSeekerPhoto(structuredContent, website)
+      : attachCreatorLogo(structuredContent, website);
 
     const recommendedThemeId = parseRecommendedThemeId(parsed, website.siteType, structuredContent);
     const selectedThemeId = website.selectedThemeId && isThemeAllowedForSiteType(website.selectedThemeId, website.siteType)

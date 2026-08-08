@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { SitegenCreatorProfile, SitegenWebsiteDraft } from "../../types/profile";
 import { saveSitegenDraft, uploadSitegenImage } from "../../lib/client";
+import { sitegenDisplayPublicUrl } from "../../lib/publicUrl";
 import { SitegenFieldLabel, SitegenInfoBox, SitegenInput, SitegenSection, SitegenTextarea } from "./SitegenFormFields";
 
 const CATEGORIES = [
@@ -110,7 +111,7 @@ export function SitegenCreatorInfoForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <SitegenInfoBox>
-        Tell us about your business or brand. We&apos;ll use this to build your website at <strong className="text-white">rolebolt.tech/{draft.username}</strong>.
+        Tell us about your business or brand. We&apos;ll use this to build your website at <strong className="text-white">{sitegenDisplayPublicUrl(draft.username)}</strong>.
         Only a few fields are required — skip anything that doesn&apos;t apply.
       </SitegenInfoBox>
 

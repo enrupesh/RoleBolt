@@ -87,6 +87,7 @@ const SeekerProfileSchema = new Schema(
     linkedin: { type: String, trim: true, maxlength: 500 },
     github: { type: String, trim: true, maxlength: 500 },
     portfolio: { type: String, trim: true, maxlength: 500 },
+    photoUrl: { type: String, trim: true, maxlength: 1000 },
     skills: [{ type: String, trim: true, maxlength: 80 }],
     experience: [SeekerExperienceSchema],
     education: [SeekerEducationSchema],
