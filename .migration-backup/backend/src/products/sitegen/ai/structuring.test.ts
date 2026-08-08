@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { parseSeekerStructuredFromAi } from "./fallback";
 import { parseSitegenJson } from "./parseJson";
+import { buildSeekerStructuringPrompt, truncateResumeForPrompt } from "./prompts";
 
 const baseSeekerWebsite = {
   username: "seekerqa",
@@ -46,5 +47,18 @@ describe("sitegen AI parsing and fallback", () => {
     assert.equal(structured.skills.includes("ZZZNotARealSkillAtAll"), false);
     assert.equal(structured.experience.some((item) => item.company === "FakeCorp"), false);
     assert.equal(structured.experience.some((item) => item.company === "Acme"), true);
+  });
+
+  it("truncates very long resume text before sending to NVIDIA", () => {
+    const longResume = "A".repeat(20_000);
+    const truncated = truncateResumeForPrompt(longResume, 100);
+    assert.equal(truncated.length < longResume.length, true);
+    assert.match(truncated, /truncated for processing/i);
+
+    const prompt = buildSeekerStructuringPrompt({
+      profileJson: "{}",
+      resumeText: longResume,
+    });
+    assert.equal(prompt.prompt.includes("A".repeat(20_000)), false);
   });
 });

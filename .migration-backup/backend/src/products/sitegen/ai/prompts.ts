@@ -14,10 +14,21 @@ If information is missing, use null or an empty array.
 You may lightly polish wording for clarity, but do not add new facts.
 Return ONLY valid JSON matching the requested schema.`;
 
+/** Keep prompts lean — very long resume text slows NVIDIA without improving output. */
+export const SITEGEN_RESUME_PROMPT_MAX_CHARS = 12_000;
+
+export function truncateResumeForPrompt(resumeText: string, maxChars = SITEGEN_RESUME_PROMPT_MAX_CHARS): string {
+  const trimmed = resumeText.trim();
+  if (trimmed.length <= maxChars) return trimmed;
+  return `${trimmed.slice(0, maxChars)}\n\n[Resume text truncated for processing — earlier sections prioritized.]`;
+}
+
 export function buildSeekerStructuringPrompt(input: {
   profileJson: string;
   resumeText: string;
 }): { system: string; prompt: string } {
+  const resumeText = truncateResumeForPrompt(input.resumeText);
+
   return {
     system: SEEKER_SYSTEM,
     prompt: `Structure the following Job Seeker information into website-ready JSON.
@@ -48,7 +59,7 @@ PROFILE JSON:
 ${input.profileJson}
 
 RESUME TEXT:
-${input.resumeText || "(none)"}`,
+${resumeText || "(none)"}`,
   };
 }
 
