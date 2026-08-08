@@ -28,6 +28,9 @@ export function SitegenPreviewPage() {
   const [draft, setDraft] = useState<SitegenWebsiteDraft | null>(null);
   const [loading, setLoading] = useState(true);
   const [structuring, setStructuring] = useState(false);
+  const [structureCompleting, setStructureCompleting] = useState(false);
+  const [structureError, setStructureError] = useState("");
+  const [previewReady, setPreviewReady] = useState(false);
   const [themeBusy, setThemeBusy] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [justPublished, setJustPublished] = useState(false);
@@ -39,15 +42,24 @@ export function SitegenPreviewPage() {
   const handleStructure = useCallback(async () => {
     if (!accessToken) return;
     setStructuring(true);
+    setStructureCompleting(false);
+    setStructureError("");
+    setPreviewReady(false);
     setError("");
     try {
       const website = await structureSitegenDraft(accessToken);
-      setDraft(website);
-      saveSitegenSession(accessToken, toSessionWebsite(website));
+      setStructureCompleting(true);
+      window.setTimeout(() => {
+        setDraft(website);
+        saveSitegenSession(accessToken, toSessionWebsite(website));
+        setStructuring(false);
+        setStructureCompleting(false);
+        setPreviewReady(true);
+      }, 650);
     } catch (structureError: unknown) {
-      setError(structureError instanceof Error ? structureError.message : "Structuring failed.");
-    } finally {
+      setStructureError(structureError instanceof Error ? structureError.message : "Structuring failed.");
       setStructuring(false);
+      setStructureCompleting(false);
     }
   }, [accessToken]);
 
@@ -130,7 +142,8 @@ export function SitegenPreviewPage() {
 
   const themeId = draft?.selectedThemeId || draft?.recommendedThemeId;
   const themes = draft ? SITEGEN_THEME_OPTIONS[draft.siteType] : [];
-  const canPublish = Boolean(draft?.structuredContent && themeId && draft.infoCompletedAt && !draft.needsRestructure);
+  const showStructuring = structuring || structureCompleting;
+  const canPublish = Boolean(draft?.structuredContent && themeId && draft.infoCompletedAt && !draft.needsRestructure && !showStructuring);
   const isPublished = draft?.status === "published";
   const hasPendingUpdates = Boolean(draft?.hasUnpublishedChanges);
   const hasResume = Boolean(draft?.resumeText?.trim() || draft?.resumeFileName);
@@ -212,16 +225,26 @@ export function SitegenPreviewPage() {
               ) : null}
             </div>
 
-            {structuring ? (
-              <SitegenStructuringProgress active={structuring} hasResume={hasResume} />
-            ) : !draft.structuredContent ? (
+            {structureError && !showStructuring ? (
+              <SitegenStructuringProgress
+                active={false}
+                error={structureError}
+                onRetry={() => void handleStructure()}
+              />
+            ) : null}
+
+            {showStructuring ? (
+              <SitegenStructuringProgress active={structuring || structureCompleting} completing={structureCompleting} hasResume={hasResume} />
+            ) : null}
+
+            {!showStructuring && !draft.structuredContent ? (
               <div className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-8 sm:p-10">
                 <h2 className="text-xl font-semibold">Ready to structure your content</h2>
                 <p className="mt-3 text-sm leading-7 text-violet-100/60">
                   We&apos;ll send your saved information to NVIDIA AI, validate the response, and map it to a theme. If AI is unavailable, your saved data is used as a fallback.
                 </p>
                 {error ? <p className="mt-4 text-sm text-red-300">{error}</p> : null}
-                <button type="button" disabled={structuring || !draft.infoCompletedAt} onClick={() => void handleStructure()} className="mt-6 rounded-full bg-white px-5 py-3 text-sm font-semibold text-[#1a1033] disabled:opacity-50">
+                <button type="button" disabled={!draft.infoCompletedAt} onClick={() => void handleStructure()} className="mt-6 rounded-full bg-white px-5 py-3 text-sm font-semibold text-[#1a1033] disabled:opacity-50">
                   Structure my website content
                 </button>
                 {!draft.infoCompletedAt ? (
@@ -230,23 +253,23 @@ export function SitegenPreviewPage() {
                   </p>
                 ) : null}
               </div>
-            ) : (
-              <>
-                {structuring ? <SitegenStructuringProgress active={structuring} hasResume={hasResume} /> : null}
+            ) : null}
 
-                {!structuring && draft.aiMessage ? (
-                  <div className={`rounded-2xl border px-4 py-3.5 text-sm ${draft.aiProcessingStatus === "ai_success" ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-100" : "border-amber-400/20 bg-amber-500/10 text-amber-100"}`}>
+            {draft.structuredContent ? (
+              <>
+                {!showStructuring && draft.aiMessage ? (
+                  <div className={`rounded-2xl border px-4 py-3.5 text-sm transition-opacity duration-500 ${previewReady ? "opacity-100" : "opacity-90"} ${draft.aiProcessingStatus === "ai_success" ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-100" : "border-amber-400/20 bg-amber-500/10 text-amber-100"}`}>
                     {draft.aiMessage}
                   </div>
                 ) : null}
 
-                {!structuring && draft.needsRestructure ? (
+                {!showStructuring && draft.needsRestructure ? (
                   <div className="rounded-2xl border border-amber-400/20 bg-amber-500/10 px-4 py-3.5 text-sm text-amber-100">
                     Your information has changed since the last structuring run. Re-run AI structuring before publishing an update.
                   </div>
                 ) : null}
 
-                <div className={`grid gap-6 lg:grid-cols-[280px_1fr] ${structuring ? "pointer-events-none opacity-40" : ""}`}>
+                <div className={`grid gap-6 transition-all duration-500 lg:grid-cols-[280px_1fr] ${showStructuring ? "pointer-events-none opacity-40" : "opacity-100"}`}>
                   <aside className="space-y-4">
                     <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-5">
                       <h2 className="text-sm font-semibold">Themes</h2>
@@ -265,15 +288,15 @@ export function SitegenPreviewPage() {
                         ))}
                       </div>
                     </div>
-                    <button type="button" disabled={structuring} onClick={() => void handleStructure()} className="w-full rounded-full border border-white/15 px-4 py-2.5 text-sm font-semibold text-white hover:bg-white/5 disabled:opacity-50">
-                      {structuring ? "Re-structuring…" : "Re-run AI structuring"}
+                    <button type="button" disabled={showStructuring} onClick={() => void handleStructure()} className="w-full rounded-full border border-white/15 px-4 py-2.5 text-sm font-semibold text-white hover:bg-white/5 disabled:opacity-50">
+                      {showStructuring ? "Re-structuring…" : "Re-run AI structuring"}
                     </button>
                     <Link href={sitegenRoutes.build} className="block w-full rounded-full border border-white/15 px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-white/5">
                       Edit information
                     </Link>
                   </aside>
 
-                  <div className="overflow-hidden rounded-[2rem] border border-white/10 bg-white shadow-[0_30px_100px_rgba(0,0,0,.35)] min-h-[480px]">
+                  <div className={`overflow-hidden rounded-[2rem] border border-white/10 bg-white shadow-[0_30px_100px_rgba(0,0,0,.35)] min-h-[480px] transition-opacity duration-500 ${previewReady ? "opacity-100" : "opacity-100"}`}>
                     {themeId && draft.structuredContent ? (
                       <SitegenThemeRenderer themeId={themeId} content={draft.structuredContent} username={draft.username} />
                     ) : (
@@ -317,7 +340,7 @@ export function SitegenPreviewPage() {
                   {error ? <p className="mt-4 text-sm text-red-300">{error}</p> : null}
                 </div>
               </>
-            )}
+            ) : null}
           </div>
         )}
       </main>

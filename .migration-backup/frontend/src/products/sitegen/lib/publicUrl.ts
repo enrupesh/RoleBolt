@@ -5,9 +5,9 @@ export function sitegenPublicSitePath(username: string): string {
 }
 
 export function sitegenPublicSiteUrl(username: string): string {
-  return `https://${sitegenProduct.hostDomain}/${encodeURIComponent(username)}`;
+  return `${sitegenProduct.canonicalOrigin}/${encodeURIComponent(username)}`;
 }
 
 export function sitegenDisplayPublicUrl(username: string): string {
-  return `${sitegenProduct.hostDomain}/${username}`;
+  return `${sitegenProduct.publicHost}/${username}`;
 }

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { parseSeekerStructuredFromAi } from "./fallback";
+import { parseSeekerStructuredFromAi, buildSeekerFallback } from "./fallback";
 import { parseSitegenJson } from "./parseJson";
 import { buildSeekerStructuringPrompt, truncateResumeForPrompt } from "./prompts";
 
@@ -60,5 +60,42 @@ describe("sitegen AI parsing and fallback", () => {
       resumeText: longResume,
     });
     assert.equal(prompt.prompt.includes("A".repeat(20_000)), false);
+  });
+
+  it("keeps seeker photoUrl from saved profile, not AI output", () => {
+    const website = {
+      ...baseSeekerWebsite,
+      seekerProfile: {
+        ...baseSeekerWebsite.seekerProfile,
+        photoUrl: "/sitegen-public/uploads/images/abc123",
+      },
+    };
+
+    const structured = parseSeekerStructuredFromAi({
+      name: "Alex Seeker",
+      photoUrl: "https://evil.example/photo.jpg",
+      skills: ["TypeScript"],
+      experience: [{ title: "Engineer", company: "Acme", bullets: ["Shipped features"] }],
+      education: [],
+      projects: [],
+      certifications: [],
+      achievements: [],
+      contact: {},
+    }, website as never);
+
+    assert.equal(structured.photoUrl, "/sitegen-public/uploads/images/abc123");
+  });
+
+  it("fallback seeker content includes optional profile photo", () => {
+    const content = buildSeekerFallback({
+      username: "seekerqa",
+      siteType: "seeker",
+      seekerProfile: {
+        fullName: "Alex Seeker",
+        photoUrl: "/sitegen-public/uploads/images/profile.webp",
+      },
+    } as never);
+
+    assert.equal(content.photoUrl, "/sitegen-public/uploads/images/profile.webp");
   });
 });
