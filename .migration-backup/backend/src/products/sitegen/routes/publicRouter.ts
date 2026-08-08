@@ -21,6 +21,8 @@ import {
 import { structureSitegenWebsite } from "../ai/structuring";
 import { isThemeAllowedForSiteType } from "../ai/themeMapping";
 import type { SitegenThemeId } from "../types/structuredContent";
+import { applyPublish, markUnpublishedChanges, validatePublishReady } from "../lib/publish";
+import { sitegenPublicSiteDto } from "../lib/publicSiteDto";
 
 export const sitegenPublicRouter = express.Router();
 
@@ -145,6 +147,30 @@ sitegenPublicRouter.post("/auth/login", async (req, res) => {
   }
 });
 
+sitegenPublicRouter.get("/sites/:username", async (req, res) => {
+  try {
+    await connectMongo();
+    const parsed = validateSitegenUsername(req.params.username);
+    if ("error" in parsed) {
+      return res.status(404).json({ error: "Website not found." });
+    }
+
+    const website = await SitegenWebsite.findOne({
+      username: parsed.username,
+      status: "published",
+    }).select("-passwordHash");
+
+    if (!website?.publishedStructuredContent || !website.publishedThemeId) {
+      return res.status(404).json({ error: "Website not found." });
+    }
+
+    return res.json({ site: sitegenPublicSiteDto(website) });
+  } catch (err: unknown) {
+    console.error("[sitegen] GET /sites/:username", err);
+    return res.status(500).json({ error: "We couldn't load this website right now." });
+  }
+});
+
 sitegenPublicRouter.get("/drafts/me", requireSitegenAuth, async (req, res) => {
   return res.json({ website: sitegenWebsiteDto(req.sitegen!.website) });
 });
@@ -174,6 +200,7 @@ sitegenPublicRouter.patch("/drafts/me", requireSitegenAuth, async (req, res) => 
       website.seekerProfile = parsed.profile;
       if (resumeText) website.resumeText = resumeText.slice(0, 50000);
       website.infoCompletedAt = complete ? new Date() : website.infoCompletedAt;
+      markUnpublishedChanges(website);
       await website.save();
       return res.json({ ok: true, website: sitegenWebsiteDto(website) });
     }
@@ -188,6 +215,7 @@ sitegenPublicRouter.patch("/drafts/me", requireSitegenAuth, async (req, res) => 
 
     website.creatorProfile = parsed.profile;
     website.infoCompletedAt = complete ? new Date() : website.infoCompletedAt;
+    markUnpublishedChanges(website);
     await website.save();
     return res.json({ ok: true, website: sitegenWebsiteDto(website) });
   } catch (err: unknown) {
@@ -210,6 +238,7 @@ sitegenPublicRouter.post("/drafts/me/structure", requireSitegenAuth, async (req,
     website.aiProcessingStatus = result.aiProcessingStatus;
     website.aiMessage = result.aiMessage || "";
     website.structuredAt = new Date();
+    markUnpublishedChanges(website);
     await website.save();
 
     return res.json({
@@ -224,6 +253,26 @@ sitegenPublicRouter.post("/drafts/me/structure", requireSitegenAuth, async (req,
   }
 });
 
+sitegenPublicRouter.post("/drafts/me/publish", requireSitegenAuth, async (req, res) => {
+  try {
+    const website = req.sitegen!.website;
+    const validationError = validatePublishReady(website);
+    if (validationError) return res.status(400).json({ error: validationError });
+
+    applyPublish(website);
+    await website.save();
+
+    return res.json({
+      ok: true,
+      website: sitegenWebsiteDto(website),
+      publicUrl: `https://www.rolebolt.tech/${website.username}`,
+    });
+  } catch (err: unknown) {
+    console.error("[sitegen] POST /drafts/me/publish", err);
+    return res.status(500).json({ error: "We couldn't publish your website right now." });
+  }
+});
+
 sitegenPublicRouter.patch("/drafts/me/theme", requireSitegenAuth, async (req, res) => {
   try {
     const website = req.sitegen!.website;
@@ -233,6 +282,7 @@ sitegenPublicRouter.patch("/drafts/me/theme", requireSitegenAuth, async (req, re
     }
 
     website.selectedThemeId = themeId;
+    markUnpublishedChanges(website);
     await website.save();
     return res.json({ ok: true, website: sitegenWebsiteDto(website) });
   } catch (err: unknown) {
@@ -265,6 +315,7 @@ sitegenPublicRouter.post(
       website.resumeText = text;
       website.resumeFileName = req.file.originalname.slice(0, 255);
       website.inputMode = "resume";
+      markUnpublishedChanges(website);
       await website.save();
 
       return res.json({

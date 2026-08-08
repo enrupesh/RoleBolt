@@ -30,6 +30,10 @@ export interface ISitegenWebsite extends Document {
   structuredContent?: SitegenStructuredContent;
   recommendedThemeId?: SitegenThemeId;
   selectedThemeId?: SitegenThemeId;
+  publishedStructuredContent?: SitegenStructuredContent;
+  publishedThemeId?: SitegenThemeId;
+  publishedAt?: Date;
+  hasUnpublishedChanges?: boolean;
   aiProcessingStatus?: SitegenAiProcessingStatus;
   aiMessage?: string;
   structuredAt?: Date;
@@ -132,6 +136,10 @@ const SitegenWebsiteSchema = new Schema<ISitegenWebsite>(
     structuredContent: { type: Schema.Types.Mixed },
     recommendedThemeId: { type: String },
     selectedThemeId: { type: String },
+    publishedStructuredContent: { type: Schema.Types.Mixed },
+    publishedThemeId: { type: String },
+    publishedAt: { type: Date },
+    hasUnpublishedChanges: { type: Boolean, default: false },
     aiProcessingStatus: { type: String, enum: ["idle", "ai_success", "ai_fallback", "failed"], default: "idle" },
     aiMessage: { type: String, trim: true, maxlength: 500 },
     structuredAt: { type: Date },
