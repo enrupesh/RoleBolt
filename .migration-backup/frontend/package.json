@@ -21,6 +21,7 @@
   "dependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "firebase": "^12.16.0",
@@ -39,7 +40,6 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",
-    "@types/qrcode": "^1.5.6",
     "eslint": "^9",
     "eslint-config-next": "16.2.3",
     "tsx": "^4.21.0"
