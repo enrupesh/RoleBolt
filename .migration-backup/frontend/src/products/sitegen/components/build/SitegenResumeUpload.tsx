@@ -52,7 +52,7 @@ export function SitegenResumeUpload({
         <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-violet-200/45">Extracted text preview</p>
           <pre className="mt-3 max-h-48 overflow-auto whitespace-pre-wrap text-xs leading-6 text-violet-100/70">{resumeText.slice(0, 2000)}{resumeText.length > 2000 ? "…" : ""}</pre>
-          <p className="mt-3 text-xs text-violet-200/40">This text will be used to help build your website in the next phase. No AI processing happens yet.</p>
+          <p className="mt-3 text-xs text-violet-200/40">This extracted text will be used when you structure your website content on the preview page.</p>
         </div>
       ) : null}
     </div>

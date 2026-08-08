@@ -44,7 +44,10 @@ export function SitegenUsernameField({ id = "sitegen-username", value, onChange,
           setServerError("");
         }
       } catch {
-        if (active) setAvailability("idle");
+        if (active) {
+          setAvailability("idle");
+          setServerError("We couldn't check that username right now. Please try again.");
+        }
       }
     }, 400);
 
