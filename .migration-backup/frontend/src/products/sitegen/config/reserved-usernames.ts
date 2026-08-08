@@ -15,7 +15,7 @@ export const SITEGEN_RESERVED_USERNAMES = new Set([
   // Rolebolt product routes
   "rolebolt", "recruit", "recruiter", "seeker", "creator", "reviews", "resources",
   "website", "about", "blog", "careers", "contact", "privacy", "terms", "billing",
-  "f", "backend", "api", "status",
+  "f", "backend", "status", "offline", "refund", "manage", "login",
   // Sitegen product routes (block usernames that collide with app paths)
   "start", "username", "build", "preview", "publish", "dashboard", "edit",
 ]);
