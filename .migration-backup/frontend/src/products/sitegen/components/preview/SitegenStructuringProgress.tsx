@@ -15,7 +15,7 @@ const STATUS_MESSAGES = [
   { afterMs: 14_000, text: "Organizing experience, skills, and contact details…" },
   { afterMs: 28_000, text: "Matching your content to a professional theme…" },
   { afterMs: 45_000, text: "Almost there — finalizing your website preview…" },
-  { afterMs: 75_000, text: "NVIDIA AI is still working. Large resumes can take a bit longer — please keep this tab open." },
+  { afterMs: 75_000, text: "AI is still working. Large resumes can take a bit longer — please keep this tab open." },
 ] as const;
 
 const SLOW_MESSAGE_AFTER_MS = 45_000;
@@ -143,7 +143,7 @@ export function SitegenStructuringProgress({
         </div>
 
         <p className="mt-6 text-xs font-semibold uppercase tracking-[0.16em] text-violet-200">
-          {completing ? "Preview ready" : "NVIDIA AI processing"}
+          {completing ? "Preview ready" : "AI processing"}
         </p>
         <h2 className="mt-3 text-xl font-semibold text-white sm:text-2xl">
           {completing ? "Opening your preview…" : STEPS[activeStepIndex]?.label}
@@ -191,7 +191,7 @@ export function SitegenStructuringProgress({
 
         {timedOut ? (
           <div className="mt-5 max-w-lg rounded-2xl border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-            This is taking longer than usual. NVIDIA may still be working — you can wait a bit longer or try again.
+            This is taking longer than usual. AI may still be working — you can wait a bit longer or try again.
             {onRetry ? (
               <button type="button" onClick={onRetry} className="mt-3 block w-full rounded-full bg-white px-4 py-2 text-sm font-semibold text-[#1a1033]">
                 Try again
