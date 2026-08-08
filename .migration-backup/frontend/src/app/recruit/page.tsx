@@ -133,6 +133,7 @@ export default function RecruitLandingPage() {
             <a href="#product" className="whitespace-nowrap rounded-lg px-1.5 py-2 text-[12px] text-[#5d7285] transition hover:bg-white hover:text-[#10263d] min-[1180px]:px-3 min-[1180px]:text-sm">Product</a>
             <Link href="/recruit/pricing" className="whitespace-nowrap rounded-lg px-1.5 py-2 text-[12px] text-[#5d7285] transition hover:bg-white hover:text-[#10263d] min-[1180px]:px-3 min-[1180px]:text-sm">Plans</Link>
             <Link href="/resources" className="whitespace-nowrap rounded-lg px-1.5 py-2 text-[12px] text-[#5d7285] transition hover:bg-white hover:text-[#10263d] min-[1180px]:px-3 min-[1180px]:text-sm">Guides</Link>
+            <Link href="/website" className="whitespace-nowrap rounded-lg px-1.5 py-2 text-[12px] font-medium text-[#5b3f8c] transition hover:bg-[#f6f0ff] hover:text-[#4a2f78] min-[1180px]:px-3 min-[1180px]:text-sm">Free website</Link>
           </nav>
           <div className="flex shrink-0 items-center gap-1.5 lg:gap-2">
             {isLoggedIn ? (
@@ -165,6 +166,7 @@ export default function RecruitLandingPage() {
               <a onClick={() => setMenuOpen(false)} href="#product" className="rounded-lg px-3 py-3 text-sm">Product</a>
               <Link onClick={() => setMenuOpen(false)} href="/recruit/pricing" className="rounded-lg px-3 py-3 text-sm">Plans</Link>
               <Link onClick={() => setMenuOpen(false)} href="/resources" className="rounded-lg px-3 py-3 text-sm">Guides</Link>
+              <Link onClick={() => setMenuOpen(false)} href="/website" className="rounded-lg px-3 py-3 text-sm font-medium text-[#5b3f8c]">Free website</Link>
             </div>
           </nav>
         )}
@@ -189,6 +191,27 @@ export default function RecruitLandingPage() {
                 <div className="mt-9 flex flex-col gap-3 sm:flex-row">
                   <Link href="/recruit/signup" className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0a66c2] px-5 py-3.5 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(10,102,194,.18)] transition hover:-translate-y-0.5 hover:bg-[#07559f]">Build your hiring workspace <Arrow /></Link>
                   <Link href="/recruit/opportunities" className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#cbd9e4] bg-white px-5 py-3.5 text-sm font-semibold text-[#31536e] transition hover:border-[#0a66c2] hover:text-[#0a66c2]">Explore open roles <Arrow /></Link>
+                </div>
+                <div className="mt-6 max-w-xl rounded-2xl border border-[#e4d8f8] bg-gradient-to-br from-[#faf7ff] to-white p-4 shadow-[0_10px_30px_rgba(91,63,140,.06)] sm:p-5">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#6b4fa8]">
+                        <span className="rounded-full bg-[#ede4ff] px-2 py-0.5 text-[10px] text-[#5b3f8c]">New</span>
+                        Sitegen
+                      </p>
+                      <p className="mt-2 text-sm font-semibold text-[#10263d]">Need a portfolio or business website?</p>
+                      <p className="mt-1 text-sm leading-6 text-[#667d8f]">
+                        Create a free site at <span className="font-medium text-[#38546d]">www.rolebolt.tech/yourname</span> — no Rolebolt account required.
+                      </p>
+                    </div>
+                    <Link
+                      href="/website"
+                      className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-[#d8c8f5] bg-white px-4 py-3 text-sm font-semibold text-[#5b3f8c] transition hover:border-[#b79ce8] hover:bg-[#faf7ff] hover:text-[#4a2f78]"
+                    >
+                      Build free website
+                      <Arrow />
+                    </Link>
+                  </div>
                 </div>
                 <Link href="/recruit/preview" className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[#0a66c2] transition hover:text-[#07559f]">See the product preview <Arrow /></Link>
                 <p className="mt-3 text-xs text-[#7a8c9b]">Start with the entry plan. Upgrade when your workflow needs more.</p>
@@ -283,7 +306,7 @@ export default function RecruitLandingPage() {
 
          <section id="seekers" className="scroll-mt-20 bg-[#eef6fb]">
           <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 py-24 lg:grid-cols-[1fr_1.08fr] lg:px-8">
-            <div><p className="text-xs font-semibold uppercase tracking-[.17em] text-[#0a66c2]">For job seekers</p><h2 className="mt-4 font-display text-4xl font-semibold leading-tight tracking-[-.055em] text-[#10263d]">Your next role deserves more than a browser tab.</h2><p className="mt-5 max-w-xl text-base leading-7 text-[#5d7285]">Discover public opportunities, understand your match, and keep the whole search moving in one place — from resume and cover letter to interview preparation.</p><div className="mt-7 flex flex-col gap-3 sm:flex-row"><Link href="/recruit/opportunities" className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#10263d] px-5 py-3.5 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#1d405c]">Find your next opportunity <Arrow /></Link><Link href="/seeker/workspace" className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#cbd9e4] bg-white px-5 py-3.5 text-sm font-semibold text-[#31536e] transition hover:border-[#0a66c2]">Open your workspace <Arrow /></Link></div></div>
+            <div><p className="text-xs font-semibold uppercase tracking-[.17em] text-[#0a66c2]">For job seekers</p><h2 className="mt-4 font-display text-4xl font-semibold leading-tight tracking-[-.055em] text-[#10263d]">Your next role deserves more than a browser tab.</h2><p className="mt-5 max-w-xl text-base leading-7 text-[#5d7285]">Discover public opportunities, understand your match, and keep the whole search moving in one place — from resume and cover letter to interview preparation.</p><div className="mt-7 flex flex-col gap-3 sm:flex-row"><Link href="/recruit/opportunities" className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#10263d] px-5 py-3.5 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#1d405c]">Find your next opportunity <Arrow /></Link><Link href="/seeker/workspace" className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#cbd9e4] bg-white px-5 py-3.5 text-sm font-semibold text-[#31536e] transition hover:border-[#0a66c2]">Open your workspace <Arrow /></Link></div><Link href="/website" className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[#5b3f8c] transition hover:text-[#4a2f78]">Or build a free portfolio website with Sitegen <Arrow /></Link></div>
             <div className="grid gap-4 sm:grid-cols-2">{seekerFeatures.map(([title, copy], index) => <div key={title} className={`rounded-2xl border border-[#d4e4ee] bg-white p-6 shadow-[0_8px_26px_rgba(32,79,112,.06)] ${index === 1 ? "sm:translate-y-8" : ""}`}><div className="mb-8 flex h-9 w-9 items-center justify-center rounded-lg bg-[#e7f0ff] text-sm font-semibold text-[#0a66c2]">0{index + 1}</div><h3 className="text-sm font-semibold text-[#203d56]">{title}</h3><p className="mt-2 text-sm leading-6 text-[#718496]">{copy}</p></div>)}</div>
           </div>
         </section>

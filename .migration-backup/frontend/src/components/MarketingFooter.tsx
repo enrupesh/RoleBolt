@@ -7,6 +7,7 @@ import { FeedbackModal } from "@/components/FeedbackModal";
 import { ReviewModal } from "@/components/ReviewModal";
 
 const productLinks = [
+  ["Free website (Sitegen)", "/website"],
   ["AI Copilot", "/recruit/copilot"],
   ["Analytics", "/recruit/analytics"],
   ["Talent pool", "/recruit/talent-pool"],
