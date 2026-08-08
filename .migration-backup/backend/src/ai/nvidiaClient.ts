@@ -34,6 +34,8 @@ export interface NvidiaCallArgs {
   responseFormat?: "json_object";
   /** Per-request timeout in ms. Default: 60s */
   timeoutMs?: number;
+  /** Optional model chain override (defaults to NVIDIA_MODEL_CHAIN) */
+  models?: readonly string[];
 }
 
 /**
@@ -53,13 +55,14 @@ export async function callNvidia(args: NvidiaCallArgs): Promise<string> {
     max_tokens = 1200,
     responseFormat,
     timeoutMs = 60_000,
+    models = NVIDIA_MODEL_CHAIN,
   } = args;
 
   const url = `${NVIDIA_BASE_URL}/chat/completions`;
   let lastErr: unknown;
 
-  for (let i = 0; i < NVIDIA_MODEL_CHAIN.length; i++) {
-    const model = NVIDIA_MODEL_CHAIN[i];
+  for (let i = 0; i < models.length; i++) {
+    const model = models[i];
 
     const body = JSON.stringify({
       model,
@@ -91,7 +94,7 @@ export async function callNvidia(args: NvidiaCallArgs): Promise<string> {
         ? new Error(`[nvidiaClient] Timeout after ${Math.round(timeoutMs / 1000)}s (model=${model})`)
         : err;
       console.warn(
-        `[nvidiaClient] Network error on ${model} (${i + 1}/${NVIDIA_MODEL_CHAIN.length}): ${(lastErr as Error).message}. ${i + 1 < NVIDIA_MODEL_CHAIN.length ? `Trying ${NVIDIA_MODEL_CHAIN[i + 1]}…` : "No more models."}`
+        `[nvidiaClient] Network error on ${model} (${i + 1}/${models.length}): ${(lastErr as Error).message}. ${i + 1 < models.length ? `Trying ${models[i + 1]}…` : "No more models."}`
       );
       continue;
     } finally {
@@ -104,7 +107,7 @@ export async function callNvidia(args: NvidiaCallArgs): Promise<string> {
         `[nvidiaClient] HTTP ${res.status} from ${model}: ${text || res.statusText}`
       );
       console.warn(
-        `[nvidiaClient] ${model} returned HTTP ${res.status} (${i + 1}/${NVIDIA_MODEL_CHAIN.length}). ${i + 1 < NVIDIA_MODEL_CHAIN.length ? `Trying ${NVIDIA_MODEL_CHAIN[i + 1]}…` : "No more models."}`
+        `[nvidiaClient] ${model} returned HTTP ${res.status} (${i + 1}/${models.length}). ${i + 1 < models.length ? `Trying ${models[i + 1]}…` : "No more models."}`
       );
       continue;
     }
@@ -118,12 +121,12 @@ export async function callNvidia(args: NvidiaCallArgs): Promise<string> {
     if (!content) {
       lastErr = new Error(`[nvidiaClient] Empty response from ${model}`);
       console.warn(
-        `[nvidiaClient] Empty content from ${model} (${i + 1}/${NVIDIA_MODEL_CHAIN.length}). ${i + 1 < NVIDIA_MODEL_CHAIN.length ? `Trying ${NVIDIA_MODEL_CHAIN[i + 1]}…` : "No more models."}`
+        `[nvidiaClient] Empty content from ${model} (${i + 1}/${models.length}). ${i + 1 < models.length ? `Trying ${models[i + 1]}…` : "No more models."}`
       );
       continue;
     }
 
-    console.log(`[nvidiaClient] ✓ Success with ${model} (attempt ${i + 1}/${NVIDIA_MODEL_CHAIN.length})`);
+    console.log(`[nvidiaClient] ✓ Success with ${model} (attempt ${i + 1}/${models.length})`);
     return content.trim();
   }
 
