@@ -119,7 +119,7 @@ export function SitegenPreviewPage() {
 
   const themeId = draft?.selectedThemeId || draft?.recommendedThemeId;
   const themes = draft ? SITEGEN_THEME_OPTIONS[draft.siteType] : [];
-  const canPublish = Boolean(draft?.structuredContent && themeId && draft.infoCompletedAt);
+  const canPublish = Boolean(draft?.structuredContent && themeId && draft.infoCompletedAt && !draft.needsRestructure);
   const isPublished = draft?.status === "published";
   const hasPendingUpdates = Boolean(draft?.hasUnpublishedChanges);
 
@@ -224,6 +224,12 @@ export function SitegenPreviewPage() {
                   </div>
                 ) : null}
 
+                {draft.needsRestructure ? (
+                  <div className="rounded-2xl border border-amber-400/20 bg-amber-500/10 px-4 py-3.5 text-sm text-amber-100">
+                    Your information has changed since the last structuring run. Re-run AI structuring before publishing an update.
+                  </div>
+                ) : null}
+
                 <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
                   <aside className="space-y-4">
                     <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-5">
@@ -251,10 +257,12 @@ export function SitegenPreviewPage() {
                     </Link>
                   </aside>
 
-                  <div className="overflow-hidden rounded-[2rem] border border-white/10 bg-white shadow-[0_30px_100px_rgba(0,0,0,.35)]">
+                  <div className="overflow-hidden rounded-[2rem] border border-white/10 bg-white shadow-[0_30px_100px_rgba(0,0,0,.35)] min-h-[480px]">
                     {themeId && draft.structuredContent ? (
                       <SitegenThemeRenderer themeId={themeId} content={draft.structuredContent} username={draft.username} />
-                    ) : null}
+                    ) : (
+                      <div className="flex min-h-[480px] items-center justify-center p-8 text-center text-sm text-slate-500">Select a theme to preview your website.</div>
+                    )}
                   </div>
                 </div>
 

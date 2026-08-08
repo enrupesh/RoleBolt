@@ -5,6 +5,7 @@ import type {
   SitegenSeekerProfile,
   SitegenSeekerProject,
 } from "../types/profile";
+import { sanitizeHttpUrl } from "./sanitize";
 
 function cleanString(value: unknown, max = 500): string {
   return String(value ?? "").trim().slice(0, max);
@@ -63,7 +64,7 @@ function parseProjects(value: unknown): SitegenSeekerProject[] | undefined {
     .map((item) => ({
       name: cleanString((item as SitegenSeekerProject)?.name, 160),
       description: cleanOptionalString((item as SitegenSeekerProject)?.description, 1000),
-      url: cleanOptionalString((item as SitegenSeekerProject)?.url, 500),
+      url: sanitizeHttpUrl((item as SitegenSeekerProject)?.url, 500),
     }))
     .filter((item) => item.name)
     .slice(0, 15);
@@ -82,10 +83,10 @@ export function parseSeekerProfile(body: unknown): { profile?: SitegenSeekerProf
     email: cleanOptionalString(input.email, 254),
     phone: cleanOptionalString(input.phone, 40),
     location: cleanOptionalString(input.location, 120),
-    website: cleanOptionalString(input.website, 500),
-    linkedin: cleanOptionalString(input.linkedin, 500),
-    github: cleanOptionalString(input.github, 500),
-    portfolio: cleanOptionalString(input.portfolio, 500),
+    website: sanitizeHttpUrl(input.website, 500),
+    linkedin: sanitizeHttpUrl(input.linkedin, 500),
+    github: sanitizeHttpUrl(input.github, 500),
+    portfolio: sanitizeHttpUrl(input.portfolio, 500),
     skills: cleanStringArray(input.skills, 40, 80),
     experience: parseExperience(input.experience),
     education: parseEducation(input.education),
@@ -120,7 +121,7 @@ export function parseCreatorProfile(body: unknown): { profile?: SitegenCreatorPr
     ? input.portfolioLinks
       .map((item) => ({
         title: cleanString((item as { title?: string })?.title, 120),
-        url: cleanString((item as { url?: string })?.url, 500),
+        url: sanitizeHttpUrl((item as { url?: string })?.url, 500) || "",
       }))
       .filter((item) => item.title && item.url)
       .slice(0, 12)
@@ -142,19 +143,19 @@ export function parseCreatorProfile(body: unknown): { profile?: SitegenCreatorPr
     category: cleanOptionalString(input.category, 80),
     tagline: cleanOptionalString(input.tagline, 200),
     description: cleanOptionalString(input.description, 4000),
-    logoUrl: cleanOptionalString(input.logoUrl, 1000),
+    logoUrl: sanitizeHttpUrl(input.logoUrl, 1000),
     about: cleanOptionalString(input.about, 4000),
     services: cleanStringArray(input.services, 20, 120),
     location: cleanOptionalString(input.location, 120),
     email: cleanOptionalString(input.email, 254),
     phone: cleanOptionalString(input.phone, 40),
-    website: cleanOptionalString(input.website, 500),
+    website: sanitizeHttpUrl(input.website, 500),
     socialLinks: {
-      linkedin: cleanOptionalString(social.linkedin, 500),
-      instagram: cleanOptionalString(social.instagram, 500),
-      twitter: cleanOptionalString(social.twitter, 500),
-      youtube: cleanOptionalString(social.youtube, 500),
-      tiktok: cleanOptionalString(social.tiktok, 500),
+      linkedin: sanitizeHttpUrl(social.linkedin, 500),
+      instagram: sanitizeHttpUrl(social.instagram, 500),
+      twitter: sanitizeHttpUrl(social.twitter, 500),
+      youtube: sanitizeHttpUrl(social.youtube, 500),
+      tiktok: sanitizeHttpUrl(social.tiktok, 500),
     },
     portfolioLinks: portfolioLinks.length ? portfolioLinks : undefined,
     team: team.length ? team : undefined,

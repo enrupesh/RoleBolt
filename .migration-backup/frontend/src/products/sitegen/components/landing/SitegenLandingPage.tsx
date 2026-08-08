@@ -10,7 +10,7 @@ import { sitegenRoutes } from "../../lib/routes";
 
 const steps = [
   { number: "01", title: "Choose your path", copy: "Pick Job Seeker or Creator / Business — each path is tailored to your goals." },
-  { number: "02", title: "Claim your username", copy: "Choose a unique username and password to manage your site later. No traditional signup." },
+  { number: "02", title: "Claim your username", copy: "Create your website with a username and password. Use those credentials to manage your site later." },
   { number: "03", title: "Add your information", copy: "Upload a resume or fill in your details manually. We keep it simple." },
   { number: "04", title: "AI structures your content", copy: "Our AI organizes your information into professional website sections — not arbitrary code." },
   { number: "05", title: "Publish instantly", copy: "Preview, pick a theme, and go live at rolebolt.tech/yourname." },
@@ -18,7 +18,7 @@ const steps = [
 
 const features = [
   { title: "Free to start", copy: "No payment, no subscription, no credit card. Build and publish for free." },
-  { title: "No signup required", copy: "Start creating immediately. Just choose a username and password to manage your site." },
+  { title: "No Rolebolt account", copy: "No account signup required. Create your website with a username and password to manage it later." },
   { title: "Template-first design", copy: "Professional themes built by us — predictable, beautiful, and secure." },
   { title: "AI-assisted content", copy: "AI understands your resume and polishes your content into structured sections." },
   { title: "Your own URL", copy: "Get a clean, memorable link: rolebolt.tech/yourname." },
@@ -35,7 +35,7 @@ const themes = [
 const faqs = [
   {
     q: "Do I need to create a Rolebolt account?",
-    a: "No traditional signup or login. You choose a username and password when creating your website. Those credentials let you edit and manage your site later.",
+    a: "No account signup required. You create your website with a Sitegen username and password. Use those credentials to sign in, edit, preview, and publish your site later.",
   },
   {
     q: "Is it really free?",
@@ -123,7 +123,7 @@ export function SitegenLandingPage() {
               <div>
                 <p className="inline-flex items-center gap-2 rounded-full border border-violet-400/25 bg-violet-500/10 px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-violet-200">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                  Free · No signup to start
+                  Free · No account signup required
                 </p>
                 <h1 className="mt-6 font-display text-5xl font-semibold leading-[1.04] tracking-[-0.06em] text-white sm:text-6xl lg:text-[4.25rem]">
                   Create your professional website — <span className="bg-gradient-to-r from-violet-300 via-fuchsia-200 to-amber-200 bg-clip-text text-transparent">free.</span>
@@ -149,7 +149,7 @@ export function SitegenLandingPage() {
                     <ArrowIcon />
                   </Link>
                 </div>
-                <p className="mt-5 text-sm text-violet-200/45">No payment. No traditional signup. Start building in minutes.</p>
+                <p className="mt-5 text-sm text-violet-200/45">No payment. No Rolebolt account. Create your website with a username and password.</p>
               </div>
 
               {/* URL preview mockup */}
