@@ -92,4 +92,6 @@ export type SitegenWebsiteDraft = {
   aiProcessingStatus?: SitegenAiProcessingStatus;
   aiMessage?: string;
   structuredAt?: string | null;
+  publishedAt?: string | null;
+  hasUnpublishedChanges?: boolean;
 };
