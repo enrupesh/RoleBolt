@@ -13,7 +13,10 @@
     "lint": "eslint src",
     "test": "node ../backend/node_modules/tsx/dist/cli.mjs --test src/lib/whatIfSimulation.test.ts src/lib/billing.test.ts",
     "test:whatif": "node ../backend/node_modules/tsx/dist/cli.mjs --test src/lib/whatIfSimulation.test.ts",
-    "test:billing": "node ../backend/node_modules/tsx/dist/cli.mjs --test src/lib/billing.test.ts"
+    "test:billing": "node ../backend/node_modules/tsx/dist/cli.mjs --test src/lib/billing.test.ts",
+    "test:sitegen": "node node_modules/tsx/dist/cli.mjs --test ../backend/src/products/sitegen/lib/publish.test.ts ../backend/src/products/sitegen/qa/security.integration.test.ts ../backend/src/products/sitegen/ai/structuring.test.ts",
+    "test:e2e": "playwright test",
+    "test:e2e:sitegen": "playwright test e2e/sitegen.spec.ts"
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4",
@@ -35,6 +38,7 @@
     "typescript": "^6.0.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@types/qrcode": "^1.5.6",
     "eslint": "^9",
     "eslint-config-next": "16.2.3",

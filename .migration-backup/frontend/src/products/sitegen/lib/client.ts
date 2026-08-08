@@ -135,13 +135,17 @@ export async function publishSitegenDraft(accessToken: string): Promise<SitegenW
 }
 
 export async function fetchPublishedSitegenSite(username: string): Promise<SitegenPublishedSite | null> {
-  const response = await fetch(sitegenApiUrl(`/sites/${encodeURIComponent(username)}`), {
-    cache: "no-store",
-  });
-  if (response.status === 404) return null;
-  const data = await readApiJson<{ site?: SitegenPublishedSite; error?: string }>(response);
-  if (!response.ok || !data.site?.structuredContent || !data.site.themeId) return null;
-  return data.site;
+  try {
+    const response = await fetch(sitegenApiUrl(`/sites/${encodeURIComponent(username)}`), {
+      cache: "no-store",
+    });
+    if (response.status === 404) return null;
+    const data = await readApiJson<{ site?: SitegenPublishedSite; error?: string }>(response).catch(() => ({}));
+    if (!response.ok || !data.site?.structuredContent || !data.site.themeId) return null;
+    return data.site;
+  } catch {
+    return null;
+  }
 }
 
 export async function uploadSitegenResume(accessToken: string, file: File): Promise<SitegenDraftResponse> {

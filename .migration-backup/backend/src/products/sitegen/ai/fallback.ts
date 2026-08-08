@@ -174,17 +174,18 @@ function filterSeekerAgainstSource(
 
   const experience = ai.experience.filter((item) =>
     (profile?.experience || []).some((source) =>
-      textIncludes(sourceText, source.title) && textIncludes(sourceText, source.company),
+      source.title.toLowerCase() === item.title.toLowerCase()
+      && source.company.toLowerCase() === item.company.toLowerCase(),
     ) || (textIncludes(sourceText, item.title) && textIncludes(sourceText, item.company)),
   );
 
   const education = ai.education.filter((item) =>
-    (profile?.education || []).some((source) => textIncludes(sourceText, source.school))
+    (profile?.education || []).some((source) => source.school.toLowerCase() === item.school.toLowerCase())
     || textIncludes(sourceText, item.school),
   );
 
   const projects = ai.projects.filter((item) =>
-    (profile?.projects || []).some((source) => textIncludes(sourceText, source.name))
+    (profile?.projects || []).some((source) => source.name.toLowerCase() === item.name.toLowerCase())
     || textIncludes(sourceText, item.name),
   );
 
@@ -242,12 +243,14 @@ function filterCreatorAgainstSource(
   );
 
   const portfolio = ai.portfolio.filter((item) =>
-    (profile?.portfolioLinks || []).some((source) => textIncludes(sourceText, source.title) || textIncludes(sourceText, source.url))
-    || (textIncludes(sourceText, item.title) && textIncludes(sourceText, item.url)),
+    (profile?.portfolioLinks || []).some((source) =>
+      source.title.toLowerCase() === item.title.toLowerCase()
+      && source.url.toLowerCase() === item.url.toLowerCase(),
+    ) || (textIncludes(sourceText, item.title) && textIncludes(sourceText, item.url)),
   );
 
   const team = ai.team.filter((item) =>
-    (profile?.team || []).some((source) => textIncludes(sourceText, source.name))
+    (profile?.team || []).some((source) => source.name.toLowerCase() === item.name.toLowerCase())
     || textIncludes(sourceText, item.name),
   );
 
