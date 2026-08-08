@@ -1,4 +1,5 @@
 import type { SitegenSeekerStructuredContent } from "../types/structuredContent";
+import { sitegenDisplayPublicUrl } from "../lib/publicUrl";
 import { SeekerContactBlock, seekerNavItems } from "./shared";
 import {
   AvatarBadge,
@@ -31,7 +32,7 @@ export function SeekerModernTheme({ content, username }: { content: SitegenSeeke
             ) : null}
           </div>
           <div className="flex items-end justify-start lg:justify-end">
-            <AvatarBadge name={displayName} size="xl" variant="dark" />
+            <AvatarBadge name={displayName} imageUrl={content.photoUrl} size="xl" variant="dark" />
           </div>
         </div>
       </header>
@@ -83,7 +84,7 @@ export function SeekerModernTheme({ content, username }: { content: SitegenSeeke
       </main>
 
       <footer className="border-t border-white/10 px-5 py-6 text-center text-xs text-violet-200/45 sm:px-8">
-        {displayName} · rolebolt.tech/{username}
+        {displayName} · {sitegenDisplayPublicUrl(username)}
       </footer>
     </div>
   );

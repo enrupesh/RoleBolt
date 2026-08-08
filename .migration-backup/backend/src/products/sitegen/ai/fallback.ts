@@ -4,6 +4,8 @@ import type {
   SitegenSeekerStructuredContent,
   SitegenStructuredContent,
 } from "../types/structuredContent";
+import { sanitizeSitegenMediaUrl } from "../lib/sanitize";
+import { applyCreatorSectionVisibility, applySeekerSectionVisibility } from "./sections";
 
 function nullableString(value: unknown, max = 500): string | null {
   const cleaned = String(value ?? "").trim().slice(0, max);
@@ -71,6 +73,7 @@ export function buildSeekerFallback(website: ISitegenWebsite): SitegenSeekerStru
     name,
     headline: profile?.headline?.trim() || null,
     about: profile?.summary?.trim() || null,
+    photoUrl: sanitizeSitegenMediaUrl(profile?.photoUrl, 1000) || null,
     skills: [...(profile?.skills || [])],
     experience: (profile?.experience || []).map((item) => ({
       title: item.title,
@@ -108,7 +111,7 @@ export function buildSeekerFallback(website: ISitegenWebsite): SitegenSeekerStru
     },
   };
 
-  return content;
+  return applySeekerSectionVisibility(content);
 }
 
 export function buildCreatorFallback(website: ISitegenWebsite): SitegenCreatorStructuredContent {
@@ -156,7 +159,7 @@ export function buildCreatorFallback(website: ISitegenWebsite): SitegenCreatorSt
     },
   };
 
-  return content;
+  return applyCreatorSectionVisibility(content);
 }
 
 export function buildFallbackStructuredContent(website: ISitegenWebsite): SitegenStructuredContent {
@@ -197,11 +200,12 @@ function filterSeekerAgainstSource(
   const certifications = ai.certifications.filter((item) => textIncludes(sourceText, item));
   const achievements = ai.achievements.filter((item) => textIncludes(sourceText, item));
 
-  return {
+  return applySeekerSectionVisibility({
     ...ai,
     name: profile?.fullName?.trim() || ai.name || website.username,
     headline: ai.headline || profile?.headline || null,
     about: ai.about || profile?.summary || null,
+    photoUrl: sanitizeSitegenMediaUrl(profile?.photoUrl, 1000) || null,
     skills,
     experience: experience.length ? experience : buildSeekerFallback(website).experience,
     education: education.length ? education : buildSeekerFallback(website).education,
@@ -217,17 +221,7 @@ function filterSeekerAgainstSource(
       github: profile?.github || ai.contact.github,
       portfolio: profile?.portfolio || ai.contact.portfolio,
     },
-    sections: {
-      about: Boolean((ai.about || profile?.summary || "").trim()),
-      skills: skills.length > 0,
-      experience: experience.length > 0,
-      education: education.length > 0,
-      projects: projects.length > 0,
-      certifications: certifications.length > 0,
-      achievements: achievements.length > 0,
-      contact: true,
-    },
-  };
+  });
 }
 
 function filterCreatorAgainstSource(
@@ -254,7 +248,7 @@ function filterCreatorAgainstSource(
     || textIncludes(sourceText, item.name),
   );
 
-  return {
+  return applyCreatorSectionVisibility({
     ...ai,
     businessName: profile?.businessName?.trim() || ai.businessName || website.username,
     tagline: ai.tagline || profile?.tagline || null,
@@ -277,26 +271,21 @@ function filterCreatorAgainstSource(
     },
     portfolio: portfolio.length ? portfolio : buildCreatorFallback(website).portfolio,
     team,
-    sections: {
-      hero: true,
-      about: Boolean((ai.about || profile?.about || profile?.description || "").trim()),
-      services: services.length > 0,
-      portfolio: portfolio.length > 0,
-      team: team.length > 0,
-      contact: Boolean(profile?.email || profile?.phone || profile?.website),
-    },
-  };
+  });
 }
 
 export function parseSeekerStructuredFromAi(raw: unknown, website: ISitegenWebsite): SitegenSeekerStructuredContent {
   const input = (raw ?? {}) as Record<string, unknown>;
   const contactInput = (input.contact ?? {}) as Record<string, unknown>;
 
+  const sectionsInput = (input.sections ?? {}) as Record<string, unknown>;
+
   const parsed: SitegenSeekerStructuredContent = {
     type: "seeker",
     name: String(input.name || website.seekerProfile?.fullName || website.username).trim().slice(0, 120),
     headline: nullableString(input.headline, 160),
     about: nullableString(input.about, 4000),
+    photoUrl: null,
     skills: stringArray(input.skills, 40, 80),
     experience: Array.isArray(input.experience)
       ? input.experience.map((item) => {
@@ -346,14 +335,14 @@ export function parseSeekerStructuredFromAi(raw: unknown, website: ISitegenWebsi
       portfolio: nullableString(contactInput.portfolio, 500),
     },
     sections: {
-      about: Boolean(nullableString(input.about, 10)),
-      skills: stringArray(input.skills).length > 0,
-      experience: Array.isArray(input.experience) && input.experience.length > 0,
-      education: Array.isArray(input.education) && input.education.length > 0,
-      projects: Array.isArray(input.projects) && input.projects.length > 0,
-      certifications: stringArray(input.certifications).length > 0,
-      achievements: stringArray(input.achievements).length > 0,
-      contact: true,
+      about: Boolean(sectionsInput.about ?? nullableString(input.about, 10)),
+      skills: Boolean(sectionsInput.skills ?? stringArray(input.skills).length > 0),
+      experience: Boolean(sectionsInput.experience ?? (Array.isArray(input.experience) && input.experience.length > 0)),
+      education: Boolean(sectionsInput.education ?? (Array.isArray(input.education) && input.education.length > 0)),
+      projects: Boolean(sectionsInput.projects ?? (Array.isArray(input.projects) && input.projects.length > 0)),
+      certifications: Boolean(sectionsInput.certifications ?? stringArray(input.certifications).length > 0),
+      achievements: Boolean(sectionsInput.achievements ?? stringArray(input.achievements).length > 0),
+      contact: Boolean(sectionsInput.contact ?? true),
     },
   };
 
@@ -365,6 +354,8 @@ export function parseCreatorStructuredFromAi(raw: unknown, website: ISitegenWebs
   const input = (raw ?? {}) as Record<string, unknown>;
   const contactInput = (input.contact ?? {}) as Record<string, unknown>;
   const socialInput = (input.socialLinks ?? {}) as Record<string, unknown>;
+
+  const sectionsInput = (input.sections ?? {}) as Record<string, unknown>;
 
   const parsed: SitegenCreatorStructuredContent = {
     type: "creator",
@@ -408,12 +399,12 @@ export function parseCreatorStructuredFromAi(raw: unknown, website: ISitegenWebs
       }).filter((item) => item.name).slice(0, 20)
       : [],
     sections: {
-      hero: true,
-      about: Boolean(nullableString(input.about, 10)),
-      services: stringArray(input.services).length > 0,
-      portfolio: Array.isArray(input.portfolio) && input.portfolio.length > 0,
-      team: Array.isArray(input.team) && input.team.length > 0,
-      contact: true,
+      hero: Boolean(sectionsInput.hero ?? true),
+      about: Boolean(sectionsInput.about ?? nullableString(input.about, 10)),
+      services: Boolean(sectionsInput.services ?? stringArray(input.services).length > 0),
+      portfolio: Boolean(sectionsInput.portfolio ?? (Array.isArray(input.portfolio) && input.portfolio.length > 0)),
+      team: Boolean(sectionsInput.team ?? (Array.isArray(input.team) && input.team.length > 0)),
+      contact: Boolean(sectionsInput.contact ?? true),
     },
   };
 

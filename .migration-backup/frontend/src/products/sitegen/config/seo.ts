@@ -3,7 +3,7 @@ import { sitegenProduct } from "./product";
 
 const SITEGEN_TITLE = "Create Your Free Website | Sitegen";
 const SITEGEN_DESCRIPTION =
-  "Build a professional website in minutes. Choose Job Seeker or Creator, create your site with a username and password, and publish at rolebolt.tech/yourname — free, with no Rolebolt account required.";
+  "Build a professional website in minutes. Choose Job Seeker or Creator, create your site with a username and password, and publish at www.rolebolt.tech/yourname — free, with no Rolebolt account required.";
 
 export function sitegenMetadata(): Metadata {
   return {
@@ -16,13 +16,13 @@ export function sitegenMetadata(): Metadata {
       "business website",
       "job seeker portfolio",
       "creator website",
-      "rolebolt.tech username",
+      "www.rolebolt.tech username",
     ],
     openGraph: {
       title: SITEGEN_TITLE,
       description: SITEGEN_DESCRIPTION,
       type: "website",
-      url: `https://www.${sitegenProduct.hostDomain}${sitegenProduct.basePath}`,
+      url: `${sitegenProduct.canonicalOrigin}${sitegenProduct.basePath}`,
     },
     twitter: {
       card: "summary_large_image",

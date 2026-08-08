@@ -6,8 +6,9 @@ import { SitegenHeader } from "../layout/SitegenHeader";
 import { SitegenFooter } from "../layout/SitegenFooter";
 import { SitegenSeekerInfoForm } from "./SitegenSeekerInfoForm";
 import { SitegenCreatorInfoForm } from "./SitegenCreatorInfoForm";
-import { sitegenSiteTypeLabels } from "../../config/product";
+import { sitegenSiteTypeLabels, sitegenProduct } from "../../config/product";
 import { sitegenRoutes } from "../../lib/routes";
+import { sitegenDisplayPublicUrl } from "../../lib/publicUrl";
 import { fetchSitegenDraft, loginSitegen, toSessionWebsite } from "../../lib/client";
 import { readSitegenSession, saveSitegenSession } from "../../lib/session";
 import type { SitegenWebsiteDraft } from "../../types/profile";
@@ -100,7 +101,7 @@ export function SitegenBuildPage() {
             <p className="mt-5 text-xs font-semibold uppercase tracking-[0.16em] text-violet-300">Information saved</p>
             <h1 className="mt-3 font-display text-3xl font-semibold tracking-[-0.05em] text-white">You&apos;re ready for the next step</h1>
             <p className="mt-4 text-sm leading-7 text-violet-100/65">
-              Your {sitegenSiteTypeLabels[draft.siteType].toLowerCase()} information has been saved for <strong className="text-white">rolebolt.tech/{draft.username}</strong>.
+              Your {sitegenSiteTypeLabels[draft.siteType].toLowerCase()} information has been saved for <strong className="text-white">{sitegenDisplayPublicUrl(draft.username)}</strong>.
               Next: we&apos;ll automatically structure your content with NVIDIA AI on the preview page, then you can choose a pre-built theme.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
@@ -124,7 +125,7 @@ export function SitegenBuildPage() {
               Add your information
             </h1>
             <p className="mt-4 text-base leading-7 text-violet-100/60">
-              Building for <span className="font-medium text-white">rolebolt.tech/{draft.username}</span>
+              Building for <span className="font-medium text-white">{sitegenDisplayPublicUrl(draft.username)}</span>
             </p>
             <div className="mt-10">
               {draft.siteType === "seeker" ? (
