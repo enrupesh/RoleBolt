@@ -32,8 +32,8 @@ export interface NvidiaCallArgs {
   max_tokens?: number;
   /** Response format — "json_object" forces JSON-only output */
   responseFormat?: "json_object";
-  /** Per-request timeout in ms. Default: 60s */
-  timeoutMs?: number;
+  /** Per-request timeout in ms. Default: 60s. Pass an array for per-model timeouts. */
+  timeoutMs?: number | readonly number[];
   /** Optional model chain override (defaults to NVIDIA_MODEL_CHAIN) */
   models?: readonly string[];
 }
@@ -63,6 +63,9 @@ export async function callNvidia(args: NvidiaCallArgs): Promise<string> {
 
   for (let i = 0; i < models.length; i++) {
     const model = models[i];
+    const modelTimeoutMs = Array.isArray(timeoutMs)
+      ? (timeoutMs[i] ?? timeoutMs[timeoutMs.length - 1] ?? 60_000)
+      : timeoutMs;
 
     const body = JSON.stringify({
       model,
@@ -74,7 +77,7 @@ export async function callNvidia(args: NvidiaCallArgs): Promise<string> {
     });
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    const timeoutId = setTimeout(() => controller.abort(), modelTimeoutMs);
 
     let res: Response;
     try {
@@ -91,7 +94,7 @@ export async function callNvidia(args: NvidiaCallArgs): Promise<string> {
       clearTimeout(timeoutId);
       const isTimeout = err?.name === "AbortError";
       lastErr = isTimeout
-        ? new Error(`[nvidiaClient] Timeout after ${Math.round(timeoutMs / 1000)}s (model=${model})`)
+        ? new Error(`[nvidiaClient] Timeout after ${Math.round(modelTimeoutMs / 1000)}s (model=${model})`)
         : err;
       console.warn(
         `[nvidiaClient] Network error on ${model} (${i + 1}/${models.length}): ${(lastErr as Error).message}. ${i + 1 < models.length ? `Trying ${models[i + 1]}…` : "No more models."}`
