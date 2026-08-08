@@ -17,6 +17,8 @@ export function sitegenWebsiteDto(website: ISitegenWebsite | Record<string, unkn
     structuredContent: doc.structuredContent || null,
     recommendedThemeId: doc.recommendedThemeId || null,
     selectedThemeId: doc.selectedThemeId || null,
+    publishedAt: doc.publishedAt ? new Date(doc.publishedAt).toISOString() : null,
+    hasUnpublishedChanges: Boolean(doc.hasUnpublishedChanges),
     aiProcessingStatus: doc.aiProcessingStatus || "idle",
     aiMessage: doc.aiMessage || "",
     structuredAt: doc.structuredAt ? new Date(doc.structuredAt).toISOString() : null,

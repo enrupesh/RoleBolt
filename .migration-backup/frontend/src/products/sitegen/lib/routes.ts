@@ -10,5 +10,7 @@ export const sitegenRoutes = {
   username: `${base}/username`,
   build: `${base}/build`,
   preview: `${base}/preview`,
+  manage: `${base}/manage`,
+  login: `${base}/login`,
   publishedSite: (username: string) => `/${encodeURIComponent(username)}`,
 } as const;
