@@ -13,6 +13,8 @@ export function SitegenShareTools({ username, publicUrl }: SitegenShareToolsProp
   const [copied, setCopied] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState("");
 
+  const [copyError, setCopyError] = useState("");
+
   useEffect(() => {
     void QRCode.toDataURL(publicUrl, {
       width: 180,
@@ -22,12 +24,14 @@ export function SitegenShareTools({ username, publicUrl }: SitegenShareToolsProp
   }, [publicUrl]);
 
   async function handleCopy() {
+    setCopyError("");
     try {
       await navigator.clipboard.writeText(publicUrl);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
       setCopied(false);
+      setCopyError("Couldn't copy the URL. Please copy it manually.");
     }
   }
 
@@ -72,6 +76,8 @@ export function SitegenShareTools({ username, publicUrl }: SitegenShareToolsProp
             Share
           </button>
         </div>
+
+        {copyError ? <p className="mt-3 text-sm text-red-300">{copyError}</p> : null}
 
         {qrDataUrl ? (
           <div className="rounded-2xl border border-white/10 bg-white p-3">

@@ -25,5 +25,5 @@ export function SitegenThemeRenderer({
   if (themeId === "creator-studio" && content.type === "creator") {
     return <CreatorStudioTheme content={content} username={username} />;
   }
-  return <div className="p-8 text-center text-slate-500">Theme preview unavailable.</div>;
+  return <div className="flex min-h-[320px] items-center justify-center p-8 text-center text-sm text-slate-500">This theme preview is unavailable for your content type.</div>;
 }

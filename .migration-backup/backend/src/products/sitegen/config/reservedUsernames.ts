@@ -9,6 +9,6 @@ export const SITEGEN_RESERVED_USERNAMES = new Set([
   "profile", "root", "signup", "support", "system", "www", "null", "undefined",
   "rolebolt", "recruit", "recruiter", "seeker", "creator", "reviews", "resources",
   "website", "about", "blog", "careers", "contact", "privacy", "terms", "billing",
-  "f", "backend", "status",
+  "f", "backend", "status", "offline", "refund", "manage", "login",
   "start", "username", "build", "preview", "publish", "dashboard", "edit",
 ]);

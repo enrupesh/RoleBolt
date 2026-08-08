@@ -34,6 +34,7 @@ export interface ISitegenWebsite extends Document {
   publishedThemeId?: SitegenThemeId;
   publishedAt?: Date;
   hasUnpublishedChanges?: boolean;
+  needsRestructure?: boolean;
   aiProcessingStatus?: SitegenAiProcessingStatus;
   aiMessage?: string;
   structuredAt?: Date;
@@ -140,6 +141,7 @@ const SitegenWebsiteSchema = new Schema<ISitegenWebsite>(
     publishedThemeId: { type: String },
     publishedAt: { type: Date },
     hasUnpublishedChanges: { type: Boolean, default: false },
+    needsRestructure: { type: Boolean, default: false },
     aiProcessingStatus: { type: String, enum: ["idle", "ai_success", "ai_fallback", "failed"], default: "idle" },
     aiMessage: { type: String, trim: true, maxlength: 500 },
     structuredAt: { type: Date },

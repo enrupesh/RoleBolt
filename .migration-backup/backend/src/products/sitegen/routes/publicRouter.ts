@@ -21,13 +21,16 @@ import {
 import { structureSitegenWebsite } from "../ai/structuring";
 import { isThemeAllowedForSiteType } from "../ai/themeMapping";
 import type { SitegenThemeId } from "../types/structuredContent";
-import { applyPublish, markUnpublishedChanges, validatePublishReady } from "../lib/publish";
+import { applyPublish, markNeedsRestructure, markUnpublishedChanges, validatePublishReady } from "../lib/publish";
 import { sitegenPublicSiteDto } from "../lib/publicSiteDto";
+import { sitegenPublicSiteUrl } from "../lib/publicUrl";
+import { detectImageContentType, isSafeImageContentType } from "../lib/sanitize";
 
 export const sitegenPublicRouter = express.Router();
 
 const BCRYPT_ROUNDS = 12;
 const PASSWORD_MIN = 8;
+const PASSWORD_MAX = 128;
 
 const resumeUpload = multer({
   storage: multer.memoryStorage(),
@@ -81,6 +84,9 @@ sitegenPublicRouter.post("/drafts", async (req, res) => {
     if (password.length < PASSWORD_MIN) {
       return res.status(400).json({ error: `Password must be at least ${PASSWORD_MIN} characters.` });
     }
+    if (password.length > PASSWORD_MAX) {
+      return res.status(400).json({ error: `Password must be at most ${PASSWORD_MAX} characters.` });
+    }
 
     const available = await isSitegenUsernameGloballyAvailable(parsed.username);
     if (!available) {
@@ -122,6 +128,9 @@ sitegenPublicRouter.post("/auth/login", async (req, res) => {
 
     const password = String(req.body?.password || "");
     if (!password) return res.status(400).json({ error: "Password is required." });
+    if (password.length > PASSWORD_MAX) {
+      return res.status(401).json({ error: "Invalid username or password." });
+    }
 
     const website = await SitegenWebsite.findOne({ username: parsed.username }).select("+passwordHash");
     if (!website?.passwordHash) {
@@ -199,8 +208,8 @@ sitegenPublicRouter.patch("/drafts/me", requireSitegenAuth, async (req, res) => 
       website.inputMode = inputMode;
       website.seekerProfile = parsed.profile;
       if (resumeText) website.resumeText = resumeText.slice(0, 50000);
-      website.infoCompletedAt = complete ? new Date() : website.infoCompletedAt;
-      markUnpublishedChanges(website);
+      website.infoCompletedAt = complete ? new Date() : undefined;
+      markNeedsRestructure(website);
       await website.save();
       return res.json({ ok: true, website: sitegenWebsiteDto(website) });
     }
@@ -214,8 +223,8 @@ sitegenPublicRouter.patch("/drafts/me", requireSitegenAuth, async (req, res) => 
     }
 
     website.creatorProfile = parsed.profile;
-    website.infoCompletedAt = complete ? new Date() : website.infoCompletedAt;
-    markUnpublishedChanges(website);
+    website.infoCompletedAt = complete ? new Date() : undefined;
+    markNeedsRestructure(website);
     await website.save();
     return res.json({ ok: true, website: sitegenWebsiteDto(website) });
   } catch (err: unknown) {
@@ -238,6 +247,7 @@ sitegenPublicRouter.post("/drafts/me/structure", requireSitegenAuth, async (req,
     website.aiProcessingStatus = result.aiProcessingStatus;
     website.aiMessage = result.aiMessage || "";
     website.structuredAt = new Date();
+    website.needsRestructure = false;
     markUnpublishedChanges(website);
     await website.save();
 
@@ -265,7 +275,7 @@ sitegenPublicRouter.post("/drafts/me/publish", requireSitegenAuth, async (req, r
     return res.json({
       ok: true,
       website: sitegenWebsiteDto(website),
-      publicUrl: `https://www.rolebolt.tech/${website.username}`,
+      publicUrl: sitegenPublicSiteUrl(website.username),
     });
   } catch (err: unknown) {
     console.error("[sitegen] POST /drafts/me/publish", err);
@@ -315,7 +325,7 @@ sitegenPublicRouter.post(
       website.resumeText = text;
       website.resumeFileName = req.file.originalname.slice(0, 255);
       website.inputMode = "resume";
-      markUnpublishedChanges(website);
+      markNeedsRestructure(website);
       await website.save();
 
       return res.json({
@@ -336,7 +346,6 @@ sitegenPublicRouter.post(
 sitegenPublicRouter.post("/uploads/image", requireSitegenAuth, async (req, res) => {
   try {
     const data = String(req.body?.data || "");
-    const contentType = String(req.body?.contentType || "image/jpeg");
     if (!data.startsWith("data:image/")) {
       return res.status(400).json({ error: "Invalid image data." });
     }
@@ -347,9 +356,14 @@ sitegenPublicRouter.post("/uploads/image", requireSitegenAuth, async (req, res) 
       return res.status(400).json({ error: "Image is too large. Please use a smaller file." });
     }
 
+    const detectedType = detectImageContentType(buffer);
+    if (!detectedType || !isSafeImageContentType(detectedType)) {
+      return res.status(400).json({ error: "Only JPEG, PNG, and WebP images are supported." });
+    }
+
     const image = await SitegenImage.create({
       websiteId: req.sitegen!.websiteId,
-      contentType,
+      contentType: detectedType,
       data: buffer,
     });
 
@@ -365,7 +379,9 @@ sitegenPublicRouter.get("/uploads/:id", async (req, res) => {
     await connectMongo();
     const image = await SitegenImage.findById(req.params.id);
     if (!image) return res.status(404).send("Not found");
+    if (!isSafeImageContentType(image.contentType)) return res.status(404).send("Not found");
     res.setHeader("Content-Type", image.contentType);
+    res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
     return res.send(image.data);
   } catch (err: unknown) {

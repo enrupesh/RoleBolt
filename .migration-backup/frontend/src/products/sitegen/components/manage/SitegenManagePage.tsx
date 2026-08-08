@@ -7,7 +7,8 @@ import { SitegenFooter } from "../layout/SitegenFooter";
 import { sitegenRoutes } from "../../lib/routes";
 import { sitegenDisplayPublicUrl } from "../../lib/publicUrl";
 import { fetchSitegenDraft, loginSitegen, toSessionWebsite } from "../../lib/client";
-import { readSitegenSession, saveSitegenSession } from "../../lib/session";
+import { readSitegenSession, saveSitegenSession, clearSitegenSession } from "../../lib/session";
+import { SitegenAuthError } from "../../lib/authErrors";
 import type { SitegenWebsiteDraft } from "../../types/profile";
 import { SitegenFieldLabel, SitegenInput } from "../build/SitegenFormFields";
 import { SitegenShareTools } from "../share/SitegenShareTools";
@@ -78,7 +79,30 @@ export function SitegenManagePage() {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [draft, setDraft] = useState<SitegenWebsiteDraft | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [error, setError] = useState("");
+
+  async function loadWebsite(token: string) {
+    setLoading(true);
+    setLoadFailed(false);
+    setError("");
+    try {
+      const website = await fetchSitegenDraft(token);
+      setDraft(website);
+      saveSitegenSession(token, toSessionWebsite(website));
+    } catch (loadError: unknown) {
+      if (loadError instanceof SitegenAuthError) {
+        setAccessToken(null);
+        setDraft(null);
+        setError(loadError.message);
+      } else {
+        setLoadFailed(true);
+        setError("We couldn't load your website. Please try again.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
     const session = readSitegenSession();
@@ -87,14 +111,16 @@ export function SitegenManagePage() {
       return;
     }
     setAccessToken(session.accessToken);
-    void fetchSitegenDraft(session.accessToken)
-      .then((website) => {
-        setDraft(website);
-        saveSitegenSession(session.accessToken, toSessionWebsite(website));
-      })
-      .catch(() => setError("We couldn't load your website."))
-      .finally(() => setLoading(false));
+    void loadWebsite(session.accessToken);
   }, []);
+
+  function handleSignOut() {
+    clearSitegenSession();
+    setAccessToken(null);
+    setDraft(null);
+    setLoadFailed(false);
+    setError("");
+  }
 
   if (loading) {
     return (
@@ -106,8 +132,25 @@ export function SitegenManagePage() {
     );
   }
 
-  if (!accessToken || !draft) {
+  if (!accessToken) {
     return <SitegenLoginPage />;
+  }
+
+  if (loadFailed || !draft) {
+    return (
+      <div className="min-h-screen bg-[#0c0618] text-white">
+        <SitegenHeader />
+        <main className="mx-auto max-w-lg px-5 py-20 text-center">
+          <h1 className="font-display text-3xl font-semibold">We couldn&apos;t load your website</h1>
+          <p className="mt-4 text-sm text-violet-100/60">{error || "Please try again."}</p>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
+            <button type="button" onClick={() => void loadWebsite(accessToken)} className="rounded-full bg-white px-5 py-3 text-sm font-semibold text-[#1a1033]">Try again</button>
+            <button type="button" onClick={handleSignOut} className="rounded-full border border-white/15 px-5 py-3 text-sm font-semibold text-white">Sign out</button>
+          </div>
+        </main>
+        <SitegenFooter />
+      </div>
+    );
   }
 
   const isPublished = draft.status === "published";
@@ -119,9 +162,12 @@ export function SitegenManagePage() {
       <main className="mx-auto max-w-3xl px-5 py-14 lg:px-8 lg:py-20">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-300">Website management</p>
         <h1 className="mt-4 font-display text-4xl font-semibold tracking-[-0.05em]">Manage your website</h1>
-        <p className="mt-4 text-sm leading-7 text-violet-100/60">
-          Signed in as <span className="font-medium text-white">{draft.username}</span>
-        </p>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-violet-100/65">
+            Signed in as <span className="font-medium text-white">{draft.username}</span>
+          </p>
+          <button type="button" onClick={handleSignOut} className="text-sm font-semibold text-violet-200 hover:text-white">Sign out</button>
+        </div>
 
         {error ? <p className="mt-4 text-sm text-red-300">{error}</p> : null}
 
@@ -159,7 +205,7 @@ export function SitegenManagePage() {
           </div>
         </div>
 
-        {isPublished && !hasPendingUpdates ? (
+        {isPublished ? (
           <div className="mt-8">
             <SitegenShareTools username={draft.username} publicUrl={draft.publicUrl} />
           </div>
