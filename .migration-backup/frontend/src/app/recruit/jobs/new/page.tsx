@@ -9,6 +9,7 @@ import { computeJobQuality } from "@/lib/jobQuality";
 import { apiErrorFromPayload, apiUrl, readApiJson } from "@/lib/api";
 import { registerPostCreateChecklist } from "@/components/PostCreateChecklist";
 import { StandardErrorNotice } from "@/components/StandardErrorNotice";
+import { PrivateJobVisibilitySection } from "@/components/recruit/PrivateJobVisibilitySection";
 
 function ChevronLeftIcon() {
   return (
@@ -1140,52 +1141,11 @@ function NewJobContent() {
           {step === 3 && (
             <div className="space-y-5">
               <h2 className="text-[17px] font-bold text-slate-900 mb-6">Review & Generate</h2>
-               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                 <div className="flex items-start justify-between gap-4">
-                   <div>
-                     <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Job Visibility</p>
-                     <p className="mt-1 text-sm font-bold text-slate-900">
-                       {form.publicVisibility ? "Public job" : "Private job"}
-                     </p>
-                     <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                       {form.publicVisibility
-                         ? "Your job will appear in Find Jobs and can be shared with candidates."
-                         : "Private jobs are for employers who want to manage hiring without publishing a listing. You can import candidates from other platforms and continue the process here."}
-                     </p>
-                   </div>
-                   <div className="flex shrink-0 rounded-xl border border-slate-200 bg-white p-1">
-                     {[
-                       { value: true, label: "Public" },
-                       { value: false, label: "Private" },
-                     ].map(option => (
-                       <button
-                         key={option.label}
-                         type="button"
-                         onClick={() => setForm(prev => ({ ...prev, publicVisibility: option.value }))}
-                         className={`rounded-lg px-3 py-2 text-xs font-bold transition ${
-                           form.publicVisibility === option.value
-                             ? option.value
-                               ? "bg-indigo-600 text-white shadow-sm"
-                               : "bg-slate-800 text-white shadow-sm"
-                             : "text-slate-500 hover:bg-slate-50 hover:text-slate-700"
-                         }`}
-                       >
-                         {option.label}
-                       </button>
-                     ))}
-                   </div>
-                 </div>
-                 {!form.publicVisibility && (
-                   <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
-                     <svg className="mt-0.5 shrink-0" width="14" height="14" fill="none" stroke="#d97706" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                       <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-                     </svg>
-                     <p className="text-xs font-medium leading-relaxed text-amber-800">
-                       <span className="font-bold">Warning:</span> Once a job is marked private, it cannot be changed back to public. To publish it later, you will need to create a new job.
-                     </p>
-                   </div>
-                 )}
-               </div>
+               <PrivateJobVisibilitySection
+                 isPublic={form.publicVisibility}
+                 onSetPublic={() => setForm(prev => ({ ...prev, publicVisibility: true }))}
+                 onSetPrivate={() => setForm(prev => ({ ...prev, publicVisibility: false }))}
+               />
               <div className="grid gap-3 sm:grid-cols-2">
                 {[
                   ["Role", `${form.seniority} ${form.title}`],
