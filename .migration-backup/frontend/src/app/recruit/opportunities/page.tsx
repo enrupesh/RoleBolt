@@ -4,6 +4,7 @@ import RecruitHeader from "@/components/RecruitHeader";
 import FilterDropdown from "./FilterDropdown";
 import PageTracker from "@/components/PageTracker";
 import JobAlertSubscribe from "./JobAlertSubscribe";
+import PublicJobsEndMessage from "./PublicJobsEndMessage";
 import { apiUrl, readApiJson } from "@/lib/api";
 import { buildMetadata } from "@/lib/seo";
 
@@ -340,6 +341,7 @@ export default async function RecruitOpportunitiesPage({ searchParams }: { searc
               );
             })
           )}
+          {jobs.length > 0 && <PublicJobsEndMessage />}
         </section>
       </main>
     </div>
