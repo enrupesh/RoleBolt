@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 function WarningIcon() {
   return (
@@ -23,9 +23,9 @@ function LockIcon() {
 
 type ModalProps = {
   title: string;
-  children: React.ReactNode;
+  children: ReactNode;
   onClose: () => void;
-  actions: React.ReactNode;
+  actions: ReactNode;
 };
 
 function Modal({ title, children, onClose, actions }: ModalProps) {
