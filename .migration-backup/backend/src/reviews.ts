@@ -14,6 +14,7 @@ import {
 } from "./models/RecruitReview";
 import { getEntitlement } from "./billing/entitlements";
 import { parseXPostUrls, resolvedFeaturedXPostUrls } from "./xPost";
+import { parseYouTubeVideoUrls, resolvedFeaturedVideoReviewUrls } from "./youtubeVideo";
 
 export const reviewsPublicRouter = express.Router();
 
@@ -32,7 +33,7 @@ function reviewDto(review: Record<string, any>) {
 async function getSettings() {
   return RecruitReviewSettings.findOneAndUpdate(
     {},
-    { $setOnInsert: { allowGuestReviews: false, showFeaturedReviews: true, featuredXPostUrls: [] } },
+    { $setOnInsert: { allowGuestReviews: false, showFeaturedReviews: true, featuredXPostUrls: [], featuredVideoReviewUrls: [] } },
     { new: true, upsert: true },
   ).lean();
 }
@@ -42,6 +43,7 @@ function settingsDto(settings: Record<string, any> | null | undefined) {
     showFeaturedReviews: settings?.showFeaturedReviews !== false,
     allowGuestReviews: settings?.showFeaturedReviews === false,
     featuredXPostUrls: resolvedFeaturedXPostUrls(settings?.featuredXPostUrls),
+    featuredVideoReviewUrls: resolvedFeaturedVideoReviewUrls(settings?.featuredVideoReviewUrls),
   };
 }
 
@@ -106,6 +108,7 @@ reviewsPublicRouter.get("/reviews/featured", async (_req, res) => {
         reviews: [],
         enabled: false,
         featuredXPostUrls: resolvedFeaturedXPostUrls(settings?.featuredXPostUrls),
+        featuredVideoReviewUrls: resolvedFeaturedVideoReviewUrls(settings?.featuredVideoReviewUrls),
       });
     }
     const reviews = await RecruitReview.find({ visible: true, featured: true })
@@ -116,6 +119,7 @@ reviewsPublicRouter.get("/reviews/featured", async (_req, res) => {
       reviews: reviews.map((review) => reviewDto(review as Record<string, any>)),
       enabled: true,
       featuredXPostUrls: resolvedFeaturedXPostUrls(settings?.featuredXPostUrls),
+      featuredVideoReviewUrls: resolvedFeaturedVideoReviewUrls(settings?.featuredVideoReviewUrls),
     });
   } catch (err: unknown) {
     console.error("[reviews] GET /reviews/featured", err);

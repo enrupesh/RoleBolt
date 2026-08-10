@@ -56,6 +56,8 @@ export type AdminReviewSettings = {
   showFeaturedReviews: boolean;
   featuredXPostUrls: string[];
   savedFeaturedXPostUrls?: string[];
+  featuredVideoReviewUrls: string[];
+  savedFeaturedVideoReviewUrls?: string[];
 };
 
 export type AdminVerificationRequest = {
@@ -190,7 +192,10 @@ export async function deleteReview(id: string) {
   return adminFetch(`/admin/reviews/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
-export async function updateReviewSettings(update: Partial<AdminReviewSettings> & { featuredXPostUrls?: string[] }) {
+export async function updateReviewSettings(update: Partial<AdminReviewSettings> & {
+  featuredXPostUrls?: string[];
+  featuredVideoReviewUrls?: string[];
+}) {
   const data = await adminFetch("/admin/reviews/settings", {
     method: "PATCH",
     body: JSON.stringify(update),

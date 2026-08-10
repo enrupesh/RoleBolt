@@ -6,11 +6,13 @@ import { MarketingFooter } from "@/components/MarketingFooter";
 import { ReviewCard, type PublicReview } from "@/components/ReviewCard";
 import { ReviewModal } from "@/components/ReviewModal";
 import { SharedOnXPosts } from "@/components/SharedOnXPosts";
+import { SharedVideoReviews } from "@/components/SharedVideoReviews";
 import { apiUrl, readApiJson } from "@/lib/api";
 
 export default function ReviewsPage() {
   const [reviews, setReviews] = useState<PublicReview[]>([]);
   const [xPostUrls, setXPostUrls] = useState<string[]>([]);
+  const [videoReviewUrls, setVideoReviewUrls] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [reviewOpen, setReviewOpen] = useState(false);
 
@@ -18,13 +20,19 @@ export default function ReviewsPage() {
     setLoading(true);
     fetch(apiUrl("/recruit-public/reviews"), { cache: "no-store" })
       .then(async (response) => {
-        const data = await readApiJson<{ reviews?: PublicReview[]; featuredXPostUrls?: string[] }>(response);
+        const data = await readApiJson<{
+          reviews?: PublicReview[];
+          featuredXPostUrls?: string[];
+          featuredVideoReviewUrls?: string[];
+        }>(response);
         setReviews(data.reviews || []);
         setXPostUrls(data.featuredXPostUrls || []);
+        setVideoReviewUrls(data.featuredVideoReviewUrls || []);
       })
       .catch(() => {
         setReviews([]);
         setXPostUrls([]);
+        setVideoReviewUrls([]);
       })
       .finally(() => setLoading(false));
   }
@@ -51,10 +59,11 @@ export default function ReviewsPage() {
           </div>
         </section>
 
-        {xPostUrls.length > 0 ? (
+        {(xPostUrls.length > 0 || videoReviewUrls.length > 0) ? (
           <section className="border-b border-[#dfe8ef] bg-[#f8fbfd]">
-            <div className="mx-auto max-w-5xl px-5 py-12 lg:px-8">
-              <SharedOnXPosts urls={xPostUrls} />
+            <div className="mx-auto max-w-5xl space-y-12 px-5 py-12 lg:px-8">
+              {xPostUrls.length > 0 ? <SharedOnXPosts urls={xPostUrls} /> : null}
+              {videoReviewUrls.length > 0 ? <SharedVideoReviews urls={videoReviewUrls} /> : null}
             </div>
           </section>
         ) : null}
@@ -66,7 +75,7 @@ export default function ReviewsPage() {
             </div>
           ) : reviews.length ? (
             <div>
-              {xPostUrls.length > 0 ? (
+              {(xPostUrls.length > 0 || videoReviewUrls.length > 0) ? (
                 <p className="mb-6 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">On Rolebolt</p>
               ) : null}
               <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">

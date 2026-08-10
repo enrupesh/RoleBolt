@@ -113,12 +113,16 @@ export function ReviewAdminPanel() {
     showFeaturedReviews: true,
     featuredXPostUrls: [],
     savedFeaturedXPostUrls: [],
+    featuredVideoReviewUrls: [],
+    savedFeaturedVideoReviewUrls: [],
   });
   const [xPostDraft, setXPostDraft] = useState("");
+  const [videoReviewDraft, setVideoReviewDraft] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [savingSetting, setSavingSetting] = useState(false);
   const [savingXPosts, setSavingXPosts] = useState(false);
+  const [savingVideoReviews, setSavingVideoReviews] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -129,6 +133,8 @@ export function ReviewAdminPanel() {
       setSettings(result.settings);
       const saved = result.settings.savedFeaturedXPostUrls ?? [];
       setXPostDraft(saved.join("\n"));
+      const savedVideos = result.settings.savedFeaturedVideoReviewUrls ?? [];
+      setVideoReviewDraft(savedVideos.join("\n"));
     } catch (loadError: unknown) {
       setError(loadError instanceof Error ? loadError.message : "Could not load reviews.");
     } finally {
@@ -166,6 +172,24 @@ export function ReviewAdminPanel() {
       setError(saveError instanceof Error ? saveError.message : "Could not save X post URLs.");
     } finally {
       setSavingXPosts(false);
+    }
+  }
+
+  async function saveVideoReviews() {
+    setSavingVideoReviews(true);
+    setError("");
+    try {
+      const urls = videoReviewDraft
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean);
+      const data = await updateReviewSettings({ featuredVideoReviewUrls: urls });
+      setSettings(data);
+      setVideoReviewDraft((data.savedFeaturedVideoReviewUrls ?? data.featuredVideoReviewUrls ?? []).join("\n"));
+    } catch (saveError: unknown) {
+      setError(saveError instanceof Error ? saveError.message : "Could not save video review URLs.");
+    } finally {
+      setSavingVideoReviews(false);
     }
   }
 
@@ -213,6 +237,33 @@ export function ReviewAdminPanel() {
             className="rounded-lg border border-[#5faef0]/30 bg-[#5faef0]/10 px-4 py-2 text-xs font-semibold text-[#9ed2ff] hover:bg-[#5faef0]/15 disabled:opacity-50"
           >
             {savingXPosts ? "Saving…" : "Save X posts"}
+          </button>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+        <p className="text-sm font-semibold text-white/80">Featured video reviews (YouTube)</p>
+        <p className="mt-1 text-xs leading-5 text-white/40">
+          Paste one public YouTube or YouTube Shorts URL per line. These appear under <strong className="text-white/60">Video reviews</strong> on the landing page and reviews page. Leave empty to use the built-in default video.
+        </p>
+        <textarea
+          value={videoReviewDraft}
+          onChange={(event) => setVideoReviewDraft(event.target.value)}
+          rows={4}
+          placeholder={"https://www.youtube.com/shorts/6gmOVyWTX7k"}
+          className="mt-4 w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/80 placeholder:text-white/25 focus:border-[#5faef0]/40 focus:outline-none"
+        />
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-xs text-white/35">
+            Live now: {(settings.featuredVideoReviewUrls || []).length} video{(settings.featuredVideoReviewUrls || []).length === 1 ? "" : "s"}
+          </p>
+          <button
+            type="button"
+            disabled={savingVideoReviews}
+            onClick={() => void saveVideoReviews()}
+            className="rounded-lg border border-[#ff6b6b]/30 bg-[#ff6b6b]/10 px-4 py-2 text-xs font-semibold text-[#ffb4b4] hover:bg-[#ff6b6b]/15 disabled:opacity-50"
+          >
+            {savingVideoReviews ? "Saving…" : "Save video reviews"}
           </button>
         </div>
       </div>
