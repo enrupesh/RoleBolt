@@ -108,10 +108,17 @@ function ReviewAdminCard({ item, onChange }: { item: AdminReview; onChange: () =
 
 export function ReviewAdminPanel() {
   const [items, setItems] = useState<AdminReview[]>([]);
-  const [settings, setSettings] = useState<AdminReviewSettings>({ allowGuestReviews: false, showFeaturedReviews: true });
+  const [settings, setSettings] = useState<AdminReviewSettings>({
+    allowGuestReviews: false,
+    showFeaturedReviews: true,
+    featuredXPostUrls: [],
+    savedFeaturedXPostUrls: [],
+  });
+  const [xPostDraft, setXPostDraft] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [savingSetting, setSavingSetting] = useState(false);
+  const [savingXPosts, setSavingXPosts] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -120,6 +127,8 @@ export function ReviewAdminPanel() {
       const result = await fetchReviews();
       setItems(result.reviews);
       setSettings(result.settings);
+      const saved = result.settings.savedFeaturedXPostUrls ?? [];
+      setXPostDraft(saved.join("\n"));
     } catch (loadError: unknown) {
       setError(loadError instanceof Error ? loadError.message : "Could not load reviews.");
     } finally {
@@ -129,16 +138,34 @@ export function ReviewAdminPanel() {
 
   useEffect(() => { void load(); }, [load]);
 
-  async function changeSetting(field: keyof AdminReviewSettings) {
+  async function changeSetting(field: keyof Pick<AdminReviewSettings, "allowGuestReviews" | "showFeaturedReviews">) {
     setSavingSetting(true);
     try {
       const next = { [field]: !settings[field] };
-      await updateReviewSettings(next);
-      setSettings((current) => ({ ...current, ...next }));
+      const data = await updateReviewSettings(next);
+      setSettings(data);
     } catch (settingError: unknown) {
       setError(settingError instanceof Error ? settingError.message : "Could not update review setting.");
     } finally {
       setSavingSetting(false);
+    }
+  }
+
+  async function saveXPosts() {
+    setSavingXPosts(true);
+    setError("");
+    try {
+      const urls = xPostDraft
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean);
+      const data = await updateReviewSettings({ featuredXPostUrls: urls });
+      setSettings(data);
+      setXPostDraft((data.savedFeaturedXPostUrls ?? data.featuredXPostUrls ?? []).join("\n"));
+    } catch (saveError: unknown) {
+      setError(saveError instanceof Error ? saveError.message : "Could not save X post URLs.");
+    } finally {
+      setSavingXPosts(false);
     }
   }
 
@@ -161,6 +188,33 @@ export function ReviewAdminPanel() {
             <span className={`relative h-6 w-11 shrink-0 rounded-full transition ${settings[field] ? "bg-[#41d2a0]" : "bg-white/15"}`}><span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition ${settings[field] ? "left-6" : "left-1"}`} /></span>
           </button>
         ))}
+      </div>
+
+      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+        <p className="text-sm font-semibold text-white/80">Featured X posts</p>
+        <p className="mt-1 text-xs leading-5 text-white/40">
+          Paste one public X post URL per line. These appear under <strong className="text-white/60">Shared on X</strong> on the landing page and reviews page. Leave empty to use the built-in default post.
+        </p>
+        <textarea
+          value={xPostDraft}
+          onChange={(event) => setXPostDraft(event.target.value)}
+          rows={4}
+          placeholder={"https://x.com/username/status/1234567890"}
+          className="mt-4 w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/80 placeholder:text-white/25 focus:border-[#5faef0]/40 focus:outline-none"
+        />
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-xs text-white/35">
+            Live now: {(settings.featuredXPostUrls || []).length} post{(settings.featuredXPostUrls || []).length === 1 ? "" : "s"}
+          </p>
+          <button
+            type="button"
+            disabled={savingXPosts}
+            onClick={() => void saveXPosts()}
+            className="rounded-lg border border-[#5faef0]/30 bg-[#5faef0]/10 px-4 py-2 text-xs font-semibold text-[#9ed2ff] hover:bg-[#5faef0]/15 disabled:opacity-50"
+          >
+            {savingXPosts ? "Saving…" : "Save X posts"}
+          </button>
+        </div>
       </div>
       {error && <div className="rounded-lg border border-red-500/25 bg-red-500/8 px-4 py-3 text-sm text-red-300">{error}</div>}
       {loading ? <div className="space-y-3">{[1, 2].map((item) => <div key={item} className="h-44 animate-pulse rounded-2xl border border-white/8 bg-white/[0.02]" />)}</div> : items.length ? <div className="space-y-4">{items.map((item) => <ReviewAdminCard key={item.id} item={item} onChange={() => void load()} />)}</div> : <div className="rounded-2xl border border-dashed border-white/10 px-6 py-14 text-center text-sm text-white/45">No reviews yet.</div>}
