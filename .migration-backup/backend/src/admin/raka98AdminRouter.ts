@@ -17,6 +17,7 @@ import {
   type FeedbackCategory,
 } from "../models/RecruitFeedback";
 import { RecruitReview, RecruitReviewSettings } from "../models/RecruitReview";
+import { parseXPostUrls, resolvedFeaturedXPostUrls } from "../xPost";
 import { RecruitAuthSettings } from "../models/RecruitAuthSettings";
 
 export const raka98AdminRouter = Router();
@@ -381,9 +382,18 @@ function reviewDto(review: Record<string, any>) {
 async function getReviewSettings() {
   return RecruitReviewSettings.findOneAndUpdate(
     {},
-    { $setOnInsert: { allowGuestReviews: false, showFeaturedReviews: true } },
+    { $setOnInsert: { allowGuestReviews: false, showFeaturedReviews: true, featuredXPostUrls: [] } },
     { new: true, upsert: true },
   ).lean();
+}
+
+function reviewSettingsDto(settings: Record<string, any> | null | undefined) {
+  return {
+    allowGuestReviews: settings?.showFeaturedReviews === false,
+    showFeaturedReviews: settings?.showFeaturedReviews !== false,
+    featuredXPostUrls: resolvedFeaturedXPostUrls(settings?.featuredXPostUrls),
+    savedFeaturedXPostUrls: parseXPostUrls(settings?.featuredXPostUrls),
+  };
 }
 
 raka98AdminRouter.get("/reviews", async (_req, res) => {
@@ -395,10 +405,7 @@ raka98AdminRouter.get("/reviews", async (_req, res) => {
     ]);
     return res.json({
       reviews: reviews.map((item) => reviewDto(item as Record<string, any>)),
-      settings: {
-        allowGuestReviews: settings?.showFeaturedReviews === false,
-        showFeaturedReviews: settings?.showFeaturedReviews !== false,
-      },
+      settings: reviewSettingsDto(settings as Record<string, any>),
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to load reviews.";
@@ -410,7 +417,7 @@ raka98AdminRouter.get("/reviews", async (_req, res) => {
 raka98AdminRouter.patch("/reviews/settings", async (req, res) => {
   try {
     await connectMongo();
-    const update: Record<string, boolean> = {};
+    const update: Record<string, boolean | string[]> = {};
     if (typeof req.body?.allowGuestReviews === "boolean") update.allowGuestReviews = req.body.allowGuestReviews;
     if (typeof req.body?.showFeaturedReviews === "boolean") {
       update.showFeaturedReviews = req.body.showFeaturedReviews;
@@ -420,20 +427,19 @@ raka98AdminRouter.patch("/reviews/settings", async (req, res) => {
       update.allowGuestReviews = req.body.allowGuestReviews;
       update.showFeaturedReviews = !req.body.allowGuestReviews;
     }
+    if (req.body?.featuredXPostUrls !== undefined) {
+      update.featuredXPostUrls = parseXPostUrls(req.body.featuredXPostUrls);
+    }
     if (!Object.keys(update).length) return res.status(400).json({ error: "No review setting was provided." });
-    const current = await RecruitReviewSettings.findOne().lean();
-    const settings = current
-      ? await RecruitReviewSettings.findByIdAndUpdate(current._id, { $set: update }, { new: true }).lean()
-      : await RecruitReviewSettings.create({
-        allowGuestReviews: update.allowGuestReviews ?? false,
-        showFeaturedReviews: update.showFeaturedReviews ?? true,
-      });
+    const current = await getReviewSettings();
+    const settings = await RecruitReviewSettings.findByIdAndUpdate(
+      current?._id,
+      { $set: update },
+      { new: true },
+    ).lean();
     return res.json({
       ok: true,
-      settings: {
-        allowGuestReviews: settings?.showFeaturedReviews === false,
-        showFeaturedReviews: settings?.showFeaturedReviews !== false,
-      },
+      settings: reviewSettingsDto(settings as Record<string, any>),
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to update review settings.";

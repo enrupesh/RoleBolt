@@ -53,6 +53,7 @@ export const RecruitReview =
 export interface IRecruitReviewSettings extends Document {
   allowGuestReviews: boolean;
   showFeaturedReviews: boolean;
+  featuredXPostUrls: string[];
   updatedAt: Date;
 }
 
@@ -60,6 +61,7 @@ const RecruitReviewSettingsSchema = new Schema<IRecruitReviewSettings>(
   {
     allowGuestReviews: { type: Boolean, default: false },
     showFeaturedReviews: { type: Boolean, default: true },
+    featuredXPostUrls: { type: [String], default: [] },
   },
   { timestamps: true },
 );
