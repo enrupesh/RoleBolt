@@ -16,6 +16,9 @@ export function SharedVideoReviews({ urls }: { urls: string[] }) {
         <div>
           <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Video reviews</p>
           <p className="text-sm font-semibold text-[#203d56]">Watch what users are saying on YouTube</p>
+          <p className="mt-1 text-xs leading-5 text-[#8496a5]">
+            Pro &amp; Ultra job seekers can earn free tokens after admin approval — up to 2× for genuine face-on reviews.
+          </p>
         </div>
       </div>
       <div className={`grid gap-5 ${urls.length > 1 ? "md:grid-cols-2" : "justify-items-center"}`}>
