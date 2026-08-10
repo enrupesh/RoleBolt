@@ -18,6 +18,7 @@ import {
 } from "../models/RecruitFeedback";
 import { RecruitReview, RecruitReviewSettings } from "../models/RecruitReview";
 import { parseXPostUrls, resolvedFeaturedXPostUrls } from "../xPost";
+import { parseYouTubeVideoUrls, resolvedFeaturedVideoReviewUrls } from "../youtubeVideo";
 import { RecruitAuthSettings } from "../models/RecruitAuthSettings";
 
 export const raka98AdminRouter = Router();
@@ -382,7 +383,7 @@ function reviewDto(review: Record<string, any>) {
 async function getReviewSettings() {
   return RecruitReviewSettings.findOneAndUpdate(
     {},
-    { $setOnInsert: { allowGuestReviews: false, showFeaturedReviews: true, featuredXPostUrls: [] } },
+    { $setOnInsert: { allowGuestReviews: false, showFeaturedReviews: true, featuredXPostUrls: [], featuredVideoReviewUrls: [] } },
     { new: true, upsert: true },
   ).lean();
 }
@@ -393,6 +394,8 @@ function reviewSettingsDto(settings: Record<string, any> | null | undefined) {
     showFeaturedReviews: settings?.showFeaturedReviews !== false,
     featuredXPostUrls: resolvedFeaturedXPostUrls(settings?.featuredXPostUrls),
     savedFeaturedXPostUrls: parseXPostUrls(settings?.featuredXPostUrls),
+    featuredVideoReviewUrls: resolvedFeaturedVideoReviewUrls(settings?.featuredVideoReviewUrls),
+    savedFeaturedVideoReviewUrls: parseYouTubeVideoUrls(settings?.featuredVideoReviewUrls),
   };
 }
 
@@ -429,6 +432,9 @@ raka98AdminRouter.patch("/reviews/settings", async (req, res) => {
     }
     if (req.body?.featuredXPostUrls !== undefined) {
       update.featuredXPostUrls = parseXPostUrls(req.body.featuredXPostUrls);
+    }
+    if (req.body?.featuredVideoReviewUrls !== undefined) {
+      update.featuredVideoReviewUrls = parseYouTubeVideoUrls(req.body.featuredVideoReviewUrls);
     }
     if (!Object.keys(update).length) return res.status(400).json({ error: "No review setting was provided." });
     const current = await getReviewSettings();
