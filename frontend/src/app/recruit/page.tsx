@@ -131,11 +131,10 @@ export default function RecruitLandingPage() {
             <a href="#how-it-works" className="whitespace-nowrap rounded-lg px-1.5 py-2 text-[12px] text-[#5d7285] transition hover:bg-white hover:text-[#10263d] min-[1180px]:px-3 min-[1180px]:text-sm">How it works</a>
             <a href="#recruiters" className="whitespace-nowrap rounded-lg px-1.5 py-2 text-[12px] text-[#5d7285] transition hover:bg-white hover:text-[#10263d] min-[1180px]:px-3 min-[1180px]:text-sm">For recruiters</a>
             <a href="#seekers" className="whitespace-nowrap rounded-lg px-1.5 py-2 text-[12px] text-[#5d7285] transition hover:bg-white hover:text-[#10263d] min-[1180px]:px-3 min-[1180px]:text-sm">For job seekers</a>
-            <a href="#product" className="whitespace-nowrap rounded-lg px-1.5 py-2 text-[12px] text-[#5d7285] transition hover:bg-white hover:text-[#10263d] min-[1180px]:px-3 min-[1180px]:text-sm">Product</a>
             <Link href="/recruit/pricing" className="whitespace-nowrap rounded-lg px-1.5 py-2 text-[12px] text-[#5d7285] transition hover:bg-white hover:text-[#10263d] min-[1180px]:px-3 min-[1180px]:text-sm">Plans</Link>
             <Link href="/resources" className="whitespace-nowrap rounded-lg px-1.5 py-2 text-[12px] text-[#5d7285] transition hover:bg-white hover:text-[#10263d] min-[1180px]:px-3 min-[1180px]:text-sm">Guides</Link>
             <Link href="/website" className="whitespace-nowrap rounded-lg px-1.5 py-2 text-[12px] font-medium text-[#5b3f8c] transition hover:bg-[#f6f0ff] hover:text-[#4a2f78] min-[1180px]:px-3 min-[1180px]:text-sm">Free website</Link>
-            <a href="#sitegen" className="whitespace-nowrap rounded-lg px-1.5 py-2 text-[12px] text-[#5d7285] transition hover:bg-white hover:text-[#10263d] min-[1180px]:px-3 min-[1180px]:text-sm">Sitegen</a>
+            <Link href="/reviews" className="whitespace-nowrap rounded-lg px-1.5 py-2 text-[12px] font-medium text-[#5b3f8c] transition hover:bg-[#f6f0ff] hover:text-[#4a2f78] min-[1180px]:px-3 min-[1180px]:text-sm">Reviews</Link>
           </nav>
           <div className="flex shrink-0 items-center gap-1.5 lg:gap-2">
             {isLoggedIn ? (
@@ -165,11 +164,10 @@ export default function RecruitLandingPage() {
               <a onClick={() => setMenuOpen(false)} href="#how-it-works" className="rounded-lg px-3 py-3 text-sm">How it works</a>
               <a onClick={() => setMenuOpen(false)} href="#recruiters" className="rounded-lg px-3 py-3 text-sm">For recruiters</a>
               <a onClick={() => setMenuOpen(false)} href="#seekers" className="rounded-lg px-3 py-3 text-sm">For job seekers</a>
-              <a onClick={() => setMenuOpen(false)} href="#product" className="rounded-lg px-3 py-3 text-sm">Product</a>
               <Link onClick={() => setMenuOpen(false)} href="/recruit/pricing" className="rounded-lg px-3 py-3 text-sm">Plans</Link>
               <Link onClick={() => setMenuOpen(false)} href="/resources" className="rounded-lg px-3 py-3 text-sm">Guides</Link>
               <Link onClick={() => setMenuOpen(false)} href="/website" className="rounded-lg px-3 py-3 text-sm font-medium text-[#5b3f8c]">Free website</Link>
-              <a onClick={() => setMenuOpen(false)} href="#sitegen" className="rounded-lg px-3 py-3 text-sm">Sitegen</a>
+              <Link onClick={() => setMenuOpen(false)} href="/reviews" className="rounded-lg px-3 py-3 text-sm font-medium text-[#5b3f8c]">Reviews</Link>
             </div>
           </nav>
         )}
