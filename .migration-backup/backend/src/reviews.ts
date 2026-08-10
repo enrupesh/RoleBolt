@@ -13,6 +13,7 @@ import {
   type ReviewSubmitterPlan,
 } from "./models/RecruitReview";
 import { getEntitlement } from "./billing/entitlements";
+import { parseXPostUrls, resolvedFeaturedXPostUrls } from "./xPost";
 
 export const reviewsPublicRouter = express.Router();
 
@@ -31,9 +32,17 @@ function reviewDto(review: Record<string, any>) {
 async function getSettings() {
   return RecruitReviewSettings.findOneAndUpdate(
     {},
-    { $setOnInsert: { allowGuestReviews: false, showFeaturedReviews: true } },
+    { $setOnInsert: { allowGuestReviews: false, showFeaturedReviews: true, featuredXPostUrls: [] } },
     { new: true, upsert: true },
   ).lean();
+}
+
+function settingsDto(settings: Record<string, any> | null | undefined) {
+  return {
+    showFeaturedReviews: settings?.showFeaturedReviews !== false,
+    allowGuestReviews: settings?.showFeaturedReviews === false,
+    featuredXPostUrls: resolvedFeaturedXPostUrls(settings?.featuredXPostUrls),
+  };
 }
 
 function parseRole(value: unknown): ReviewRole | null {
@@ -80,8 +89,7 @@ reviewsPublicRouter.get("/reviews", async (_req, res) => {
       .lean();
     return res.json({
       reviews: reviews.map((review) => reviewDto(review as Record<string, any>)),
-      showFeaturedReviews: Boolean(settings?.showFeaturedReviews),
-      allowGuestReviews: settings?.showFeaturedReviews === false,
+      ...settingsDto(settings),
     });
   } catch (err: unknown) {
     console.error("[reviews] GET /reviews", err);
@@ -93,7 +101,13 @@ reviewsPublicRouter.get("/reviews/featured", async (_req, res) => {
   try {
     await connectMongo();
     const settings = await getSettings();
-    if (!settings?.showFeaturedReviews) return res.json({ reviews: [], enabled: false });
+    if (!settings?.showFeaturedReviews) {
+      return res.json({
+        reviews: [],
+        enabled: false,
+        featuredXPostUrls: resolvedFeaturedXPostUrls(settings?.featuredXPostUrls),
+      });
+    }
     const reviews = await RecruitReview.find({ visible: true, featured: true })
       .sort({ createdAt: -1 })
       .limit(6)
@@ -101,6 +115,7 @@ reviewsPublicRouter.get("/reviews/featured", async (_req, res) => {
     return res.json({
       reviews: reviews.map((review) => reviewDto(review as Record<string, any>)),
       enabled: true,
+      featuredXPostUrls: resolvedFeaturedXPostUrls(settings?.featuredXPostUrls),
     });
   } catch (err: unknown) {
     console.error("[reviews] GET /reviews/featured", err);
