@@ -5,11 +5,39 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { isJudgeReviewerEmail } from "@/lib/judgeReviewer";
-import { consumeJudgeWelcomePending } from "@/lib/judgeWelcome";
+import { consumeJudgeWelcomePending, JUDGE_WELCOME_OPEN_EVENT } from "@/lib/judgeWelcome";
 
 type Panel = "welcome" | "vision" | "timeline" | "google";
 
-const QUICK_LINKS = [
+const JUDGE_FEATURED_LINKS = [
+  {
+    href: "https://www.youtube.com/watch?v=3odX6rX572E&t=86s",
+    label: "Watch demo video",
+    description: "Full product walkthrough on YouTube",
+    accent: "from-[#dc2626] to-[#ef4444]",
+    icon: "▶",
+    external: true,
+  },
+  {
+    href: "https://github.com/enrupesh/ratheeji/blob/main/JUDGES.md",
+    label: "Technical brief (JUDGES.md)",
+    description: "Architecture, Gemini usage & Google Cloud stack",
+    accent: "from-[#24292f] to-[#57606a]",
+    icon: "⌘",
+    external: true,
+  },
+] as const;
+
+type QuickLink = {
+  href: string;
+  label: string;
+  description: string;
+  accent: string;
+  icon: string;
+  external?: boolean;
+};
+
+const QUICK_LINKS: QuickLink[] = [
   {
     href: "/recruit/judges",
     label: "10-min testing kit",
@@ -66,7 +94,58 @@ const QUICK_LINKS = [
     accent: "from-[#334155] to-[#64748b]",
     icon: "∞",
   },
-] as const;
+];
+
+function QuickLinkCard({
+  link,
+  onNavigate,
+}: {
+  link: QuickLink;
+  onNavigate: () => void;
+}) {
+  const className =
+    "group flex items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4 transition hover:-translate-y-0.5 hover:border-[#0a66c2]/30 hover:shadow-[0_10px_28px_rgba(15,55,90,.1)]";
+
+  const inner = (
+    <>
+      <span
+        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${link.accent} text-sm font-bold text-white shadow-sm`}
+        aria-hidden="true"
+      >
+        {link.icon}
+      </span>
+      <span className="min-w-0">
+        <span className="flex items-center gap-1.5 text-sm font-bold text-[#10263d]">
+          {link.label}
+          <span className="text-[#0a66c2] opacity-0 transition group-hover:opacity-100">
+            {link.external ? "↗" : "→"}
+          </span>
+        </span>
+        <span className="mt-0.5 block text-xs leading-5 text-[#718697]">{link.description}</span>
+      </span>
+    </>
+  );
+
+  if (link.external) {
+    return (
+      <a
+        href={link.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={onNavigate}
+        className={className}
+      >
+        {inner}
+      </a>
+    );
+  }
+
+  return (
+    <Link href={link.href} onClick={onNavigate} className={className}>
+      {inner}
+    </Link>
+  );
+}
 
 function shouldWaitForOnboarding(pathname: string) {
   return (
@@ -132,6 +211,17 @@ export function JudgeWelcomeModal() {
 
     return () => window.clearTimeout(timer);
   }, [authUser, loading, pathname, recruitProfile]);
+
+  useEffect(() => {
+    function onReopen() {
+      if (!authUser?.email || !isJudgeReviewerEmail(authUser.email)) return;
+      setPanel("welcome");
+      setVisible(true);
+    }
+
+    window.addEventListener(JUDGE_WELCOME_OPEN_EVENT, onReopen);
+    return () => window.removeEventListener(JUDGE_WELCOME_OPEN_EVENT, onReopen);
+  }, [authUser?.email]);
 
   function close() {
     setVisible(false);
@@ -207,32 +297,23 @@ export function JudgeWelcomeModal() {
         <div className="px-6 pb-7 pt-2 sm:px-9 sm:pb-8">
           {panel === "welcome" && (
             <>
-              <p className="text-sm font-semibold text-[#203d56]">Where would you like to start?</p>
+              <p className="text-sm font-semibold text-[#203d56]">Start here</p>
+              <p className="mt-1 text-xs text-[#8496a5]">
+                Watch the demo, read the technical brief, or jump straight into the product.
+              </p>
+              <div className="mt-4 grid gap-2.5 sm:grid-cols-2">
+                {JUDGE_FEATURED_LINKS.map((link) => (
+                  <QuickLinkCard key={link.href} link={link} onNavigate={close} />
+                ))}
+              </div>
+
+              <p className="mt-6 text-sm font-semibold text-[#203d56]">Explore the product</p>
               <p className="mt-1 text-xs text-[#8496a5]">
                 Pick a path below — or read our vision, origin story, and Google Cloud stack in the tabs above.
               </p>
               <div className="mt-4 grid gap-2.5 sm:grid-cols-2">
                 {QUICK_LINKS.map((link) => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    onClick={close}
-                    className="group flex items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4 transition hover:-translate-y-0.5 hover:border-[#0a66c2]/30 hover:shadow-[0_10px_28px_rgba(15,55,90,.1)]"
-                  >
-                    <span
-                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${link.accent} text-sm font-bold text-white shadow-sm`}
-                      aria-hidden="true"
-                    >
-                      {link.icon}
-                    </span>
-                    <span className="min-w-0">
-                      <span className="flex items-center gap-1.5 text-sm font-bold text-[#10263d]">
-                        {link.label}
-                        <span className="text-[#0a66c2] opacity-0 transition group-hover:opacity-100">→</span>
-                      </span>
-                      <span className="mt-0.5 block text-xs leading-5 text-[#718697]">{link.description}</span>
-                    </span>
-                  </Link>
+                  <QuickLinkCard key={link.href} link={link} onNavigate={close} />
                 ))}
               </div>
             </>
@@ -294,9 +375,35 @@ export function JudgeWelcomeModal() {
               </ol>
               <p className="text-xs leading-6 text-[#8496a5]">
                 Technical evidence (GCP billing, Gemini usage dashboards) lives in the repository&apos;s{" "}
-                <code className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-[#31536e]">Product_Evidence/</code> folder and{" "}
-                <code className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-[#31536e]">JUDGES.md</code> technical brief.
+                <code className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-[#31536e]">Product_Evidence/</code> folder and the{" "}
+                <a
+                  href="https://github.com/enrupesh/ratheeji/blob/main/JUDGES.md"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-[#0a66c2] hover:underline"
+                >
+                  JUDGES.md technical brief
+                </a>
+                .
               </p>
+              <div className="flex flex-wrap gap-2">
+                <a
+                  href="https://www.youtube.com/watch?v=3odX6rX572E&t=86s"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-xl bg-[#dc2626] px-4 py-2.5 text-xs font-bold text-white shadow-[0_6px_16px_rgba(220,38,38,.2)] transition hover:bg-[#b91c1c]"
+                >
+                  Watch demo video ↗
+                </a>
+                <a
+                  href="https://github.com/enrupesh/ratheeji/blob/main/JUDGES.md"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold text-[#31536e] transition hover:border-[#0a66c2] hover:text-[#0a66c2]"
+                >
+                  Read JUDGES.md ↗
+                </a>
+              </div>
             </div>
           )}
 
@@ -328,6 +435,24 @@ export function JudgeWelcomeModal() {
               >
                 Check live AI routing status →
               </Link>
+              <div className="flex flex-wrap gap-2">
+                <a
+                  href="https://github.com/enrupesh/ratheeji/blob/main/JUDGES.md"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-xl bg-[#10263d] px-4 py-2.5 text-xs font-bold text-white transition hover:bg-[#0a1f33]"
+                >
+                  Full JUDGES.md brief ↗
+                </a>
+                <a
+                  href="https://www.youtube.com/watch?v=3odX6rX572E&t=86s"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold text-[#31536e] transition hover:border-[#dc2626] hover:text-[#dc2626]"
+                >
+                  Demo video ↗
+                </a>
+              </div>
             </div>
           )}
 
