@@ -13,9 +13,9 @@ import { NewVisitorWelcomePopup } from "@/components/NewVisitorWelcomePopup";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 
 const NAV_LINK_CLASS =
-  "whitespace-nowrap rounded-lg border border-[#e9dffc] bg-[#f6f0ff]/80 px-1.5 py-2 text-[12px] font-semibold text-[#5b3f8c] shadow-[0_1px_0_rgba(91,63,140,.06)] transition hover:border-[#d8c4f5] hover:bg-[#f6f0ff] hover:text-[#4a2f78] min-[1180px]:px-3 min-[1180px]:text-sm";
+  "whitespace-nowrap rounded-lg px-1.5 py-2 text-[12px] font-medium text-[#5b3f8c] transition hover:bg-[#f6f0ff] hover:text-[#4a2f78] min-[1180px]:px-3 min-[1180px]:text-sm";
 const NAV_LINK_MOBILE_CLASS =
-  "rounded-lg border border-[#e9dffc] bg-[#f6f0ff]/80 px-3 py-3 text-sm font-semibold text-[#5b3f8c] transition hover:bg-[#f6f0ff] hover:text-[#4a2f78]";
+  "rounded-lg px-3 py-3 text-sm font-medium text-[#5b3f8c] transition hover:bg-[#f6f0ff] hover:text-[#4a2f78]";
 
 const capabilities = [
   {
@@ -131,7 +131,7 @@ export default function RecruitLandingPage() {
             <RoleboltLogo size="md" />
             <span className="font-display text-[15px] font-semibold tracking-[-0.03em]">Rolebolt</span>
           </Link>
-          <nav className="hidden min-w-0 flex-1 flex-wrap items-center justify-center gap-1 min-[900px]:flex min-[1180px]:gap-1.5" aria-label="Primary navigation">
+          <nav className="hidden min-w-0 flex-1 items-center justify-center gap-0 min-[900px]:flex" aria-label="Primary navigation">
             <Link href="/recruit/opportunities" className={NAV_LINK_CLASS}>Find jobs</Link>
             <a href="#how-it-works" className={NAV_LINK_CLASS}>How it works</a>
             <a href="#recruiters" className={NAV_LINK_CLASS}>For recruiters</a>
@@ -164,7 +164,7 @@ export default function RecruitLandingPage() {
         </div>
         {menuOpen && (
           <nav className="border-t border-[#dfe8ef] bg-[#f8fbfd] px-5 py-3 min-[900px]:hidden">
-            <div className="mx-auto flex max-w-7xl flex-col gap-1.5">
+            <div className="mx-auto flex max-w-7xl flex-col gap-1">
               <Link onClick={() => setMenuOpen(false)} href="/recruit/opportunities" className={NAV_LINK_MOBILE_CLASS}>Find jobs</Link>
               <a onClick={() => setMenuOpen(false)} href="#how-it-works" className={NAV_LINK_MOBILE_CLASS}>How it works</a>
               <a onClick={() => setMenuOpen(false)} href="#recruiters" className={NAV_LINK_MOBILE_CLASS}>For recruiters</a>
