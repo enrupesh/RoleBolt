@@ -13,6 +13,7 @@ import { RoleboltLogo } from "@/components/RoleboltLogo";
 import PostCreateChecklist from "@/components/PostCreateChecklist";
 import { ReviewModal } from "@/components/ReviewModal";
 import { isJudgeReviewerEmail } from "@/lib/judgeReviewer";
+import { openJudgeWelcomeModal } from "@/lib/judgeWelcome";
 import { ensureSeekerProfileReady } from "@/lib/ensureSeekerProfileReady";
 
 type Job = {
@@ -517,6 +518,16 @@ function RecruitDashboardContent() {
               className="flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition">
               Profile
             </Link>
+            {isJudgeReviewer && (
+              <button
+                type="button"
+                onClick={() => openJudgeWelcomeModal()}
+                className="flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2 text-[13px] font-semibold text-amber-900 transition hover:bg-amber-100"
+              >
+                <span aria-hidden="true">★</span>
+                Judge guide
+              </button>
+            )}
           </nav>
 
           <Link href="/recruit/new"
@@ -551,15 +562,25 @@ function RecruitDashboardContent() {
             Write a review
           </button>
           {isJudgeReviewer && (
-            <button
-              type="button"
-              onClick={() => void openSeekerDashboard()}
-              disabled={seekerNavLoading}
-              className="mt-4 ml-2 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-60"
-            >
-              {seekerNavLoading ? "Opening seeker workspace…" : "Explore Job Seeker Features"}
-              {!seekerNavLoading && <span aria-hidden="true">→</span>}
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => openJudgeWelcomeModal()}
+                className="mt-4 inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900 shadow-sm transition hover:bg-amber-100"
+              >
+                <span aria-hidden="true">★</span>
+                Judge guide
+              </button>
+              <button
+                type="button"
+                onClick={() => void openSeekerDashboard()}
+                disabled={seekerNavLoading}
+                className="mt-4 ml-2 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-60"
+              >
+                {seekerNavLoading ? "Opening seeker workspace…" : "Explore Job Seeker Features"}
+                {!seekerNavLoading && <span aria-hidden="true">→</span>}
+              </button>
+            </>
           )}
         </div>
 
