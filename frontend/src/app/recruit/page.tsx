@@ -12,6 +12,11 @@ import { FeaturedReviews } from "@/components/FeaturedReviews";
 import { NewVisitorWelcomePopup } from "@/components/NewVisitorWelcomePopup";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 
+const NAV_LINK_CLASS =
+  "whitespace-nowrap rounded-lg border border-[#e9dffc] bg-[#f6f0ff]/80 px-1.5 py-2 text-[12px] font-semibold text-[#5b3f8c] shadow-[0_1px_0_rgba(91,63,140,.06)] transition hover:border-[#d8c4f5] hover:bg-[#f6f0ff] hover:text-[#4a2f78] min-[1180px]:px-3 min-[1180px]:text-sm";
+const NAV_LINK_MOBILE_CLASS =
+  "rounded-lg border border-[#e9dffc] bg-[#f6f0ff]/80 px-3 py-3 text-sm font-semibold text-[#5b3f8c] transition hover:bg-[#f6f0ff] hover:text-[#4a2f78]";
+
 const capabilities = [
   {
     number: "01",
@@ -126,15 +131,15 @@ export default function RecruitLandingPage() {
             <RoleboltLogo size="md" />
             <span className="font-display text-[15px] font-semibold tracking-[-0.03em]">Rolebolt</span>
           </Link>
-          <nav className="hidden min-w-0 flex-1 items-center justify-center gap-0 min-[900px]:flex" aria-label="Primary navigation">
-            <Link href="/recruit/opportunities" className="whitespace-nowrap rounded-lg px-1.5 py-2 text-[12px] text-[#5d7285] transition hover:bg-white hover:text-[#10263d] min-[1180px]:px-3 min-[1180px]:text-sm">Find jobs</Link>
-            <a href="#how-it-works" className="whitespace-nowrap rounded-lg px-1.5 py-2 text-[12px] text-[#5d7285] transition hover:bg-white hover:text-[#10263d] min-[1180px]:px-3 min-[1180px]:text-sm">How it works</a>
-            <a href="#recruiters" className="whitespace-nowrap rounded-lg px-1.5 py-2 text-[12px] text-[#5d7285] transition hover:bg-white hover:text-[#10263d] min-[1180px]:px-3 min-[1180px]:text-sm">For recruiters</a>
-            <a href="#seekers" className="whitespace-nowrap rounded-lg px-1.5 py-2 text-[12px] text-[#5d7285] transition hover:bg-white hover:text-[#10263d] min-[1180px]:px-3 min-[1180px]:text-sm">For job seekers</a>
-            <Link href="/recruit/pricing" className="whitespace-nowrap rounded-lg px-1.5 py-2 text-[12px] text-[#5d7285] transition hover:bg-white hover:text-[#10263d] min-[1180px]:px-3 min-[1180px]:text-sm">Plans</Link>
-            <Link href="/resources" className="whitespace-nowrap rounded-lg px-1.5 py-2 text-[12px] text-[#5d7285] transition hover:bg-white hover:text-[#10263d] min-[1180px]:px-3 min-[1180px]:text-sm">Guides</Link>
-            <Link href="/website" className="whitespace-nowrap rounded-lg px-1.5 py-2 text-[12px] font-medium text-[#5b3f8c] transition hover:bg-[#f6f0ff] hover:text-[#4a2f78] min-[1180px]:px-3 min-[1180px]:text-sm">Free website</Link>
-            <Link href="/reviews" className="whitespace-nowrap rounded-lg px-1.5 py-2 text-[12px] font-medium text-[#5b3f8c] transition hover:bg-[#f6f0ff] hover:text-[#4a2f78] min-[1180px]:px-3 min-[1180px]:text-sm">Reviews</Link>
+          <nav className="hidden min-w-0 flex-1 flex-wrap items-center justify-center gap-1 min-[900px]:flex min-[1180px]:gap-1.5" aria-label="Primary navigation">
+            <Link href="/recruit/opportunities" className={NAV_LINK_CLASS}>Find jobs</Link>
+            <a href="#how-it-works" className={NAV_LINK_CLASS}>How it works</a>
+            <a href="#recruiters" className={NAV_LINK_CLASS}>For recruiters</a>
+            <a href="#seekers" className={NAV_LINK_CLASS}>For job seekers</a>
+            <Link href="/recruit/pricing" className={NAV_LINK_CLASS}>Plans</Link>
+            <Link href="/resources" className={NAV_LINK_CLASS}>Guides</Link>
+            <Link href="/website" className={NAV_LINK_CLASS}>Free website</Link>
+            <Link href="/reviews" className={NAV_LINK_CLASS}>Reviews</Link>
           </nav>
           <div className="flex shrink-0 items-center gap-1.5 lg:gap-2">
             {isLoggedIn ? (
@@ -159,15 +164,15 @@ export default function RecruitLandingPage() {
         </div>
         {menuOpen && (
           <nav className="border-t border-[#dfe8ef] bg-[#f8fbfd] px-5 py-3 min-[900px]:hidden">
-            <div className="mx-auto flex max-w-7xl flex-col gap-1">
-              <Link onClick={() => setMenuOpen(false)} href="/recruit/opportunities" className="rounded-lg px-3 py-3 text-sm">Find jobs</Link>
-              <a onClick={() => setMenuOpen(false)} href="#how-it-works" className="rounded-lg px-3 py-3 text-sm">How it works</a>
-              <a onClick={() => setMenuOpen(false)} href="#recruiters" className="rounded-lg px-3 py-3 text-sm">For recruiters</a>
-              <a onClick={() => setMenuOpen(false)} href="#seekers" className="rounded-lg px-3 py-3 text-sm">For job seekers</a>
-              <Link onClick={() => setMenuOpen(false)} href="/recruit/pricing" className="rounded-lg px-3 py-3 text-sm">Plans</Link>
-              <Link onClick={() => setMenuOpen(false)} href="/resources" className="rounded-lg px-3 py-3 text-sm">Guides</Link>
-              <Link onClick={() => setMenuOpen(false)} href="/website" className="rounded-lg px-3 py-3 text-sm font-medium text-[#5b3f8c]">Free website</Link>
-              <Link onClick={() => setMenuOpen(false)} href="/reviews" className="rounded-lg px-3 py-3 text-sm font-medium text-[#5b3f8c]">Reviews</Link>
+            <div className="mx-auto flex max-w-7xl flex-col gap-1.5">
+              <Link onClick={() => setMenuOpen(false)} href="/recruit/opportunities" className={NAV_LINK_MOBILE_CLASS}>Find jobs</Link>
+              <a onClick={() => setMenuOpen(false)} href="#how-it-works" className={NAV_LINK_MOBILE_CLASS}>How it works</a>
+              <a onClick={() => setMenuOpen(false)} href="#recruiters" className={NAV_LINK_MOBILE_CLASS}>For recruiters</a>
+              <a onClick={() => setMenuOpen(false)} href="#seekers" className={NAV_LINK_MOBILE_CLASS}>For job seekers</a>
+              <Link onClick={() => setMenuOpen(false)} href="/recruit/pricing" className={NAV_LINK_MOBILE_CLASS}>Plans</Link>
+              <Link onClick={() => setMenuOpen(false)} href="/resources" className={NAV_LINK_MOBILE_CLASS}>Guides</Link>
+              <Link onClick={() => setMenuOpen(false)} href="/website" className={NAV_LINK_MOBILE_CLASS}>Free website</Link>
+              <Link onClick={() => setMenuOpen(false)} href="/reviews" className={NAV_LINK_MOBILE_CLASS}>Reviews</Link>
             </div>
           </nav>
         )}
