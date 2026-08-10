@@ -376,22 +376,6 @@ export default function RecruitLandingPage() {
           </div>
         </section>
 
-        <section id="team" className="bg-[#f8fbfd] scroll-mt-20">
-          <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 py-24 lg:grid-cols-[.75fr_1fr] lg:px-8">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[.17em] text-[#0a66c2]">Built with care</p>
-              <h2 className="mt-4 font-display text-4xl font-semibold tracking-[-.055em] text-[#10263d]">Hiring is human work. The software should respect that.</h2>
-            </div>
-            <div className="rounded-2xl border border-[#d9e5ee] bg-white p-7 shadow-[0_8px_26px_rgba(32,79,112,.06)]">
-              <p className="text-base leading-7 text-[#5d7285]">Rolebolt is being built by a small product team focused on making hiring more legible for both sides of the market: teams need better signals, and candidates deserve a clearer path through the process.</p>
-              <div className="mt-7 flex items-center gap-3 border-t border-[#edf1f5] pt-5">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#e7f0ff] text-sm font-semibold text-[#0a66c2]">RG</div>
-                <div><p className="text-sm font-semibold text-[#203d56]">Rupesh Gupta</p><p className="text-xs text-[#8093a4]">Founder</p></div>
-              </div>
-            </div>
-          </div>
-        </section>
-
          <section className="bg-white">
           <div className="mx-auto max-w-4xl px-5 py-24 text-center lg:px-8"><p className="text-xs font-semibold uppercase tracking-[.17em] text-[#0a66c2]">Ready when your team is</p><h2 className="mt-4 font-display text-4xl font-semibold tracking-[-.055em] text-[#10263d] sm:text-5xl">Make the next hiring decision with the whole picture.</h2><p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-[#667d8f]">Start with the tools that fit today. Rolebolt plans are designed to grow with your hiring volume, with payment-ready upgrades when you need them.</p><div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row"><Link href="/recruit/signup" className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0a66c2] px-6 py-3.5 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#07559f]">Start building <Arrow /></Link><Link href="/recruit/opportunities" className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#cbd9e4] px-6 py-3.5 text-sm font-semibold text-[#31536e] transition hover:border-[#0a66c2]">Browse opportunities <Arrow /></Link></div></div>
         </section>

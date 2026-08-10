@@ -425,13 +425,6 @@ export default function ProductPreviewPage() {
           </Link>
           <div className="flex items-center gap-2">
             <Link
-              href="/recruit#team"
-              className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3.5 py-2 text-[13px] font-medium text-slate-600 hover:bg-slate-50 transition-all"
-            >
-              <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-              Meet the Team
-            </Link>
-            <Link
               href="/recruit/status"
               className="relative inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3.5 py-2 text-[13px] font-bold text-emerald-700 shadow-[0_0_0_0_rgba(16,185,129,0.5)] hover:bg-emerald-100 hover:-translate-y-px transition-all animate-[rb-pulse-glow_2.2s_ease-in-out_infinite]"
             >
