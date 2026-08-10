@@ -218,6 +218,7 @@ Rolebolt is submitted to the **Build with Gemini XPRIZE** ([Devpost](https://xpr
 
 - **Category:** Professional Services / Small Business Services
 - **Judges page:** [/recruit/judges](https://www.rolebolt.tech/recruit/judges) — sample jobs, resumes, and walkthrough
+- **Judge's technical brief:** [`JUDGES.md`](JUDGES.md) — Google Cloud stack, architecture diagrams, Gemini usage, roadmap
 - **Evidence folder:** `Product_Evidence/` — add GCP billing, Gemini usage screenshots, and revenue proof before final submission
 
 ---

@@ -36,3 +36,4 @@ Supporting infrastructure runs on **MongoDB Atlas** and deploys to **Render**; F
 1. Create a free account or use the pre-built testing kit on the judges page.
 2. Walk through: create a job → import resumes → review AI scores → use Copilot → publish a public opportunity.
 3. Job seekers can browse public roles at `/recruit/opportunities` (private jobs are hidden from the public board).
+4. Read **[`JUDGES.md`](../JUDGES.md)** for the full technical brief — Google Cloud stack, architecture diagrams, Gemini usage map, and roadmap.
