@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { RecruitAuthProvider } from "@/contexts/RecruitAuthContext";
 import { BillingEntitlementProvider } from "@/contexts/BillingEntitlementContext";
 import { SignupWelcomeModal } from "@/components/SignupWelcomeModal";
+import { JudgeWelcomeModal } from "@/components/JudgeWelcomeModal";
 import { JsonLd } from "@/components/JsonLd";
 import { PwaInstallPrompt } from "@/components/PwaInstallPrompt";
 import { buildMetadata, organizationJsonLd, websiteJsonLd, softwareApplicationJsonLd, productKeywords } from "@/lib/seo";
@@ -99,6 +100,7 @@ export default function RootLayout({
                 <JsonLd id="ld-rolebolt-application" data={softwareApplicationJsonLd()} />
                 {children}
                 <SignupWelcomeModal />
+                <JudgeWelcomeModal />
                 <PwaInstallPrompt />
               </div>
             </ThemeProvider>

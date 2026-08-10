@@ -11,6 +11,7 @@ import {
 import { apiUrl } from "@/lib/api";
 import { setTokenCookie, getTokenCookie, clearTokenCookie } from "@/lib/tokenCookie";
 import { isJudgeReviewerEmail } from "@/lib/judgeReviewer";
+import { markJudgeWelcomePending } from "@/lib/judgeWelcome";
 
 export type RecruitRole = "creator" | "seeker";
 
@@ -219,6 +220,9 @@ export function RecruitAuthProvider({ children }: { children: ReactNode }) {
         } else {
           setProfileError("Could not reach the server. Please try again.");
         }
+        if (isJudgeReviewerEmail(user.email)) {
+          markJudgeWelcomePending();
+        }
         return { username: user.username };
       } catch {
         return { error: "Network error. Please check your connection." };
@@ -274,6 +278,10 @@ export function RecruitAuthProvider({ children }: { children: ReactNode }) {
           setRecruitProfile(profile);
         } else {
           setProfileError("Could not reach the server. Please try again.");
+        }
+
+        if (isJudgeReviewerEmail(nextUser.email)) {
+          markJudgeWelcomePending();
         }
 
         return {};
