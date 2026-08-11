@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { apiUrl, readApiJson } from "@/lib/api";
+import { isFoundersTeamsReview } from "@/lib/foundersTeams";
 import { ReviewCard, type PublicReview } from "./ReviewCard";
 import { SharedOnXPosts } from "./SharedOnXPosts";
 import { SharedVideoReviews } from "./SharedVideoReviews";
@@ -31,7 +32,8 @@ export function FeaturedReviews() {
       .catch(() => {});
   }, []);
 
-  const hasReviews = enabled && reviews.length > 0;
+  const communityReviews = reviews.filter((review) => !isFoundersTeamsReview(review));
+  const hasReviews = enabled && communityReviews.length > 0;
   const hasXPosts = xPostUrls.length > 0;
   const hasVideoReviews = videoReviewUrls.length > 0;
   if (!hasReviews && !hasXPosts && !hasVideoReviews) return null;
@@ -60,10 +62,10 @@ export function FeaturedReviews() {
           {hasReviews ? (
             <div>
               {(hasXPosts || hasVideoReviews) ? (
-                <p className="mb-5 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">On Rolebolt</p>
+                <p className="mb-5 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Community reviews</p>
               ) : null}
               <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-                {reviews.map((review) => (
+                {communityReviews.map((review) => (
                   <ReviewCard key={review.id} review={review} featured />
                 ))}
               </div>
