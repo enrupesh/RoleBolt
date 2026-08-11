@@ -13,7 +13,7 @@ import { callSitegenNvidia, callSitegenNvidiaLegacy } from "../ai/nvidia";
 const live = process.env.SITEGEN_BENCHMARK_NVIDIA === "1" && Boolean(process.env.GEMINI_FALLBACK_KEY);
 
 const SAMPLE_PROFILE = {
-  fullName: "Rupesh Rathee",
+  fullName: "Alex Sharma",
   headline: "Software Engineer",
   summary: "Full-stack engineer with experience building production web applications.",
   skills: ["TypeScript", "Node.js", "React", "MongoDB", "AWS"],
@@ -35,7 +35,7 @@ const SAMPLE_PROFILE = {
 };
 
 const SAMPLE_RESUME = `
-Rupesh Rathee
+Alex Sharma
 Software Engineer | TypeScript | Node.js | React
 
 SUMMARY

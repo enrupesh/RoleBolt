@@ -43,7 +43,7 @@ const faqs = [
   },
   {
     q: "What will my website URL look like?",
-    a: `Your published site will be available at ${sitegenProduct.publicUrlPattern.replace("{username}", "yourusername")} — for example, ${sitegenProduct.publicUrlPattern.replace("{username}", "rupesh")} or ${sitegenProduct.publicUrlPattern.replace("{username}", "mycompany")}.`,
+    a: `Your published site will be available at ${sitegenProduct.publicUrlPattern.replace("{username}", "yourusername")} — for example, ${sitegenProduct.publicUrlPattern.replace("{username}", "alex")} or ${sitegenProduct.publicUrlPattern.replace("{username}", "mycompany")}.`,
   },
   {
     q: "Does AI write the website code?",

@@ -462,7 +462,7 @@ export default function RecruitLoginPage() {
                       spellCheck={false}
                       value={username}
                       onChange={e => { setUsername(normalizeUsernameInput(e.target.value)); setError(""); setUnverified(false); }}
-                      placeholder="rupesh"
+                      placeholder="alexsharma"
                       className="w-full h-11 rounded-xl border border-slate-200 pl-8 pr-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#0a66c2] focus:ring-2 focus:ring-[#0a66c2]/15 outline-none transition-all"
                       required
                     />

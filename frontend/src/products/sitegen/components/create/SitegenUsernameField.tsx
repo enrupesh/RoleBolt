@@ -87,7 +87,7 @@ export function SitegenUsernameField({ id = "sitegen-username", value, onChange,
           spellCheck={false}
           value={value}
           onChange={(event) => onChange(normalizeSitegenUsernameInput(event.target.value))}
-          placeholder="rupesh"
+          placeholder="alexsharma"
           className="w-full rounded-xl border border-white/10 bg-white/5 py-3 pl-8 pr-3.5 text-sm text-white outline-none placeholder:text-violet-200/30 focus:border-violet-400/50"
           required
         />

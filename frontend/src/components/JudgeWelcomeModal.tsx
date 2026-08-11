@@ -19,7 +19,7 @@ const JUDGE_FEATURED_LINKS = [
     external: true,
   },
   {
-    href: "https://github.com/enrupesh/ratheeji/blob/main/JUDGES.md",
+    href: "https://github.com/enrupesh/RoleBolt/blob/main/JUDGES.md",
     label: "Technical brief (JUDGES.md)",
     description: "Architecture, Gemini usage & Google Cloud stack",
     accent: "from-[#24292f] to-[#57606a]",
@@ -377,7 +377,7 @@ export function JudgeWelcomeModal() {
                 Technical evidence (GCP billing, Gemini usage dashboards) lives in the repository&apos;s{" "}
                 <code className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-[#31536e]">Product_Evidence/</code> folder and the{" "}
                 <a
-                  href="https://github.com/enrupesh/ratheeji/blob/main/JUDGES.md"
+                  href="https://github.com/enrupesh/RoleBolt/blob/main/JUDGES.md"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="font-semibold text-[#0a66c2] hover:underline"
@@ -396,7 +396,7 @@ export function JudgeWelcomeModal() {
                   Watch demo video ↗
                 </a>
                 <a
-                  href="https://github.com/enrupesh/ratheeji/blob/main/JUDGES.md"
+                  href="https://github.com/enrupesh/RoleBolt/blob/main/JUDGES.md"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold text-[#31536e] transition hover:border-[#0a66c2] hover:text-[#0a66c2]"
@@ -437,7 +437,7 @@ export function JudgeWelcomeModal() {
               </Link>
               <div className="flex flex-wrap gap-2">
                 <a
-                  href="https://github.com/enrupesh/ratheeji/blob/main/JUDGES.md"
+                  href="https://github.com/enrupesh/RoleBolt/blob/main/JUDGES.md"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="rounded-xl bg-[#10263d] px-4 py-2.5 text-xs font-bold text-white transition hover:bg-[#0a1f33]"

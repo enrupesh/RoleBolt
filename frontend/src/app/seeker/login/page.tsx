@@ -519,7 +519,7 @@ function SeekerLoginPageContent() {
                         setError("");
                         setUnverified(false);
                       }}
-                      placeholder="rupesh"
+                      placeholder="alexsharma"
                       className="h-11 w-full rounded-xl border border-slate-200 pl-8 pr-3.5 text-sm text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15"
                     />
                   </div>

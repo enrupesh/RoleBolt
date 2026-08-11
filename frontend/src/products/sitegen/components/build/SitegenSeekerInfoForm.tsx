@@ -146,7 +146,7 @@ export function SitegenSeekerInfoForm({
         </div>
         <div>
           <SitegenFieldLabel required>Full name</SitegenFieldLabel>
-          <SitegenInput value={fullName} onChange={setFullName} placeholder="Rupesh Kumar" />
+          <SitegenInput value={fullName} onChange={setFullName} placeholder="Alex Sharma" />
         </div>
         <div>
           <SitegenFieldLabel optional>Headline</SitegenFieldLabel>

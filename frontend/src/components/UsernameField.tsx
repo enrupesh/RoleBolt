@@ -72,7 +72,7 @@ export function UsernameField({ id = "username", value, onChange, onValidChange,
             onChange(normalizeUsernameInput(e.target.value));
             setLocalError("");
           }}
-          placeholder="rupesh"
+          placeholder="alexsharma"
           className={`w-full h-11 rounded-xl border border-slate-200 pl-8 pr-3.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-all focus:ring-2 ${focusRing}`}
           required
         />

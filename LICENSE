@@ -1,170 +1,125 @@
 ROLEBOLT PROPRIETARY SOFTWARE LICENSE
-Build with Gemini XPRIZE — Judge & Official Reviewer Edition
-Version 1.0 — Effective August 11, 2026
+Build with Gemini XPRIZE — Evaluation Access Edition
+Version 2.0 — Effective August 11, 2026
 
-Copyright (c) 2026 Rupesh Gupta (enrupesh). All Rights Reserved.
+Copyright (c) 2026 Rolebolt. All Rights Reserved.
 
-Product name: Rolebolt
-Repository: https://github.com/enrupesh/ratheeji
-Live service: https://www.rolebolt.tech
-
-================================================================================
-IMPORTANT — READ BEFORE ACCESSING, VIEWING, CLONING, OR USING THIS SOFTWARE
-================================================================================
-
-This software and all associated materials (source code, object code, documentation,
-designs, data models, APIs, configuration, trade secrets, and derivative know-how)
-are the exclusive property of the copyright holder ("Licensor").
-
-EXCEPT AS EXPRESSLY SET FORTH IN SECTION 2 BELOW, NO RIGHTS ARE GRANTED TO ANY
-PERSON OR ENTITY. ALL RIGHTS NOT EXPRESSLY GRANTED ARE RESERVED.
-
---------------------------------------------------------------------------------
-1. DEFINITIONS
---------------------------------------------------------------------------------
-
-1.1 "Software" means the Rolebolt codebase, documentation, and related materials
-    made available in this repository or any copy thereof.
-
-1.2 "Authorized Reviewers" means ONLY the following, acting solely in their
-    official capacity to evaluate a Build with Gemini XPRIZE submission:
-
-    (a) Devpost, Inc. and its designated contest administrators;
-    (b) Hacker Fund and designated XPRIZE judging personnel;
-    (c) Google LLC and its authorized hackathon / XPRIZE evaluation staff;
-    (d) Official judges and reviewers explicitly appointed for the
-        Build with Gemini XPRIZE competition; and
-    (e) Accounts or email addresses explicitly invited by Licensor for judging
-        (including but not limited to testing@devpost.com and judging@hacker.fund).
-
-1.3 "Evaluation Purpose" means reviewing, testing, scoring, verifying, and
-    reporting on the submission during the active contest and judging periods
-    only, as defined on the official Devpost/XPRIZE competition pages.
-
-1.4 "You" means any individual or legal entity that accesses, views, downloads,
-    clones, forks, or otherwise interacts with the Software.
-
---------------------------------------------------------------------------------
-2. LIMITED LICENSE (AUTHORIZED REVIEWERS ONLY)
---------------------------------------------------------------------------------
-
-Licensor grants Authorized Reviewers a limited, non-exclusive, non-transferable,
-non-sublicensable, revocable license to:
-
-  (a) view and browse the Software in this repository;
-  (b) clone or download the Software solely to the extent necessary to run,
-      test, and evaluate the submission for the Evaluation Purpose;
-  (c) execute the Software locally or on cloud infrastructure for testing; and
-  (d) retain copies only for the duration required to complete official judging,
-      after which all copies must be deleted unless Licensor provides written
-      permission to retain them.
-
-This license terminates automatically when:
-  - the judging period ends;
-  - the submission is withdrawn; or
-  - Licensor revokes access in writing.
-
---------------------------------------------------------------------------------
-3. PROHIBITED CONDUCT (EVERYONE — INCLUDING THE GENERAL PUBLIC)
---------------------------------------------------------------------------------
-
-Unless You are an Authorized Reviewer acting strictly within Section 2, You
-are EXPRESSLY PROHIBITED from:
-
-  (a) using, executing, or deploying the Software for any purpose;
-  (b) copying, reproducing, mirroring, or redistributing the Software;
-  (c) modifying, adapting, translating, or creating derivative works;
-  (d) reverse engineering, decompiling, or disassembling the Software;
-  (e) publishing, posting, or sharing the Software or substantial portions;
-  (f) sublicensing, selling, renting, leasing, or commercializing the Software;
-  (g) removing or altering copyright, trademark, or license notices;
-  (h) using the Software to build, train, or improve competing products,
-      models, or services (including AI model training on this code);
-  (i) scraping, bulk-downloading, or archiving the repository for reuse;
-  (j) forking the repository on GitHub or any other platform for any purpose
-      other than official judging explicitly authorized by Licensor; and
-  (k) any use that infringes intellectual property or trade secret rights.
-
-Unauthorized access or use is not permitted and may result in civil and
-criminal liability to the fullest extent permitted by applicable law.
-
---------------------------------------------------------------------------------
-4. PUBLIC AVAILABILITY DOES NOT GRANT PERMISSION
---------------------------------------------------------------------------------
-
-The Software may be hosted on a publicly reachable GitHub repository solely to
-satisfy hackathon submission requirements. Public visibility DOES NOT constitute
-permission for the general public to use, copy, fork, download, or create
-derivative works.
-
-If You are not an Authorized Reviewer, You must not clone, download, fork, or
-use this Software. Close this repository and do not retain any copies.
-
---------------------------------------------------------------------------------
-5. OWNERSHIP & RESERVATION OF RIGHTS
---------------------------------------------------------------------------------
-
-Licensor retains all right, title, and interest in and to the Software, including
-all intellectual property rights (copyright, patent, trade secret, trademark, and
-moral rights to the extent waivable).
-
-No ownership rights are transferred by this license.
-
---------------------------------------------------------------------------------
-6. THIRD-PARTY COMPONENTS
---------------------------------------------------------------------------------
-
-The Software may include or depend on third-party open-source libraries governed
-by their own licenses (see package manifests). Those third-party components
-remain subject to their respective licenses. This license applies only to
-Licensor's original Rolebolt materials.
-
---------------------------------------------------------------------------------
-7. NO WARRANTY
---------------------------------------------------------------------------------
-
-THE SOFTWARE IS PROVIDED "AS IS" FOR EVALUATION ONLY. LICENSOR DISCLAIMS ALL
-WARRANTIES, EXPRESS OR IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A
-PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
-
---------------------------------------------------------------------------------
-8. LIMITATION OF LIABILITY
---------------------------------------------------------------------------------
-
-TO THE MAXIMUM EXTENT PERMITTED BY LAW, LICENSOR SHALL NOT BE LIABLE FOR ANY
-INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES ARISING FROM
-USE OF OR INABILITY TO USE THE SOFTWARE.
-
---------------------------------------------------------------------------------
-9. ENFORCEMENT & REMEDIES
---------------------------------------------------------------------------------
-
-Licensor may pursue all available legal and equitable remedies for unauthorized
-use, including injunctive relief, damages, and attorney fees where recoverable.
-
-Report unauthorized use or suspected infringement to:
-  support.studyhelp@gmail.com
-  Subject: [Rolebolt License Violation]
-
---------------------------------------------------------------------------------
-10. GOVERNING LAW
---------------------------------------------------------------------------------
-
-This license is governed by the laws of India, without regard to conflict-of-law
-principles. Courts in Patna, Bihar, India shall have exclusive jurisdiction,
-subject to mandatory consumer protection laws where applicable.
-
---------------------------------------------------------------------------------
-11. CONTACT
---------------------------------------------------------------------------------
-
-Rupesh Gupta (enrupesh)
-Email: support.studyhelp@gmail.com
+Product: Rolebolt
+Repository: https://github.com/enrupesh/RoleBolt
 Website: https://www.rolebolt.tech
 
+--------------------------------------------------------------------------------
+PURPOSE
+--------------------------------------------------------------------------------
+
+This repository is made publicly available so that official judges and
+authorized reviewers of the Build with Gemini / XPRIZE hackathon can access,
+inspect, run, test, and evaluate the Rolebolt submission.
+
+Public visibility on GitHub does NOT mean this software is open source, and
+does NOT grant the general public permission to use, copy, modify, fork,
+redistribute, deploy, or commercialize the code.
+
+--------------------------------------------------------------------------------
+1. OWNERSHIP
+--------------------------------------------------------------------------------
+
+The Rolebolt source code and all original proprietary materials in this
+repository (including documentation, designs, APIs, data models, and related
+artifacts) are owned by Rolebolt.
+
+All rights not expressly granted in this license are reserved by Rolebolt.
+
+--------------------------------------------------------------------------------
+2. LIMITED PERMISSION FOR OFFICIAL EVALUATION
+--------------------------------------------------------------------------------
+
+Authorized Reviewers may, solely for Evaluation Purposes:
+
+  (a) view and browse this repository;
+  (b) clone or download the Software as needed to inspect and test it;
+  (c) run the Software locally or in a test environment; and
+  (d) evaluate the submission for scoring and verification.
+
+"Authorized Reviewers" means official judges, contest administrators, and
+reviewers acting for Build with Gemini / XPRIZE evaluation (including Devpost,
+Hacker Fund, Google, and accounts such as testing@devpost.com and
+judging@hacker.fund), when acting in that official capacity.
+
+"Evaluation Purposes" means reviewing, testing, scoring, and verifying the
+submission during the contest submission and judging periods.
+
+This limited permission ends when the relevant judging period ends, or earlier
+if Rolebolt withdraws the submission or revokes access. After evaluation,
+reviewers should delete retained copies unless Rolebolt provides written
+permission to keep them.
+
+--------------------------------------------------------------------------------
+3. NO GENERAL LICENSE
+--------------------------------------------------------------------------------
+
+Except for the limited evaluation permission in Section 2, no license is
+granted to any person or entity.
+
+Without Rolebolt's prior written permission, you may not:
+
+  (a) use, copy, modify, fork, or redistribute the Software;
+  (b) deploy the Software in production or for any commercial purpose;
+  (c) create derivative works from the Software;
+  (d) use the Software, or substantial parts of its implementation, to build
+      another product, service, platform, or competing brand; or
+  (e) remove or alter copyright or proprietary notices.
+
+If you are not an Authorized Reviewer, please do not treat this repository as
+reusable source code. Viewing a public repository does not create permission
+to reuse it.
+
+--------------------------------------------------------------------------------
+4. PUBLIC ACCESS IS NOT OPEN SOURCE
+--------------------------------------------------------------------------------
+
+This Software is proprietary. Publication on a public GitHub repository is for
+hackathon submission and judging logistics only.
+
+It must not be interpreted as:
+
+  - an open-source license;
+  - a grant of rights under MIT, Apache, GPL, or any similar license; or
+  - permission for the general public to reuse the code.
+
+--------------------------------------------------------------------------------
+5. THIRD-PARTY COMPONENTS
+--------------------------------------------------------------------------------
+
+This repository may include or depend on third-party open-source libraries.
+Those components remain subject to their own licenses. This license applies
+only to Rolebolt's original proprietary materials.
+
+--------------------------------------------------------------------------------
+6. NO WARRANTY
+--------------------------------------------------------------------------------
+
+THE SOFTWARE IS PROVIDED "AS IS" FOR EVALUATION ONLY, WITHOUT WARRANTIES OF ANY
+KIND, EXPRESS OR IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR
+PURPOSE, AND NON-INFRINGEMENT.
+
+--------------------------------------------------------------------------------
+7. LIMITATION OF LIABILITY
+--------------------------------------------------------------------------------
+
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, ROLEBOLT SHALL NOT BE LIABLE FOR ANY
+INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES ARISING FROM
+ACCESS TO OR USE OF THE SOFTWARE.
+
+--------------------------------------------------------------------------------
+8. CONTACT
+--------------------------------------------------------------------------------
+
+Questions about this license: support.studyhelp@gmail.com
+Subject: [Rolebolt License]
+
 ================================================================================
-BY ACCESSING THIS REPOSITORY, YOU ACKNOWLEDGE THAT YOU HAVE READ THIS LICENSE,
-UNDERSTAND IT, AND AGREE TO BE BOUND BY ITS TERMS. IF YOU DO NOT AGREE, OR IF
-YOU ARE NOT AN AUTHORIZED REVIEWER, DO NOT ACCESS, DOWNLOAD, COPY, OR USE THE
-SOFTWARE.
+By accessing this repository, you acknowledge these terms. If you do not agree,
+or if you are not an Authorized Reviewer, do not use, copy, or redistribute
+the Software.
 ================================================================================
