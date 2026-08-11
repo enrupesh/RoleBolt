@@ -13,6 +13,7 @@ import {
   type ReviewSubmitterPlan,
 } from "./models/RecruitReview";
 import { getEntitlement } from "./billing/entitlements";
+import { PARTNER_REVIEWS } from "./partnerReviews";
 import { parseXPostUrls, resolvedFeaturedXPostUrls } from "./xPost";
 import { parseYouTubeVideoUrls, resolvedFeaturedVideoReviewUrls } from "./youtubeVideo";
 
@@ -28,6 +29,40 @@ function reviewDto(review: Record<string, any>) {
     role: review.role,
     featured: Boolean(review.featured),
   };
+}
+
+/** Idempotent upsert of curated partner reviews (featured on landing + /reviews). */
+let partnerReviewsReady: Promise<void> | null = null;
+async function ensurePartnerReviews(): Promise<void> {
+  if (!partnerReviewsReady) {
+    partnerReviewsReady = (async () => {
+      await Promise.all(
+        PARTNER_REVIEWS.map((review) =>
+          RecruitReview.findOneAndUpdate(
+            { uid: review.uid },
+            {
+              $set: {
+                uid: review.uid,
+                rating: review.rating,
+                title: review.title,
+                message: review.message,
+                displayName: review.displayName,
+                role: review.role,
+                featured: review.featured,
+                visible: review.visible,
+                isGuest: review.isGuest,
+              },
+            },
+            { upsert: true, new: true, setDefaultsOnInsert: true },
+          ).exec(),
+        ),
+      );
+    })().catch((err) => {
+      partnerReviewsReady = null;
+      throw err;
+    });
+  }
+  await partnerReviewsReady;
 }
 
 async function getSettings() {
@@ -84,6 +119,7 @@ function parseSubmitterPlan(value: unknown): ReviewSubmitterPlan | undefined {
 reviewsPublicRouter.get("/reviews", async (_req, res) => {
   try {
     await connectMongo();
+    await ensurePartnerReviews();
     const settings = await getSettings();
     const reviews = await RecruitReview.find({ visible: true })
       .sort({ featured: -1, createdAt: -1 })
@@ -102,6 +138,7 @@ reviewsPublicRouter.get("/reviews", async (_req, res) => {
 reviewsPublicRouter.get("/reviews/featured", async (_req, res) => {
   try {
     await connectMongo();
+    await ensurePartnerReviews();
     const settings = await getSettings();
     if (!settings?.showFeaturedReviews) {
       return res.json({
