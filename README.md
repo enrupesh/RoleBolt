@@ -234,4 +234,4 @@ Rolebolt is submitted to the **Build with Gemini XPRIZE** ([Devpost](https://xpr
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+**Proprietary — all rights reserved.** Source is published for Build with Gemini XPRIZE judging only. Unauthorized copying, use, distribution, or derivative works are prohibited. See [LICENSE](LICENSE) for the full Judge & Official Reviewer Edition terms.
