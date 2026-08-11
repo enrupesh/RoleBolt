@@ -9,6 +9,7 @@ import { SiteGuideChatbot } from "@/components/SiteGuideChatbot";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { SitegenHeroPromoCard, SitegenShowcaseSection } from "@/components/SitegenHomePromo";
 import { FeaturedReviews } from "@/components/FeaturedReviews";
+import { FoundersTeamsSection } from "@/components/FoundersTeamsSection";
 import { NewVisitorWelcomePopup } from "@/components/NewVisitorWelcomePopup";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 
@@ -379,6 +380,7 @@ export default function RecruitLandingPage() {
          <section className="bg-white">
           <div className="mx-auto max-w-4xl px-5 py-24 text-center lg:px-8"><p className="text-xs font-semibold uppercase tracking-[.17em] text-[#0a66c2]">Ready when your team is</p><h2 className="mt-4 font-display text-4xl font-semibold tracking-[-.055em] text-[#10263d] sm:text-5xl">Make the next hiring decision with the whole picture.</h2><p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-[#667d8f]">Start with the tools that fit today. Rolebolt plans are designed to grow with your hiring volume, with payment-ready upgrades when you need them.</p><div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row"><Link href="/recruit/signup" className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0a66c2] px-6 py-3.5 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#07559f]">Start building <Arrow /></Link><Link href="/recruit/opportunities" className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#cbd9e4] px-6 py-3.5 text-sm font-semibold text-[#31536e] transition hover:border-[#0a66c2]">Browse opportunities <Arrow /></Link></div></div>
         </section>
+        <FoundersTeamsSection />
         <FeaturedReviews />
       </main>
 
