@@ -6,6 +6,15 @@
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, type Auth } from "firebase/auth";
 
+export class FirebaseClientConfigurationError extends Error {
+  readonly code = "FIREBASE_CLIENT_NOT_CONFIGURED";
+
+  constructor(missing: string[]) {
+    super(`Firebase is not configured. Missing: ${missing.join(", ")}`);
+    this.name = "FirebaseClientConfigurationError";
+  }
+}
+
 function readFirebaseConfig() {
   return {
     apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY ?? "",
@@ -15,6 +24,13 @@ function readFirebaseConfig() {
     messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ?? "",
     appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID ?? "",
   };
+}
+
+function validateFirebaseConfig(config: ReturnType<typeof readFirebaseConfig>) {
+  const missing = Object.entries(config)
+    .filter(([, value]) => !value.trim())
+    .map(([key]) => key);
+  if (missing.length) throw new FirebaseClientConfigurationError(missing);
 }
 
 let firebaseApp: FirebaseApp | undefined;
@@ -31,6 +47,7 @@ export function getFirebaseAuth(): Auth {
   assertBrowserAuth();
   if (!firebaseAuthInstance) {
     const config = readFirebaseConfig();
+    validateFirebaseConfig(config);
     firebaseApp = getApps().length ? getApp() : initializeApp(config);
     firebaseAuthInstance = getAuth(firebaseApp);
   }

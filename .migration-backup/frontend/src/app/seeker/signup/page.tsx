@@ -106,7 +106,7 @@ export default function SeekerSignupPage() {
     setSocialLoading("google");
     try {
       const result = await signInWithPopup(getFirebaseAuth(), getGoogleProvider());
-      const idToken = await result.user.getIdToken();
+      const idToken = await result.user.getIdToken(true);
       const res = await fetch(apiUrl("/auth/social"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -182,7 +182,7 @@ export default function SeekerSignupPage() {
     setPhoneLoading(true);
     try {
       const result = await confirmationRef.current.confirm(otp.trim());
-      const idToken = await result.user.getIdToken();
+      const idToken = await result.user.getIdToken(true);
       const res = await fetch(apiUrl("/auth/social"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },

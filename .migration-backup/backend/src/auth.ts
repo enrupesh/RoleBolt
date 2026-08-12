@@ -19,7 +19,10 @@ import { User } from "./models/User";
 import { signToken, verifyToken, requireAuth } from "./authMiddleware";
 import { sendEmail } from "./mailer";
 import { AUTH_FROM } from "./emailConfig";
-import { verifyFirebaseToken } from "./firebaseAdmin";
+import {
+  FirebaseAuthConfigurationError,
+  verifyFirebaseToken,
+} from "./firebaseAdmin";
 import { RecruitProfile } from "./models/RecruitProfile";
 import { RecruitSeekerProfile } from "./models/RecruitSeekerProfile";
 import { initializeFreeEntitlements } from "./billing/entitlements";
@@ -32,15 +35,17 @@ export const authRouter = express.Router();
 // ─── Config ───────────────────────────────────────────────────────────────────
 
 // Guard: reject any stale/incorrect FRONTEND_URL values so email links always point to the real domain.
-const _rawFrontendUrl = process.env.FRONTEND_URL ?? "";
-const FRONTEND_URL = (
-  _rawFrontendUrl &&
-  !_rawFrontendUrl.includes("forjob.onrender.com") &&
-  !_rawFrontendUrl.includes("localhost") &&
-  !_rawFrontendUrl.includes("127.0.0.1")
-    ? _rawFrontendUrl
-    : "https://www.rolebolt.tech"
-).replace(/\/$/, "");
+function getFrontendUrl(): string {
+  const raw = process.env.FRONTEND_URL ?? "";
+  return (
+    raw &&
+    !raw.includes("forjob.onrender.com") &&
+    !raw.includes("localhost") &&
+    !raw.includes("127.0.0.1")
+      ? raw
+      : "https://www.rolebolt.tech"
+  ).replace(/\/$/, "");
+}
 const BCRYPT_ROUNDS    = 12;
 const TOKEN_TTL_MS     = 24 * 60 * 60 * 1000;       // 24 h  (email verification)
 const RESET_TTL_MS     =  1 * 60 * 60 * 1000;       //  1 h  (password reset)
@@ -163,7 +168,7 @@ async function sendVerificationEmail(
   role: SignupRole = "creator",
 ): Promise<void> {
   const verificationPath = role === "seeker" ? "/seeker/verify-email" : "/recruit/verify-email";
-  const link = `${FRONTEND_URL}${verificationPath}?token=${token}`;
+  const link = `${getFrontendUrl()}${verificationPath}?token=${token}`;
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -243,7 +248,9 @@ async function sendVerificationEmail(
 
 // ─── Config (backend base URL for OAuth callbacks) ───────────────────────────
 
-const BACKEND_URL = (process.env.BACKEND_URL || "https://back-mp9k.onrender.com").replace(/\/$/, "");
+function getBackendUrl(): string {
+  return (process.env.BACKEND_URL || "https://back-mp9k.onrender.com").replace(/\/$/, "");
+}
 type GitHubAuthTarget = "recruit" | "seeker";
 type GitHubAuthIntent = "login" | "signup";
 
@@ -261,7 +268,7 @@ function buildGitHubFrontendCallback(
   params: Record<string, string>
 ): string {
   const search = new URLSearchParams({ target, intent, ...params });
-  return `${FRONTEND_URL}/recruit/auth/callback?${search.toString()}`;
+  return `${getFrontendUrl()}/recruit/auth/callback?${search.toString()}`;
 }
 
 // ─── POST /auth/social — Firebase social login (Google, Microsoft) ────────────
@@ -287,8 +294,32 @@ authRouter.post("/social", async (req, res) => {
     let decoded: import("firebase-admin").auth.DecodedIdToken;
     try {
       decoded = await verifyFirebaseToken(idToken);
-    } catch {
-      return res.status(401).json({ error: "Invalid or expired Firebase token." });
+    } catch (err: any) {
+      const firebaseCode = String(err?.code ?? "");
+      const firebaseMessage = String(err?.message ?? "unknown verifier error");
+
+      if (err instanceof FirebaseAuthConfigurationError || firebaseCode === "FIREBASE_AUTH_NOT_CONFIGURED") {
+        console.error("[auth/social] Firebase Admin configuration error:", firebaseMessage);
+        return res.status(503).json({
+          code: "FIREBASE_AUTH_NOT_CONFIGURED",
+          error: "Google sign-in is temporarily unavailable because server authentication is not configured.",
+        });
+      }
+
+      console.error("[auth/social] Firebase token verification failed:", {
+        code: firebaseCode || "unknown",
+        message: firebaseMessage,
+      });
+      if (firebaseCode === "auth/id-token-expired") {
+        return res.status(401).json({
+          code: "FIREBASE_TOKEN_EXPIRED",
+          error: "Your Google sign-in session expired. Please try again.",
+        });
+      }
+      return res.status(401).json({
+        code: "FIREBASE_TOKEN_INVALID",
+        error: "The Google sign-in session is invalid. Please try again.",
+      });
     }
 
     const firebaseUid = decoded.uid;
@@ -403,7 +434,7 @@ authRouter.get("/github", (_req, res) => {
   }
   const target = getGitHubTarget(_req.query.target);
   const intent = getGitHubIntent(_req.query.intent);
-  const redirectUri = `${BACKEND_URL}/auth/github/callback?target=${encodeURIComponent(target)}&intent=${encodeURIComponent(intent)}`;
+  const redirectUri = `${getBackendUrl()}/auth/github/callback?target=${encodeURIComponent(target)}&intent=${encodeURIComponent(intent)}`;
   // Use a short-lived signed JWT as the state — provides CSRF protection without a session store
   const state = signToken({ sub: "oauth-state", email: `gh-${crypto.randomBytes(8).toString("hex")}` });
   const params = new URLSearchParams({
@@ -449,7 +480,7 @@ authRouter.get("/github/callback", async (req, res) => {
         client_id: clientId,
         client_secret: clientSecret,
         code,
-        redirect_uri: `${BACKEND_URL}/auth/github/callback?target=${encodeURIComponent(target)}&intent=${encodeURIComponent(intent)}`,
+        redirect_uri: `${getBackendUrl()}/auth/github/callback?target=${encodeURIComponent(target)}&intent=${encodeURIComponent(intent)}`,
       }),
     });
     const tokenData: any = await tokenRes.json();

@@ -1,10 +1,12 @@
 import express from "express";
 import jwt from "jsonwebtoken";
 
-const JWT_SECRET = process.env.SESSION_SECRET || "";
-
-if (!JWT_SECRET) {
-  console.warn("[auth] SESSION_SECRET is not set — JWT signing will fail in production.");
+function getJwtSecret(): string {
+  const secret = process.env.SESSION_SECRET?.trim() || "";
+  if (!secret) {
+    throw new Error("SESSION_SECRET is not configured.");
+  }
+  return secret;
 }
 
 export interface JwtPayload {
@@ -13,12 +15,14 @@ export interface JwtPayload {
 }
 
 export function signToken(payload: JwtPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: "30d" });
+  return jwt.sign(payload, getJwtSecret(), { expiresIn: "30d" });
 }
 
 export function verifyToken(token: string): JwtPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as JwtPayload;
+    const secret = process.env.SESSION_SECRET?.trim() || "";
+    if (!secret) return null;
+    return jwt.verify(token, secret) as JwtPayload;
   } catch {
     return null;
   }

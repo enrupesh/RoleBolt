@@ -1,5 +1,7 @@
+// Load .env before importing auth modules; several auth helpers read
+// configuration at request time and OAuth/JWT must work in local development too.
+import "dotenv/config";
 import cors from "cors";
-import dotenv from "dotenv";
 import express from "express";
 import { authRouter } from "./auth";
 import { requireAuth } from "./authMiddleware";
@@ -22,8 +24,6 @@ import { creatorEmailRouter } from "./creatorEmailRouter";
 import { feedbackPublicRouter } from "./feedback";
 import { reviewsPublicRouter } from "./reviews";
 import { sitegenPublicRouter } from "./products/sitegen";
-
-dotenv.config();
 
 const app = express();
 
