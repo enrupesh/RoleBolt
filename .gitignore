@@ -1,38 +1,49 @@
-# Dependencies
-node_modules/
+# See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
 
-# Build output
-dist/
-.next/
-out/
+# compiled output
+dist
+tmp
+out-tsc
 *.tsbuildinfo
+.expo
+.expo-shared
 
-# Environment and secrets
-.env
-.env.*
-!.env.example
-firebase-service-account.json
-*.pem
+# dependencies
+node_modules
 
-# Logs and caches
-npm-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-.cache/
-.turbo/
+# IDEs and editors
+/.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
 
-# Test and coverage
-coverage/
-playwright-report/
-test-results/
-
-# OS and editors
-.DS_Store
-Thumbs.db
-.idea/
+# IDE - VSCode
 .vscode/*
 !.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
 !.vscode/extensions.json
 
-# Misc
-*.local
+# misc
+/.sass-cache
+/connect.lock
+/coverage
+/libpeerconnection.log
+npm-debug.log
+yarn-error.log
+testem.log
+/typings
+
+# System Files
+.DS_Store
+Thumbs.db
+
+.cursor/rules/nx-rules.mdc
+.github/instructions/nx.instructions.md
+
+# Replit
+.cache/
+.local/
