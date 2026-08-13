@@ -15,6 +15,25 @@ export class FirebaseClientConfigurationError extends Error {
   }
 }
 
+export function firebaseAuthErrorMessage(
+  error: unknown,
+  fallback = "Sign-in failed. Please try again.",
+): string {
+  const code = typeof error === "object" && error && "code" in error
+    ? String((error as { code?: unknown }).code)
+    : "";
+  const messages: Record<string, string> = {
+    "FIREBASE_CLIENT_NOT_CONFIGURED": "Google sign-in is not configured for this app yet.",
+    "auth/unauthorized-domain": "This website is not authorized in Firebase. Add its domain under Firebase Authentication → Settings → Authorized domains.",
+    "auth/operation-not-allowed": "Google sign-in is disabled in Firebase Authentication. Enable the Google provider and try again.",
+    "auth/invalid-api-key": "The Firebase browser configuration is invalid. Check the Firebase web app settings.",
+    "auth/network-request-failed": "Firebase could not reach the network. Check your connection and try again.",
+    "auth/popup-blocked": "Your browser blocked the Google sign-in popup. Allow popups for this site and try again.",
+    "auth/popup-closed-by-user": "Google sign-in was cancelled.",
+  };
+  return messages[code] ?? (error instanceof Error && error.message ? error.message : fallback);
+}
+
 function readFirebaseConfig() {
   return {
     apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY ?? "",

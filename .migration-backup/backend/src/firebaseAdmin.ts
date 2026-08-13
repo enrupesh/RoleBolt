@@ -23,28 +23,67 @@ export class FirebaseAuthConfigurationError extends Error {
 }
 
 function parseServiceAccount(raw: string): admin.ServiceAccount {
-  const value = raw.trim();
+  const value = raw.trim().replace(/^\uFEFF/, "");
   if (!value) {
     throw new FirebaseAuthConfigurationError(
       "FIREBASE_SERVICE_ACCOUNT_JSON is empty.",
     );
   }
 
+  let parsed: admin.ServiceAccount & {
+    project_id?: string;
+    client_email?: string;
+    private_key?: string;
+  };
   try {
-    const parsed = JSON.parse(value) as admin.ServiceAccount & {
-      project_id?: string;
-      client_email?: string;
-      private_key?: string;
-    };
-    if (!parsed.projectId && parsed.project_id) parsed.projectId = parsed.project_id;
-    if (!parsed.clientEmail && parsed.client_email) parsed.clientEmail = parsed.client_email;
-    if (!parsed.privateKey && parsed.private_key) parsed.privateKey = parsed.private_key;
-    return parsed;
+    parsed = JSON.parse(value);
   } catch {
-    throw new FirebaseAuthConfigurationError(
-      "FIREBASE_SERVICE_ACCOUNT_JSON is not valid JSON.",
-    );
+    try {
+      parsed = JSON.parse(escapeControlCharactersInsideJsonStrings(value));
+    } catch {
+      throw new FirebaseAuthConfigurationError("FIREBASE_SERVICE_ACCOUNT_JSON is not valid JSON.");
+    }
   }
+
+  if (!parsed.projectId && parsed.project_id) parsed.projectId = parsed.project_id;
+  if (!parsed.clientEmail && parsed.client_email) parsed.clientEmail = parsed.client_email;
+  if (!parsed.privateKey && parsed.private_key) parsed.privateKey = parsed.private_key;
+  if (parsed.privateKey) parsed.privateKey = parsed.privateKey.replace(/\\n/g, "\n");
+  return parsed;
+}
+
+function escapeControlCharactersInsideJsonStrings(value: string): string {
+  let result = "";
+  let insideString = false;
+  let escaped = false;
+
+  for (const character of value) {
+    if (insideString) {
+      if (escaped) {
+        result += character;
+        escaped = false;
+      } else if (character === "\\") {
+        result += character;
+        escaped = true;
+      } else if (character === '"') {
+        result += character;
+        insideString = false;
+      } else if (character === "\n") {
+        result += "\\n";
+      } else if (character === "\r") {
+        result += "\\r";
+      } else if (character === "\t") {
+        result += "\\t";
+      } else {
+        result += character;
+      }
+    } else {
+      result += character;
+      if (character === '"') insideString = true;
+    }
+  }
+
+  return result;
 }
 
 function getApp(): admin.app.App {
@@ -70,6 +109,13 @@ function getApp(): admin.app.App {
     );
   }
 
+  const clientProjectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID?.trim();
+  if (clientProjectId && clientProjectId !== serviceAccount.projectId) {
+    throw new FirebaseAuthConfigurationError(
+      "Firebase client and server credentials belong to different projects.",
+    );
+  }
+
   _app = admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
   });
@@ -82,8 +128,7 @@ export function getFirebaseProjectId(): string | null {
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON?.trim();
   if (raw) {
     try {
-      const parsed = JSON.parse(raw) as { project_id?: string; projectId?: string };
-      return parsed.projectId ?? parsed.project_id ?? null;
+      return parseServiceAccount(raw).projectId ?? null;
     } catch {
       return null;
     }

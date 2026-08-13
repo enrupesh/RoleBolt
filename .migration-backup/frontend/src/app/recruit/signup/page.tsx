@@ -8,7 +8,7 @@ import { RoleboltLogo } from "@/components/RoleboltLogo";
 import { useRecruitAuth } from "@/contexts/RecruitAuthContext";
 import { UsernameField } from "@/components/UsernameField";
 import { validateUsername } from "@/lib/username";
-import { getFirebaseAuth, getGoogleProvider } from "@/lib/firebaseClient";
+import { firebaseAuthErrorMessage, getFirebaseAuth, getGoogleProvider } from "@/lib/firebaseClient";
 import { signInWithPopup, RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from "firebase/auth";
 import { markSignupWelcome } from "@/lib/signupWelcome";
 
@@ -115,9 +115,7 @@ export default function RecruitSignUpPage() {
         router.replace(nextPath);
       }
     } catch (err: any) {
-      if (err?.code !== "auth/popup-closed-by-user") {
-        setError("Sign-in was cancelled or failed. Please try again.");
-      }
+      if (err?.code !== "auth/popup-closed-by-user") setError(firebaseAuthErrorMessage(err));
     } finally {
       setSocialLoading(null);
     }
@@ -145,7 +143,7 @@ export default function RecruitSignUpPage() {
       confirmationRef.current = await signInWithPhoneNumber(getFirebaseAuth(), trimmed, recaptchaVerifierRef.current);
       setPhoneStep("otp");
     } catch (err: any) {
-      setPhoneError(err?.message ?? "Failed to send OTP. Please try again.");
+      setPhoneError(firebaseAuthErrorMessage(err, "Failed to send OTP. Please try again."));
       recaptchaVerifierRef.current = null;
     } finally {
       setPhoneLoading(false);

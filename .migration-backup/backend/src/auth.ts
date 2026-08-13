@@ -14,7 +14,7 @@
 import express from "express";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
-import { connectMongo } from "./db";
+import { connectMongo, DatabaseConfigurationError } from "./db";
 import { User } from "./models/User";
 import { signToken, verifyToken, requireAuth } from "./authMiddleware";
 import { sendEmail } from "./mailer";
@@ -104,6 +104,20 @@ function userPublicDto(user: {
     name: user.name ?? "",
     signupRole: user.signupRole,
   };
+}
+
+function respondIfAuthDependencyIsMisconfigured(
+  res: express.Response,
+  err: unknown,
+): boolean {
+  if (err instanceof DatabaseConfigurationError || (err as any)?.code === "DATABASE_NOT_CONFIGURED") {
+    res.status(503).json({
+      code: "DATABASE_NOT_CONFIGURED",
+      error: "Authentication is temporarily unavailable because the account database is not configured.",
+    });
+    return true;
+  }
+  return false;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -420,6 +434,7 @@ authRouter.post("/social", async (req, res) => {
       user: userPublicDto(user),
     });
   } catch (err: any) {
+    if (respondIfAuthDependencyIsMisconfigured(res, err)) return;
     console.error("[auth/social] error:", err?.message);
     return res.status(500).json({ error: "Internal server error." });
   }
@@ -428,9 +443,11 @@ authRouter.post("/social", async (req, res) => {
 // ─── GET /auth/github — initiate GitHub OAuth ─────────────────────────────────
 
 authRouter.get("/github", (_req, res) => {
-  const clientId = process.env.GITHUB_CLIENT_ID;
-  if (!clientId) {
-    return res.status(500).send("GitHub OAuth is not configured (missing GITHUB_CLIENT_ID).");
+  const clientId = process.env.GITHUB_CLIENT_ID?.trim();
+  const clientSecret = process.env.GITHUB_CLIENT_SECRET?.trim();
+  if (!clientId || !clientSecret) {
+    console.error("[auth/github] OAuth configuration is incomplete.");
+    return res.status(503).send("GitHub sign-in is temporarily unavailable because OAuth is not fully configured.");
   }
   const target = getGitHubTarget(_req.query.target);
   const intent = getGitHubIntent(_req.query.intent);
@@ -743,6 +760,7 @@ authRouter.post("/signup", async (req, res) => {
       username: user.username,
     });
   } catch (err: any) {
+    if (respondIfAuthDependencyIsMisconfigured(res, err)) return;
     if (err?.code === 11000) {
       const field = Object.keys(err.keyPattern ?? {})[0];
       if (field === "username") return res.status(400).json({ error: "This username is already taken." });
@@ -836,6 +854,7 @@ authRouter.post("/login", async (req, res) => {
       user: userPublicDto(user),
     });
   } catch (err: any) {
+    if (respondIfAuthDependencyIsMisconfigured(res, err)) return;
     console.error("[auth] login error:", err?.message);
     return res.status(500).json({ error: "Internal server error." });
   }
@@ -931,7 +950,7 @@ authRouter.post("/forgot-password", async (req, res) => {
     user.resetTokenExpiry  = new Date(Date.now() + RESET_TTL_MS);
     await user.save();
 
-    const link = `${FRONTEND_URL}/recruit/reset-password?token=${resetToken}`;
+    const link = `${getFrontendUrl()}/recruit/reset-password?token=${resetToken}`;
 
     const html = `<!DOCTYPE html>
 <html lang="en">
@@ -1085,6 +1104,7 @@ authRouter.get("/me", requireAuth, async (req, res) => {
       signupRole: user.signupRole,
     });
   } catch (err: any) {
+    if (respondIfAuthDependencyIsMisconfigured(res, err)) return;
     console.error("[auth] /me error:", err?.message);
     return res.status(500).json({ error: "Internal server error." });
   }

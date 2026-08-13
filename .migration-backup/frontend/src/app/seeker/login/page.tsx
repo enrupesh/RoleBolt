@@ -10,7 +10,7 @@ import { normalizeUsernameInput } from "@/lib/username";
 import { apiUrl } from "@/lib/api";
 import { isJudgeReviewerEmail } from "@/lib/judgeReviewer";
 import { ensureSeekerProfileReady } from "@/lib/ensureSeekerProfileReady";
-import { getFirebaseAuth, getGoogleProvider } from "@/lib/firebaseClient";
+import { firebaseAuthErrorMessage, getFirebaseAuth, getGoogleProvider } from "@/lib/firebaseClient";
 import { signInWithPopup, RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from "firebase/auth";
 
 function GoogleIcon() {
@@ -130,9 +130,7 @@ function SeekerLoginPageContent() {
         goAfterLogin();
       }
     } catch (err: any) {
-      if (err?.code !== "auth/popup-closed-by-user") {
-        setError("Sign-in was cancelled or failed. Please try again.");
-      }
+      if (err?.code !== "auth/popup-closed-by-user") setError(firebaseAuthErrorMessage(err));
     } finally {
       setSocialLoading(null);
     }
@@ -167,7 +165,7 @@ function SeekerLoginPageContent() {
       confirmationRef.current = await signInWithPhoneNumber(getFirebaseAuth(), trimmed, recaptchaVerifierRef.current);
       setPhoneStep("otp");
     } catch (err: any) {
-      setPhoneError(err?.message ?? "Failed to send OTP. Please try again.");
+      setPhoneError(firebaseAuthErrorMessage(err, "Failed to send OTP. Please try again."));
       recaptchaVerifierRef.current = null;
     } finally {
       setPhoneLoading(false);
