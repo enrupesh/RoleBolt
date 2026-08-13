@@ -1014,6 +1014,18 @@ function DailyBriefingCard() {
   const [sending, setSending] = useState(false);
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
   const [msg, setMsg] = useState("");
+  const [infoOpen, setInfoOpen] = useState(false);
+
+  useEffect(() => {
+    if (!infoOpen) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setInfoOpen(false);
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [infoOpen]);
 
   async function sendNow() {
     if (!sessionToken) return;
@@ -1038,30 +1050,139 @@ function DailyBriefingCard() {
   }
 
   return (
-    <div className="mb-6 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50 to-blue-50 p-4 flex items-center justify-between gap-4 flex-wrap">
-      <div className="flex items-center gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-500 text-white shadow shadow-indigo-500/25">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>
-          </svg>
+    <>
+      <div className="mb-6 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50 to-blue-50 p-4 flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-500 text-white shadow shadow-indigo-500/25">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>
+            </svg>
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-slate-800">AI Daily Briefing</p>
+            <p className="text-xs text-slate-500">A clear hiring summary sent to your inbox, ready when you need it.</p>
+          </div>
         </div>
-        <div>
-          <p className="text-sm font-semibold text-slate-800">AI Daily Briefing</p>
-          <p className="text-xs text-slate-500">AI sends a personalised hiring summary to your inbox every day at 8 AM UTC.</p>
+        <div className="flex items-center gap-3">
+          {status === "success" && <p className="text-xs font-medium text-emerald-600">{msg}</p>}
+          {status === "error"   && <p className="text-xs font-medium text-rose-600">{msg}</p>}
+          <button
+            type="button"
+            onClick={() => setInfoOpen(true)}
+            className="shrink-0 rounded-xl bg-indigo-500 px-4 py-2 text-xs font-bold text-white shadow shadow-indigo-500/20 transition hover:bg-indigo-400"
+          >
+            Send today's briefing now
+          </button>
         </div>
       </div>
-      <div className="flex items-center gap-3">
-        {status === "success" && <p className="text-xs font-medium text-emerald-600">{msg}</p>}
-        {status === "error"   && <p className="text-xs font-medium text-rose-600">{msg}</p>}
-        <button
-          onClick={sendNow}
-          disabled={sending}
-          className="shrink-0 rounded-xl bg-indigo-500 px-4 py-2 text-xs font-bold text-white shadow shadow-indigo-500/20 transition hover:bg-indigo-400 disabled:opacity-60"
+
+      {infoOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm"
+          role="presentation"
+          onMouseDown={event => {
+            if (event.target === event.currentTarget) setInfoOpen(false);
+          }}
         >
-          {sending ? "Sending…" : "Send today's briefing now"}
-        </button>
-      </div>
-    </div>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="daily-briefing-title"
+            className="w-full max-w-lg overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.22)]"
+            onMouseDown={event => event.stopPropagation()}
+          >
+            <div className="bg-gradient-to-br from-indigo-50 via-white to-blue-50 px-6 pb-5 pt-6 sm:px-7">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-indigo-500 text-white shadow-lg shadow-indigo-500/20">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                      <polyline points="22,6 12,13 2,6"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-indigo-600">Your daily overview</p>
+                    <h2 id="daily-briefing-title" className="mt-1 text-xl font-bold tracking-tight text-slate-900">Daily Briefing</h2>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setInfoOpen(false)}
+                  aria-label="Close Daily Briefing information"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-white hover:text-slate-700"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M18 6 6 18M6 6l12 12"/>
+                  </svg>
+                </button>
+              </div>
+              <p className="mt-4 text-sm leading-6 text-slate-600">
+                Daily Briefing sends you a useful summary by email, making your daily hiring information easier to understand and review.
+              </p>
+            </div>
+
+            <div className="space-y-5 px-6 py-6 sm:px-7">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">How it works</h3>
+                <div className="mt-3 space-y-3">
+                  <div className="flex gap-3">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-xs font-bold text-indigo-600">1</span>
+                    <p className="pt-0.5 text-sm leading-5 text-slate-600">Get a simple summary of the hiring activity that matters most.</p>
+                  </div>
+                  <div className="flex gap-3">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-xs font-bold text-indigo-600">2</span>
+                    <p className="pt-0.5 text-sm leading-5 text-slate-600">Review it in your inbox whenever you are ready to plan your day.</p>
+                  </div>
+                  <div className="flex gap-3">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-xs font-bold text-indigo-600">3</span>
+                    <p className="pt-0.5 text-sm leading-5 text-slate-600">Choose manual delivery or automatic delivery based on your plan.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <p className="text-xs font-bold text-slate-800">Free &amp; Pro Plans</p>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">Send your briefing manually whenever you want to receive it.</p>
+                </div>
+                <div className="rounded-2xl border border-indigo-100 bg-indigo-50/70 px-4 py-3">
+                  <p className="text-xs font-bold text-indigo-900">Ultra Pro Plan</p>
+                  <p className="mt-1 text-xs leading-5 text-indigo-700">Eligible users can receive it automatically every day at 8:00 AM.</p>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3.5">
+                <p className="text-xs font-extrabold uppercase tracking-[0.12em] text-amber-800">Note</p>
+                <p className="mt-1.5 text-sm leading-5 text-amber-950">
+                  <strong>Free Plan &amp; Pro Plan:</strong> The Daily Briefing email must be sent manually by you. These plans do not receive the briefing automatically.
+                </p>
+                <p className="mt-2 text-sm leading-5 text-amber-950">
+                  <strong>Ultra Pro Plan:</strong> The Daily Briefing service works automatically, so eligible Ultra Pro users can receive the briefing without sending it manually.
+                </p>
+              </div>
+
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setInfoOpen(false)}
+                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
+                >
+                  Not now
+                </button>
+                <button
+                  type="button"
+                  onClick={sendNow}
+                  disabled={sending}
+                  className="rounded-xl bg-indigo-500 px-4 py-2.5 text-sm font-bold text-white shadow shadow-indigo-500/20 transition hover:bg-indigo-400 disabled:opacity-60"
+                >
+                  {sending ? "Sending…" : "Send today's briefing"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
