@@ -1,1 +1,0 @@
-- [Firebase auth validation](firebase-auth-validation.md) — separate Admin configuration failures from invalid or expired user tokens during diagnosis.
