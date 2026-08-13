@@ -1175,7 +1175,7 @@ function DailyBriefingCard() {
                   disabled={sending}
                   className="rounded-xl bg-indigo-500 px-4 py-2.5 text-sm font-bold text-white shadow shadow-indigo-500/20 transition hover:bg-indigo-400 disabled:opacity-60"
                 >
-                  {sending ? "Sending…" : "Send today's briefing"}
+                  {sending ? "Sending…" : "Send Daily Briefing"}
                 </button>
               </div>
             </div>
