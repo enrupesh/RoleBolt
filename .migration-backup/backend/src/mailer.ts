@@ -18,16 +18,16 @@ export async function sendEmail(opts: {
   text?: string;
   /** Override the default sender. Pass a full "Name <email>" string. */
   from?: string;
-}): Promise<{ ok: boolean; error?: string }> {
+}): Promise<{ ok: boolean; error?: string; retryable?: boolean }> {
   if (!opts.to?.trim()) {
     console.warn("[mailer] No recipient — skipping");
-    return { ok: false, error: "no_recipient" };
+    return { ok: false, error: "no_recipient", retryable: false };
   }
 
   const client = getClient();
   if (!client) {
     console.warn("[mailer] RESEND_API_KEY not set — skipped (to:", opts.to, ")");
-    return { ok: false, error: "smtp_not_configured" };
+    return { ok: false, error: "smtp_not_configured", retryable: false };
   }
 
   try {
@@ -41,7 +41,7 @@ export async function sendEmail(opts: {
 
     if (error) {
       console.error("[mailer] Resend error:", error.message);
-      return { ok: false, error: error.message };
+      return { ok: false, error: error.message, retryable: false };
     }
 
     console.log("[mailer] Sent:", opts.subject);
@@ -49,7 +49,10 @@ export async function sendEmail(opts: {
   } catch (err: any) {
     const msg = err?.message || String(err);
     console.error("[mailer] sendEmail failed:", msg);
-    return { ok: false, error: msg };
+    // A network/transport exception is ambiguous: the provider may have
+    // accepted the message before the connection failed. Callers should not
+    // automatically retry these, especially for metered plans.
+    return { ok: false, error: msg, retryable: true };
   }
 }
 

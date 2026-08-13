@@ -54,6 +54,7 @@ function defaultReleaseOnFailure(error: unknown): boolean {
   const code = (error as { code?: string })?.code;
   if (code === "PLAN_LIMIT_REACHED" || code === "FEATURE_NOT_AVAILABLE") return true;
   if (code === "IDEMPOTENCY_KEY_REUSED") return true;
+  if (code === "DAILY_BRIEFING_DELIVERY_REJECTED") return true;
   // Provider/network ambiguity: retain reservation per payment.md §5.2
   return false;
 }

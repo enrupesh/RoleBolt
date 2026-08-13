@@ -1032,9 +1032,15 @@ function DailyBriefingCard() {
     setSending(true);
     setStatus("idle");
     try {
+      const requestKey = typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? `daily_briefing_${crypto.randomUUID()}`
+        : `daily_briefing_${Date.now()}`;
       const res = await fetch(apiUrl("/recruit/briefing/send-now"), {
         method: "POST",
-        headers: { Authorization: `Bearer ${sessionToken}` },
+        headers: {
+          Authorization: `Bearer ${sessionToken}`,
+          "Idempotency-Key": requestKey,
+        },
       });
       const data = await readApiJson(res);
       if (!res.ok) throw new Error(data.error || "Failed to send briefing.");

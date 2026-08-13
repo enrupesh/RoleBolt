@@ -8,10 +8,11 @@ import { RecruitForm } from "../models/RecruitForm";
 import { RecruitFormResponse } from "../models/RecruitFormResponse";
 import { sendEmail } from "../mailer";
 import { NOTIFICATION_FROM } from "../emailConfig";
-import { callGeminiChain } from "../ai/geminiClient";
+import { callGemini } from "../ai/geminiClient";
 import { callMeshChatCompletions } from "../ai/meshClient";
 import { callNvidia } from "../ai/nvidiaClient";
 import * as emailTemplates from "../emailTemplates";
+import { getEntitlement } from "../billing/entitlements";
 import {
   tryBackgroundBillingOperation,
   backgroundIdempotencyKey,
@@ -22,30 +23,61 @@ const MESH_KEY = process.env.GEMINI_MESH_KEY ?? "";
 // ── AI fallback chain ─────────────────────────────────────────────────────────
 async function callAI(prompt: string): Promise<string> {
   try {
-    const r = await callGeminiChain({ prompt });
+    // A briefing is intentionally kept to one quick model attempt per
+    // provider. The full model chains are useful for large AI workflows, but
+    // they make a simple email wait through several sequential timeouts.
+    const r = await callGemini({
+      model: "gemini-2.5-flash-lite",
+      prompt,
+      maxOutputTokens: 500,
+      timeoutMs: 12_000,
+    });
     if (r) return r;
   } catch (e) { console.error("[briefing] Gemini failed:", e); }
   try {
-    const r = await callMeshChatCompletions({
-      apiKey: MESH_KEY,
-      messages: [{ role: "user", content: prompt }],
-    });
-    if (r) return r;
+    if (MESH_KEY) {
+      const r = await callMeshChatCompletions({
+        apiKey: MESH_KEY,
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 500,
+        timeoutMs: 12_000,
+        retries: 0,
+      });
+      if (r) return r;
+    }
   } catch (e) { console.error("[briefing] Mesh failed:", e); }
-  return await callNvidia({ messages: [{ role: "user", content: prompt }] });
+  return await callNvidia({
+    messages: [{ role: "user", content: prompt }],
+    max_tokens: 500,
+    timeoutMs: 12_000,
+    models: ["meta/llama-3.1-405b-instruct"],
+  });
 }
 
 // ── Generate + send briefing for one user ─────────────────────────────────────
-export async function generateBriefingForUser(userId: string): Promise<void> {
+export async function generateBriefingForUser(
+  userId: string,
+  options: { idempotencyKey?: string; automatic?: boolean } = {},
+): Promise<{ sent: boolean; reason?: string }> {
   await connectMongo();
   const user = await User.findById(userId).lean() as any;
-  if (!user || !user.isVerified || !user.email) return;
+  if (!user || !user.isVerified || !user.email) {
+    return { sent: false, reason: "recipient_unavailable" };
+  }
+  if (options.automatic) {
+    const entitlement = await getEntitlement(userId, "creator_standard");
+    if (entitlement.plan !== "ultra") {
+      return { sent: false, reason: "automatic_delivery_not_available" };
+    }
+  }
 
   const [jobs, forms] = await Promise.all([
     RecruitJob.find({ uid: userId, status: "active" }).lean() as Promise<any[]>,
     RecruitForm.find({ uid: userId, status: "active" }).lean() as Promise<any[]>,
   ]);
-  if (jobs.length === 0 && forms.length === 0) return;
+  if (jobs.length === 0 && forms.length === 0) {
+    return { sent: false, reason: "no_active_roles" };
+  }
 
   const jobIds = jobs.map((j: any) => j._id);
   const formIds = forms.map((f: any) => f._id);
@@ -75,37 +107,37 @@ export async function generateBriefingForUser(userId: string): Promise<void> {
   const pendingReview = pendingJobReview + pendingFormReview;
   const inInterview = inJobInterview + inFormInterview;
 
-  // Stale jobs: active but < 3 applications in last 14 days
-  const staleJobs: string[] = [];
-  for (const job of jobs) {
-    const recentApps = await RecruitCandidate.countDocuments({
-      jobId: job._id,
-      createdAt: { $gte: twoWeeksAgo },
-    });
-    if (recentApps < 3) staleJobs.push(job.title);
-  }
-
-  // Stale forms: active but < 3 submissions in last 14 days
-  const staleForms: string[] = [];
-  for (const form of forms) {
-    const recentSubs = await RecruitFormResponse.countDocuments({
-      formId: form._id,
-      createdAt: { $gte: twoWeeksAgo },
-    });
-    if (recentSubs < 3) staleForms.push((form as any).title);
-  }
-
-  // Top Form candidates (highest scoring, not yet shortlisted or higher)
-  const topFormCandidates = await RecruitFormResponse.find({
-    formId: { $in: formIds },
-    scoringFailed: { $ne: true },
-    aiScore: { $gte: 70 },
-    stage: { $in: ["new", "scored", "review_zone"] },
-  })
-    .sort({ aiScore: -1 })
-    .limit(3)
-    .select("submittedName aiScore formId")
-    .lean() as any[];
+  const [staleJobResults, staleFormResults, topFormCandidates] = await Promise.all([
+    // Stale jobs: active but < 3 applications in last 14 days
+    Promise.all(jobs.map(async (job: any) => {
+      const recentApps = await RecruitCandidate.countDocuments({
+        jobId: job._id,
+        createdAt: { $gte: twoWeeksAgo },
+      });
+      return recentApps < 3 ? job.title : null;
+    })),
+    // Stale forms: active but < 3 submissions in last 14 days
+    Promise.all(forms.map(async (form: any) => {
+      const recentSubs = await RecruitFormResponse.countDocuments({
+        formId: form._id,
+        createdAt: { $gte: twoWeeksAgo },
+      });
+      return recentSubs < 3 ? form.title : null;
+    })),
+    // Top Form candidates (highest scoring, not yet shortlisted or higher)
+    RecruitFormResponse.find({
+      formId: { $in: formIds },
+      scoringFailed: { $ne: true },
+      aiScore: { $gte: 70 },
+      stage: { $in: ["new", "scored", "review_zone"] },
+    })
+      .sort({ aiScore: -1 })
+      .limit(3)
+      .select("submittedName aiScore formId")
+      .lean(),
+  ]);
+  const staleJobs = staleJobResults.filter((title): title is string => Boolean(title));
+  const staleForms = staleFormResults.filter((title): title is string => Boolean(title));
 
   const name = user.name || user.email.split("@")[0];
 
@@ -145,7 +177,8 @@ Rules: Under 220 words total. Conversational tone, not robotic. No bullet points
     ownerUid: userId,
     category: "creator_standard",
     operation: "daily_briefing",
-    idempotencyKey: backgroundIdempotencyKey(userId, ["daily-briefing", utcDay]),
+    idempotencyKey: options.idempotencyKey
+      ?? backgroundIdempotencyKey(userId, ["daily-briefing", utcDay]),
     resourceType: "user",
     resourceId: userId,
     work: async () => {
@@ -160,22 +193,34 @@ Rules: Under 220 words total. Conversational tone, not robotic. No bullet points
         newApps, pendingReview, inInterview, activeJobs: jobs.length, staleJobs,
       });
 
-      await sendEmail({
+      const delivery = await sendEmail({
         to: user.email,
         subject: `☀️ Your Daily Hiring Briefing — ${new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}`,
         html,
         text: briefingText,
         from: NOTIFICATION_FROM,
       });
+      if (!delivery.ok) {
+        const deliveryError = new Error(
+          delivery.retryable
+            ? "Email delivery could not be confirmed."
+            : "The email provider rejected the briefing.",
+        ) as Error & { code?: string };
+        deliveryError.code = delivery.retryable
+          ? "DAILY_BRIEFING_DELIVERY_UNKNOWN"
+          : "DAILY_BRIEFING_DELIVERY_REJECTED";
+        throw deliveryError;
+      }
     },
   });
 
   if (!outcome.ok) {
     console.log(`[briefing] Skipped for ${user.email} — billing blocked: ${outcome.reason}`);
-    return;
+    return { sent: false, reason: outcome.reason };
   }
 
   console.log(`[briefing] Sent to ${user.email}`);
+  return { sent: true };
 }
 
 // ── Send job alerts to subscribers ───────────────────────────────────────────
@@ -248,7 +293,7 @@ export function startDailyBriefingJob(): void {
       let sent = 0;
       for (const user of users) {
         try {
-          await generateBriefingForUser(user._id.toString());
+          await generateBriefingForUser(user._id.toString(), { automatic: true });
           sent++;
         } catch (e) {
           console.error("[briefing] Failed for user:", user.email, e);

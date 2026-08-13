@@ -3286,15 +3286,37 @@ recruitRouter.post("/briefing/send-now", async (req, res) => {
     await connectMongo();
     const uid = getUid(req);
     const { generateBriefingForUser } = await import("./jobs/dailyBriefing.js");
-    await runStandardBillingOperation({
-      ownerUid: uid,
-      operation: "daily_briefing",
-      idempotencyKey: standardIdempotencyKey(uid, ["daily-briefing", new Date().toISOString().slice(0, 13)]),
-      work: async () => generateBriefingForUser(uid),
+    // generateBriefingForUser owns the single metered reservation. Wrapping it
+    // here as well used to reserve the Free Plan quota twice and could make the
+    // inner send get blocked before it ever reached the email provider.
+    const requestKey = standardIdempotencyHeader(req);
+    const result = await generateBriefingForUser(uid, {
+      idempotencyKey: standardRequestIdempotencyKey(uid, "daily-briefing", requestKey),
     });
+    if (!result.sent) {
+      if (result.reason === "no_active_roles") {
+        return res.status(400).json({ error: "Add an active job or form before sending a briefing." });
+      }
+      if (result.reason === "recipient_unavailable") {
+        return res.status(400).json({ error: "Your verified email address is not available yet." });
+      }
+      return res.status(409).json({
+        error: "Daily Briefing is not available right now. Your plan was not charged for this attempt.",
+      });
+    }
     return res.json({ ok: true, message: "Briefing sent to your email." });
   } catch (e: any) {
     if (await respondStandardBillingError(res, e, getUid(req))) return;
+    if (e?.code === "DAILY_BRIEFING_DELIVERY_REJECTED") {
+      return res.status(503).json({
+        error: "The email service could not accept your briefing. Please try again shortly. This attempt was not charged.",
+      });
+    }
+    if (e?.code === "DAILY_BRIEFING_DELIVERY_UNKNOWN") {
+      return res.status(503).json({
+        error: "We could not confirm delivery yet. Please check your inbox before trying again so you are not charged twice.",
+      });
+    }
     console.error("[briefing] manual trigger failed:", e);
     return res.status(500).json({ error: e.message || "Failed to send briefing." });
   }
