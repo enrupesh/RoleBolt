@@ -16,4 +16,16 @@ export const PARTNER_REVIEWS = [
     visible: true,
     isGuest: false,
   },
+  {
+    uid: "partner:sendora.me",
+    rating: 5,
+    title: "Private hiring with AI screening — finally under our control",
+    message:
+      "As the founder of Sendora.me, finding the right talent quickly while keeping our hiring process secure was always a priority. Rolebolt made this incredibly easy. We loved being able to post jobs privately and connect with a curated pool of private candidates — giving us full control over visibility and outreach. On top of that, Rolebolt’s AI-powered candidate screening and smart matching helped us shortlist the right people in a fraction of the time we used to spend manually. The intuitive dashboard made tracking applicants effortless, and the entire process felt faster, smarter, and far more secure. Rolebolt has genuinely become an essential part of how we hire at Sendora.me.",
+    displayName: "Founder, Sendora.me",
+    role: "creator" as const,
+    featured: true,
+    visible: true,
+    isGuest: false,
+  },
 ] as const;
