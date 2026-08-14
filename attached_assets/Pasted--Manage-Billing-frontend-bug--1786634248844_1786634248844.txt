@@ -1,0 +1,41 @@
+अभी मुझे **Manage Billing** सेक्शन में एक संभावित frontend bug दिखाई दे रहा है। मुझे पूरा यकीन नहीं है कि यह frontend की समस्या है या backend की, इसलिए पहले इसे ध्यान से समझकर verify करना है। बिना जाँच के कोई बदलाव नहीं करना है।
+
+### समस्या क्या है?
+
+जब कोई user **Manage Billing** में जाता है, चाहे वह **Free Plan** पर हो या **Paid Plan** पर, वहाँ billing/revenue tracking में एक fixed date दिखाई दे रही है, जैसे:
+
+**“Revenue — 1 September”**
+
+समस्या यह है कि यह date हर user के लिए एक जैसी दिखाई देती है, जबकि user ने अपना account अलग-अलग तारीखों पर बनाया हो सकता है या अलग-अलग समय पर अपना plan लिया हो।
+
+खासकर **Free Plan users** के मामले में ऐसा दिखाई दे रहा है कि account कब बनाया गया था, उससे संबंधित वास्तविक information दिखने के बजाय हमेशा **1 September** जैसी fixed date दिखाई देती है।
+
+### दूसरी समस्या — Free Plan का Job Limit
+
+Free Plan user को एक job create करने की अनुमति है।
+
+अगर Free Plan user एक job successfully create कर चुका है, तो **Manage Billing** या संबंधित usage/billing tracking section में यह स्पष्ट रूप से दिखाई देना चाहिए कि:
+
+* User ने कितनी jobs create की हैं।
+* उसकी current job usage क्या है।
+* उसकी plan limit क्या है।
+* कितनी jobs अभी बाकी हैं।
+
+लेकिन अभी ऐसा लगता है कि पहली job create करने के बाद Manage Billing में उसकी usage properly reflect नहीं होती।
+
+फिर जब वही user दूसरी job create करने की कोशिश करता है, तब system अचानक बताता है कि अब उसे upgrade करना होगा।
+
+इससे user को बीच में यह स्पष्ट नहीं होता कि उसकी पहली job already count हो चुकी है और Free Plan की limit पूरी हो गई है।
+
+### मुझे क्या चाहिए?
+
+पहले इस पूरे flow को **जाँचकर समझें और confirm करें कि actual issue क्या है**:
+
+1. Account creation date और billing/revenue date कैसे निर्धारित हो रही है?
+2. **“Revenue — 1 September”** सभी users को क्यों दिखाई दे रहा है?
+3. क्या यह वास्तव में कोई bug है, या monthly billing cycle की वजह से यह date intentionally दिखाई जा रही है?
+4. Free Plan में job creation की usage/limit Manage Billing में properly track और display हो रही है या नहीं?
+5. अगर user ने एक job create कर ली है, तो क्या उसका usage frontend में तुरंत और accurately reflect होना चाहिए?
+6. दूसरी job पर upgrade message आने से पहले user को अपनी current usage और remaining limit स्पष्ट रूप से दिखाई दे रही है या नहीं?
+
+**महत्वपूर्ण:** पहले केवल समस्या को समझकर verify करें। अभी कोई unnecessary frontend या backend बदलाव न करें। पहले मुझे बताएं कि आपको actual problem क्या दिखाई दे रही है और वह frontend issue है, backend issue है, या expected billing-cycle behavior है। उसके बाद ही बदलाव करें।
