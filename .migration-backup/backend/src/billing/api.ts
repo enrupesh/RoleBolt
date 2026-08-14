@@ -4,6 +4,10 @@ import { UsagePeriod } from "../models/UsagePeriod";
 import { getPublicPlanCatalog } from "./planCatalog";
 import { getEntitlement } from "./entitlements";
 import { getPeriodWindow } from "./periods";
+import {
+  countOwnedResources,
+  supportedResourceCounters,
+} from "./resourceCounters";
 import { isBillingCategory, type BillingCategory } from "../billingTypes";
 
 export const billingCatalogRouter = express.Router();
@@ -63,13 +67,37 @@ billingFoundationRouter.get("/entitlements", async (req, res) => {
           category,
           periodKey: period.periodKey,
         }).lean();
-        const usedCounters = mapCounters(usage?.usedCounters);
+        const resourceCounterEntries = await Promise.all(
+          supportedResourceCounters(category).map(
+            async (counter) =>
+              [
+                counter,
+                await countOwnedResources(uid, category, counter),
+              ] as const,
+          ),
+        );
+        // Resource limits are absolute owner-scoped capacities, not period
+        // usage. Keep metered counters from UsagePeriod, but always replace
+        // resource counters with the current database count so the billing
+        // tracker matches the same source used by enforcement.
+        const usedCounters = {
+          ...mapCounters(usage?.usedCounters),
+          ...Object.fromEntries(resourceCounterEntries),
+        };
         const reservedCounters = mapCounters(usage?.reservedCounters);
         const remaining: Record<string, number | null> = {};
-        for (const [counter, limit] of Object.entries(entitlement.definition.limits)) {
-          remaining[counter] = typeof limit === "number"
-            ? Math.max(0, limit - (usedCounters[counter] ?? 0) - (reservedCounters[counter] ?? 0))
-            : null;
+        for (const [counter, limit] of Object.entries(
+          entitlement.definition.limits,
+        )) {
+          remaining[counter] =
+            typeof limit === "number"
+              ? Math.max(
+                  0,
+                  limit -
+                    (usedCounters[counter] ?? 0) -
+                    (reservedCounters[counter] ?? 0),
+                )
+              : null;
         }
         return {
           category,

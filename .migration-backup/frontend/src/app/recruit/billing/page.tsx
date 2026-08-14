@@ -152,6 +152,14 @@ function BillingContent() {
     }
   }, [authLoading, sessionToken, router, category]);
 
+  // The billing provider lives above route pages, so navigating here after
+  // creating a job/form/application can otherwise reuse stale entitlements.
+  // Refresh on every billing-page visit so resource counters are current.
+  useEffect(() => {
+    if (authLoading || !sessionToken) return;
+    void refresh();
+  }, [authLoading, sessionToken, refresh]);
+
   useEffect(() => {
     if (checkoutPending) {
       setActionNotice(
