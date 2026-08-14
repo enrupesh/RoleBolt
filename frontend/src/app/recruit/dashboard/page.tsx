@@ -1084,7 +1084,7 @@ function DailyBriefingCard() {
 
       {infoOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm"
+          className="rb-daily-briefing-backdrop fixed inset-0 z-50 flex items-end justify-center bg-slate-950/45 p-0 backdrop-blur-sm sm:p-4"
           role="presentation"
           onMouseDown={event => {
             if (event.target === event.currentTarget) setInfoOpen(false);
@@ -1094,7 +1094,7 @@ function DailyBriefingCard() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="daily-briefing-title"
-            className="w-full max-w-lg overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.22)]"
+            className="rb-daily-briefing-sheet w-full max-w-lg overflow-y-auto rounded-t-3xl border border-slate-200 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.22)] sm:rounded-3xl"
             onMouseDown={event => event.stopPropagation()}
           >
             <div className="bg-gradient-to-br from-indigo-50 via-white to-blue-50 px-6 pb-5 pt-6 sm:px-7">
